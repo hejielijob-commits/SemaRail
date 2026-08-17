@@ -1,0 +1,9 @@
+# Out-of-tree Wren Data Agent Bundle layer.
+# Each row is independently patchable by a later profile or home overlay.
+
+- insert:
+    - id: wren-data-agent-host
+      name: '@hejielijob/dsh-wren-data-agent-host'
+
+    - id: wren-data-agent-client
+      name: '@hejielijob/dsh-wren-data-agent-client'

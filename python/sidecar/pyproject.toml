@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dsh-wren-data-agent-sidecar"
+version = "0.1.0"
+description = "Framed JSON-RPC sidecar boundary for the Wren data agent"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+wren = ["wrenai==0.13.2"]
+
+[project.scripts]
+dsh-wren-sidecar = "sidecar.main:main"
+
+[tool.setuptools]
+packages = ["sidecar"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
