@@ -114,7 +114,10 @@ function extractDataQueryMetas(entries) {
   for (const entry of entries) {
     const event = entry?.event
     if (event?.type !== 'tool/result') continue
-    const meta = event?.data?.message?.meta
+    // rc.7 stores presentation metadata beside the tool message in the
+    // durable tool/result payload. Keep the nested form as a compatibility
+    // fallback for older fixtures, but prefer the public durable shape.
+    const meta = event?.data?.meta ?? event?.data?.message?.meta
     if (!meta || typeof meta !== 'object' || Array.isArray(meta)) continue
     if (meta.schemaVersion !== 1 || typeof meta.queryId !== 'string') continue
     if (typeof meta.status !== 'string' || !Array.isArray(meta.columns) || !Array.isArray(meta.previewRows)) continue

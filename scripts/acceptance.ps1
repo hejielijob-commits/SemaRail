@@ -9,6 +9,7 @@ param(
   [ValidateRange(5, 300)]
   [int] $StartupTimeoutSeconds = 60,
   [switch] $SkipBuild,
+  [switch] $PauseAfterServerReady,
   [switch] $KeepTemp
 )
 
@@ -428,6 +429,15 @@ try {
   if ($null -eq $indexResponse -or [int] $indexResponse.StatusCode -ne 200) {
     throw "Harness web profile did not become ready within $StartupTimeoutSeconds seconds on $baseUri"
   }
+
+  if ($PauseAfterServerReady) {
+    Write-Host 'ACCEPTANCE_PAUSED_FOR_REPLAY'
+    Write-Host "ACCEPTANCE_REPLAY_DSH_HOME=$env:DSH_HOME"
+    Write-Host "ACCEPTANCE_REPLAY_BASE_URL=$baseUri"
+    Write-Host 'Press Enter after replay seeding/browser checks are complete.'
+    [void] [Console]::ReadLine()
+  }
+
   $indexBody = [string] $indexResponse.Content
   Assert-Contains -Text $indexBody -Needle $clientName -EvidenceLabel 'web index boot manifest'
   Write-Host "[acceptance] web index returned HTTP 200 and advertises Client plugin"
