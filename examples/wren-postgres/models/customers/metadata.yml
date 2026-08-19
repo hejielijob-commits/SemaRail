@@ -1,0 +1,22 @@
+name: customers
+table_reference:
+  schema: public
+  table: customers
+primary_key: id
+columns:
+  - name: id
+    type: INTEGER
+    is_primary_key: true
+    not_null: true
+  - name: display_name
+    type: VARCHAR
+    not_null: true
+  - name: region_id
+    type: INTEGER
+    not_null: true
+  - name: segment
+    type: VARCHAR
+    not_null: true
+  - name: region
+    type: regions
+    relationship: customers_region

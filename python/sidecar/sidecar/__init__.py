@@ -6,6 +6,7 @@ from .dispatch import (
     Dispatcher,
     ProjectValidator,
     QueryPlanner,
+    QueryService,
     RpcDispatcher,
     RpcRequest,
     SidecarDependencies,
@@ -24,6 +25,21 @@ from .protocol import (
     write_frame,
 )
 from .server import JsonRpcServer, serve
+from .query import (
+    MAX_QUERY_CONCURRENCY,
+    MAX_PREVIEW_BYTES,
+    MAX_PREVIEW_ROWS,
+    MAX_QUERY_ROWS,
+    MAX_TIMEOUT_MS,
+    PostgresQueryExecutor,
+    QueryLimits,
+    SqlPolicyError,
+    WrenQueryService,
+    validate_native_sql,
+    validate_read_only_sql,
+    validate_semantic_sql,
+)
+from .sql_policy import DANGEROUS_FUNCTIONS, PhysicalAllowlist, PhysicalTable
 from .wren_adapter import (
     WREN_PACKAGE_NAME,
     WREN_SUPPORTED_VERSION,
@@ -42,6 +58,7 @@ __all__ = [
     "RPC_METHODS",
     "ProjectValidator",
     "QueryPlanner",
+    "QueryService",
     "ProtocolError",
     "RpcDispatcher",
     "RpcError",
@@ -60,4 +77,19 @@ __all__ = [
     "LazyWrenAdapter",
     "WrenAdapter",
     "default_dependencies",
+    "MAX_PREVIEW_BYTES",
+    "MAX_PREVIEW_ROWS",
+    "MAX_QUERY_ROWS",
+    "MAX_QUERY_CONCURRENCY",
+    "MAX_TIMEOUT_MS",
+    "PostgresQueryExecutor",
+    "QueryLimits",
+    "SqlPolicyError",
+    "WrenQueryService",
+    "validate_read_only_sql",
+    "validate_native_sql",
+    "validate_semantic_sql",
+    "DANGEROUS_FUNCTIONS",
+    "PhysicalAllowlist",
+    "PhysicalTable",
 ]

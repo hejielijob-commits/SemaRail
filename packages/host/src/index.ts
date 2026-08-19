@@ -14,43 +14,59 @@ import {
   MAX_QUERY_ROWS,
   parseDataQueryInput,
   parseDataQueryPresentation,
+  parseSemanticContext,
+  parseSemanticContextInput,
   SCHEMA_VERSION,
 } from '@hejielijob/dsh-wren-data-agent-contract'
 import type {
   DataAgentErrorCode,
   DataQueryInput,
   DataQueryPresentation,
+  SemanticContext,
 } from '@hejielijob/dsh-wren-data-agent-contract'
 import type { ToolDefinition, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-system-prompt'
+import {
+  createSidecarQueryGateway,
+  createSubprocessSidecarSpawn,
+  type SidecarGatewayConfig,
+} from './sidecar.js'
+import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
+import {
+  QueryGatewayError,
+  SemanticContextGatewayError,
+  type QueryGateway,
+  type SemanticContextGateway,
+} from './types.js'
+
+export type { QueryGateway, SemanticContextGateway } from './types.js'
+export { QueryGatewayError, SemanticContextGatewayError } from './types.js'
+export {
+  createSidecarQueryGateway,
+  createSubprocessSidecarSpawn,
+  SidecarQueryGateway,
+  SidecarRpcClient,
+  SidecarRpcError,
+  SidecarProcessError,
+} from './sidecar.js'
+export type {
+  SidecarChildProcess,
+  SidecarGatewayConfig,
+  SidecarRequestOptions,
+  SidecarSpawn,
+} from './sidecar.js'
+export { DEFAULT_MAX_FRAME_BYTES, SidecarFrameDecoder, SidecarFrameError, encodeSidecarFrame } from './framing.js'
 
 export const TOOL_NAME = 'data_query' as const
+/** Stable wire name of the semantic-context Tool. */
+export const CONTEXT_TOOL_NAME = 'wren_semantic_context' as const
+/** Stable SystemPrompt section name for the Wren data-agent operating rules. */
+export const SYSTEM_PROMPT_SECTION_NAME = 'wren:data-agent' as const
 export { MAX_PREVIEW_BYTES, MAX_PREVIEW_ROWS, MAX_QUERY_ROWS, SCHEMA_VERSION }
 
 /** Stable bounds shared with the version-one contract. */
 export const MAX_QUERY_TEXT_LENGTH = 64_000 as const
-
-/** Gateway boundary used by the registered Tool. */
-export interface QueryGateway {
-  /** Execute one already-validated query and observe Host cancellation. */
-  query(input: DataQueryInput, signal: AbortSignal): Promise<DataQueryPresentation>
-}
-
-/** A stable failure raised by an unavailable or rejected gateway. */
-export class QueryGatewayError extends Error {
-  readonly code: DataAgentErrorCode
-  readonly retryable: boolean
-
-  constructor(
-    code: DataAgentErrorCode = 'WREN_UNAVAILABLE',
-    retryable = true,
-  ) {
-    super('Wren query gateway is unavailable.')
-    this.name = 'QueryGatewayError'
-    this.code = code
-    this.retryable = retryable
-  }
-}
 
 /** Default gateway: it never fabricates a successful query result. */
 export const unavailableQueryGateway: QueryGateway = {
@@ -141,6 +157,45 @@ function renderResult(value: unknown): Array<{ type: 'text'; text: string }> {
   return [{ type: 'text', text: `Wren query returned ${result.stats.returnedRows} row(s).` }]
 }
 
+type SemanticContextToolError = {
+  readonly schemaVersion: typeof SCHEMA_VERSION
+  readonly status: 'error'
+  readonly error: {
+    readonly code: DataAgentErrorCode
+    readonly message: string
+    readonly retryable: boolean
+  }
+}
+
+type SemanticContextToolResult = SemanticContext | SemanticContextToolError
+
+function contextFailure(error: unknown, signal: AbortSignal): SemanticContextToolError {
+  const code: DataAgentErrorCode = signal.aborted
+    ? 'CANCELLED'
+    : error instanceof SemanticContextGatewayError ? error.code : 'INTERNAL_ERROR'
+  const retryable = error instanceof SemanticContextGatewayError
+    ? error.retryable
+    : false
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    status: 'error',
+    error: { code, message: safeErrorMessage(code), retryable },
+  }
+}
+
+function normalizeContextResult(value: SemanticContext): SemanticContext {
+  return parseSemanticContext(value)
+}
+
+function renderContextResult(value: unknown): Array<{ type: 'text'; text: string }> {
+  if (typeof value === 'object' && value !== null && 'status' in value && value.status === 'error') {
+    const failure = value as SemanticContextToolError
+    return [{ type: 'text', text: `Wren semantic context failed (${failure.error.code}).` }]
+  }
+  const context = parseSemanticContext(value)
+  return [{ type: 'text', text: `Wren semantic context resolved ${context.models.length} model(s).` }]
+}
+
 /** Build a registry-ready `data_query` definition around an injected gateway. */
 export function createDataQueryTool(gateway: QueryGateway): ToolDefinition {
   return defineTool({
@@ -187,16 +242,109 @@ export function installDataQueryTool(ctx: Context, gateway: QueryGateway): () =>
   return ctx.tools.register(createDataQueryTool(gateway))
 }
 
+/** Build the registry-ready `wren_semantic_context` definition. */
+export function createSemanticContextTool(gateway: SemanticContextGateway): ToolDefinition {
+  return defineTool({
+    name: CONTEXT_TOOL_NAME,
+    description: 'Resolve the Wren semantic context before generating semantic SQL.',
+    parameters: {
+      question: {
+        type: 'string',
+        required: true,
+        description: 'The natural-language question whose semantic context is needed.',
+      },
+    },
+    output: {
+      schema: { type: 'json' },
+      render: (_args, value) => renderContextResult(value),
+      presentationMeta: (_args, value) => value as JsonValue,
+    },
+    async execute(args, exec: ToolRunContext): Promise<JsonValue> {
+      const input = parseSemanticContextInput(args)
+      try {
+        const result = await gateway.context(input, exec.signal)
+        return normalizeContextResult(result) as unknown as JsonValue
+      } catch (error: unknown) {
+        return contextFailure(error, exec.signal) as unknown as JsonValue
+      }
+    },
+  })
+}
+
+/** Install one gateway-backed semantic-context Tool into a Harness context. */
+export function installSemanticContextTool(ctx: Context, gateway: SemanticContextGateway): () => void {
+  return ctx.tools.register(createSemanticContextTool(gateway))
+}
+
 /** Loader entry name used by the Bundle patch. */
 export const name = 'wren-data-agent-host'
 
-/** Wait for the public Harness Tool registry before installing the Tool. */
-export const inject = ['tools'] as const
+/** Wait for the public Harness registries used by this Host plugin. */
+export const inject = ['tools', 'subprocess', 'systemPrompt'] as const
 
 /**
- * Default Cordis plugin entry. It is deliberately unavailable until a real
- * QueryGateway adapter replaces this registration boundary.
+ * Model-facing rules for the semantic query loop. This is deliberately
+ * credential-free and does not reveal the sidecar project path or DSN name.
  */
-export function apply(ctx: Context): void {
-  installDataQueryTool(ctx, unavailableQueryGateway)
+export const SYSTEM_PROMPT_GUIDANCE = [
+  'For data questions, first call `wren_semantic_context` with the exact user question.',
+  'Treat the successful semantic-context response as the authoritative allowlist: use only its returned models, tables, columns, relationships, and semantic roles.',
+  'Do not guess or invent fields, entities, joins, filters, or metric definitions that are absent from the returned context.',
+  'Only after context succeeds, generate semanticSql and call `data_query`; treat generated SQL as untrusted and keep it read-only.',
+  'If a recoverable semantic/query validation failure occurs, make at most one repair attempt using only the same returned entities.',
+  'Never retry `POLICY_DENIED`, `TIMEOUT`, or `CANCELLED`; report the bounded failure instead of guessing or bypassing policy.',
+  'If Wren is unavailable or context cannot be resolved, explain that data is unavailable and do not fabricate an answer.',
+].join('\n')
+
+function configuredProjectDir(config: SidecarGatewayConfig | undefined): string | undefined {
+  const value = config?.projectDir
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined
+}
+
+/**
+ * Default Cordis plugin entry. A configured plugin starts the supervised
+ * sidecar in the order health → project.validate and then serves both tools.
+ * Without a project directory the tools remain registered but fail closed.
+ */
+export function apply(ctx: Context, config?: SidecarGatewayConfig): void {
+  const runtime = (ctx as Context & { subprocess?: SubprocessRuntime }).subprocess
+  const spawn = config?.spawn
+    ?? (runtime === undefined ? undefined : createSubprocessSidecarSpawn(runtime, config))
+  const projectDir = configuredProjectDir(config)
+  let gateway: ReturnType<typeof createSidecarQueryGateway> | undefined
+  if (config !== undefined && projectDir !== undefined && spawn !== undefined) {
+    try {
+      gateway = createSidecarQueryGateway({ ...config, projectDir }, spawn)
+    } catch {
+      // Invalid deployment configuration is an unavailable data boundary,
+      // never a reason to expose a startup exception or a credential-bearing
+      // diagnostic through Harness.
+      gateway = undefined
+    }
+  }
+  const queryGateway = gateway ?? unavailableQueryGateway
+  const contextGateway: SemanticContextGateway = gateway ?? unavailableSemanticContextGateway
+  installDataQueryTool(ctx, queryGateway)
+  installSemanticContextTool(ctx, contextGateway)
+  ctx.effect(
+    () => ctx.systemPrompt.section({
+      name: SYSTEM_PROMPT_SECTION_NAME,
+      order: 125,
+      text: SYSTEM_PROMPT_GUIDANCE,
+    }),
+    'wren-data-agent-host.system-prompt',
+  )
+  if (gateway !== undefined) {
+    ctx.effect(() => () => gateway.dispose(), 'wren-data-agent-host.sidecar()')
+    // Cordis apply hooks are synchronous. Startup is deterministic and lazy
+    // requests await the same health → project.validate promise.
+    void gateway.start().catch(() => undefined)
+  }
+}
+
+/** Default context gateway: it never fabricates semantic entities. */
+export const unavailableSemanticContextGateway: SemanticContextGateway = {
+  async context(): Promise<SemanticContext> {
+    throw new SemanticContextGatewayError()
+  },
 }

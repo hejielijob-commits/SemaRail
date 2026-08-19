@@ -11,7 +11,11 @@
     "build": "pnpm -r --if-present build",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",
-    "lint": "pnpm -r --if-present lint"
+    "lint": "pnpm -r --if-present lint",
+    "acceptance": "pwsh -NoLogo -NoProfile -File scripts/acceptance.ps1",
+    "acceptance:postgres": "pwsh -NoLogo -NoProfile -File scripts/acceptance-postgres.ps1",
+    "acceptance:replay": "node scripts/acceptance-replay.mjs",
+    "evaluate:golden": "pwsh -NoLogo -NoProfile -File scripts/evaluate-golden.ps1",
+    "probe:sidecar": "node scripts/probe-sidecar.mjs"
   }
 }
-

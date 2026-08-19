@@ -2,6 +2,7 @@ node_modules/
 lib/
 dist/
 .build/
+.acceptance/
 coverage/
 .DS_Store
 *.log
@@ -9,6 +10,9 @@ coverage/
 .env.*
 !.env.example
 .venv/
+.wren/
+target/
 __pycache__/
 .pytest_cache/
 *.py[cod]
+packages/host/python/

@@ -1,0 +1,24 @@
+name: orders
+table_reference:
+  schema: public
+  table: orders
+primary_key: id
+columns:
+  - name: id
+    type: INTEGER
+    is_primary_key: true
+    not_null: true
+  - name: customer_id
+    type: INTEGER
+    not_null: true
+  - name: ordered_at
+    type: TIMESTAMP
+    not_null: true
+    properties:
+      description: Order creation timestamp in UTC.
+  - name: status
+    type: VARCHAR
+    not_null: true
+  - name: customer
+    type: customers
+    relationship: orders_customer

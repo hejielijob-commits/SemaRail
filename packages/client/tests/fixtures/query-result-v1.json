@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "queryId": "replay-q-001",
+  "status": "success",
+  "semanticSql": "select day, region, revenue from orders",
+  "nativeSql": "SELECT day, region, revenue FROM orders ORDER BY day",
+  "columns": [
+    { "name": "day", "type": "DATE", "semanticRole": "dimension" },
+    { "name": "region", "type": "VARCHAR", "semanticRole": "dimension" },
+    { "name": "revenue", "type": "DECIMAL", "semanticRole": "measure" }
+  ],
+  "previewRows": [
+    { "day": "2026-08-16", "region": "east", "revenue": "12.50" },
+    { "day": "2026-08-17", "region": "west", "revenue": "18.75" },
+    { "day": "2026-08-18", "region": "east", "revenue": "21.00" }
+  ],
+  "chart": {
+    "version": 1,
+    "type": "line",
+    "title": "Revenue by day",
+    "x": "day",
+    "y": ["revenue"],
+    "tooltip": true
+  },
+  "stats": { "returnedRows": 3, "durationMs": 42.5, "truncated": false }
+}

@@ -15,6 +15,7 @@ from .errors import (
     INVALID_PARAMS,
     INVALID_REQUEST,
     METHOD_NOT_FOUND,
+    POLICY_DENIED,
     PROJECT_VALIDATION_FAILED,
     SEMANTIC_ERROR,
     RpcError,
@@ -23,6 +24,7 @@ from .errors import (
     WREN_UNAVAILABLE,
 )
 from .protocol import PROTOCOL_VERSION
+from .sql_policy import SqlPolicyError, validate_semantic_sql
 
 
 RPC_METHODS = frozenset(
@@ -61,9 +63,20 @@ class QueryPlanner(Protocol):
         """Transform semantic SQL without executing it."""
 
 
+class QueryService(Protocol):
+    """Wren query execution/cancellation dependency."""
+
+    def run(self, params: Mapping[str, Any]) -> Any:
+        """Plan and execute one bounded query."""
+
+    def cancel(self, params: Mapping[str, Any]) -> Any:
+        """Cancel one query by its query id."""
+
+
 ProjectValidatorCallable = Callable[[Mapping[str, Any]], Any]
 ContextProviderCallable = Callable[[Mapping[str, Any]], Any]
 QueryPlannerCallable = Callable[[Mapping[str, Any]], Any]
+QueryServiceCallable = Callable[[Mapping[str, Any]], Any]
 HealthProvider = Callable[[], Any]
 
 
@@ -79,6 +92,8 @@ class SidecarDependencies:
     project_validator: ProjectValidator | ProjectValidatorCallable | None = None
     context_provider: ContextProvider | ContextProviderCallable | None = None
     query_planner: QueryPlanner | QueryPlannerCallable | None = None
+    query_service: QueryService | None = None
+    query_runner: QueryService | QueryServiceCallable | None = None
     health_provider: HealthProvider | None = None
 
 
@@ -217,6 +232,8 @@ class Dispatcher:
         project_validator: ProjectValidator | ProjectValidatorCallable | None = None,
         context_provider: ContextProvider | ContextProviderCallable | None = None,
         query_planner: QueryPlanner | QueryPlannerCallable | None = None,
+        query_service: QueryService | None = None,
+        query_runner: QueryService | QueryServiceCallable | None = None,
         health_provider: HealthProvider | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
@@ -224,6 +241,8 @@ class Dispatcher:
             project_validator is not None
             or context_provider is not None
             or query_planner is not None
+            or query_service is not None
+            or query_runner is not None
             or health_provider is not None
         ):
             raise ValueError("pass dependencies or keyword dependencies, not both")
@@ -231,6 +250,8 @@ class Dispatcher:
             project_validator=project_validator,
             context_provider=context_provider,
             query_planner=query_planner,
+            query_service=query_service,
+            query_runner=query_runner,
             health_provider=health_provider,
         )
         self.logger = logger or logging.getLogger("sidecar.dispatch")
@@ -249,6 +270,10 @@ class Dispatcher:
                 result = self._context_ask(parsed.params)
             elif parsed.method == "query.dryPlan":
                 result = self._query_dry_plan(parsed.params)
+            elif parsed.method == "query.run":
+                result = self._query_run(parsed.params)
+            elif parsed.method == "query.cancel":
+                result = self._query_cancel(parsed.params)
             else:
                 raise RpcFault(
                     METHOD_NOT_FOUND,
@@ -367,7 +392,16 @@ class Dispatcher:
             fields={"projectDir", "semanticSql"},
         )
         _required_string(object_params, "projectDir", maximum=32_768)
-        _required_string(object_params, "semanticSql", maximum=64_000)
+        semantic_sql = _required_string(object_params, "semanticSql", maximum=64_000)
+        try:
+            validate_semantic_sql(semantic_sql)
+        except SqlPolicyError as exc:
+            raise RpcFault(
+                POLICY_DENIED,
+                "policy",
+                "semantic SQL must be one read-only query",
+                retryable=False,
+            ) from exc
         planner = self.dependencies.query_planner
         if planner is None:
             raise RpcFault(
@@ -388,6 +422,63 @@ class Dispatcher:
                 SEMANTIC_ERROR,
                 "query.dryPlan",
                 "semantic SQL planning failed",
+                retryable=False,
+            ) from exc
+
+    def _query_run(self, params: Any) -> Any:
+        object_params = _query_run_params(params)
+        provider = self.dependencies.query_service or self.dependencies.query_runner
+        if provider is None:
+            raise RpcFault(
+                WREN_UNAVAILABLE,
+                "query.run",
+                "Wren query runner is unavailable",
+                retryable=True,
+            )
+        try:
+            if callable(provider) and not hasattr(provider, "run"):
+                return provider(object_params)
+            return provider.run(object_params)  # type: ignore[union-attr]
+        except RpcFault:
+            raise
+        except Exception as exc:
+            # Keep driver/planner exception text out of both logs and wire.
+            self.logger.error("query execution failed")
+            raise RpcFault(
+                INTERNAL_ERROR,
+                "query.run",
+                "query execution failed",
+                retryable=False,
+            ) from exc
+
+    def _query_cancel(self, params: Any) -> Any:
+        object_params = _query_cancel_params(params)
+        provider = self.dependencies.query_service or self.dependencies.query_runner
+        if provider is None:
+            raise RpcFault(
+                WREN_UNAVAILABLE,
+                "query.cancel",
+                "Wren query runner is unavailable",
+                retryable=True,
+            )
+        try:
+            cancel = getattr(provider, "cancel", None)
+            if not callable(cancel):
+                raise RpcFault(
+                    WREN_UNAVAILABLE,
+                    "query.cancel",
+                    "Wren query cancellation is unavailable",
+                    retryable=True,
+                )
+            return cancel(object_params)
+        except RpcFault:
+            raise
+        except Exception as exc:
+            self.logger.error("query cancellation failed")
+            raise RpcFault(
+                INTERNAL_ERROR,
+                "query.cancel",
+                "query cancellation failed",
                 retryable=False,
             ) from exc
 
@@ -426,6 +517,69 @@ def _required_string(
             f"{field} must be a non-empty string",
         )
     return value
+
+
+def _query_run_params(params: Any) -> Mapping[str, Any]:
+    """Validate the sidecar-facing query.run shape before adapter code runs."""
+
+    allowed = {
+        "projectDir",
+        "question",
+        "semanticSql",
+        "queryId",
+        "chartIntent",
+        "timeoutMs",
+        "maxRows",
+        "previewRows",
+        "maxPreviewBytes",
+        "databaseDsnEnv",
+    }
+    if not isinstance(params, Mapping):
+        raise RpcFault(INVALID_PARAMS, "validation", "params must be an object")
+    if set(params) - allowed:
+        raise RpcFault(INVALID_PARAMS, "validation", "query.run params are invalid")
+    _required_string(params, "projectDir", maximum=32_768)
+    _required_string(params, "question", maximum=16_000)
+    semantic_sql = _required_string(params, "semanticSql", maximum=64_000)
+    try:
+        validate_semantic_sql(semantic_sql)
+    except SqlPolicyError as exc:
+        raise RpcFault(
+            POLICY_DENIED,
+            "policy",
+            "semantic SQL must be one read-only query",
+            retryable=False,
+        ) from exc
+    _required_string(params, "queryId", maximum=128)
+    for field, maximum in (
+        # AC-07 is a hard 30 second wall; a request must never enlarge it.
+        ("timeoutMs", 30_000),
+        ("maxRows", 500),
+        ("previewRows", 200),
+        ("maxPreviewBytes", 1_048_576),
+    ):
+        if field in params:
+            value = params[field]
+            if type(value) is not int or value < 1 or value > maximum:
+                raise RpcFault(
+                    INVALID_PARAMS,
+                    "validation",
+                    f"{field} is outside the supported range",
+                )
+    if "chartIntent" in params and params["chartIntent"] not in {"auto", "table", "line", "bar", "pie"}:
+        raise RpcFault(INVALID_PARAMS, "validation", "chartIntent is invalid")
+    if "databaseDsnEnv" in params:
+        env_name = params["databaseDsnEnv"]
+        if not isinstance(env_name, str) or not env_name or len(env_name) > 128:
+            raise RpcFault(INVALID_PARAMS, "validation", "databaseDsnEnv is invalid")
+    return cast(Mapping[str, Any], params)
+
+
+def _query_cancel_params(params: Any) -> Mapping[str, Any]:
+    if not isinstance(params, Mapping) or set(params) != {"queryId"}:
+        raise RpcFault(INVALID_PARAMS, "validation", "query.cancel params are invalid")
+    _required_string(params, "queryId", maximum=128)
+    return cast(Mapping[str, Any], params)
 
 
 def dispatch_request(

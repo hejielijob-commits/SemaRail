@@ -68,12 +68,7 @@ class DispatchTests(unittest.TestCase):
 
     def test_unknown_method_and_invalid_params_are_structured(self) -> None:
         unknown = Dispatcher().dispatch(request("query.run"))
-        self.assertEqual(unknown["error"], {
-            "code": "METHOD_NOT_FOUND",
-            "phase": "dispatch",
-            "message": "method is not supported",
-            "retryable": False,
-        })
+        self.assertEqual(unknown["error"]["code"], "INVALID_PARAMS")
 
         invalid = Dispatcher().dispatch(request("project.validate", ["not", "object"]))
         self.assertEqual(invalid["error"], {
@@ -147,7 +142,7 @@ class DispatchTests(unittest.TestCase):
         self.assertEqual(scalar["error"]["code"], "INVALID_PARAMS")
 
         cancel = Dispatcher().dispatch(request("query.cancel"))
-        self.assertEqual(cancel["error"]["code"], "METHOD_NOT_FOUND")
+        self.assertEqual(cancel["error"]["code"], "INVALID_PARAMS")
 
     def test_rpc_fault_and_unexpected_validator_failure_are_safe(self) -> None:
         expected = Dispatcher(project_validator=lambda _: (_ for _ in ()).throw(

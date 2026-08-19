@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "daily-revenue-30d",
+      "question": "最近 30 天每天的销售额是多少？",
+      "features": ["aggregate", "date_grain", "join"],
+      "semanticSql": "SELECT DATE_TRUNC('day', orders.ordered_at) AS order_day, SUM(order_items.line_revenue) AS revenue FROM order_items JOIN orders ON order_items.order_id = orders.id WHERE orders.status <> 'cancelled' AND orders.ordered_at >= CURRENT_DATE - INTERVAL '30 days' GROUP BY 1 ORDER BY 1",
+      "expectedColumns": ["order_day", "revenue"],
+      "expectedChart": "line"
+    },
+    {
+      "id": "revenue-by-region",
+      "question": "各地区销售额是多少？",
+      "features": ["aggregate", "join"],
+      "semanticSql": "SELECT regions.name AS region, SUM(order_items.line_revenue) AS revenue FROM order_items JOIN orders ON order_items.order_id = orders.id JOIN customers ON orders.customer_id = customers.id JOIN regions ON customers.region_id = regions.id WHERE orders.status <> 'cancelled' GROUP BY 1 ORDER BY 2 DESC",
+      "expectedColumns": ["region", "revenue"],
+      "expectedChart": "bar"
+    },
+    {
+      "id": "revenue-by-category",
+      "question": "各产品类别的销售额是多少？",
+      "features": ["aggregate", "join"],
+      "semanticSql": "SELECT products.category, SUM(order_items.line_revenue) AS revenue FROM order_items JOIN products ON order_items.product_id = products.id JOIN orders ON order_items.order_id = orders.id WHERE orders.status <> 'cancelled' GROUP BY 1 ORDER BY 2 DESC",
+      "expectedColumns": ["category", "revenue"],
+      "expectedChart": "bar"
+    },
+    {
+      "id": "discount-null",
+      "question": "没有填写折扣的订单项销售额是多少？",
+      "features": ["aggregate", "join", "null"],
+      "semanticSql": "SELECT SUM(order_items.line_revenue) AS revenue FROM order_items JOIN orders ON order_items.order_id = orders.id WHERE order_items.discount_amount IS NULL AND orders.status <> 'cancelled'",
+      "expectedColumns": ["revenue"],
+      "expectedChart": null
+    }
+  ]
+}

@@ -18,24 +18,33 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "lib/index.js",
-    "lib/invariant.js",
-    "lib/**/*.d.ts"
+    "lib/**/*.js",
+    "lib/**/*.d.ts",
+    "python/sidecar/pyproject.toml",
+    "python/sidecar/README.md",
+    "python/sidecar/sidecar/**/*.py"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "stage-sidecar": "node scripts/stage-sidecar.mjs",
+    "build": "pnpm run stage-sidecar && tsc -p tsconfig.json",
+    "prepack": "pnpm run stage-sidecar && pnpm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "pnpm run stage-sidecar && vitest run && pnpm run verify-pack",
+    "verify-pack": "node scripts/verify-packaged-sidecar.mjs"
   },
   "dependencies": {
     "@hejielijob/dsh-wren-data-agent-contract": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-subprocess": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-system-prompt": "0.1.0-rc.7",
     "@deepseek-ai/dsh-tools": "0.1.0-rc.7"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-subprocess": "0.1.0-rc.7",
     "@deepseek-ai/dsh-llm": "0.1.0-rc.7",
     "@deepseek-ai/dsh-session": "0.1.0-rc.7",
     "@deepseek-ai/dsh-system-prompt": "0.1.0-rc.7",

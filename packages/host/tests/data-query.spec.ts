@@ -6,6 +6,7 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import {
   SCHEMA_VERSION,
   TOOL_NAME,
+  CONTEXT_TOOL_NAME,
   apply,
   createDataQueryTool,
   type QueryGateway,
@@ -14,7 +15,7 @@ import type { DataQueryPresentation } from '@hejielijob/dsh-wren-data-agent-cont
 
 const input = {
   question: 'How many orders exist?',
-  semanticSql: 'SELECT COUNT(*) AS count FROM orders',
+  semanticSql: "SELECT 'all' AS day, COUNT(*) AS revenue FROM orders",
 } as const
 
 function success(queryInput: { semanticSql: string }): DataQueryPresentation {
@@ -23,10 +24,13 @@ function success(queryInput: { semanticSql: string }): DataQueryPresentation {
     queryId: 'q-1',
     status: 'success',
     semanticSql: queryInput.semanticSql,
-    nativeSql: 'SELECT COUNT(*) AS count FROM orders',
-    columns: [{ name: 'count', type: 'BIGINT', semanticRole: 'measure' }],
-    previewRows: [{ count: '1' }],
-    chart: { version: 1, type: 'bar', x: 'count', y: ['count'], tooltip: true },
+    nativeSql: "SELECT 'all' AS day, COUNT(*) AS revenue FROM orders",
+    columns: [
+      { name: 'day', type: 'TEXT', semanticRole: 'dimension' },
+      { name: 'revenue', type: 'BIGINT', semanticRole: 'measure' },
+    ],
+    previewRows: [{ day: 'all', revenue: '1' }],
+    chart: { version: 1, type: 'bar', x: 'day', y: ['revenue'], tooltip: true },
     stats: { returnedRows: 1, durationMs: 12, truncated: false },
   }
 }
@@ -59,7 +63,7 @@ describe('Wren data_query Host boundary', () => {
       })
       expect(result).toMatchObject({
         isError: false,
-        value: { status: 'success', nativeSql: 'SELECT COUNT(*) AS count FROM orders' },
+        value: { status: 'success', nativeSql: "SELECT 'all' AS day, COUNT(*) AS revenue FROM orders" },
         meta: { status: 'success', chart: { type: 'bar' } },
       })
       disposer()
@@ -71,6 +75,7 @@ describe('Wren data_query Host boundary', () => {
       apply(ctx)
       const tool = ctx.tools.get(TOOL_NAME)
       expect(tool?.name).toBe(TOOL_NAME)
+      expect(ctx.tools.get(CONTEXT_TOOL_NAME)?.name).toBe(CONTEXT_TOOL_NAME)
       const result = await ctx.tools.execute({
         signal: new AbortController().signal,
         callId: CallId('wren-unavailable'),
@@ -85,6 +90,31 @@ describe('Wren data_query Host boundary', () => {
           error: { code: 'WREN_UNAVAILABLE' },
         },
       })
+      const contextResult = await ctx.tools.execute({
+        signal: new AbortController().signal,
+        callId: CallId('wren-context-unavailable'),
+        name: CONTEXT_TOOL_NAME,
+        arguments: { question: 'How many orders exist?' },
+      })
+      expect(contextResult).toMatchObject({
+        isError: false,
+        value: { schemaVersion: SCHEMA_VERSION, status: 'error', error: { code: 'WREN_UNAVAILABLE' } },
+      })
+    })
+  })
+
+  it('assembles the semantic-first, entity-allowlist and bounded-retry guidance', async () => {
+    await withRealToolContext(async ctx => {
+      apply(ctx)
+      const assembly = await ctx.systemPrompt.assemble()
+      const section = assembly.sections.find(candidate => candidate.name === 'wren:data-agent')
+      expect(section?.text).toContain('wren_semantic_context')
+      expect(section?.text).toContain('authoritative allowlist')
+      expect(section?.text).toContain('Do not guess or invent')
+      expect(section?.text).toContain('at most one repair attempt')
+      expect(section?.text).toContain('POLICY_DENIED')
+      expect(section?.text).toContain('TIMEOUT')
+      expect(section?.text).toContain('CANCELLED')
     })
   })
 
@@ -98,7 +128,7 @@ describe('Wren data_query Host boundary', () => {
     const result = await tool.execute(input, { signal: new AbortController().signal })
     expect(result.status).toBe('success')
     if (result.status !== 'success') return
-    expect(result.nativeSql).toBe('SELECT COUNT(*) AS count FROM orders')
+    expect(result.nativeSql).toBe("SELECT 'all' AS day, COUNT(*) AS revenue FROM orders")
     expect(result.chart).toMatchObject({ version: 1, type: 'bar' })
     expect(result.previewRows).toHaveLength(1)
   })
@@ -108,7 +138,7 @@ describe('Wren data_query Host boundary', () => {
       async query(queryInput): Promise<DataQueryPresentation> {
         return {
           ...success(queryInput),
-          previewRows: Array.from({ length: 250 }, () => ({ count: '1' })),
+          previewRows: Array.from({ length: 250 }, () => ({ day: 'all', revenue: '1' })),
           stats: { returnedRows: 250, durationMs: 12, truncated: true },
         }
       },
@@ -122,7 +152,7 @@ describe('Wren data_query Host boundary', () => {
       async query(queryInput) {
         return {
           ...success(queryInput),
-          previewRows: [{ count: BigInt(1) as unknown as string }],
+          previewRows: [{ day: 'all', revenue: BigInt(1) as unknown as string }],
         }
       },
     }
@@ -136,7 +166,7 @@ describe('Wren data_query Host boundary', () => {
       async query(queryInput) {
         return {
           ...success(queryInput),
-          previewRows: [{ count: new Date('2026-01-01') as unknown as string }],
+          previewRows: [{ day: 'all', revenue: new Date('2026-01-01') as unknown as string }],
         }
       },
     }

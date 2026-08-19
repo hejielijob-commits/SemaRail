@@ -1,0 +1,18 @@
+name: regions
+table_reference:
+  schema: public
+  table: regions
+primary_key: id
+columns:
+  - name: id
+    type: INTEGER
+    is_primary_key: true
+    not_null: true
+  - name: name
+    type: VARCHAR
+    not_null: true
+    properties:
+      description: Stable sales region name.
+  - name: country
+    type: VARCHAR
+    not_null: true

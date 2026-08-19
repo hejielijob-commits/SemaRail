@@ -1,10 +1,29 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import {
   apply,
+  buildDataQueryChartOption,
+  compareDataQueryCells,
+  DATA_QUERY_TAB_ORDER,
+  DEFAULT_DATA_QUERY_TAB,
   DataQueryRow,
+  DataQuerySqlView,
   parseDataQueryMeta,
+  tokenizeSql,
   type DataQueryResultBlock,
 } from '../src/client/index.js'
+
+const replayFixture = JSON.parse(readFileSync(new URL('./fixtures/query-result-v1.json', import.meta.url), 'utf8')) as Record<string, any>
+
+function collectElementTypes(value: unknown, types: string[] = []): string[] {
+  if (typeof value !== 'object' || value === null) return types
+  const candidate = value as { type?: unknown; props?: { children?: unknown } }
+  if (typeof candidate.type === 'string') types.push(candidate.type)
+  const children = candidate.props?.children
+  if (Array.isArray(children)) children.forEach(child => collectElementTypes(child, types))
+  else collectElementTypes(children, types)
+  return types
+}
 
 const validMeta = {
   schemaVersion: 1,
@@ -58,5 +77,122 @@ describe('data_query Client adapter', () => {
       { name: 'tool.call.toolview', key: 'data_query' },
       DataQueryRow,
     )
+  })
+
+  it('rebuilds a fixed replay fixture deterministically from durable metadata', () => {
+    const first = parseDataQueryMeta(replayFixture)
+    const refreshed = parseDataQueryMeta(JSON.parse(JSON.stringify(replayFixture)))
+    expect(first).not.toBeNull()
+    expect(refreshed).toEqual(first)
+    expect(buildDataQueryChartOption(first!)).toEqual(buildDataQueryChartOption(refreshed!))
+  })
+
+  it('limits only previewRows bytes, allowing a legal 1 MiB preview plus full SQL', () => {
+    const maxPreviewBytes = 1_048_576
+    const emptyEnvelopeBytes = new TextEncoder().encode(JSON.stringify([{ blob: '' }])).byteLength
+    const blob = 'x'.repeat(maxPreviewBytes - emptyEnvelopeBytes)
+    const boundaryMeta = {
+      schemaVersion: 1,
+      queryId: 'preview-byte-boundary',
+      status: 'success',
+      semanticSql: 's'.repeat(64_000),
+      nativeSql: 'n'.repeat(64_000),
+      columns: [{ name: 'blob', type: 'VARCHAR', semanticRole: 'dimension' }],
+      previewRows: [{ blob }],
+      stats: { returnedRows: 1, durationMs: 1, truncated: false },
+    }
+    expect(new TextEncoder().encode(JSON.stringify(boundaryMeta.previewRows)).byteLength).toBe(maxPreviewBytes)
+    expect(parseDataQueryMeta(boundaryMeta)).not.toBeNull()
+    expect(parseDataQueryMeta({ ...boundaryMeta, previewRows: [{ blob: `${blob}x` }] })).toBeNull()
+  })
+
+  it('maps only validated chart fields and keeps raw dimension/value tooltip data', () => {
+    const meta = parseDataQueryMeta(replayFixture)
+    const option = buildDataQueryChartOption(meta!)
+    expect(option?.tooltip).toEqual({ trigger: 'axis' })
+    expect(option?.legend.data).toEqual(['revenue'])
+    expect(option?.series[0]?.data[0]).toEqual({ name: '2026-08-16', value: '12.50' })
+    expect(option).not.toHaveProperty('formatter')
+    expect(JSON.stringify(option)).not.toMatch(/javascript:|https?:\/\//iu)
+
+    for (const type of ['line', 'bar', 'pie'] as const) {
+      const typed = JSON.parse(JSON.stringify(replayFixture)) as Record<string, any>
+      typed.chart.type = type
+      const typedMeta = parseDataQueryMeta(typed)
+      expect(buildDataQueryChartOption(typedMeta!)?.series[0]?.type).toBe(type)
+    }
+
+    const grouped = JSON.parse(JSON.stringify(replayFixture)) as Record<string, any>
+    grouped.chart.series = 'region'
+    const groupedOption = buildDataQueryChartOption(parseDataQueryMeta(grouped)!)
+    expect(groupedOption?.xAxis?.data).toEqual(['2026-08-16', '2026-08-17', '2026-08-18'])
+    expect(groupedOption?.series[0]?.data).toEqual([
+      { name: '2026-08-16', value: '12.50' },
+      { name: '2026-08-17', value: null },
+      { name: '2026-08-18', value: '21.00' },
+    ])
+    expect(groupedOption?.series[1]?.data).toEqual([
+      { name: '2026-08-16', value: null },
+      { name: '2026-08-17', value: '18.75' },
+      { name: '2026-08-18', value: null },
+    ])
+
+    const booleanMeasure = JSON.parse(JSON.stringify(replayFixture)) as Record<string, any>
+    booleanMeasure.columns[2] = { name: 'revenue', type: 'BOOLEAN', semanticRole: 'measure' }
+    booleanMeasure.previewRows = booleanMeasure.previewRows.map((row: Record<string, unknown>, index: number) => ({ ...row, revenue: index % 2 === 0 }))
+    const booleanMeta = parseDataQueryMeta(booleanMeasure)
+    expect(booleanMeta).not.toBeNull()
+    expect(buildDataQueryChartOption(booleanMeta!)).toBeNull()
+  })
+
+  it('fails closed for old, malformed, or unmapped chart metadata', () => {
+    expect(parseDataQueryMeta({ ...replayFixture, schemaVersion: 2 })).toBeNull()
+    expect(parseDataQueryMeta({ ...replayFixture, chart: { ...replayFixture.chart, formatter: 'return value' } })).toBeNull()
+    expect(parseDataQueryMeta({ ...replayFixture, error: null })).toBeNull()
+    expect(parseDataQueryMeta({
+      ...replayFixture,
+      chart: { ...replayFixture.chart, title: 'javascript:alert(1)' },
+    })).toBeNull()
+    expect(parseDataQueryMeta({
+      ...replayFixture,
+      status: 'error',
+      error: { code: 'DATABASE_ERROR', phase: 'run', message: 'safe error', retryable: false },
+    })).toBeNull()
+    const unmapped = JSON.parse(JSON.stringify(replayFixture)) as Record<string, any>
+    unmapped.chart.x = 'missing_dimension'
+    const unmappedMeta = parseDataQueryMeta(unmapped)
+    expect(unmappedMeta).not.toBeNull()
+    expect(buildDataQueryChartOption(unmappedMeta!)).toBeNull()
+  })
+
+  it('provides stable basic sorting and text-only SQL highlighting', () => {
+    expect(compareDataQueryCells(null, 'a')).toBeGreaterThan(0)
+    expect(compareDataQueryCells('10', '2')).toBeGreaterThan(0)
+    expect(tokenizeSql("SELECT revenue -- raw\nFROM orders WHERE id = 2")).toEqual(expect.arrayContaining([
+      { kind: 'keyword', text: 'SELECT' },
+      { kind: 'comment', text: '-- raw' },
+      { kind: 'number', text: '2' },
+    ]))
+  })
+
+  it('uses the review-first Table / Chart / SQL order and table default', () => {
+    expect(DATA_QUERY_TAB_ORDER).toEqual(['table', 'chart', 'sql'])
+    expect(DEFAULT_DATA_QUERY_TAB).toBe('table')
+  })
+
+  it('renders SQL content directly after selecting the SQL tab', () => {
+    const meta = parseDataQueryMeta(replayFixture)!
+    const view = DataQuerySqlView({
+      meta,
+      mode: 'semantic',
+      copied: false,
+      onModeChange: vi.fn(),
+      onCopy: vi.fn(),
+    }) as { type?: unknown; props?: Record<string, unknown> }
+    expect(view.type).toBe('section')
+    expect(view.props?.['data-query-sql']).toBe(true)
+    expect(collectElementTypes(view)).toContain('pre')
+    expect(collectElementTypes(view)).not.toContain('details')
+    expect(collectElementTypes(view)).not.toContain('summary')
   })
 })

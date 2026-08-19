@@ -1,8 +1,9 @@
 # Wren data-agent sidecar
 
 This package is the first Python process boundary for the Wren data agent. It
-speaks a deliberately small, dependency-free RPC protocol so the Host can
-supervise it without importing Wren into the Harness process.
+speaks a deliberately small RPC protocol so the Host can supervise it without
+importing Wren into the Harness process. `sqlglot` is the PostgreSQL AST policy
+boundary; the package remains independent of the Harness runtime.
 
 ## Wire protocol
 
@@ -39,12 +40,28 @@ The initial methods are:
   `sha256:<digest>` `projectRevision`; Wren issue paths/messages and project
   paths never cross the RPC boundary.
 - `context.ask` — requires `projectDir` and `question`, builds the Wren
-  manifest, uses Wren's public context/description capability when available,
-  and returns a `schemaVersion: 1` semantic context.
-- `query.dryPlan` — requires `projectDir` and `semanticSql`, builds the
-  manifest and calls `WrenEngine(..., connection_info={}).dry_plan()` to
-  transform SQL without opening a database connection. `query.run` and
-  `query.cancel` are deliberately not implemented yet.
+  manifest, loads Wren's public `load_rules` knowledge/rules content plus the
+  context/description capability when available, applies bounded UTF-8
+  redaction, and returns a `schemaVersion: 1` semantic context.
+- `query.dryPlan` — requires `projectDir` and `semanticSql`, rejects anything
+  other than one read-only AST before Wren is called, then builds the manifest
+  and calls `WrenEngine(..., connection_info={}, config=WrenConfig(strict_mode=True,
+  denied_functions=...)).dry_plan()` without opening a database connection.
+  The result includes an MDL-derived `allowedPhysical` schema/table allowlist.
+- `query.run` — requires `projectDir`, `question`, `semanticSql`, and
+  `queryId`. Optional `chartIntent`, `timeoutMs`, `maxRows` (at most 500),
+  `previewRows` (at most 200), `maxPreviewBytes` (at most 1 MiB), and
+  `databaseDsnEnv` are accepted. The sidecar dry-plans through Wren, then
+  applies a second PostgreSQL AST check for one read-only statement, allowed
+  functions, and MDL-derived physical tables. The default DSN environment
+  variable is `WREN_DATABASE_URL`; the DSN is resolved inside the sidecar and
+  is never sent in an RPC request. A hard 30-second timeout and hard two-query
+  concurrency limit apply. Native SQL is wrapped in a server-side `LIMIT
+  maxRows+1` before execution, and results are shaped as DataQueryPresentation
+  schema version 1 with exact numeric/date scalar strings.
+- `query.cancel` — requires `queryId`. The server handles this method while a
+  `query.run` worker is waiting on PostgreSQL and calls the driver's cancel
+  hook. Unknown query ids are harmless and return `cancelled: false`.
 
 Request envelopes fail closed like the TypeScript contract: only
 `protocolVersion`, `id`, `method`, `params`, and optional `deadlineMs` are
@@ -56,9 +73,10 @@ Malformed transport frames cannot carry a recoverable request id. Their
 framed diagnostic uses `id: ""` to mark an uncorrelated transport fault; it is
 handled before the ordinary correlated `RpcResponse` parser.
 
-The validator is injected through `SidecarDependencies`, and the CLI default
-uses `LazyWrenAdapter`. Protocol and adapter tests can inject a fake Wren
-context module, so they do not need Wren or a database installed.
+The validator and query service are injected through `SidecarDependencies`,
+and the CLI default uses `LazyWrenAdapter` plus a lazy psycopg executor.
+Protocol and adapter tests can inject fake Wren/database implementations, so
+they do not need Wren or a database installed.
 
 ## Local development
 

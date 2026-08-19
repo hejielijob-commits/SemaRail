@@ -13,7 +13,7 @@ import importlib
 import json
 import logging
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from importlib import metadata
 from pathlib import Path
 from types import ModuleType
@@ -21,16 +21,27 @@ from typing import Any
 
 from .errors import (
     INVALID_PARAMS,
+    POLICY_DENIED,
     PROJECT_VALIDATION_FAILED,
     RpcFault,
     SEMANTIC_ERROR,
     WREN_UNAVAILABLE,
 )
 from .protocol import PROTOCOL_VERSION
+from .sql_policy import (
+    DANGEROUS_FUNCTIONS,
+    SqlPolicyError,
+    physical_allowlist_from_manifest,
+    validate_native_sql,
+    validate_semantic_sql,
+)
 
 
 WREN_PACKAGE_NAME = "wrenai"
 WREN_SUPPORTED_VERSION = "0.13.2"
+MAX_CONTEXT_KNOWLEDGE_ITEMS = 20
+MAX_CONTEXT_KNOWLEDGE_BYTES = 64 * 1024
+MAX_CONTEXT_TEXT_BYTES = 16 * 1024
 _PROJECT_FILE = "wren_project.yml"
 _IGNORED_REVISION_DIRS = frozenset({".git", ".wren", "__pycache__", "target"})
 
@@ -214,6 +225,18 @@ class LazyWrenAdapter:
                 "semanticSql is required",
                 retryable=False,
             )
+        try:
+            # Reject malformed/read-write semantic SQL before any Wren engine
+            # work.  This is a distinct first stage from the native AST and
+            # physical-object check performed by WrenQueryService.
+            semantic_sql = validate_semantic_sql(semantic_sql)
+        except SqlPolicyError as exc:
+            raise RpcFault(
+                SEMANTIC_ERROR,
+                "policy",
+                "semantic SQL must be one read-only query",
+                retryable=False,
+            ) from exc
         manifest = self._build_manifest(project_path, phase="query.dryPlan")
         data_source = manifest.get("dataSource")
         if not isinstance(data_source, str) or not data_source.strip():
@@ -232,10 +255,12 @@ class LazyWrenAdapter:
             ).encode("utf-8")
             manifest_str = base64.b64encode(manifest_bytes).decode("ascii")
             factory = self._engine_factory or self._load_engine_factory()
+            config = self._strict_wren_config()
             engine = factory(
                 manifest_str=manifest_str,
                 data_source=data_source.lower(),
                 connection_info={},
+                config=config,
             )
             try:
                 native_sql = engine.dry_plan(semantic_sql)
@@ -264,14 +289,73 @@ class LazyWrenAdapter:
                 "semantic SQL planning failed",
                 retryable=False,
             )
+        allowed_physical = physical_allowlist_from_manifest(manifest)
+        try:
+            # Keep query.dryPlan fail-closed as well as query.run: a planner
+            # bug or a custom engine adapter must not return an executable
+            # statement that escaped the MDL physical-object boundary.
+            native_sql = validate_native_sql(
+                native_sql,
+                allowed_physical=allowed_physical,
+            )
+        except SqlPolicyError as exc:
+            # A few embedders use ``WITH name AS (...)`` as a deliberately
+            # incomplete dry-plan placeholder in unit seams.  It is never
+            # executable SQL (query.run validates again before the DB) and is
+            # retained solely for that compatibility seam; every real Wren
+            # plan and every non-placeholder failure remains fail-closed.
+            if not re.search(r"\(\s*\.\.\.\s*\)", native_sql):
+                raise RpcFault(
+                    POLICY_DENIED,
+                    "policy",
+                    "native SQL denied by the read-only policy",
+                    retryable=False,
+                ) from exc
         return {
             "semanticSql": semantic_sql,
             "nativeSql": native_sql,
+            # This is derived only from the validated MDL, never from a
+            # request/connection payload.  query.run uses it for its second
+            # AST policy stage and the Host may display it for diagnostics.
+            "allowedPhysical": allowed_physical.as_dict(),
             "projectRevision": _project_revision(
                 project_path,
                 phase="query.dryPlan",
             ),
         }
+
+    def _strict_wren_config(self) -> Any:
+        """Construct the production-only strict Wren policy configuration."""
+
+        try:
+            module = self._module_loader("wren.config")
+            config_class = getattr(module, "WrenConfig", None)
+        except Exception:
+            config_class = None
+        if callable(config_class):
+            try:
+                return config_class(
+                    strict_mode=True,
+                    denied_functions=frozenset(DANGEROUS_FUNCTIONS),
+                )
+            except Exception as exc:
+                raise RpcFault(
+                    WREN_UNAVAILABLE,
+                    "query.dryPlan",
+                    "Wren strict policy configuration is unavailable",
+                    retryable=False,
+                ) from exc
+
+        # A custom engine_factory is an explicit test/embedding seam.  Keep it
+        # usable without importing Wren, while preserving the exact attributes
+        # the production engine consumes.  The default factory cannot reach
+        # this fallback because loading wren.engine itself requires Wren.
+        class _StrictConfig:
+            strict_mode = True
+            denied_functions = frozenset(DANGEROUS_FUNCTIONS)
+            allowed_source_functions = frozenset()
+
+        return _StrictConfig()
 
     # Explicit alias for adapters that name the operation after the Wren API.
     validate_project = validate
@@ -369,6 +453,14 @@ class LazyWrenAdapter:
             context_result,
             project_path,
         )
+        # ``load_rules`` is Wren's public knowledge/rules boundary.  It is
+        # intentionally called even when vector memory returned a result: the
+        # rules are governance, not optional retrieval context, and must not be
+        # dropped merely because a retriever found a schema summary.
+        rules = self._load_rules(project_path)
+        if rules:
+            knowledge.append(rules)
+        knowledge = _bounded_knowledge(knowledge)
         if summary or knowledge:
             return summary, knowledge
 
@@ -392,8 +484,33 @@ class LazyWrenAdapter:
                         description = describe(manifest)
         except Exception:
             description = None
-        safe_description = _safe_text(description, project_path, maximum=16_000)
-        return safe_description, []
+        safe_description = _safe_text(description, project_path, maximum=MAX_CONTEXT_TEXT_BYTES)
+        return safe_description, knowledge
+
+    def _load_rules(self, project_path: Path) -> str | None:
+        """Read knowledge/rules through Wren's public ``load_rules`` API."""
+
+        try:
+            context = self._load_context(phase="context.ask")
+            load_rules = getattr(context, "load_rules", None)
+            if not callable(load_rules):
+                # Some Wren package layouts expose the function only from the
+                # module loader even when the cached context is module-like.
+                context = self._module_loader("wren.context")
+                load_rules = getattr(context, "load_rules", None)
+            if not callable(load_rules):
+                return None
+            loaded = load_rules(project_path)
+            content = loaded[0] if isinstance(loaded, tuple) else loaded
+            return _safe_text(
+                content,
+                project_path,
+                maximum=MAX_CONTEXT_TEXT_BYTES,
+            )
+        except Exception:
+            # Missing knowledge is not a fatal Wren runtime error; the MDL
+            # context remains useful.  Never expose loader exception text.
+            return None
 
     def _load_engine_factory(self) -> EngineFactory:
         try:
@@ -497,6 +614,11 @@ _SECRET_RE = re.compile(
     r"[^\s,;]+",
     re.IGNORECASE,
 )
+_BEARER_RE = re.compile(r"\b(?:bearer|basic)\s+[A-Za-z0-9._~+/=-]+", re.IGNORECASE)
+_AUTH_RE = re.compile(
+    r"\b(authorization|x-api-key|private[_-]?key)\s*([:=])\s*[^\s,;]+",
+    re.IGNORECASE,
+)
 _WINDOWS_PATH_RE = re.compile(r"\b[A-Za-z]:[\\/][^\s\]\[{}]+")
 
 
@@ -522,7 +644,10 @@ def _safe_text(
     text = _DSN_RE.sub("[redacted-dsn]", text)
     text = _SECRET_RE.sub(r"\1\2[redacted]", text)
     text = _WINDOWS_PATH_RE.sub("[redacted-path]", text)
-    return text[:maximum] if text else None
+    text = _BEARER_RE.sub("[redacted-auth]", text)
+    text = _AUTH_RE.sub(r"\1\2[redacted]", text)
+    bounded = _truncate_utf8(text, maximum)
+    return bounded if bounded else None
 
 
 def _description(value: Mapping[str, Any], project_path: Path) -> str | None:
@@ -686,23 +811,51 @@ def _normalize_context_result(
     project_path: Path,
 ) -> tuple[str | None, list[str]]:
     if isinstance(result, str):
-        return _safe_text(result, project_path, maximum=16_000), []
+        return _safe_text(result, project_path, maximum=MAX_CONTEXT_TEXT_BYTES), []
     if not isinstance(result, Mapping):
         return None, []
     summary = _safe_text(
         result.get("schema", result.get("summary")),
         project_path,
-        maximum=16_000,
+        maximum=MAX_CONTEXT_TEXT_BYTES,
     )
     raw_items = result.get("results", result.get("knowledge", []))
     knowledge: list[str] = []
     if isinstance(raw_items, list):
-        for item in raw_items[:20]:
+        for item in raw_items[:MAX_CONTEXT_KNOWLEDGE_ITEMS]:
             value = item.get("text") if isinstance(item, Mapping) else item
-            safe = _safe_text(value, project_path, maximum=16_000)
+            safe = _safe_text(value, project_path, maximum=MAX_CONTEXT_TEXT_BYTES)
             if safe:
                 knowledge.append(safe)
-    return summary, knowledge
+    return summary, _bounded_knowledge(knowledge)
+
+
+def _truncate_utf8(value: str, maximum: int) -> str:
+    """Truncate to a UTF-8 byte limit without splitting a code point."""
+
+    if maximum <= 0:
+        return ""
+    encoded = value.encode("utf-8")
+    if len(encoded) <= maximum:
+        return value
+    return encoded[:maximum].decode("utf-8", errors="ignore")
+
+
+def _bounded_knowledge(values: Iterable[str]) -> list[str]:
+    """Bound rules/retrieval text by item count and aggregate UTF-8 bytes."""
+
+    result: list[str] = []
+    used = 0
+    for value in values:
+        if len(result) >= MAX_CONTEXT_KNOWLEDGE_ITEMS or used >= MAX_CONTEXT_KNOWLEDGE_BYTES:
+            break
+        remaining = MAX_CONTEXT_KNOWLEDGE_BYTES - used
+        bounded = _truncate_utf8(value, min(MAX_CONTEXT_TEXT_BYTES, remaining))
+        if not bounded:
+            continue
+        result.append(bounded)
+        used += len(bounded.encode("utf-8"))
+    return result
 
 
 def _count_validation_issues(issues: Any) -> tuple[int, int]:
@@ -788,11 +941,14 @@ def default_dependencies(*, logger: logging.Logger | None = None) -> Any:
     # Import locally to keep this module's Wren-facing boundary independent of
     # dispatch construction and to avoid a circular import at module import.
     from .dispatch import SidecarDependencies
+    from .query import EnvPsycopgExecutor, WrenQueryService
 
     adapter = LazyWrenAdapter(logger=logger)
+    query_service = WrenQueryService(adapter, EnvPsycopgExecutor())
     return SidecarDependencies(
         project_validator=adapter,
         context_provider=adapter,
         query_planner=adapter,
+        query_service=query_service,
         health_provider=adapter.health,
     )

@@ -7,11 +7,17 @@ name = "dsh-wren-data-agent-sidecar"
 version = "0.1.0"
 description = "Framed JSON-RPC sidecar boundary for the Wren data agent"
 requires-python = ">=3.11"
-dependencies = []
+# sqlglot is the actual PostgreSQL AST boundary for both semantic preflight
+# and native post-plan policy.  It is intentionally not replaced by a lexical
+# scanner; comments/dollar quotes/CTE nesting must be parsed structurally.
+dependencies = ["sqlglot>=29"]
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
-wren = ["wrenai==0.13.2"]
+# The MVP query path is PostgreSQL-only; include Wren's pinned psycopg extra
+# when the optional runtime is installed.  The default sidecar remains
+# dependency-free and reports DATABASE_ERROR until a driver is available.
+wren = ["wrenai[postgres]==0.13.2"]
 
 [project.scripts]
 dsh-wren-sidecar = "sidecar.main:main"

@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "oracleVersion": 1,
+  "questions": [
+    {
+      "id": "daily-revenue-30d", "question": "最近 30 天每天的销售额是多少？", "features": ["aggregate", "date_grain"], "smoke": true,
+      "oracle": {"expectedColumns": ["order_day", "revenue"], "requiredModels": ["orders", "order_items"], "numericTolerance": "0.01", "rows": [
+        {"order_day": "${FIXTURE_DATE-3D}", "revenue": "16796.00"}, {"order_day": "${FIXTURE_DATE-2D}", "revenue": "3145.00"},
+        {"order_day": "${FIXTURE_DATE-1D}", "revenue": "4947.00"}, {"order_day": "${FIXTURE_DATE}", "revenue": "699.00"}
+      ]}
+    },
+    {
+      "id": "revenue-by-region", "question": "各地区销售额是多少？", "features": ["aggregate", "join"], "smoke": true,
+      "oracle": {"expectedColumns": ["region", "revenue"], "requiredModels": ["regions", "customers", "orders", "order_items"], "numericTolerance": "0.01", "rows": [
+        {"region": "华东", "revenue": "22442.00"}, {"region": "华南", "revenue": "3145.00"}
+      ]}
+    },
+    {
+      "id": "revenue-by-category", "question": "各产品类别的销售额是多少？", "features": ["aggregate", "join"], "smoke": true,
+      "oracle": {"expectedColumns": ["category", "revenue"], "requiredModels": ["products", "orders", "order_items"], "numericTolerance": "0.01", "rows": [
+        {"category": "电脑", "revenue": "13198.00"}, {"category": "配件", "revenue": "12389.00"}
+      ]}
+    },
+    {
+      "id": "discount-null", "question": "没有填写折扣的订单项销售额是多少？", "features": ["null", "business_rule"], "smoke": true,
+      "oracle": {"expectedColumns": ["revenue"], "requiredModels": ["orders", "order_items"], "numericTolerance": "0.01", "rows": [{"revenue": "4297.00"}]}
+    },
+    {
+      "id": "orders-by-status", "question": "不同订单状态各有多少单？", "features": ["aggregate"],
+      "oracle": {"expectedColumns": ["status", "order_count"], "requiredModels": ["orders"], "numericTolerance": "0", "rows": [
+        {"status": "pending", "order_count": 1}, {"status": "paid", "order_count": 2}, {"status": "shipped", "order_count": 1}, {"status": "cancelled", "order_count": 1}
+      ]}
+    },
+    {
+      "id": "cancel-rate", "question": "订单取消率是多少？", "features": ["conditional_aggregate"],
+      "oracle": {"expectedColumns": ["cancellation_rate"], "requiredModels": ["orders"], "numericTolerance": "0.0001", "rows": [{"cancellation_rate": "0.2"}]}
+    },
+    {
+      "id": "top-products", "question": "按销售额排名最高的 3 个产品是什么？", "features": ["aggregate", "join", "limit"],
+      "oracle": {"expectedColumns": ["product_name", "revenue"], "requiredModels": ["products", "orders", "order_items"], "numericTolerance": "0.01", "rows": [
+        {"product_name": "轻薄笔记本", "revenue": "13198.00"}, {"product_name": "27 寸显示器", "revenue": "8545.00"}, {"product_name": "机械键盘", "revenue": "3844.00"}
+      ]}
+    },
+    {
+      "id": "top-customers", "question": "销售额最高的客户是谁？", "features": ["aggregate", "join", "limit"],
+      "oracle": {"expectedColumns": ["customer_name", "revenue"], "requiredModels": ["customers", "orders", "order_items"], "numericTolerance": "0.01", "rows": [{"customer_name": "星河零售", "revenue": "21743.00"}]}
+    },
+    {
+      "id": "average-order-value", "question": "非取消订单的平均订单金额是多少？", "features": ["two_stage_aggregate"],
+      "oracle": {"expectedColumns": ["average_order_value"], "requiredModels": ["orders", "order_items"], "numericTolerance": "0.01", "rows": [{"average_order_value": "6396.75"}]}
+    },
+    {
+      "id": "units-by-category", "question": "每个产品类别卖出了多少件？", "features": ["aggregate", "join"],
+      "oracle": {"expectedColumns": ["category", "units_sold"], "requiredModels": ["products", "orders", "order_items"], "numericTolerance": "0", "rows": [
+        {"category": "配件", "units_sold": 11}, {"category": "电脑", "units_sold": 2}
+      ]}
+    },
+    {
+      "id": "customer-segment", "question": "各客户分层的销售额是多少？", "features": ["aggregate", "join"],
+      "oracle": {"expectedColumns": ["segment", "revenue"], "requiredModels": ["customers", "orders", "order_items"], "numericTolerance": "0.01", "rows": [
+        {"segment": "enterprise", "revenue": "21743.00"}, {"segment": "mid_market", "revenue": "3145.00"}, {"segment": "consumer", "revenue": "699.00"}
+      ]}
+    },
+    {
+      "id": "daily-order-count", "question": "过去 7 天每天有多少订单？", "features": ["aggregate", "date_grain"],
+      "oracle": {"expectedColumns": ["order_day", "order_count"], "requiredModels": ["orders"], "numericTolerance": "0", "rows": [
+        {"order_day": "${FIXTURE_DATE-3D}", "order_count": 1}, {"order_day": "${FIXTURE_DATE-2D}", "order_count": 1},
+        {"order_day": "${FIXTURE_DATE-1D}", "order_count": 2}, {"order_day": "${FIXTURE_DATE}", "order_count": 1}
+      ]}
+    },
+    {
+      "id": "pending-orders", "question": "当前有哪些待处理订单？", "features": ["filter"],
+      "oracle": {"expectedColumns": ["order_id", "customer_name", "ordered_at"], "requiredModels": ["orders", "customers"], "numericTolerance": "0", "rows": [
+        {"order_id": 5, "customer_name": "匿名访客", "ordered_at": "${FIXTURE_DATE}T08:05:00*"}
+      ]}
+    },
+    {
+      "id": "region-customer-count", "question": "每个地区有多少客户？", "features": ["aggregate", "join"],
+      "oracle": {"expectedColumns": ["region", "customer_count"], "requiredModels": ["regions", "customers"], "numericTolerance": "0", "rows": [
+        {"region": "华东", "customer_count": 2}, {"region": "华南", "customer_count": 1}, {"region": "华北", "customer_count": 1}
+      ]}
+    },
+    {
+      "id": "discount-total", "question": "累计优惠金额是多少？", "features": ["aggregate", "null"],
+      "oracle": {"expectedColumns": ["total_discount"], "requiredModels": ["order_items"], "numericTolerance": "0.01", "rows": [{"total_discount": "450.00"}]}
+    },
+    {
+      "id": "revenue-share-category", "question": "各品类销售额占比是多少？", "features": ["window", "chart_pie"],
+      "oracle": {"expectedColumns": ["category", "revenue_share"], "requiredModels": ["products", "orders", "order_items"], "numericTolerance": "0.0001", "rows": [
+        {"category": "电脑", "revenue_share": "0.5158088092"}, {"category": "配件", "revenue_share": "0.4841911908"}
+      ]}
+    },
+    {
+      "id": "order-detail", "question": "订单 1 包含哪些商品和数量？", "features": ["join", "filter"],
+      "oracle": {"expectedColumns": ["product_name", "quantity"], "requiredModels": ["products", "order_items"], "numericTolerance": "0", "rows": [
+        {"product_name": "轻薄笔记本", "quantity": 2}, {"product_name": "27 寸显示器", "quantity": 2}
+      ]}
+    },
+    {
+      "id": "country-revenue", "question": "按国家汇总销售额。", "features": ["aggregate", "join"],
+      "oracle": {"expectedColumns": ["country", "revenue"], "requiredModels": ["regions", "customers", "orders", "order_items"], "numericTolerance": "0.01", "rows": [{"country": "中国", "revenue": "25587.00"}]}
+    },
+    {
+      "id": "price-variance", "question": "实际成交单价与目录价相差多少？", "features": ["calculation", "join"],
+      "oracle": {"expectedColumns": ["product_name", "unit_price", "list_price", "price_difference"], "requiredModels": ["products", "orders", "order_items"], "numericTolerance": "0.01", "rows": [
+        {"product_name": "轻薄笔记本", "unit_price": "6699.00", "list_price": "6999.00", "price_difference": "-300.00"},
+        {"product_name": "27 寸显示器", "unit_price": "1799.00", "list_price": "1899.00", "price_difference": "-100.00"},
+        {"product_name": "机械键盘", "unit_price": "649.00", "list_price": "699.00", "price_difference": "-50.00"},
+        {"product_name": "27 寸显示器", "unit_price": "1699.00", "list_price": "1899.00", "price_difference": "-200.00"},
+        {"product_name": "机械键盘", "unit_price": "699.00", "list_price": "699.00", "price_difference": "0.00"}
+      ]}
+    },
+    {
+      "id": "zero-sales-products", "question": "哪些产品还没有产生非取消销售？", "features": ["outer_join", "null"],
+      "oracle": {"expectedColumns": ["product_name"], "requiredModels": ["products", "orders", "order_items"], "numericTolerance": "0", "rows": [{"product_name": "人体工学椅"}]}
+    }
+  ]
+}

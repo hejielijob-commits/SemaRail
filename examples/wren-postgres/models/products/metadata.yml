@@ -1,0 +1,22 @@
+name: products
+table_reference:
+  schema: public
+  table: products
+primary_key: id
+columns:
+  - name: id
+    type: INTEGER
+    is_primary_key: true
+    not_null: true
+  - name: sku
+    type: VARCHAR
+    not_null: true
+  - name: name
+    type: VARCHAR
+    not_null: true
+  - name: category
+    type: VARCHAR
+    not_null: true
+  - name: list_price
+    type: DECIMAL
+    not_null: true
