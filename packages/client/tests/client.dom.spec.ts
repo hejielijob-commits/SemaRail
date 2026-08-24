@@ -88,7 +88,7 @@ afterEach(() => {
 })
 
 describe('DataQueryRow browser interactions', () => {
-  it('mounts Table by default, changes tabs, sorts rows, switches SQL, and copies the visible SQL', async () => {
+  it('mounts Chart by default, changes tabs, sorts rows, switches SQL, and copies the visible SQL', async () => {
     const writeText = vi.fn(async () => undefined)
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,
@@ -96,16 +96,20 @@ describe('DataQueryRow browser interactions', () => {
     })
     const { container } = mount()
 
-    expect(container.querySelector('[data-query-tab-panel="table"]')).not.toBeNull()
-    expect(container.querySelector('table[data-query-table]')).not.toBeNull()
-    expect(button(container, 'Table').getAttribute('aria-selected')).toBe('true')
+    expect(container.querySelector('[data-query-tab-panel="chart"]')).not.toBeNull()
+    expect(container.querySelector('[data-query-chart-canvas="line"]')).not.toBeNull()
+    expect(button(container, 'Chart').getAttribute('aria-selected')).toBe('true')
+    expect([...container.querySelectorAll('[data-query-tab]')].map(tab => tab.textContent)).toEqual(['Chart', 'Table', 'SQL'])
+    expect(container.querySelector('[role="tabpanel"]')?.getAttribute('aria-labelledby')).toBe(container.querySelector('[data-query-tab="chart"]')?.id)
 
-    const revenueHeading = [...container.querySelectorAll('th')].find(cell => cell.textContent === 'revenue')
-    expect(revenueHeading).toBeInstanceOf(HTMLTableCellElement)
+    click(button(container, 'Table'))
+    const revenueHeading = container.querySelector('[data-query-column-sort="revenue"]')
+    expect(revenueHeading).toBeInstanceOf(HTMLButtonElement)
     click(revenueHeading!)
-    expect(revenueHeading?.getAttribute('aria-sort')).toBe('ascending')
+    const revenueCell = revenueHeading?.closest('th')
+    expect(revenueCell?.getAttribute('aria-sort')).toBe('ascending')
     click(revenueHeading!)
-    expect(revenueHeading?.getAttribute('aria-sort')).toBe('descending')
+    expect(revenueCell?.getAttribute('aria-sort')).toBe('descending')
     expect(tableRows(container)[0]).toEqual(['2026-08-18', 'east', '21.00'])
 
     click(button(container, 'Chart'))
@@ -115,6 +119,8 @@ describe('DataQueryRow browser interactions', () => {
     click(button(container, 'SQL'))
     expect(container.querySelector('[data-query-tab-panel="sql"]')).not.toBeNull()
     const sqlBlock = container.querySelector('[data-query-sql-code-block]')
+    expect(sqlBlock?.querySelector('code[data-query-sql-code]')).not.toBeNull()
+    expect(container.querySelector('style')?.textContent).toContain('white-space: pre-wrap')
     expect(sqlBlock?.getAttribute('data-query-sql-current')).toBe('semantic')
     expect(sqlBlock?.textContent).toBe(replayMeta.semanticSql)
 
@@ -125,6 +131,35 @@ describe('DataQueryRow browser interactions', () => {
     expect(writeText).toHaveBeenCalledOnce()
     expect(writeText).toHaveBeenCalledWith(replayMeta.nativeSql)
     expect(button(container, 'Copied')).toBeInstanceOf(HTMLButtonElement)
+  })
+
+  it('paginates a large preview after sorting the complete result set', () => {
+    const largeMeta = {
+      ...replayMeta,
+      chart: undefined,
+      stats: { ...replayMeta.stats, returnedRows: 45 },
+      previewRows: Array.from({ length: 45 }, (_, index) => ({
+        day: `2026-09-${String(index + 1).padStart(2, '0')}`,
+        region: 'east',
+        revenue: String(index),
+      })),
+    }
+    const { container } = mount(largeMeta)
+    expect(container.querySelector('[data-query-tab-panel="table"]')).not.toBeNull()
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(20)
+    expect(container.querySelector('[data-query-page-label]')?.textContent).toBe('Page 1 of 3')
+    expect(container.querySelector('[data-query-row-range]')?.textContent).toBe('1-20 of 45 rows')
+    click(button(container, 'Next'))
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(20)
+    expect(container.querySelector('[data-query-row-range]')?.textContent).toBe('21-40 of 45 rows')
+    click(button(container, 'Next'))
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(5)
+    expect(container.querySelector('[data-query-row-range]')?.textContent).toBe('41-45 of 45 rows')
+    expect(button(container, 'Next').disabled).toBe(true)
+    const revenueHeading = container.querySelector('[data-query-column-sort="revenue"]')
+    click(revenueHeading!)
+    expect(container.querySelector('[data-query-page-label]')?.textContent).toBe('Page 1 of 3')
+    expect(tableRows(container)[0]?.[2]).toBe('0')
   })
 
   it('renders malformed settled metadata through the safe DOM fallback', () => {

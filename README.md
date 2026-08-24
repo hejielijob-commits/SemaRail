@@ -62,7 +62,7 @@ process and the Host only returns credential-free stable error messages.
 - `packages/contract`: shared JSON-safe Host/Client and Sidecar contracts.
 - `packages/host`: two tools, Sidecar supervision, cancellation, and durable
   result projection.
-- `packages/client`: keyed `data_query` Table/Chart/SQL conversation view.
+- `packages/client`: keyed `data_query` Chart/Table/SQL conversation view with a paginated preview table.
 - `packages/bundle`: installable `dsh.bundle` composition.
 - `python/sidecar`: framed RPC server, Wren context/planning, PostgreSQL query
   execution, AST policy, limits, and chart specification.

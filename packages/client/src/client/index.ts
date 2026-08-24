@@ -6,7 +6,7 @@
  * in-memory query cache when a result is settled. A replay or hard refresh is
  * therefore equivalent to the first render of the same tool result.
  */
-import { createElement, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createElement, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as echarts from 'echarts/core'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TitleComponent, TooltipComponent } from 'echarts/components'
@@ -126,6 +126,100 @@ const MAX_STRING = 4_000
 const MAX_SQL = 64_000
 const MAX_QUERY_ROWS = 500
 const MAX_PREVIEW_BYTES = 1_048_576
+export const DATA_QUERY_PAGE_SIZE = 20
+
+/**
+ * The Client artifact has no CSS entry point in Harness rc.7. Keep the styles
+ * scoped to this tool view so the plugin remains portable and cannot affect
+ * Harness core. Values prefer Harness theme tokens and retain system fallbacks.
+ */
+const DATA_QUERY_STYLES = `
+[data-dsh-wren-data-query] {
+  --wren-bg: var(--dsw-alias-bg-layer-1, Canvas);
+  --wren-bg-subtle: var(--dsw-alias-bg-module-platform, color-mix(in srgb, CanvasText 5%, Canvas));
+  --wren-bg-hover: var(--dsw-alias-interactive-bg-hover, color-mix(in srgb, CanvasText 7%, transparent));
+  --wren-border: var(--dsw-alias-border-l2, color-mix(in srgb, CanvasText 14%, transparent));
+  --wren-border-strong: var(--dsw-alias-border-l3, color-mix(in srgb, CanvasText 22%, transparent));
+  --wren-text: var(--dsw-alias-label-primary, CanvasText);
+  --wren-text-secondary: var(--dsw-alias-label-secondary, color-mix(in srgb, CanvasText 72%, transparent));
+  --wren-text-tertiary: var(--dsw-alias-label-tertiary, color-mix(in srgb, CanvasText 58%, transparent));
+  --wren-accent: var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6);
+  --wren-success: var(--dsw-alias-state-success-primary, #22875a);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 12px 0;
+  overflow: hidden;
+  border: 1px solid var(--wren-border);
+  border-radius: 12px;
+  background: var(--wren-bg);
+  color: var(--wren-text);
+  font: var(--dsw-font-s-14, 14px/1.5 system-ui, sans-serif);
+}
+[data-dsh-wren-data-query] *, [data-dsh-wren-data-query] *::before, [data-dsh-wren-data-query] *::after { box-sizing: border-box; }
+[data-query-header] { display: flex; min-width: 0; align-items: center; gap: 10px; padding: 13px 16px 11px; }
+[data-query-status] { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 9px; border-radius: 6px; background: color-mix(in srgb, var(--wren-success) 12%, transparent); color: var(--wren-success); font-weight: 600; font-size: 12px; line-height: 18px; }
+[data-dsh-wren-data-query="error"] [data-query-status] { background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c23b3b) 12%, transparent); color: var(--dsw-alias-state-error-primary, #c23b3b); }
+[data-query-stats] { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px 12px; color: var(--wren-text-secondary); font-size: 12px; }
+[data-query-stats] span + span { position: relative; }
+[data-query-stats] span + span::before { position: absolute; left: -7px; top: 50%; width: 2px; height: 2px; border-radius: 50%; background: var(--wren-text-tertiary); content: ""; }
+[data-query-error] { margin: 0 16px 12px; padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c23b3b) 9%, transparent); color: var(--wren-text); overflow-wrap: anywhere; }
+[data-query-tabs] { min-width: 0; }
+[data-query-tabs] [role="tablist"] { display: flex; gap: 4px; padding: 0 12px; border-bottom: 1px solid var(--wren-border); }
+[data-query-tabs] [role="tab"] { position: relative; min-width: 72px; min-height: 38px; padding: 8px 12px; border: 0; border-radius: 8px 8px 0 0; background: transparent; color: var(--wren-text-secondary); font: inherit; font-weight: 500; cursor: pointer; transition: background-color 120ms ease, color 120ms ease; }
+[data-query-tabs] [role="tab"]::after { position: absolute; right: 12px; bottom: -1px; left: 12px; height: 2px; border-radius: 2px 2px 0 0; background: transparent; content: ""; }
+[data-query-tabs] [role="tab"]:hover:not(:disabled) { background: var(--wren-bg-hover); color: var(--wren-text); }
+[data-query-tabs] [role="tab"][aria-selected="true"] { color: var(--wren-text); }
+[data-query-tabs] [role="tab"][aria-selected="true"]::after { background: var(--wren-accent); }
+[data-query-tabs] [role="tab"]:disabled { cursor: not-allowed; opacity: .42; }
+[data-dsh-wren-data-query] button:focus-visible, [data-dsh-wren-data-query] [tabindex="0"]:focus-visible { outline: 2px solid var(--wren-accent); outline-offset: 2px; }
+[data-query-tab-panel] { min-width: 0; padding: 14px 16px 16px; }
+[data-query-chart-shell] { min-width: 0; overflow: hidden; border-radius: 8px; background: var(--wren-bg-subtle); }
+[data-query-chart-canvas] { width: 100%; min-height: 320px; }
+[data-query-chart-fallback], [data-query-empty] { display: grid; min-height: 180px; place-items: center; padding: 24px; color: var(--wren-text-tertiary); text-align: center; }
+[data-query-table-shell] { min-width: 0; overflow: hidden; border: 1px solid var(--wren-border); border-radius: 8px; }
+[data-query-table-scroll] { max-width: 100%; overflow: auto; }
+[data-query-table] { width: 100%; min-width: max-content; border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
+[data-query-table] th { position: sticky; top: 0; z-index: 1; padding: 0; border-bottom: 1px solid var(--wren-border-strong); background: var(--wren-bg-subtle); color: var(--wren-text-secondary); text-align: left; }
+[data-query-column-sort] { display: flex; width: 100%; min-width: 120px; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+[data-query-column-sort]:hover { background: var(--wren-bg-hover); color: var(--wren-text); }
+[data-query-sort-indicator] { width: 12px; color: var(--wren-text-tertiary); font-size: 10px; text-align: center; }
+[data-query-table] td { max-width: 360px; padding: 9px 12px; border-bottom: 1px solid var(--wren-border); color: var(--wren-text); overflow-wrap: anywhere; vertical-align: top; }
+[data-query-table] tbody tr:last-child td { border-bottom: 0; }
+[data-query-table] tbody tr:hover td { background: var(--wren-bg-hover); }
+[data-query-null] { color: var(--wren-text-tertiary); font-style: italic; }
+[data-query-pagination] { display: flex; min-height: 48px; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 9px 10px 9px 12px; border-top: 1px solid var(--wren-border); color: var(--wren-text-secondary); font-size: 12px; }
+[data-query-pagination-actions] { display: flex; align-items: center; gap: 8px; }
+[data-query-page-label] { min-width: 88px; color: var(--wren-text); text-align: center; font-variant-numeric: tabular-nums; }
+[data-query-pagination] button, .data-query-sql-toolbar button { min-height: 30px; padding: 5px 10px; border: 1px solid var(--wren-border); border-radius: 7px; background: var(--wren-bg); color: var(--wren-text); font: inherit; font-size: 12px; cursor: pointer; transition: background-color 120ms ease, border-color 120ms ease; }
+[data-query-pagination] button:hover:not(:disabled), .data-query-sql-toolbar button:hover:not(:disabled) { border-color: var(--wren-border-strong); background: var(--wren-bg-hover); }
+[data-query-pagination] button:active:not(:disabled), .data-query-sql-toolbar button:active:not(:disabled) { transform: translateY(1px); }
+[data-query-pagination] button:disabled, .data-query-sql-toolbar button:disabled { cursor: not-allowed; opacity: .42; }
+[data-query-sql] { min-width: 0; overflow: hidden; border: 1px solid var(--wren-border); border-radius: 8px; background: var(--dsw-alias-markdown-code-block, var(--wren-bg-subtle)); }
+[data-query-sql-heading] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.data-query-sql-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px; border-bottom: 1px solid var(--wren-border); }
+.data-query-sql-toolbar [aria-pressed="true"] { border-color: var(--wren-accent); background: color-mix(in srgb, var(--wren-accent) 12%, transparent); color: var(--wren-text); }
+.data-query-sql-toolbar [data-query-sql-copy] { margin-left: auto; }
+[data-query-sql-code-block] { width: 100%; max-width: 100%; max-height: 440px; margin: 0; overflow: auto; padding: 16px; color: var(--wren-text); font: var(--dsw-font-markdown-code-block, 13px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace); tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+[data-query-sql-code] { display: block; min-width: 0; white-space: inherit; overflow-wrap: inherit; word-break: inherit; }
+.sql-keyword { color: var(--dsw-static-deepseek-500, #356ac3); font-weight: 600; }
+.sql-number { color: var(--dsw-alias-state-warn-label, #9a5b13); }
+.sql-string { color: var(--dsw-alias-state-success-primary, #22875a); }
+.sql-comment { color: var(--wren-text-tertiary); font-style: italic; }
+.sql-identifier { color: var(--wren-text); }
+@media (max-width: 640px) {
+  [data-query-header] { align-items: flex-start; flex-direction: column; gap: 6px; }
+  [data-query-tabs] [role="tablist"] { padding: 0 6px; }
+  [data-query-tabs] [role="tab"] { min-width: 0; flex: 1 1 0; }
+  [data-query-tab-panel] { padding: 10px; }
+  [data-query-chart-canvas] { min-height: 260px; }
+  [data-query-pagination] { align-items: stretch; flex-direction: column; }
+  [data-query-pagination-actions] { justify-content: space-between; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-dsh-wren-data-query] button { transition: none !important; }
+}
+`
 
 /** Return true for a JSON/plain object, excluding arrays and null. */
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -538,6 +632,7 @@ function DataQuerySql({ meta }: { readonly meta: DataQueryMeta }): ReactNode {
 
 function DataQueryTable({ meta }: { readonly meta: DataQueryMeta }): ReactNode {
   const [sort, setSort] = useState<{ readonly column: string; readonly descending: boolean } | null>(null)
+  const [page, setPage] = useState(0)
   const rows = useMemo(() => {
     if (sort === null) return meta.previewRows
     return meta.previewRows
@@ -548,29 +643,54 @@ function DataQueryTable({ meta }: { readonly meta: DataQueryMeta }): ReactNode {
       })
       .map(item => item.row)
   }, [meta.previewRows, sort])
+  const pageCount = Math.max(1, Math.ceil(rows.length / DATA_QUERY_PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount - 1)
+  const pageStart = currentPage * DATA_QUERY_PAGE_SIZE
+  const visibleRows = rows.slice(pageStart, pageStart + DATA_QUERY_PAGE_SIZE)
+  useEffect(() => {
+    setPage(0)
+    setSort(null)
+  }, [meta.queryId, meta.previewRows])
   const toggleSort = (column: string): void => {
+    setPage(0)
     setSort(current => current?.column === column
       ? { column, descending: !current.descending }
       : { column, descending: false })
   }
-  return element('div', { 'data-query-table-scroll': true, style: { overflowX: 'auto', maxWidth: '100%' } },
-    element('table', { 'data-query-table': true, style: { minWidth: 'max-content', borderCollapse: 'collapse' } },
-      element('thead', { style: { position: 'sticky', top: 0, zIndex: 1 } }, element('tr', null,
+  if (rows.length === 0) return element('div', { 'data-query-empty': true, role: 'status' }, 'No rows returned')
+  const rangeEnd = Math.min(pageStart + DATA_QUERY_PAGE_SIZE, rows.length)
+  return element('div', { 'data-query-table-shell': true },
+    element('div', { 'data-query-table-scroll': true },
+      element('table', { 'data-query-table': true },
+        element('thead', null, element('tr', null,
         ...meta.columns.map(column => element('th', {
           key: column.name,
           scope: 'col',
           'aria-sort': sort?.column === column.name ? (sort.descending ? 'descending' : 'ascending') : 'none',
-          style: { position: 'sticky', top: 0, background: 'var(--color-bg, Canvas)', cursor: 'pointer' },
+        }, element('button', {
+          type: 'button',
+          'data-query-column-sort': column.name,
           onClick: () => toggleSort(column.name),
-          onKeyDown: (event: { key?: string; preventDefault?: () => void }) => {
-            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault?.(); toggleSort(column.name) }
-          },
-          tabIndex: 0,
-        }, column.name)),
-      )),
-      element('tbody', null, ...rows.map((row, index) => element('tr', { key: `${meta.queryId}-${index}` },
-        ...meta.columns.map(column => element('td', { key: column.name }, cellText(row[column.name]))),
-      ))),
+          'aria-label': `Sort by ${column.name}`,
+        },
+        element('span', null, column.name),
+        element('span', { 'data-query-sort-indicator': true, 'aria-hidden': true }, sort?.column === column.name ? (sort.descending ? '▼' : '▲') : '↕'),
+        ))),
+        )),
+        element('tbody', null, ...visibleRows.map((row, index) => element('tr', { key: `${meta.queryId}-${pageStart + index}` },
+          ...meta.columns.map(column => element('td', { key: column.name }, row[column.name] === null
+            ? element('span', { 'data-query-null': true }, 'null')
+            : cellText(row[column.name]))),
+        ))),
+      ),
+    ),
+    element('div', { 'data-query-pagination': true, role: 'navigation', 'aria-label': 'Table pagination' },
+      element('span', { 'data-query-row-range': true }, `${pageStart + 1}-${rangeEnd} of ${rows.length} rows`),
+      element('div', { 'data-query-pagination-actions': true },
+        element('button', { type: 'button', disabled: currentPage === 0, onClick: () => setPage(value => Math.max(0, value - 1)), 'aria-label': 'Previous page' }, 'Previous'),
+        element('span', { 'data-query-page-label': true, 'aria-live': 'polite' }, `Page ${currentPage + 1} of ${pageCount}`),
+        element('button', { type: 'button', disabled: currentPage >= pageCount - 1, onClick: () => setPage(value => Math.min(pageCount - 1, value + 1)), 'aria-label': 'Next page' }, 'Next'),
+      ),
     ),
   )
 }
@@ -594,36 +714,47 @@ function DataQueryChartPanel({ meta }: { readonly meta: DataQueryMeta }): ReactN
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [replayKey])
   if (option === null) return element('div', { 'data-query-chart-fallback': true, role: 'status' }, 'Chart unavailable for this result')
-  return element('div', {
-    ref,
-    role: 'img',
-    'data-query-chart-canvas': meta.chart?.type,
-    'aria-label': meta.chart?.title ?? `${meta.chart?.type ?? 'data'} chart`,
-    style: { width: '100%', minHeight: 280 },
-  })
+  return element('div', { 'data-query-chart-shell': true }, element('div', {
+      ref,
+      role: 'img',
+      'data-query-chart-canvas': meta.chart?.type,
+      'aria-label': meta.chart?.title ?? `${meta.chart?.type ?? 'data'} chart`,
+    }),
+  )
 }
 
-/** Stable review-first tab order used by the MVP query card. */
-export const DATA_QUERY_TAB_ORDER = ['table', 'chart', 'sql'] as const
+/** Stable analysis-first tab order used by the query card. */
+export const DATA_QUERY_TAB_ORDER = ['chart', 'table', 'sql'] as const
 
-/** The table is the deterministic default view for a replayed result. */
-export const DEFAULT_DATA_QUERY_TAB = 'table' as const
+/** Prefer the visual summary when the result includes a valid chart. */
+export const DEFAULT_DATA_QUERY_TAB = 'chart' as const
 
 type QueryTab = typeof DATA_QUERY_TAB_ORDER[number]
 
 function DataQueryTabs({ meta }: { readonly meta: DataQueryMeta }): ReactNode {
   const chartAvailable = buildDataQueryChartOption(meta) !== null
-  const [tab, setTab] = useState<QueryTab>(DEFAULT_DATA_QUERY_TAB)
+  const tabIdPrefix = `wren-query-${useId().replace(/:/gu, '')}`
+  const tabPanelId = `${tabIdPrefix}-panel`
+  const [tab, setTab] = useState<QueryTab>(chartAvailable ? DEFAULT_DATA_QUERY_TAB : 'table')
   const panel = tab === 'chart'
     ? (chartAvailable ? element(DataQueryChartPanel, { meta }) : element('div', { role: 'status' }, 'Chart unavailable for this result'))
     : tab === 'table' ? element(DataQueryTable, { meta }) : element(DataQuerySql, { meta })
   return element('div', { 'data-query-tabs': true },
     element('nav', { role: 'tablist', 'aria-label': 'Data query views' },
-      element('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'table', onClick: () => setTab('table') }, 'Table'),
-      element('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'chart', disabled: !chartAvailable, onClick: () => setTab('chart') }, 'Chart'),
-      element('button', { type: 'button', role: 'tab', 'aria-selected': tab === 'sql', onClick: () => setTab('sql') }, 'SQL'),
+      ...DATA_QUERY_TAB_ORDER.map(item => element('button', {
+        key: item,
+        type: 'button',
+        role: 'tab',
+        'data-query-tab': item,
+        id: `${tabIdPrefix}-${item}`,
+        'aria-controls': tabPanelId,
+        'aria-selected': tab === item,
+        disabled: item === 'chart' && !chartAvailable,
+        tabIndex: tab === item ? 0 : -1,
+        onClick: () => setTab(item),
+      }, item === 'sql' ? 'SQL' : `${item[0]?.toUpperCase() ?? ''}${item.slice(1)}`)),
     ),
-    element('div', { 'data-query-tab-panel': tab }, panel),
+    element('div', { id: tabPanelId, role: 'tabpanel', 'aria-labelledby': `${tabIdPrefix}-${tab}`, 'data-query-tab-panel': tab }, panel),
   )
 }
 
@@ -639,12 +770,16 @@ export function DataQueryRow(props: DataQueryViewProps): ReactNode {
     return fallback(props, 'Data query result is not renderable', detail)
   }
   const status = meta.status === 'success' ? 'success' : 'error'
-  const stats = `${meta.stats.returnedRows} row(s) · ${Math.round(meta.stats.durationMs)} ms${meta.stats.truncated ? ' · preview truncated' : ''}`
   const error = meta.error === undefined ? null : element('p', { 'data-query-error': meta.error.code }, `${meta.error.code}: ${meta.error.message}`)
   return element('section', { 'data-dsh-wren-data-query': status, 'data-query-id': meta.queryId },
+    element('style', null, DATA_QUERY_STYLES),
     element('header', { 'data-query-header': true },
       element('strong', { 'data-query-status': status }, status === 'success' ? 'Success' : 'Error'),
-      element('span', { 'data-query-stats': true }, stats),
+      element('div', { 'data-query-stats': true },
+        element('span', null, `${meta.stats.returnedRows} ${meta.stats.returnedRows === 1 ? 'row' : 'rows'}`),
+        element('span', null, `${Math.round(meta.stats.durationMs)} ms`),
+        ...(meta.stats.truncated ? [element('span', { key: 'truncated' }, 'Preview limited')] : []),
+      ),
     ),
     error,
     element(DataQueryTabs, { meta }),

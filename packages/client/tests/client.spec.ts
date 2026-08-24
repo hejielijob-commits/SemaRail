@@ -175,9 +175,9 @@ describe('data_query Client adapter', () => {
     ]))
   })
 
-  it('uses the review-first Table / Chart / SQL order and table default', () => {
-    expect(DATA_QUERY_TAB_ORDER).toEqual(['table', 'chart', 'sql'])
-    expect(DEFAULT_DATA_QUERY_TAB).toBe('table')
+  it('uses the analysis-first Chart / Table / SQL order and chart default', () => {
+    expect(DATA_QUERY_TAB_ORDER).toEqual(['chart', 'table', 'sql'])
+    expect(DEFAULT_DATA_QUERY_TAB).toBe('chart')
   })
 
   it('renders SQL content directly after selecting the SQL tab', () => {
