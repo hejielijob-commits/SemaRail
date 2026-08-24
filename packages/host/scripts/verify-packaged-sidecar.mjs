@@ -34,6 +34,13 @@ const required = [
   'python/sidecar/sidecar/__main__.py',
   'python/sidecar/sidecar/protocol.py',
   'python/sidecar/sidecar/query.py',
+  'python/semantic-console/server/app.py',
+  'python/semantic-console/server/service.py',
+  'semantic-console-web/index.html',
+  'semantic-console-web/licenses/react/LICENSE',
+  'semantic-console-web/licenses/react-dom/LICENSE',
+  'semantic-console-web/licenses/scheduler/LICENSE',
+  'semantic-console-web/licenses/phosphor-icons-react/LICENSE',
 ]
 for (const path of required) {
   if (!files.includes(path)) throw new Error(`npm pack omitted required sidecar file: ${path}`)
@@ -41,6 +48,7 @@ for (const path of required) {
 
 const forbidden = files.filter(path =>
   path.startsWith('python/sidecar/tests/')
+  || path.startsWith('python/semantic-console/tests/')
   || path.includes('/__pycache__/')
   || path.includes('/.pytest_cache/')
   || path.endsWith('.pyc')

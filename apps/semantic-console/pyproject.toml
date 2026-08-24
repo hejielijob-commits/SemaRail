@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dsh-wren-semantic-console"
+version = "0.1.0"
+description = "Local Wren 0.13.2 Semantic Console MVP server"
+requires-python = ">=3.11"
+dependencies = ["PyYAML>=6"]
+
+[project.optional-dependencies]
+wren = ["wrenai==0.13.2"]
+postgres = ["psycopg[binary]>=3.1"]
+mysql = ["mysql-connector-python>=8.0"]
+
+[project.scripts]
+wren-semantic-console = "server.app:main"
+
+[tool.setuptools]
+packages = ["server"]

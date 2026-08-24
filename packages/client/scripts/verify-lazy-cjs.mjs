@@ -1,5 +1,5 @@
 /**
- * Execute the generated rc.7 lazy-CJS artifact in a small VM sandbox.
+ * Execute the generated rc.10-compatible lazy-CJS artifact in a small VM sandbox.
  *
  * This catches the most common packaging regression: a browser bundle that
  * exists on disk but is not actually consumable by Harness's ModuleLoader, or
@@ -39,14 +39,34 @@ const exportsValue = loaded.factory((moduleId) => {
   if (moduleId === 'react') return react
   throw new Error(`unexpected non-external module request: ${moduleId}`)
 })
-for (const name of ['apply', 'DataQueryRow', 'parseDataQueryMeta', 'buildDataQueryChartOption']) {
+for (const name of ['apply', 'DataQueryRow', 'SemanticConsoleSidebarAction', 'parseDataQueryMeta', 'buildDataQueryChartOption']) {
   if (typeof exportsValue[name] !== 'function') throw new Error(`lazy-CJS export ${name} is missing`)
+}
+const slotNames = []
+const registrations = []
+exportsValue.apply({
+  slots: {
+    inject(name, callback) {
+      slotNames.push(name)
+      callback()
+    },
+    register(options, component) {
+      registrations.push({ options, component })
+      return () => undefined
+    },
+  },
+})
+if (!slotNames.includes('tool.call.toolview') || !slotNames.includes('sidebar.footer.action')) {
+  throw new Error(`lazy-CJS apply did not inject both public slots: ${slotNames.join(', ')}`)
+}
+if (!registrations.some(({ options }) => options.name === 'sidebar.footer.action' && options.id === 'wren-semantic-console')) {
+  throw new Error('lazy-CJS apply did not register the semantic-console sidebar action')
 }
 if (/require\(["']echarts(?:\/|["'])/u.test(source)) throw new Error('ECharts was not bundled into the Client artifact')
 if (!/require\(["']react["']\)/u.test(source)) throw new Error('React is not external to the Client artifact')
 process.stdout.write(JSON.stringify({
   ok: true,
   id: loaded.id,
-  exports: ['apply', 'DataQueryRow', 'parseDataQueryMeta', 'buildDataQueryChartOption'],
+  exports: ['apply', 'DataQueryRow', 'SemanticConsoleSidebarAction', 'parseDataQueryMeta', 'buildDataQueryChartOption'],
   bytes: Buffer.byteLength(source, 'utf8'),
 }))

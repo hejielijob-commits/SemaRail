@@ -12,7 +12,7 @@ rmSync(resolve(packageDir, '.build'), { recursive: true, force: true })
 execFileSync(process.execPath, [tsc, '-p', 'tsconfig.json'], { cwd: packageDir, stdio: 'inherit' })
 execFileSync(process.execPath, [tsc, '-p', 'tsconfig.client.json'], { cwd: packageDir, stdio: 'inherit' })
 // The package is ESM, while this intermediate tree is intentionally CJS for
-// the rc.7 lazy factory. Mark only the temporary tree as CommonJS so esbuild
+// the rc.10-compatible lazy factory. Mark only the temporary tree as CommonJS so esbuild
 // does not reinterpret TypeScript's `exports` assignments as ESM globals.
 writeFileSync(resolve(packageDir, '.build/client-cjs/package.json'), '{"type":"commonjs"}\n')
 
@@ -35,7 +35,7 @@ const body = bundled.outputFiles[0]?.text
 if (body === undefined) throw new Error('esbuild did not emit a Client artifact')
 const pluginId = '@hejielijob/dsh-wren-data-agent-client'
 const artifact = [
-  '// Generated lazy-CJS Client artifact for DeepSeek Harness 0.1.0-rc.7.',
+  '// Generated lazy-CJS Client artifact for DeepSeek Harness rc.10-compatible API (verified with 0.1.1-rc.2).',
   '// The loader supplies the platform module table through the factory require.',
   'window.__ModuleLoader__.load({',
   `  id: ${JSON.stringify(pluginId)},`,

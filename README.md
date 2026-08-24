@@ -11,19 +11,63 @@ does not patch, fork, or modify the DeepSeek Harness repository.
 
 ## Target baseline
 
-- DeepSeek Harness `0.1.0-rc.7`
+- DeepSeek Harness `>=0.1.0-rc.10 <0.2.0`, compiled and accepted against
+  the current DSH Desktop runtime `0.1.1-rc.2`
 - Wren Python CLI/Core `0.13.2`
 - Node.js `^22.19.0 || >=24`
 - Python `>=3.11`
 
-## Deploying the packaged Python sidecar
+### Client rc.10 compatibility and semantic-console URL
 
-The Host package stages `python/sidecar` into its own npm tarball.  The
-published package therefore contains `python/sidecar/pyproject.toml` and the
-reviewed `sidecar/*.py` runtime; it does not require a checkout of this
-repository at runtime.  The default Host working directory is that packaged
-directory.  Set `workingDirectory` only when an explicitly managed sidecar
-directory should override the packaged default.
+The Client package now targets the public rc.10-compatible slot/runtime API:
+its peer range is `>=0.1.0-rc.10 <0.2.0`.  The public npm registry did not
+contain `@deepseek-ai/dsh-client-runtime@0.1.0-rc.10` (the representative
+`npm view ...@0.1.0-rc.10` query returned `E404` during this migration), so
+the final typecheck/build was run against the official `0.1.1-rc.2` packages
+shipped in DSH Desktop 2.0.2 at
+`C:\Users\20786\AppData\Local\Programs\DSH Desktop\resources\app.asar.unpacked\node_modules`
+(the path is installation-specific).  Those packages expose the
+`ClientContext` from `@deepseek-ai/dsh-client-runtime/client`, the keyed
+`tool.call.toolview` slot, and the public list slot
+`sidebar.footer.action` with a `{ wide: boolean }` owner.  No Harness source
+or DOM internals are required by this plugin.
+
+The public Client `apply(ctx)` receives the slot-bearing context only; there
+is no stable Host-to-Client `consoleUrl` field in this API.  Configuration is
+therefore deliberately local to the browser: an embedding may pass a
+`semanticConsoleUrl` to the exported view/link props, or set
+`localStorage['dsh-wren-data-agent.semantic-console-url']`.  Both paths accept
+only absolute `http:`/`https:` URLs without credentials (maximum 2,048
+characters).  Otherwise the link uses the explicit loopback default
+`http://127.0.0.1:48763`.  External links use `target="_blank"`
+`rel="noopener noreferrer"`; localStorage is a same-origin convenience and
+not a trust boundary.  The Bundle patch intentionally does not claim to
+forward a Host config value that the public Client context cannot receive.
+
+## Semantic Console
+
+The Host starts a second, independently supervised Python process for the
+local Wren Semantic Console. It listens only on
+`http://127.0.0.1:48763`, serves the packaged production SPA, and manages data
+sources, project drafts, Wren validation/build, publication, versions, and
+rollback. The Client exposes the console through the public
+`sidebar.footer.action` slot and through each completed query card. No Harness
+source or DOM is patched.
+
+Datasource credentials are stored outside the Wren project at a deterministic
+per-project path below `~/.wren/semantic-console`. The query sidecar reads the
+active PostgreSQL profile from that same state on every query and falls back to
+`WREN_DATABASE_URL` only when no active Console profile exists. The Console is
+local-only and unauthenticated in this MVP; team login, RBAC, approval, and
+audit are later deployment work.
+
+## Deploying the packaged Python runtimes
+
+The Host package stages both `python/sidecar` and the Semantic Console server
+and SPA into its npm tarball. It does not require a checkout of this repository
+at runtime. The default query-sidecar working directory is the packaged
+directory. Set `workingDirectory` only when an explicitly managed query
+sidecar directory should override that default.
 
 Install the PostgreSQL/Wren runtime into the Python environment that the Host
 will use.  `.[wren]` is intentionally installed from the packaged directory,
@@ -31,10 +75,12 @@ so the source checkout is not needed:
 
 ```powershell
 $sidecarDir = 'C:\path\to\node_modules\@hejielijob\dsh-wren-data-agent-host\python\sidecar'
+$consoleDir = 'C:\path\to\node_modules\@hejielijob\dsh-wren-data-agent-host\python\semantic-console'
 $python = 'C:\Python311\python.exe'
 Push-Location $sidecarDir
 & $python -m pip install '.[wren]'
 Pop-Location
+& $python -m pip install $consoleDir
 ```
 
 Configure the Host with an absolute Wren project directory and, when the
@@ -47,6 +93,7 @@ Harness profile patch (a row patch replaces that row's complete `config`):
     pythonExecutable: C:\Python311\python.exe
     projectDir: D:\data\wren-project
     databaseDsnEnv: WREN_DATABASE_URL
+    # semanticConsoleEnabled: false  # optional; enabled by default
     # workingDirectory: D:\managed\sidecar  # optional explicit override
 ```
 
@@ -60,10 +107,12 @@ process and the Host only returns credential-free stable error messages.
 ## Packages
 
 - `packages/contract`: shared JSON-safe Host/Client and Sidecar contracts.
-- `packages/host`: two tools, Sidecar supervision, cancellation, and durable
-  result projection.
-- `packages/client`: keyed `data_query` Chart/Table/SQL conversation view with a paginated preview table.
+- `packages/host`: two tools, query Sidecar supervision, independent Semantic
+  Console supervision, cancellation, and durable result projection.
+- `packages/client`: keyed `data_query` Chart/Table/SQL conversation view with a paginated preview table, plus the public semantic-console sidebar/card entries.
 - `packages/bundle`: installable `dsh.bundle` composition.
+- `apps/semantic-console`: local REST server and responsive React management
+  console for data sources and Wren project lifecycle.
 - `python/sidecar`: framed RPC server, Wren context/planning, PostgreSQL query
   execution, AST policy, limits, and chart specification.
 

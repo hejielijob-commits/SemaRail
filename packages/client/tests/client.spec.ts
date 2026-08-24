@@ -8,6 +8,12 @@ import {
   DEFAULT_DATA_QUERY_TAB,
   DataQueryRow,
   DataQuerySqlView,
+  DEFAULT_SEMANTIC_CONSOLE_URL,
+  parseSemanticConsoleUrl,
+  resolveSemanticConsoleUrl,
+  SemanticConsoleLink,
+  SemanticConsoleSidebarAction,
+  SEMANTIC_CONSOLE_URL_STORAGE_KEY,
   parseDataQueryMeta,
   tokenizeSql,
   type DataQueryResultBlock,
@@ -73,10 +79,59 @@ describe('data_query Client adapter', () => {
     const inject = vi.fn((_name: string, callback: () => unknown) => callback())
     apply({ slots: { inject, register } })
     expect(inject).toHaveBeenCalledWith('tool.call.toolview', expect.any(Function))
+    expect(inject).toHaveBeenCalledWith('sidebar.footer.action', expect.any(Function))
     expect(register).toHaveBeenCalledWith(
       { name: 'tool.call.toolview', key: 'data_query' },
       DataQueryRow,
     )
+    expect(register).toHaveBeenCalledWith(
+      { name: 'sidebar.footer.action', id: 'wren-semantic-console' },
+      SemanticConsoleSidebarAction,
+    )
+  })
+
+  it('accepts only absolute HTTP(S) console URLs and falls back to loopback', () => {
+    expect(parseSemanticConsoleUrl('https://console.example.test/wren')).toBe('https://console.example.test/wren')
+    expect(parseSemanticConsoleUrl('javascript:alert(1)')).toBeUndefined()
+    expect(parseSemanticConsoleUrl('data:text/html,owned')).toBeUndefined()
+    expect(parseSemanticConsoleUrl('https://user:password@example.test')).toBeUndefined()
+    expect(resolveSemanticConsoleUrl('not a URL')).toBe(DEFAULT_SEMANTIC_CONSOLE_URL)
+  })
+
+  it('uses the validated browser-local URL override without leaking credentials', () => {
+    const values = new Map<string, string>()
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value) },
+      removeItem: (key: string) => { values.delete(key) },
+    }
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage })
+    storage.setItem(SEMANTIC_CONSOLE_URL_STORAGE_KEY, 'https://console.example.test/project')
+    expect(resolveSemanticConsoleUrl()).toBe('https://console.example.test/project')
+    storage.setItem(SEMANTIC_CONSOLE_URL_STORAGE_KEY, 'javascript:alert(1)')
+    expect(resolveSemanticConsoleUrl()).toBe(DEFAULT_SEMANTIC_CONSOLE_URL)
+    storage.removeItem(SEMANTIC_CONSOLE_URL_STORAGE_KEY)
+  })
+
+  it('renders an external link with opener isolation and collapsed tooltip', () => {
+    const wide = SemanticConsoleLink({ wide: true, consoleUrl: 'https://console.example.test', surface: 'card' }) as { props?: Record<string, unknown> }
+    expect(wide.props?.href).toBe('https://console.example.test/')
+    expect(wide.props?.target).toBe('_blank')
+    expect(wide.props?.rel).toBe('noopener noreferrer')
+    expect(wide.props?.referrerPolicy).toBe('no-referrer')
+    const rail = SemanticConsoleSidebarAction({ wide: false }) as { props?: { children?: unknown } }
+    const children = rail.props?.children
+    expect(Array.isArray(children)).toBe(true)
+    const style = (children as unknown[])[0] as { props?: Record<string, unknown> }
+    expect(style.props?.['data-wren-semantic-console-style']).toBe(true)
+    expect(style.props?.children).not.toContain('[data-query-semantic-console]')
+    const link = SemanticConsoleLink({ wide: false, surface: 'sidebar' }) as { props?: Record<string, unknown> }
+    expect(link.props?.['data-sidebar-wide']).toBe('false')
+    expect(link.props?.title).toBe('语义层管理')
+    expect(link.props?.['aria-label']).toBe('语义层管理')
+    const expanded = SemanticConsoleLink({ wide: true, surface: 'sidebar' }) as { props?: Record<string, unknown> }
+    expect(expanded.props?.children).toBe('语义层管理')
+    expect(expanded.props?.title).toBeUndefined()
   })
 
   it('rebuilds a fixed replay fixture deterministically from durable metadata', () => {

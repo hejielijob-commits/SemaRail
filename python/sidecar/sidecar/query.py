@@ -23,7 +23,6 @@ import base64
 import datetime as _datetime
 import json
 import math
-import os
 import re
 import threading
 import time
@@ -33,6 +32,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Protocol
 
+from .datasource_state import DatasourceStateError, load_active_connection
 from .errors import (
     CANCELLED,
     DATABASE_ERROR,
@@ -432,9 +432,11 @@ class WrenQueryService:
         self,
         planner: QueryPlanner,
         executor: DatabaseExecutor,
+        connection_resolver: Callable[[str, str], Mapping[str, Any] | None] | None = None,
     ) -> None:
         self.planner = planner
         self.executor = executor
+        self.connection_resolver = connection_resolver or load_active_connection
 
     def run(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Validate, dry-plan, and execute one bounded query."""
@@ -538,8 +540,16 @@ class WrenQueryService:
                 "validation",
                 "databaseDsnEnv must be a valid environment variable name",
             )
-        dsn = os.environ.get(env_name)
-        if not dsn:
+        try:
+            info = self.connection_resolver(project_dir, env_name)
+        except DatasourceStateError as exc:
+            raise RpcFault(
+                DATABASE_ERROR,
+                "database",
+                "database connection is not configured",
+                retryable=False,
+            ) from exc
+        if info is None:
             raise RpcFault(
                 DATABASE_ERROR,
                 "database",
@@ -547,11 +557,7 @@ class WrenQueryService:
                 retryable=False,
             )
         # This mapping is process-local and is never copied into an RPC
-        # response.  In particular, no plaintext DSN can arrive from Client.
-        info: Mapping[str, Any] = {
-            "connectionUrl": dsn,
-            "datasource": "postgres",
-        }
+        # response. In particular, no credential can arrive from Client.
         result = self.executor.execute(
             query_id=query_id,
             semantic_sql=semantic_sql,

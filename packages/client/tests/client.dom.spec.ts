@@ -27,7 +27,7 @@ vi.mock('echarts/components', () => ({
 }))
 vi.mock('echarts/renderers', () => ({ CanvasRenderer: {} }))
 
-import { DataQueryRow, type DataQueryResultBlock, type DataQueryViewProps } from '../src/client/index.js'
+import { DataQueryRow, SemanticConsoleSidebarAction, type DataQueryResultBlock, type DataQueryViewProps } from '../src/client/index.js'
 import replayMeta from './fixtures/query-result-v1.json'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -88,6 +88,31 @@ afterEach(() => {
 })
 
 describe('DataQueryRow browser interactions', () => {
+  it('adds a safe semantic-console link to the result card', () => {
+    const { container } = mount()
+    const link = container.querySelector('[data-query-semantic-console]')
+    expect(link).toBeInstanceOf(HTMLAnchorElement)
+    expect(link?.getAttribute('href')).toBe('http://127.0.0.1:48763')
+    expect(link?.getAttribute('target')).toBe('_blank')
+    expect(link?.getAttribute('rel')).toBe('noopener noreferrer')
+    expect(link?.getAttribute('referrerpolicy')).toBe('no-referrer')
+    expect(link?.textContent).toBe('语义层管理')
+  })
+
+  it('keeps the sidebar action on the public slot with isolated styles', () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    mountedRoots.add(root)
+    act(() => root.render(createElement(SemanticConsoleSidebarAction, { wide: false })))
+    const link = container.querySelector('[data-wren-semantic-console-action]')
+    expect(link).toBeInstanceOf(HTMLAnchorElement)
+    expect(link?.getAttribute('aria-label')).toBe('语义层管理')
+    expect(link?.getAttribute('title')).toBe('语义层管理')
+    expect(link?.getAttribute('data-sidebar-wide')).toBe('false')
+    expect(container.querySelector('style[data-wren-semantic-console-style]')?.textContent).toContain('[data-wren-semantic-console-action]')
+  })
+
   it('mounts Chart by default, changes tabs, sorts rows, switches SQL, and copies the visible SQL', async () => {
     const writeText = vi.fn(async () => undefined)
     Object.defineProperty(navigator, 'clipboard', {

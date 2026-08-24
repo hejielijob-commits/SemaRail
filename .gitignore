@@ -16,3 +16,4 @@ __pycache__/
 .pytest_cache/
 *.py[cod]
 packages/host/python/
+packages/host/semantic-console-web/

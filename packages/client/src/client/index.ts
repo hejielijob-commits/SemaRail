@@ -7,6 +7,9 @@
  * therefore equivalent to the first render of the same tool result.
  */
 import { createElement, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SidebarFooterActionOwnerProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type { ToolCallOwnerProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import * as echarts from 'echarts/core'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TitleComponent, TooltipComponent } from 'echarts/components'
@@ -15,15 +18,77 @@ import { CanvasRenderer } from 'echarts/renderers'
 /** Wire tool name registered by the Host half. */
 export const DATA_QUERY_TOOL_NAME = 'data_query' as const
 
-/** Harness slot surface used by a Harness slot plugin. */
-export interface DataQuerySlots {
-  inject(name: string, callback: () => unknown): unknown
-  register(options: { name: string; key?: string; locale?: string }, component: unknown): () => void
+/** Public sidebar slot owner share used by the rc.10-compatible action. */
+export type SemanticConsoleSidebarActionProps = SidebarFooterActionOwnerProps
+
+/** Declare the public sidebar child slot without importing Harness UI code. */
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface SlotMap {
+    'sidebar.footer.action': {
+      kind: 'list'
+      scope: 'root'
+      owner: SemanticConsoleSidebarActionProps
+    }
+  }
 }
 
-/** Minimal Client context needed by a Harness slot plugin. */
-export interface DataQueryClientContext {
-  slots: DataQuerySlots
+/** rc.10-compatible Client context: the public runtime owns the SlotRegistry. */
+export type DataQueryClientContext = Pick<ClientContext, 'slots'>
+
+/** Default local semantic console endpoint used when no browser override exists. */
+export const DEFAULT_SEMANTIC_CONSOLE_URL = 'http://127.0.0.1:48763' as const
+
+/** Browser-only override key; the value is validated before it is used as a URL. */
+export const SEMANTIC_CONSOLE_URL_STORAGE_KEY = 'dsh-wren-data-agent.semantic-console-url' as const
+
+const MAX_SEMANTIC_CONSOLE_URL = 2_048
+
+/**
+ * Validate a configurable console URL as a navigable HTTP(S) origin.
+ * Credentials and malformed/oversized values are rejected to keep links from
+ * becoming a credential-bearing or script URL sink.
+ *
+ * @param value - candidate URL from plugin config or browser storage.
+ * @returns canonical URL, or undefined when the candidate is unsafe.
+ */
+export function parseSemanticConsoleUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  if (trimmed.length === 0 || trimmed.length > MAX_SEMANTIC_CONSOLE_URL) return undefined
+  let parsed: URL
+  try {
+    parsed = new URL(trimmed)
+  } catch {
+    return undefined
+  }
+  if ((parsed.protocol !== 'http:' && parsed.protocol !== 'https:') || parsed.hostname.length === 0) return undefined
+  if (parsed.username !== '' || parsed.password !== '') return undefined
+  return parsed.href
+}
+
+function readSemanticConsoleStorage(): string | undefined {
+  if (typeof globalThis === 'undefined' || !('localStorage' in globalThis)) return undefined
+  try {
+    return parseSemanticConsoleUrl(globalThis.localStorage.getItem(SEMANTIC_CONSOLE_URL_STORAGE_KEY))
+  } catch {
+    // Storage can throw in privacy mode or for an opaque origin. Keep the
+    // loopback fallback deterministic and do not make rendering fail.
+    return undefined
+  }
+}
+
+/**
+ * Resolve the explicit value, browser-local override, or loopback default.
+ * The Host has no public rc.10 Client config injection, so this intentionally
+ * does not pretend that a server-side `consoleUrl` reached the browser.
+ *
+ * @param explicit - optional plugin-local value supplied by an embedding host.
+ * @returns a validated HTTP(S) URL.
+ */
+export function resolveSemanticConsoleUrl(explicit?: unknown): string {
+  return parseSemanticConsoleUrl(explicit)
+    ?? readSemanticConsoleStorage()
+    ?? DEFAULT_SEMANTIC_CONSOLE_URL
 }
 
 /** Settled ToolResult subset consumed by this view. */
@@ -46,13 +111,12 @@ export interface DataQueryRunningBlock {
 }
 
 /** Props supplied by Harness's keyed `tool.call.toolview` slot. */
-export interface DataQueryViewProps {
-  readonly callId: string
-  readonly toolName: string
+export interface DataQueryViewProps extends Pick<ToolCallOwnerProps, 'callId' | 'toolName' | 'cwd'> {
   readonly block: DataQueryResultBlock | DataQueryRunningBlock
-  readonly cwd?: string
-  readonly openFile?: (path: string) => void
-  readonly inspect?: () => void
+  readonly openFile?: ToolCallOwnerProps['openFile']
+  readonly inspect?: ToolCallOwnerProps['inspect']
+  /** Optional embedding override; normal Harness owners do not provide it. */
+  readonly semanticConsoleUrl?: string
 }
 
 /** Version-one result metadata shape accepted by the fail-closed guard. */
@@ -128,10 +192,29 @@ const MAX_QUERY_ROWS = 500
 const MAX_PREVIEW_BYTES = 1_048_576
 export const DATA_QUERY_PAGE_SIZE = 20
 
+/** Card-only styles; every selector is scoped below this plugin's root. */
+const SEMANTIC_CONSOLE_CARD_STYLES = `
+[data-dsh-wren-data-query] [data-query-header] { display: flex; min-width: 0; align-items: center; gap: 10px; padding: 13px 16px 11px; }
+[data-dsh-wren-data-query] [data-query-header] [data-query-semantic-console] { margin-left: auto; }
+[data-dsh-wren-data-query] [data-query-semantic-console] { display: inline-flex; min-height: 30px; align-items: center; justify-content: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--wren-border, var(--dsw-alias-border-l2, color-mix(in srgb, CanvasText 14%, transparent))); border-radius: 7px; background: var(--wren-bg, var(--dsw-alias-bg-layer-1, Canvas)); color: var(--wren-text-secondary, var(--dsw-alias-label-secondary, color-mix(in srgb, CanvasText 72%, transparent))); font: inherit; font-size: 12px; text-decoration: none; cursor: pointer; transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease; }
+[data-dsh-wren-data-query] [data-query-semantic-console]:hover { border-color: var(--wren-border-strong, var(--dsw-alias-border-l3, color-mix(in srgb, CanvasText 22%, transparent))); background: var(--wren-bg-hover, var(--dsw-alias-interactive-bg-hover, color-mix(in srgb, CanvasText 7%, transparent))); color: var(--wren-text, var(--dsw-alias-label-primary, CanvasText)); }
+[data-dsh-wren-data-query] [data-query-semantic-console]:focus-visible { outline: 2px solid var(--wren-accent, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6)); outline-offset: 2px; }
+`
+
+/** Sidebar-only styles carried by the action so it works before any card exists. */
+const SEMANTIC_CONSOLE_SIDEBAR_STYLES = `
+[data-wren-semantic-console-action] { display: inline-flex; width: 100%; min-height: 36px; align-items: center; justify-content: flex-start; gap: 6px; padding: 5px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--wren-text-secondary, var(--dsw-alias-label-secondary, color-mix(in srgb, CanvasText 72%, transparent))); font: inherit; font-size: 12px; text-decoration: none; cursor: pointer; transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease; }
+[data-wren-semantic-console-action]:hover { border-color: var(--wren-border-strong, var(--dsw-alias-border-l3, color-mix(in srgb, CanvasText 22%, transparent))); background: var(--wren-bg-hover, var(--dsw-alias-interactive-bg-hover, color-mix(in srgb, CanvasText 7%, transparent))); color: var(--wren-text, var(--dsw-alias-label-primary, CanvasText)); }
+[data-wren-semantic-console-action]:focus-visible { outline: 2px solid var(--wren-accent, var(--dsw-alias-brand-primary-new-colorprimary-new-color, #4176e6)); outline-offset: 2px; }
+[data-wren-semantic-console-action][data-sidebar-wide="false"] { width: 36px; margin: 0 auto; padding: 5px; }
+[data-wren-semantic-console-icon] { display: inline-grid; width: 18px; height: 18px; place-items: center; font-size: 15px; line-height: 1; }
+`
+
 /**
- * The Client artifact has no CSS entry point in Harness rc.7. Keep the styles
- * scoped to this tool view so the plugin remains portable and cannot affect
- * Harness core. Values prefer Harness theme tokens and retain system fallbacks.
+ * The Client artifact has no CSS entry point in Harness rc.10. Keep the
+ * styles scoped to this tool view so the plugin remains portable and cannot
+ * affect Harness core. Values prefer Harness theme tokens and retain system
+ * fallbacks.
  */
 const DATA_QUERY_STYLES = `
 [data-dsh-wren-data-query] {
@@ -157,7 +240,7 @@ const DATA_QUERY_STYLES = `
   font: var(--dsw-font-s-14, 14px/1.5 system-ui, sans-serif);
 }
 [data-dsh-wren-data-query] *, [data-dsh-wren-data-query] *::before, [data-dsh-wren-data-query] *::after { box-sizing: border-box; }
-[data-query-header] { display: flex; min-width: 0; align-items: center; gap: 10px; padding: 13px 16px 11px; }
+${SEMANTIC_CONSOLE_CARD_STYLES}
 [data-query-status] { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 9px; border-radius: 6px; background: color-mix(in srgb, var(--wren-success) 12%, transparent); color: var(--wren-success); font-weight: 600; font-size: 12px; line-height: 18px; }
 [data-dsh-wren-data-query="error"] [data-query-status] { background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c23b3b) 12%, transparent); color: var(--dsw-alias-state-error-primary, #c23b3b); }
 [data-query-stats] { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 4px 12px; color: var(--wren-text-secondary); font-size: 12px; }
@@ -397,6 +480,55 @@ function element(type: string | ((props: any) => ReactNode), props: Record<strin
 function fallback(props: DataQueryViewProps, reason: string, detail?: string): ReactNode {
   const text = detail === undefined ? reason : `${reason}: ${detail}`
   return element('div', { 'data-dsh-wren-data-query': 'fallback', 'data-tool': props.toolName, role: 'status' }, text)
+}
+
+/** Props for the shared semantic-console auxiliary link. */
+export interface SemanticConsoleLinkProps {
+  /** Expanded sidebar state; false renders only the icon and tooltip. */
+  readonly wide?: boolean
+  /** Optional embedding override; otherwise storage/default resolution applies. */
+  readonly consoleUrl?: string
+  /** Link surface, used only for stable test/accessibility hooks and styles. */
+  readonly surface?: 'card' | 'sidebar'
+}
+
+/**
+ * Render a safe external link to the semantic console.
+ *
+ * `target` plus `rel` keeps an external page from receiving an opener handle;
+ * the URL is canonicalized by {@link resolveSemanticConsoleUrl} and therefore
+ * cannot become a `javascript:`, `data:`, or credential-bearing navigation.
+ *
+ * @param props - surface and optional URL configuration.
+ * @returns an accessible external anchor.
+ */
+export function SemanticConsoleLink({ wide = true, consoleUrl, surface = 'card' }: SemanticConsoleLinkProps): ReactNode {
+  const sidebar = surface === 'sidebar'
+  const compact = sidebar && !wide
+  const label = '语义层管理'
+  return element('a', {
+    href: resolveSemanticConsoleUrl(consoleUrl),
+    target: '_blank',
+    rel: 'noopener noreferrer',
+    referrerPolicy: 'no-referrer',
+    ...(sidebar ? {
+      'data-wren-semantic-console-action': true,
+      'data-sidebar-wide': String(wide),
+      ...(compact ? { 'aria-label': label, title: label } : {}),
+    } : {
+      'data-query-semantic-console': true,
+      'aria-label': label,
+    }),
+  }, compact
+    ? element('span', { 'data-wren-semantic-console-icon': true, 'aria-hidden': true }, '↗')
+    : label)
+}
+
+/** Sidebar footer action registered through the public list slot. */
+export function SemanticConsoleSidebarAction(props: SemanticConsoleSidebarActionProps): ReactNode {
+  return element('div', { 'data-wren-semantic-console-root': true },
+    element('style', { 'data-wren-semantic-console-style': true }, SEMANTIC_CONSOLE_SIDEBAR_STYLES),
+    element(SemanticConsoleLink, { wide: props.wide, surface: 'sidebar' }))
 }
 
 /** Return a safe display label for a chart datum without evaluating content. */
@@ -780,19 +912,27 @@ export function DataQueryRow(props: DataQueryViewProps): ReactNode {
         element('span', null, `${Math.round(meta.stats.durationMs)} ms`),
         ...(meta.stats.truncated ? [element('span', { key: 'truncated' }, 'Preview limited')] : []),
       ),
+      element(SemanticConsoleLink, { consoleUrl: props.semanticConsoleUrl, surface: 'card' }),
     ),
     error,
     element(DataQueryTabs, { meta }),
   )
 }
 
-/** Required Harness service for the keyed slot. */
+/** Required Harness service for the keyed Tool and sidebar action slots. */
 export const inject = ['slots'] as const
 
-/** Register the data-query result view without modifying Harness core. */
+/**
+ * Register the data-query result view and additive semantic-console action
+ * through public rc.10-compatible slots; Harness core remains untouched.
+ *
+ * @param ctx - public Client context containing the SlotRegistry.
+ */
 export function apply(ctx: DataQueryClientContext): void {
   ctx.slots.inject('tool.call.toolview', () =>
     ctx.slots.register({ name: 'tool.call.toolview', key: DATA_QUERY_TOOL_NAME }, DataQueryRow))
+  ctx.slots.inject('sidebar.footer.action', () =>
+    ctx.slots.register({ name: 'sidebar.footer.action', id: 'wren-semantic-console' }, SemanticConsoleSidebarAction))
 }
 
 // Register only the chart families/components used by this MVP. This keeps the

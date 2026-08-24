@@ -6,8 +6,9 @@ this project. Read them only as version-pinned API references.
 
 ## Architecture constraints
 
-- Target DeepSeek Harness `0.1.0-rc.7` and Wren `0.13.2` until an explicit
-  compatibility update is made.
+- Target DeepSeek Harness `>=0.1.0-rc.10 <0.2.0` and Wren `0.13.2`. Compile
+  and accept against the current Desktop runtime (`0.1.1-rc.2`) while keeping
+  the public peer range compatible with rc.10.
 - Integrate through `dsh.bundle`, `cordis.patch.yml`, Cordis plugins, registered
   tools, `tool/result.meta`, and keyed Client tool views.
 - Do not add custom Harness session events for the MVP.
@@ -25,4 +26,3 @@ this project. Read them only as version-pinned API references.
 - Behavioral changes require focused tests. Replay-visible UI changes require a
   fixture or snapshot that proves reconstruction from durable tool events.
 - Prefer small packages with explicit ownership over cross-package shortcuts.
-

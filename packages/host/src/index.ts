@@ -33,6 +33,7 @@ import {
   type SidecarGatewayConfig,
 } from './sidecar.js'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
+import { SemanticConsoleProcess } from './semantic-console.js'
 import {
   QueryGatewayError,
   SemanticContextGatewayError,
@@ -57,6 +58,14 @@ export type {
   SidecarSpawn,
 } from './sidecar.js'
 export { DEFAULT_MAX_FRAME_BYTES, SidecarFrameDecoder, SidecarFrameError, encodeSidecarFrame } from './framing.js'
+export {
+  packagedSemanticConsoleDirectory,
+  packagedSemanticConsoleWebDirectory,
+  SEMANTIC_CONSOLE_HOST,
+  SEMANTIC_CONSOLE_PORT,
+  SemanticConsoleProcess,
+} from './semantic-console.js'
+export type { SemanticConsoleConfig } from './semantic-console.js'
 
 export const TOOL_NAME = 'data_query' as const
 /** Stable wire name of the semantic-context Tool. */
@@ -339,6 +348,26 @@ export function apply(ctx: Context, config?: SidecarGatewayConfig): void {
     // Cordis apply hooks are synchronous. Startup is deterministic and lazy
     // requests await the same health → project.validate promise.
     void gateway.start().catch(() => undefined)
+  }
+  if (
+    config !== undefined
+    && config.semanticConsoleEnabled !== false
+    && projectDir !== undefined
+    && runtime !== undefined
+  ) {
+    try {
+      const consoleProcess = new SemanticConsoleProcess(runtime, {
+        pythonExecutable: config.pythonExecutable ?? 'python',
+        projectDir,
+      })
+      ctx.effect(() => {
+        consoleProcess.start()
+        return async () => consoleProcess.dispose()
+      }, 'wren-data-agent-host.semantic-console()')
+    } catch {
+      // The query boundary remains usable if the optional administration UI
+      // is unavailable or misconfigured.
+    }
   }
 }
 

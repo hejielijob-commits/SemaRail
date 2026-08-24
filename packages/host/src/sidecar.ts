@@ -29,6 +29,7 @@ import {
   type QueryGateway,
   type SemanticContextGateway,
 } from './types.js'
+import type { SemanticConsoleConfig } from './semantic-console.js'
 
 const DEFAULT_TIMEOUT_MS = 30_000
 const DEFAULT_STARTUP_TIMEOUT_MS = 10_000
@@ -172,7 +173,7 @@ export function createSubprocessSidecarSpawn(
 }
 
 /** Options for the supervised Python sidecar and its non-secret boundary. */
-export interface SidecarGatewayConfig {
+export interface SidecarGatewayConfig extends SemanticConsoleConfig {
   /** Python executable, defaulting to `python`. */
   readonly pythonExecutable?: string
   /** Python module passed to `python -m`, defaulting to `sidecar`. */

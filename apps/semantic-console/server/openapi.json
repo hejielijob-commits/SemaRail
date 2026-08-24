@@ -1,0 +1,67 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Wren Semantic Console MVP",
+    "version": "1.0.0",
+    "description": "Local-only Semantic Console API. Success responses are the resource/list directly; errors are {code,message,details}. Datasource credentials are accepted only by write requests, held in the server's local secret state file, and never returned or written to a Wren project."
+  },
+  "servers": [{"url": "http://127.0.0.1:48763"}],
+  "paths": {
+    "/api/health": {"get": {"operationId": "health", "responses": {"200": {"description": "Process and Wren readiness", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Health"}}}}}}},
+    "/api/project": {"get": {"operationId": "getProject", "responses": {"200": {"description": "Project overview", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProjectOverview"}}}}}}},
+    "/api/datasource-types": {"get": {"operationId": "listDatasourceTypes", "responses": {"200": {"description": "Datasource types", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/DatasourceType"}}}}}}}},
+    "/api/datasources": {
+      "get": {"operationId": "listDatasources", "responses": {"200": {"description": "Redacted datasource profiles", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Datasource"}}}}}}},
+      "post": {"operationId": "createDatasource", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DatasourceInput"}}}}, "responses": {"201": {"description": "Created redacted profile", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Datasource"}}}}, "400": {"$ref": "#/components/responses/Error"}}}
+    },
+    "/api/datasources/{id}": {
+      "parameters": [{"$ref": "#/components/parameters/DatasourceId"}],
+      "get": {"operationId": "getDatasource", "responses": {"200": {"description": "Redacted profile", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Datasource"}}}}}},
+      "put": {"operationId": "updateDatasource", "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DatasourceInput"}}}}, "responses": {"200": {"description": "Updated redacted profile", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Datasource"}}}}}},
+      "delete": {"operationId": "deleteDatasource", "responses": {"200": {"description": "Deleted profile", "content": {"application/json": {"schema": {"type": "object", "required": ["id", "deleted"], "properties": {"id": {"type": "string"}, "deleted": {"type": "boolean"}}}}}}}}
+    },
+    "/api/datasources/{id}/activate": {"post": {"operationId": "activateDatasource", "parameters": [{"$ref": "#/components/parameters/DatasourceId"}], "responses": {"200": {"description": "Active profile and project overview"}}}},
+    "/api/datasources/{id}/test": {"post": {"operationId": "testDatasource", "parameters": [{"$ref": "#/components/parameters/DatasourceId"}], "responses": {"200": {"description": "Connection test result", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TestResult"}}}}}}},
+    "/api/datasources/{id}/schemas": {"get": {"operationId": "listSchemas", "parameters": [{"$ref": "#/components/parameters/DatasourceId"}], "responses": {"200": {"description": "Database schemas", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/NameItem"}}}}}}}},
+    "/api/datasources/{id}/tables": {"get": {"operationId": "listTables", "parameters": [{"$ref": "#/components/parameters/DatasourceId"}, {"name": "schema", "in": "query", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Tables", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Table"}}}}}}}},
+    "/api/datasources/{id}/columns": {"get": {"operationId": "listColumns", "parameters": [{"$ref": "#/components/parameters/DatasourceId"}, {"name": "schema", "in": "query", "required": true, "schema": {"type": "string"}}, {"name": "table", "in": "query", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Columns", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Column"}}}}}}}},
+    "/api/datasources/{id}/models": {"post": {"operationId": "generateModel", "parameters": [{"$ref": "#/components/parameters/DatasourceId"}, {"name": "schema", "in": "query", "schema": {"type": "string"}}, {"name": "table", "in": "query", "schema": {"type": "string"}}], "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/GenerateModelInput"}}}}, "responses": {"201": {"description": "Generated model draft"}}}},
+    "/api/project/import": {"post": {"operationId": "importProject", "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/ImportInput"}}}}, "responses": {"200": {"description": "Imported draft files"}}}},
+    "/api/project/files": {"get": {"operationId": "listProjectFiles", "responses": {"200": {"description": "Project file metadata", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/FileInfo"}}}}}}}},
+    "/api/project/file": {
+      "get": {"operationId": "readProjectFile", "parameters": [{"$ref": "#/components/parameters/FilePath"}], "responses": {"200": {"description": "Draft-aware file", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FileContent"}}}}}},
+      "put": {"operationId": "editProjectFile", "parameters": [{"$ref": "#/components/parameters/FilePath"}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FileEdit"}}}}, "responses": {"200": {"description": "Updated draft metadata", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DraftResult"}}}}}}
+    },
+    "/api/project/validate": {"post": {"operationId": "validateProject", "responses": {"200": {"description": "Validation result", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ValidationResult"}}}}}}},
+    "/api/project/publish": {"post": {"operationId": "publishProject", "requestBody": {"content": {"application/json": {"schema": {"type": "object", "properties": {"label": {"type": "string", "maxLength": 120}}}}}}, "responses": {"200": {"description": "Published version"}, "400": {"$ref": "#/components/responses/Error"}}}},
+    "/api/versions": {"get": {"operationId": "listVersions", "responses": {"200": {"description": "Published versions", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/Version"}}}}}}}},
+    "/api/versions/{id}/rollback": {"post": {"operationId": "rollbackVersion", "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Restored version"}, "404": {"$ref": "#/components/responses/Error"}}}}
+  },
+  "components": {
+    "parameters": {
+      "DatasourceId": {"name": "id", "in": "path", "required": true, "schema": {"type": "string"}},
+      "FilePath": {"name": "path", "in": "query", "required": true, "schema": {"type": "string", "example": "models/orders/metadata.yml"}}
+    },
+    "responses": {"Error": {"description": "Safe error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}},
+    "schemas": {
+      "Error": {"type": "object", "required": ["code", "message"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "details": {"type": "object", "additionalProperties": true}}},
+      "Health": {"type": "object", "required": ["status", "service", "apiVersion", "wren"], "properties": {"status": {"type": "string"}, "service": {"type": "string"}, "apiVersion": {"type": "string"}, "wren": {"type": "object", "additionalProperties": true}, "datasourceCount": {"type": "integer"}}},
+      "ProjectOverview": {"type": "object", "additionalProperties": true, "properties": {"name": {"type": ["string", "null"]}, "schemaVersion": {"type": ["integer", "null"]}, "dataSource": {"type": ["string", "null"]}, "revision": {"type": "string"}, "draftCount": {"type": "integer"}, "activeDatasource": {"$ref": "#/components/schemas/Datasource"}}},
+      "DatasourceType": {"type": "object", "required": ["type", "label", "available", "fields"], "properties": {"type": {"type": "string"}, "label": {"type": "string"}, "available": {"type": "boolean"}, "module": {"type": ["string", "null"]}, "supportsSchemaBrowse": {"type": "boolean"}, "supportsTest": {"type": "boolean"}, "fields": {"type": "array", "items": {"type": "object", "additionalProperties": true}}}},
+      "Datasource": {"type": "object", "required": ["id", "name", "type", "connection", "hasPassword"], "properties": {"id": {"type": "string"}, "name": {"type": "string"}, "type": {"type": "string"}, "connection": {"type": "object", "description": "Redacted non-secret fields only"}, "hasPassword": {"type": "boolean"}, "createdAt": {"type": "string", "format": "date-time"}, "updatedAt": {"type": "string", "format": "date-time"}, "lastTest": {"type": ["object", "null"]}}},
+      "DatasourceInput": {"type": "object", "required": ["type"], "properties": {"name": {"type": "string"}, "type": {"type": "string", "enum": ["postgres", "mysql"]}, "connection": {"type": "object", "additionalProperties": true, "description": "Password accepted here only; never returned"}}},
+      "NameItem": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}},
+      "Table": {"allOf": [{"$ref": "#/components/schemas/NameItem"}, {"type": "object", "properties": {"type": {"type": "string"}}}]},
+      "Column": {"type": "object", "required": ["name", "type", "nullable", "primaryKey"], "properties": {"name": {"type": "string"}, "type": {"type": "string"}, "dataType": {"type": "string"}, "nullable": {"type": "boolean"}, "ordinal": {"type": "integer"}, "primaryKey": {"type": "boolean"}}},
+      "TestResult": {"type": "object", "required": ["ok"], "properties": {"ok": {"type": "boolean"}, "latencyMs": {"type": "number"}, "driver": {"type": "string"}, "code": {"type": "string"}, "message": {"type": "string"}}},
+      "GenerateModelInput": {"type": "object", "properties": {"name": {"type": "string"}, "schema": {"type": "string"}, "table": {"type": "string"}, "overwrite": {"type": "boolean"}}},
+      "ImportInput": {"type": "object", "properties": {"path": {"type": "string"}, "projectDir": {"type": "string"}, "files": {"type": "array", "items": {"$ref": "#/components/schemas/FileEdit"}}}},
+      "FileInfo": {"type": "object", "required": ["path", "size", "sha256", "draft"], "properties": {"path": {"type": "string"}, "size": {"type": "integer"}, "sha256": {"type": "string"}, "draft": {"type": "boolean"}}},
+      "FileContent": {"type": "object", "required": ["path", "content", "draft", "revision"], "properties": {"path": {"type": "string"}, "content": {"type": "string"}, "draft": {"type": "boolean"}, "revision": {"type": "string"}}},
+      "FileEdit": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": ["string", "null"]}, "delete": {"type": "boolean"}, "expectedRevision": {"type": "string"}}},
+      "DraftResult": {"type": "object", "required": ["path", "draft", "revision"], "properties": {"path": {"type": "string"}, "draft": {"type": "boolean"}, "revision": {"type": "string"}}},
+      "ValidationResult": {"type": "object", "required": ["valid", "errorCount", "warningCount", "revision"], "properties": {"valid": {"type": "boolean"}, "errorCount": {"type": "integer"}, "warningCount": {"type": "integer"}, "errors": {"type": "array", "items": {"$ref": "#/components/schemas/Error"}}, "warnings": {"type": "array", "items": {"$ref": "#/components/schemas/Error"}}, "revision": {"type": "string"}, "draft": {"type": "boolean"}}},
+      "Version": {"type": "object", "required": ["id", "revision", "createdAt", "fileCount"], "properties": {"id": {"type": "string"}, "revision": {"type": "string"}, "createdAt": {"type": "string", "format": "date-time"}, "fileCount": {"type": "integer"}, "label": {"type": "string"}}}
+    }
+  }
+}

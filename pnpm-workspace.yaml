@@ -1,5 +1,6 @@
 packages:
   - packages/*
+  - apps/semantic-console/web
 
 allowBuilds:
   esbuild: true
