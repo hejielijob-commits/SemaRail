@@ -36,11 +36,15 @@ const required = [
   'python/sidecar/sidecar/query.py',
   'python/semantic-console/server/app.py',
   'python/semantic-console/server/service.py',
+  'python/semantic-console/server/semantic_models.py',
   'semantic-console-web/index.html',
   'semantic-console-web/licenses/react/LICENSE',
   'semantic-console-web/licenses/react-dom/LICENSE',
   'semantic-console-web/licenses/scheduler/LICENSE',
   'semantic-console-web/licenses/phosphor-icons-react/LICENSE',
+  'semantic-console-web/licenses/xyflow-react/LICENSE',
+  'semantic-console-web/licenses/i18next/LICENSE',
+  'semantic-console-web/licenses/react-i18next/LICENSE',
 ]
 for (const path of required) {
   if (!files.includes(path)) throw new Error(`npm pack omitted required sidecar file: ${path}`)

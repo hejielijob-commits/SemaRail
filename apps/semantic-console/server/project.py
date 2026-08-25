@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib
+import difflib
 import json
 import os
 import re
@@ -532,11 +533,43 @@ class ProjectStore:
                 raise ProjectError("FILE_NOT_TEXT", "project file is not UTF-8 text") from exc
             return {"path": relative, "content": content, "draft": False, "revision": _file_digest(self.project_dir, self.drafts, exclude=self.state_dir)}
 
+    def diff_file(self, relative: str) -> dict[str, Any]:
+        """Return a bounded unified diff between the published file and draft."""
+
+        relative = _safe_relative(relative, allow_target=False)
+        with self._lock:
+            candidate = self.project_dir / relative
+            before = ""
+            if candidate.is_file() and not candidate.is_symlink():
+                try:
+                    before = candidate.read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError) as exc:
+                    raise ProjectError("FILE_NOT_TEXT", "project file is not UTF-8 text") from exc
+            if relative in self.drafts:
+                after = self.drafts[relative] or ""
+            else:
+                after = before
+            lines = list(difflib.unified_diff(
+                before.splitlines(keepends=True),
+                after.splitlines(keepends=True),
+                fromfile=f"published/{relative}",
+                tofile=f"draft/{relative}",
+            ))
+            diff = "".join(lines)
+            if len(diff.encode("utf-8")) > _MAX_FILE_BYTES:
+                raise ProjectError("FILE_TOO_LARGE", "project diff exceeds the 2 MiB limit")
+            return {
+                "path": relative,
+                "changed": before != after,
+                "diff": diff,
+                "revision": _file_digest(self.project_dir, self.drafts, exclude=self.state_dir),
+            }
+
     def put_file(self, relative: str, content: str | None, *, delete: bool = False, expected_revision: str | None = None) -> dict[str, Any]:
         relative = _safe_relative(relative)
         with self._lock:
             current_revision = _file_digest(self.project_dir, self.drafts, exclude=self.state_dir)
-            if expected_revision and expected_revision != current_revision:
+            if expected_revision is not None and expected_revision != current_revision:
                 raise ProjectError("REVISION_CONFLICT", "project changed since this draft was read", {"revision": current_revision})
             if delete:
                 self.drafts[relative] = None
@@ -548,6 +581,63 @@ class ProjectStore:
                 _assert_safe_content(relative, content)
                 self.drafts[relative] = content
             return {"path": relative, "draft": True, "revision": _file_digest(self.project_dir, self.drafts, exclude=self.state_dir)}
+
+    def put_files(
+        self,
+        files: Mapping[str, str | None],
+        *,
+        expected_revision: str | None = None,
+    ) -> dict[str, Any]:
+        """Apply a set of draft file updates as one revision-checked operation.
+
+        Structured editors commonly update a Wren metadata file together with
+        an extension file (for example ``semantic-console/locales.yml``).
+        Updating those files through two independent ``put_file`` calls can
+        leave a half-written draft when the second call fails or observes a
+        concurrent edit.  Validate every path/content pair first, then mutate
+        the overlay under the same lock and roll back the in-memory changes if
+        an unexpected failure occurs.
+        """
+
+        if not isinstance(files, Mapping) or not files:
+            raise ProjectError("INVALID_CONTENT", "at least one file update is required")
+        normalized: dict[str, str | None] = {}
+        for relative, content in files.items():
+            safe_relative = _safe_relative(relative)
+            if safe_relative in normalized:
+                raise ProjectError("INVALID_PATH", "duplicate file update")
+            if content is not None:
+                if not isinstance(content, str):
+                    raise ProjectError("INVALID_CONTENT", "file content must be a string")
+                if len(content.encode("utf-8")) > _MAX_FILE_BYTES:
+                    raise ProjectError("FILE_TOO_LARGE", "project file exceeds the 2 MiB limit")
+                _assert_safe_content(safe_relative, content)
+            normalized[safe_relative] = content
+
+        with self._lock:
+            current_revision = _file_digest(self.project_dir, self.drafts, exclude=self.state_dir)
+            if expected_revision is not None and expected_revision != current_revision:
+                raise ProjectError("REVISION_CONFLICT", "project changed since this draft was read", {"revision": current_revision})
+            sentinel = object()
+            previous: dict[str, object] = {
+                relative: self.drafts.get(relative, sentinel)
+                for relative in normalized
+            }
+            try:
+                self.drafts.update(normalized)
+                revision = _file_digest(self.project_dir, self.drafts, exclude=self.state_dir)
+            except Exception:
+                for relative, value in previous.items():
+                    if value is sentinel:
+                        self.drafts.pop(relative, None)
+                    else:
+                        self.drafts[relative] = value  # type: ignore[assignment]
+                raise
+            return {
+                "files": [relative for relative in normalized],
+                "draft": True,
+                "revision": revision,
+            }
 
     def import_project(self, source: str | Path | None = None, files: Iterable[Mapping[str, Any]] | None = None) -> dict[str, Any]:
         with self._lock:

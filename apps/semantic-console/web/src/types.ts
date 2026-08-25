@@ -194,3 +194,75 @@ export interface GenerateModelResponse {
   draft: boolean;
   revision: string;
 }
+
+/** A pair of human-facing values used by the semantic model editor. */
+export interface LocalizedText {
+  "zh-CN": string;
+  "en-US": string;
+}
+
+/** A column projected from Wren metadata into the business-model editor. */
+export interface SemanticColumn {
+  name: string;
+  type: string;
+  primaryKey: boolean;
+  notNull: boolean;
+  relationship?: string | null;
+  calculated: boolean;
+  expression: string;
+  displayName: LocalizedText;
+  description: LocalizedText;
+  semanticRole: string;
+  format: string;
+  visible: boolean;
+}
+
+/** A model with both source identity and editable business semantics. */
+export interface SemanticModel {
+  name: string;
+  sourcePath: string;
+  tableReference: { schema: string; table: string };
+  primaryKey: string;
+  displayName: LocalizedText;
+  description: LocalizedText;
+  businessDomain: string;
+  visible: boolean;
+  columns: SemanticColumn[];
+  draft: boolean;
+}
+
+/** A relationship projected from relationships.yml and its locale companion. */
+export interface SemanticRelationship {
+  name: string;
+  models: [string, string];
+  joinType: "ONE_TO_ONE" | "ONE_TO_MANY" | "MANY_TO_ONE" | "MANY_TO_MANY" | string;
+  condition: string;
+  displayName: LocalizedText;
+  description: LocalizedText;
+}
+
+/** The read model used by the visual semantic console. */
+export interface SemanticProjectSnapshot {
+  revision: string;
+  draftCount: number;
+  models: SemanticModel[];
+  relationships: SemanticRelationship[];
+  sourceFiles: ProjectFile[];
+}
+
+export type SemanticModelUpdate = Omit<SemanticModel, "sourcePath" | "draft"> & {
+  expectedRevision?: string;
+};
+
+export interface SemanticRelationshipsUpdate {
+  relationships: SemanticRelationship[];
+  expectedRevision?: string;
+}
+
+/** A bounded unified diff for a project file. */
+export interface ProjectDiff {
+  path: string;
+  changed: boolean;
+  diff: string;
+  revision: string;
+}

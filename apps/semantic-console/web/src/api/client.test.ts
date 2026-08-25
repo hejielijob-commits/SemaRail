@@ -39,4 +39,40 @@ describe("ApiClient", () => {
     await new ApiClient().updateProjectFile({ path: "models/orders/metadata.yml", content: "name: Orders", expectedRevision: "sha256:1" });
     expect(fetchMock).toHaveBeenCalledWith("/api/project/file?path=models%2Forders%2Fmetadata.yml", expect.objectContaining({ method: "PUT", body: JSON.stringify({ content: "name: Orders", expectedRevision: "sha256:1" }) }));
   });
+
+  it("loads and updates the structured semantic project", async () => {
+    const snapshot = { revision: "sha256:1", draftCount: 0, models: [], relationships: [], sourceFiles: [] };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(snapshot), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(new ApiClient().getSemanticProject()).resolves.toEqual(snapshot);
+    await new ApiClient().updateSemanticModel("order items", {
+      name: "order_items",
+      primaryKey: "id",
+      displayName: { "zh-CN": "订单明细", "en-US": "Order items" },
+      description: { "zh-CN": "", "en-US": "" },
+      businessDomain: "commerce",
+      visible: true,
+      tableReference: { schema: "public", table: "order_items" },
+      columns: [],
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/semantic-project");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/semantic-models/order%20items");
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toMatchObject({ name: "order_items" });
+  });
+
+  it("saves relationships and reads a file diff with encoded paths", async () => {
+    const response = { revision: "sha256:2", draftCount: 1, models: [], relationships: [], sourceFiles: [] };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient();
+
+    await client.updateSemanticRelationships({ relationships: [], expectedRevision: "sha256:1" });
+    await client.getProjectDiff("models/order items/metadata.yml");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/semantic-relationships");
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ relationships: [], expectedRevision: "sha256:1" });
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/project/diff?path=models%2Forder%20items%2Fmetadata.yml");
+  });
 });

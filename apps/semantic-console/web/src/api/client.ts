@@ -17,6 +17,10 @@ import type {
   ValidationResponse,
   VersionRecord,
   ConnectionTest,
+  ProjectDiff,
+  SemanticModelUpdate,
+  SemanticProjectSnapshot,
+  SemanticRelationshipsUpdate,
 } from "../types";
 
 export class ApiClientError extends Error {
@@ -69,6 +73,32 @@ export class ApiClient {
 
   getProject(): Promise<ProjectSummary> {
     return this.request<ProjectSummary>("/api/project");
+  }
+
+  /** Load the structured business-model projection used by the visual editor. */
+  getSemanticProject(): Promise<SemanticProjectSnapshot> {
+    return this.request<SemanticProjectSnapshot>("/api/semantic-project");
+  }
+
+  /** Save one business model and its bilingual metadata as a project draft. */
+  updateSemanticModel(name: string, payload: SemanticModelUpdate): Promise<SemanticProjectSnapshot> {
+    return this.request<SemanticProjectSnapshot>(`/api/semantic-models/${encodeURIComponent(name)}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /** Save all relationship definitions as one atomic project draft. */
+  updateSemanticRelationships(payload: SemanticRelationshipsUpdate): Promise<SemanticProjectSnapshot> {
+    return this.request<SemanticProjectSnapshot>("/api/semantic-relationships", {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /** Read the unified diff between a published file and its current draft. */
+  getProjectDiff(path: string): Promise<ProjectDiff> {
+    return this.request<ProjectDiff>(`/api/project/diff?path=${encodeURIComponent(path)}`);
   }
 
   getDatasourceTypes(): Promise<DatasourceType[]> {

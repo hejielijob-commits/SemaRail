@@ -1,0 +1,825 @@
+.relationship-graph {
+  --relationship-edge: var(--border-strong, #c9d4e2);
+  --relationship-grid: color-mix(in srgb, var(--border, #dbe3ed) 66%, transparent);
+  min-width: 0;
+}
+
+.relationship-graph-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.relationship-graph-heading h2 {
+  margin: 5px 0 7px;
+  color: var(--text-strong);
+  font-size: 22px;
+  letter-spacing: -0.025em;
+}
+
+.relationship-graph-heading p:last-child {
+  max-width: 650px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.relationship-graph-panel-kicker {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.095em;
+  text-transform: uppercase;
+}
+
+.relationship-graph-heading-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.relationship-graph-heading-meta span {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  padding: 5px 9px;
+}
+
+.relationship-graph-error,
+.relationship-graph-form-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--border));
+  border-radius: var(--radius-sm, 7px);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.relationship-graph-error {
+  margin-bottom: 13px;
+  padding: 11px 13px;
+}
+
+.relationship-graph-workspace {
+  display: flex;
+  min-width: 0;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.relationship-graph-canvas-panel {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 10px);
+  background: var(--surface);
+  box-shadow: var(--shadow, 0 9px 24px rgb(25 43 70 / 0.06));
+}
+
+.relationship-graph-toolbar {
+  display: flex;
+  min-height: 57px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  padding: 10px 13px;
+}
+
+.relationship-graph-search-wrap {
+  position: relative;
+  display: flex;
+  min-width: 190px;
+  max-width: 360px;
+  flex: 1;
+  align-items: center;
+  color: var(--muted-soft);
+}
+
+.relationship-graph-search-wrap > svg {
+  position: absolute;
+  left: 10px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.relationship-graph-search {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--surface-soft);
+  padding: 0 11px 0 32px;
+  color: var(--text);
+  font-size: 12px;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.relationship-graph-search::placeholder {
+  color: var(--muted-soft);
+}
+
+.relationship-graph-search:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.relationship-graph-search-results {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg, 0 24px 65px rgb(17 33 60 / 0.16));
+}
+
+.relationship-graph-search-result {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  padding: 9px 11px;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.relationship-graph-search-result:last-child {
+  border-bottom: 0;
+}
+
+.relationship-graph-search-result:hover,
+.relationship-graph-search-result:focus-visible {
+  background: var(--accent-faint);
+  color: var(--accent-strong);
+  outline: 0;
+}
+
+.relationship-graph-search-result > span {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.relationship-graph-search-result strong,
+.relationship-graph-search-result small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relationship-graph-search-result strong {
+  color: var(--text-strong);
+  font-size: 12px;
+}
+
+.relationship-graph-search-result small {
+  color: var(--muted-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
+.relationship-graph-toolbar-actions,
+.relationship-graph-focusbar > div,
+.relationship-graph-drawer-actions,
+.relationship-graph-legend {
+  display: flex;
+  align-items: center;
+}
+
+.relationship-graph-toolbar-actions {
+  flex: 0 0 auto;
+  gap: 5px;
+}
+
+.relationship-graph-toolbar-button,
+.relationship-graph-button,
+.relationship-graph-focusbar button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 100ms ease;
+}
+
+.relationship-graph-toolbar-button {
+  padding: 0 8px;
+}
+
+.relationship-graph-toolbar-button:hover,
+.relationship-graph-toolbar-button:focus-visible,
+.relationship-graph-focusbar button:hover,
+.relationship-graph-focusbar button:focus-visible {
+  border-color: var(--border);
+  background: var(--surface-soft);
+  color: var(--text-strong);
+  outline: 0;
+}
+
+.relationship-graph-button {
+  padding: 0 12px;
+}
+
+.relationship-graph-button-small {
+  min-height: 33px;
+  padding: 0 10px;
+}
+
+.relationship-graph-button-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.relationship-graph-button-primary:hover {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+}
+
+.relationship-graph-button-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.relationship-graph-button-secondary {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text-strong);
+}
+
+.relationship-graph-button-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.relationship-graph-button-danger {
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--border));
+  color: var(--danger);
+}
+
+.relationship-graph-button-danger:hover {
+  background: var(--danger-soft);
+}
+
+.relationship-graph-focusbar {
+  display: flex;
+  min-height: 39px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--accent-faint);
+  padding: 5px 13px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.relationship-graph-focusbar > span,
+.relationship-graph-focusbar > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.relationship-graph-focusbar > span > svg {
+  color: var(--accent);
+}
+
+.relationship-graph-focusbar strong {
+  max-width: 180px;
+  overflow: hidden;
+  color: var(--text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relationship-graph-focusbar button {
+  min-height: 26px;
+  padding: 0 7px;
+  font-size: 10px;
+}
+
+.relationship-graph-focusbar button.active {
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.relationship-graph-flow {
+  position: relative;
+  min-height: 560px;
+  flex: 1;
+  background: var(--surface-soft);
+}
+
+.relationship-graph-flow > .react-flow {
+  min-height: 560px;
+}
+
+.relationship-graph-flow .react-flow__attribution {
+  display: none;
+}
+
+.relationship-graph-flow .react-flow__controls {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.relationship-graph-flow .react-flow__controls-button {
+  width: 28px;
+  height: 28px;
+  border-bottom-color: var(--border);
+  background: var(--surface);
+  color: var(--text-strong);
+}
+
+.relationship-graph-flow .react-flow__controls-button:hover {
+  background: var(--surface-soft);
+}
+
+.relationship-graph-flow .react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+.relationship-graph-flow .react-flow__minimap {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.relationship-graph-flow .react-flow__handle {
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--surface);
+  background: var(--accent);
+}
+
+.relationship-graph-node {
+  width: 272px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  transition: opacity 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.relationship-graph-node:hover {
+  border-color: var(--accent);
+  box-shadow: 0 9px 25px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.relationship-graph-node-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent), var(--shadow);
+}
+
+.relationship-graph-node-dimmed,
+.relationship-graph-edge-dimmed,
+.relationship-graph-edge-label-dimmed {
+  opacity: 0.25;
+}
+
+.relationship-graph-node-header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  padding: 11px 11px 10px;
+}
+
+.relationship-graph-node-glyph {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  flex: 0 0 29px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.relationship-graph-node-title {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 3px;
+}
+
+.relationship-graph-node-title strong,
+.relationship-graph-node-title small,
+.relationship-graph-node-table code,
+.relationship-graph-node-joins,
+.relationship-graph-node-pk {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relationship-graph-node-title strong {
+  color: var(--text-strong);
+  font-size: 12px;
+}
+
+.relationship-graph-node-title small {
+  color: var(--muted-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
+.relationship-graph-node-edit,
+.relationship-graph-icon-button {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted-soft);
+  cursor: pointer;
+}
+
+.relationship-graph-node-edit:hover,
+.relationship-graph-node-edit:focus-visible,
+.relationship-graph-icon-button:hover,
+.relationship-graph-icon-button:focus-visible {
+  border-color: var(--border);
+  background: var(--surface-soft);
+  color: var(--accent);
+  outline: 0;
+}
+
+.relationship-graph-node-table {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px 6px;
+}
+
+.relationship-graph-node-table span,
+.relationship-graph-node-field-heading {
+  color: var(--muted-soft);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.relationship-graph-node-table code {
+  min-width: 0;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
+.relationship-graph-node-fields {
+  padding: 5px 12px 11px;
+}
+
+.relationship-graph-node-field-heading,
+.relationship-graph-node-field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 10px;
+}
+
+.relationship-graph-node-field-heading {
+  margin-bottom: 4px;
+}
+
+.relationship-graph-node-pk,
+.relationship-graph-node-joins {
+  min-width: 0;
+  color: var(--text-strong);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+}
+
+.relationship-graph-node-joins {
+  color: var(--accent-strong);
+}
+
+.relationship-graph-edge-label {
+  position: absolute;
+  min-width: 30px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 4px 7px;
+  color: var(--text-strong);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  box-shadow: 0 2px 9px color-mix(in srgb, var(--text) 11%, transparent);
+  pointer-events: all;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease, opacity 160ms ease;
+}
+
+.relationship-graph-edge-label:hover,
+.relationship-graph-edge-label:focus-visible,
+.relationship-graph-edge-label-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  outline: 0;
+}
+
+.relationship-graph-flow-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: min(330px, calc(100% - 40px));
+  justify-items: center;
+  gap: 8px;
+  transform: translate(-50%, -50%);
+  color: var(--muted);
+  pointer-events: none;
+  text-align: center;
+}
+
+.relationship-graph-flow-empty svg {
+  color: var(--accent);
+}
+
+.relationship-graph-flow-empty strong {
+  color: var(--text-strong);
+  font-size: 13px;
+}
+
+.relationship-graph-flow-empty span {
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.relationship-graph-legend {
+  min-height: 35px;
+  flex-wrap: wrap;
+  gap: 14px;
+  border-top: 1px solid var(--border);
+  padding: 7px 13px;
+  color: var(--muted-soft);
+  font-size: 10px;
+}
+
+.relationship-graph-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.relationship-graph-legend-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.relationship-graph-legend-line {
+  display: inline-block;
+  width: 18px;
+  border-top: 2px solid var(--relationship-edge);
+}
+
+.relationship-graph-legend-hint {
+  margin-left: auto;
+}
+
+.relationship-graph-drawer {
+  display: flex;
+  width: min(350px, 100%);
+  flex: 0 0 min(350px, 100%);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 10px);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg, 0 24px 65px rgb(17 33 60 / 0.16));
+}
+
+.relationship-graph-drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 13px;
+  border-bottom: 1px solid var(--border);
+  padding: 17px 17px 14px;
+}
+
+.relationship-graph-drawer-header h3 {
+  margin-top: 4px;
+  color: var(--text-strong);
+  font-size: 16px;
+  letter-spacing: -0.015em;
+}
+
+.relationship-graph-form {
+  display: grid;
+  min-height: 0;
+  gap: 13px;
+  overflow-y: auto;
+  padding: 16px 17px 18px;
+}
+
+.relationship-graph-form-error {
+  padding: 9px 10px;
+}
+
+.relationship-graph-field {
+  display: grid;
+  gap: 6px;
+}
+
+.relationship-graph-field > span {
+  color: var(--text-strong);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.relationship-graph-input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--surface-soft);
+  padding: 7px 9px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.relationship-graph-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.relationship-graph-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.relationship-graph-textarea {
+  min-height: 66px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.relationship-graph-condition {
+  min-height: 75px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.relationship-graph-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.relationship-graph-form-divider {
+  height: 1px;
+  margin: 1px 0 0;
+  background: var(--border);
+}
+
+.relationship-graph-drawer-actions {
+  gap: 7px;
+  padding-top: 5px;
+}
+
+.relationship-graph-action-spacer {
+  flex: 1;
+}
+
+.relationship-graph-state {
+  display: grid;
+  min-height: 370px;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 10px);
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.relationship-graph-state strong {
+  color: var(--text-strong);
+  font-size: 14px;
+}
+
+.relationship-graph-state span {
+  max-width: 350px;
+  padding: 0 15px;
+  font-size: 12px;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.relationship-graph-state-empty svg {
+  color: var(--accent);
+}
+
+.relationship-graph-spin {
+  animation: relationship-graph-spin 760ms linear infinite;
+}
+
+@keyframes relationship-graph-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 920px) {
+  .relationship-graph-workspace {
+    position: relative;
+  }
+
+  .relationship-graph-drawer {
+    position: absolute;
+    z-index: 7;
+    top: 57px;
+    right: 0;
+    bottom: 35px;
+    width: min(350px, calc(100% - 20px));
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+@media (max-width: 660px) {
+  .relationship-graph-heading {
+    display: grid;
+    align-items: start;
+    gap: 12px;
+  }
+
+  .relationship-graph-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .relationship-graph-search-wrap {
+    max-width: none;
+  }
+
+  .relationship-graph-toolbar-actions {
+    justify-content: flex-end;
+  }
+
+  .relationship-graph-flow,
+  .relationship-graph-flow > .react-flow {
+    min-height: 470px;
+  }
+
+  .relationship-graph-focusbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .relationship-graph-legend-hint {
+    display: none !important;
+  }
+
+  .relationship-graph-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -44,6 +44,10 @@ The primary routes are:
 | `POST /api/project/import` | Import a source directory or `{files:[...]}` as a draft |
 | `GET /api/project/files` | Draft-aware file metadata |
 | `GET/PUT /api/project/file?path=...` | Read/edit a draft file |
+| `GET /api/semantic-project` | Read the structured business-model snapshot used by the visual editor |
+| `PUT /api/semantic-models/{name}` | Update one model, its fields, and bilingual semantic metadata |
+| `PUT /api/semantic-relationships` | Replace validated model relationships and their bilingual metadata |
+| `GET /api/project/diff?path=...` | Read the bounded diff between published and draft content |
 | `POST /api/project/validate` | Validate the effective draft tree |
 | `POST /api/project/publish` | Validate/build then transactionally publish |
 | `GET /api/versions` | Published snapshot list |
@@ -55,6 +59,34 @@ replaces managed source files while leaving `.git` and hidden runtime state in
 place. A transaction backup allows recovery if a file replacement fails.
 The MVP does not create Git commits; use the repository's normal Git workflow
 if commit history is desired.
+
+### Structured semantic-model API
+
+`GET /api/semantic-project` returns models projected from
+`models/*/metadata.yml`, relationships from `relationships.yml`, and the
+optional bilingual companion file `semantic-console/locales.yml`.  The
+companion file is outside Wren's recognized source paths, so Wren 0.13.2
+ignores it while the console uses it for `zh-CN`/`en-US` display names and
+descriptions.  It is parsed with `yaml.safe_load`, bounded by the same project
+file size/credential checks as other project files, and never interpreted as
+Python/YAML tags.
+
+The two write endpoints are draft operations.  Send the `revision` returned by
+the snapshot as `expectedRevision`; a stale revision returns HTTP 409 with the
+current revision and leaves every file unchanged.  A model save updates its
+metadata and locale companion together.  A relationship save replaces the
+relationship list and updates its locale records together.  Both operations
+preserve unknown Wren keys (including custom model/column keys, relationship
+root/entry keys, and extension keys in `locales.yml`) and only overwrite fields
+owned by the visual editor.
+
+Relationship entries must name two existing models, use one of Wren's four
+join types, and contain a condition that qualifies both referenced models
+(for example `orders.customer_id = customers.id`).  Existing hand-edited
+relationships that point at an unknown model are omitted from the graph and
+reported in `relationshipErrors`; they remain visible through the underlying
+file view for repair.  `GET /api/project/diff` shows the exact bounded unified
+diff for that underlying file.
 
 Datasource passwords and connection URLs are accepted only in create/update
 bodies. They are held in memory and persisted, for restart support, in

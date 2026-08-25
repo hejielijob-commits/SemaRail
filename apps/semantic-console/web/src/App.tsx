@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ArrowClockwise,
   ArrowRight,
@@ -40,14 +41,18 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { api } from "./api/client";
-import type { ColumnRecord, ConsoleSection, Datasource, DatasourceField, DatasourceType, ProjectFile, ProjectSummary, SchemaRecord, TableRecord, Theme, ValidationIssue, VersionRecord } from "./types";
+import "./i18n";
+import { setConsoleLocale } from "./i18n";
+import type { ColumnRecord, ConsoleSection, Datasource, DatasourceField, DatasourceType, LocalizedText, ProjectDiff, ProjectFile, ProjectSummary, SchemaRecord, SemanticModel, SemanticProjectSnapshot, SemanticRelationship, TableRecord, Theme, ValidationIssue, VersionRecord } from "./types";
 import { Badge, Button, EmptyState, Field, InlineNotice, LoadingRows, Modal, SectionHeading, Select, TextArea, TextInput } from "./components/ui";
+import ModelEditor from "./components/ModelEditor";
+import { RelationshipGraph, type RelationshipGraphLocalizedText, type RelationshipGraphRelationship } from "./components/RelationshipGraph";
 
 type Notice = { tone: "info" | "success" | "warning" | "error"; title: string; body?: string } | null;
 
-const navGroups: { label: string; items: { id: ConsoleSection; label: string; icon: typeof House; count?: string }[] }[] = [
-  { label: "Workspace", items: [{ id: "overview", label: "Overview", icon: House }, { id: "datasources", label: "Data sources", icon: Database }, { id: "schema", label: "Schema browser", icon: Table }] },
-  { label: "Semantic layer", items: [{ id: "models", label: "Models", icon: Cube }, { id: "relationships", label: "Relationships", icon: ShareNetwork }, { id: "views", label: "Views", icon: Eye }, { id: "instructions", label: "Instructions", icon: BookOpenText }, { id: "mdl", label: "MDL source", icon: BracketsCurly }] },
+const navGroups: { labelKey: string; items: { id: ConsoleSection; labelKey: string; icon: typeof House; count?: string }[] }[] = [
+  { labelKey: "nav.workspace", items: [{ id: "overview", labelKey: "nav.overview", icon: House }, { id: "datasources", labelKey: "nav.datasources", icon: Database }, { id: "schema", labelKey: "nav.schema", icon: Table }] },
+  { labelKey: "nav.semanticLayer", items: [{ id: "models", labelKey: "nav.models", icon: Cube }, { id: "relationships", labelKey: "nav.relationships", icon: ShareNetwork }, { id: "views", labelKey: "nav.views", icon: Eye }, { id: "instructions", labelKey: "nav.instructions", icon: BookOpenText }, { id: "mdl", labelKey: "nav.mdl", icon: BracketsCurly }] },
 ];
 
 function formatDate(value?: string) {
@@ -72,7 +77,27 @@ function isInstructionFile(path: string) {
   return /instructions\.(ya?ml|md)$/i.test(path);
 }
 
+function localizedValue(value: string | RelationshipGraphLocalizedText | undefined, fallback: string): LocalizedText {
+  if (typeof value === "string") return { "zh-CN": value, "en-US": value };
+  return {
+    "zh-CN": value?.["zh-CN"] ?? value?.zh ?? "",
+    "en-US": value?.["en-US"] ?? value?.en ?? fallback,
+  };
+}
+
+function semanticRelationships(value: RelationshipGraphRelationship[]): SemanticRelationship[] {
+  return value.map((relationship) => ({
+    name: relationship.name,
+    models: relationship.models.slice(0, 2).map((model) => typeof model === "string" ? model : model.name) as [string, string],
+    joinType: relationship.joinType ?? "ONE_TO_MANY",
+    condition: relationship.condition ?? "",
+    displayName: localizedValue(relationship.displayName, relationship.name),
+    description: localizedValue(relationship.description, ""),
+  }));
+}
+
 function App() {
+  const { t, i18n: activeI18n } = useTranslation();
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("semantic-console-theme") as Theme) || "light");
   const [section, setSection] = useState<ConsoleSection>("overview");
   const [project, setProject] = useState<ProjectSummary>({});
@@ -102,8 +127,34 @@ function App() {
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [selectedFilePath, setSelectedFilePath] = useState("");
   const [fileLoading, setFileLoading] = useState(false);
+  const [semanticProject, setSemanticProject] = useState<SemanticProjectSnapshot | null>(null);
+  const [semanticLoading, setSemanticLoading] = useState(false);
+  const [semanticDiff, setSemanticDiff] = useState<ProjectDiff | null>(null);
+  const [semanticDiffLoading, setSemanticDiffLoading] = useState(false);
 
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("semantic-console-theme", theme); }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.lang = activeI18n.language === "zh-CN" ? "zh-CN" : "en-US";
+  }, [activeI18n.language]);
+
+  async function loadSemanticProject() {
+    setSemanticLoading(true);
+    const result = await api.getSemanticProject().catch((error: unknown) => {
+      setNotice({ tone: "error", title: t("model.noModels"), body: error instanceof Error ? error.message : t("model.noModelsBody") });
+      return null;
+    });
+    if (result) setSemanticProject(result);
+    setSemanticLoading(false);
+  }
+
+  async function loadSemanticDiff(path: string) {
+    if (!path) return;
+    setSemanticDiffLoading(true);
+    const result = await api.getProjectDiff(path).catch(() => null);
+    setSemanticDiff(result);
+    setSemanticDiffLoading(false);
+  }
 
   async function loadProjectFile(path: string, fileList = files) {
     if (!path || !isEditableProjectFile(path)) return;
@@ -219,9 +270,28 @@ function App() {
     if (!refreshed) return;
     setNotice({ tone: "success", title: "Project published", body: result.version?.revision ? `Revision ${result.version.revision} is ready for downstream queries.` : "The project was published successfully." });
   }
+  async function saveRelationshipDraft(relationships: RelationshipGraphRelationship[]) {
+    if (!semanticProject) return;
+    setBusyAction("relationships");
+    try {
+      const result = await api.updateSemanticRelationships({
+        relationships: semanticRelationships(relationships),
+        expectedRevision: semanticProject.revision,
+      });
+      setSemanticProject(result);
+      markSaved();
+      setNotice({ tone: "success", title: t("model.saved"), body: t("model.modelSaveBody") });
+    } catch (error) {
+      setNotice({ tone: "error", title: t("model.saveError"), body: error instanceof Error ? error.message : t("model.saveError") });
+      throw error;
+    } finally {
+      setBusyAction(null);
+    }
+  }
   function openProjectFile(path: string) { setSection("mdl"); setShowMobileNav(false); setNotice(null); void loadProjectFile(path); }
   function navigate(next: ConsoleSection) {
     setSection(next); setShowMobileNav(false); setNotice(null);
+    if (next === "models" || next === "relationships") void loadSemanticProject();
     if (next === "schema" && activeDatasourceId) void handleLoadSchema();
     if (next === "instructions") {
       const instructionFile = files.find((file) => isInstructionFile(file.path));
@@ -326,19 +396,20 @@ function App() {
   return <div className="app-shell">
     <Sidebar projectName={project.name || project.projectName || "Semantic project"} section={section} onNavigate={navigate} open={showMobileNav} onClose={() => setShowMobileNav(false)} />
     <div className="app-main">
-      <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" onClick={() => setShowMobileNav(true)} aria-label="Open navigation"><SidebarSimple size={19} /></button><div className="breadcrumbs"><span>Workspace</span><CaretRight size={13} /><strong>{pageTitle(section)}</strong></div></div><div className="topbar-actions"><span className={`connection-state ${apiOnline ? "online" : "offline"}`}><span className="connection-dot" />{apiOnline ? "Connected" : "API unavailable"}</span><button className="icon-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="icon-button" onClick={() => setShowHistory(true)} aria-label="Open version history"><ClockCounterClockwise size={18} /></button><div className="avatar" aria-label="Signed in as WS">WS</div></div></header>
-      <main className="content">{notice ? <InlineNotice tone={notice.tone} title={notice.title} onDismiss={() => { setNotice(null); setLoadError(null); }}>{notice.body}</InlineNotice> : null}{loading ? <LoadingWorkspace /> : <>{section === "overview" ? <Overview project={project} datasources={datasources} versions={versions} files={files} onNavigate={navigate} onHistory={() => setShowHistory(true)} /> : null}{section === "datasources" ? <DatasourcesPage datasources={datasources} types={datasourceTypes} selectedId={activeDatasourceId} activeId={project.activeDatasource?.id ?? ""} setSelectedId={setSelectedDatasourceId} showForm={showDatasourceForm} setShowForm={setShowDatasourceForm} onAdd={addDatasource} selected={selectedDatasource} selectedType={selectedType} onUpdate={updateSelectedDatasource} onSave={handleSaveDatasource} onTest={handleTestDatasource} onActivate={handleActivateDatasource} busyAction={busyAction} /> : null}{section === "schema" ? <SchemaPage datasources={datasources} selectedDatasource={selectedDatasource} selectedSchema={selectedSchema} setSelectedSchema={(value) => { setSelectedSchema(value); void handleLoadSchema(value); }} schemas={schemas} tables={filteredTables} search={schemaSearch} setSearch={setSchemaSearch} selectedTable={selectedTable} onSelectTable={handleSelectTable} columns={columns} onImport={() => setShowImportModal(true)} busyAction={busyAction} onRefresh={() => void handleLoadSchema()} onDatasourceChange={(id: string) => { setSelectedDatasourceId(id); setSelectedSchema(""); setSelectedTable(""); void handleLoadSchema("", id); }} /> : null}{section === "models" ? <ModelsPage files={files} onOpenFile={openProjectFile} /> : null}{section === "relationships" ? <RelationshipsPage files={files} onOpenFile={openProjectFile} /> : null}{section === "views" ? <ViewsPage files={files} onOpenFile={openProjectFile} /> : null}{section === "instructions" ? <InstructionsPage value={instructions} onChange={setInstructions} onSave={() => { const path = files.find((file) => isInstructionFile(file.path))?.path; if (path) void handleSaveFile(path, instructions); else setNotice({ tone: "error", title: "Draft save failed", body: "The project API did not return an instructions file." }); }} savedAt={draftSavedAt} loading={fileLoading} /> : null}{section === "mdl" ? <MdlPage value={mdlSource} onChange={setMdlSource} files={files} selectedFile={selectedFilePath} onSelectFile={(path: string) => void loadProjectFile(path)} onSave={(path?: string) => void handleSaveFile(path ?? selectedFilePath, mdlSource)} onImportProject={handleImportProject} savedAt={draftSavedAt} loading={fileLoading} /> : null}</>}</main>
-      <footer className="command-bar"><div className="command-context"><span className="draft-indicator" /><span>{project.status === "published" ? "Published" : "Draft changes"}</span>{draftSavedAt ? <span className="saved-time">Saved {formatDate(draftSavedAt)}</span> : null}</div><div className="command-actions"><Button variant="ghost" size="sm" icon={ArrowsClockwise} onClick={() => void refreshWorkspace()} loading={refreshing}>Refresh</Button><Button variant="secondary" size="sm" icon={CheckCircle} onClick={handleValidate} loading={busyAction === "validate"}>Validate</Button><Button variant="primary" size="sm" icon={RocketLaunch} onClick={handlePublish} loading={busyAction === "publish"}>Publish</Button></div></footer>
+      <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" onClick={() => setShowMobileNav(true)} aria-label={t("nav.open")}><SidebarSimple size={19} /></button><div className="breadcrumbs"><span>{t("nav.workspace")}</span><CaretRight size={13} /><strong>{pageTitle(section, t)}</strong></div></div><div className="topbar-actions"><span className={`connection-state ${apiOnline ? "online" : "offline"}`}><span className="connection-dot" />{apiOnline ? t("common.connected") : t("common.unavailable")}</span><label className="locale-switcher"><span className="sr-only">{t("language.label")}</span><select aria-label={t("language.switchTo")} value={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onChange={(event) => setConsoleLocale(event.target.value as "zh-CN" | "en-US")}><option value="en-US">EN</option><option value="zh-CN">中</option></select></label><button className="icon-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="icon-button" onClick={() => setShowHistory(true)} aria-label="Open version history"><ClockCounterClockwise size={18} /></button><div className="avatar" aria-label="Signed in as WS">WS</div></div></header>
+      <main className="content">{notice ? <InlineNotice tone={notice.tone} title={notice.title} onDismiss={() => { setNotice(null); setLoadError(null); }}>{notice.body}</InlineNotice> : null}{loading ? <LoadingWorkspace /> : <>{section === "overview" ? <Overview project={project} datasources={datasources} versions={versions} files={files} onNavigate={navigate} onHistory={() => setShowHistory(true)} /> : null}{section === "datasources" ? <DatasourcesPage datasources={datasources} types={datasourceTypes} selectedId={activeDatasourceId} activeId={project.activeDatasource?.id ?? ""} setSelectedId={setSelectedDatasourceId} showForm={showDatasourceForm} setShowForm={setShowDatasourceForm} onAdd={addDatasource} selected={selectedDatasource} selectedType={selectedType} onUpdate={updateSelectedDatasource} onSave={handleSaveDatasource} onTest={handleTestDatasource} onActivate={handleActivateDatasource} busyAction={busyAction} /> : null}{section === "schema" ? <SchemaPage datasources={datasources} selectedDatasource={selectedDatasource} selectedSchema={selectedSchema} setSelectedSchema={(value) => { setSelectedSchema(value); void handleLoadSchema(value); }} schemas={schemas} tables={filteredTables} search={schemaSearch} setSearch={setSchemaSearch} selectedTable={selectedTable} onSelectTable={handleSelectTable} columns={columns} onImport={() => setShowImportModal(true)} busyAction={busyAction} onRefresh={() => void handleLoadSchema()} onDatasourceChange={(id: string) => { setSelectedDatasourceId(id); setSelectedSchema(""); setSelectedTable(""); void handleLoadSchema("", id); }} /> : null}{section === "models" ? <ModelsPage files={files} onOpenFile={openProjectFile} snapshot={semanticProject} loading={semanticLoading} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} onSave={async (model) => { const result = await api.updateSemanticModel(model.name, { ...model, expectedRevision: semanticProject?.revision }); if (result) { setSemanticProject(result); markSaved(); } }} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} /> : null}{section === "relationships" ? <RelationshipsPage snapshot={semanticProject} loading={semanticLoading} locale={activeI18n.language} theme={theme} saving={busyAction === "relationships"} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} onOpenEditor={() => setSection("mdl")} onSave={saveRelationshipDraft} /> : null}{section === "views" ? <ViewsPage files={files} onOpenFile={openProjectFile} /> : null}{section === "instructions" ? <InstructionsPage value={instructions} onChange={setInstructions} onSave={() => { const path = files.find((file) => isInstructionFile(file.path))?.path; if (path) void handleSaveFile(path, instructions); else setNotice({ tone: "error", title: "Draft save failed", body: "The project API did not return an instructions file." }); }} savedAt={draftSavedAt} loading={fileLoading} /> : null}{section === "mdl" ? <MdlPage value={mdlSource} onChange={setMdlSource} files={files} selectedFile={selectedFilePath} onSelectFile={(path: string) => void loadProjectFile(path)} onSave={(path?: string) => void handleSaveFile(path ?? selectedFilePath, mdlSource)} onImportProject={handleImportProject} savedAt={draftSavedAt} loading={fileLoading} /> : null}</>}</main>
+      <footer className="command-bar"><div className="command-context"><span className="draft-indicator" /><span>{project.status === "published" ? t("common.published") : t("common.draft")}</span>{draftSavedAt ? <span className="saved-time">{t("status.draftSaved")} {formatDate(draftSavedAt)}</span> : null}</div><div className="command-actions"><Button variant="ghost" size="sm" icon={ArrowsClockwise} onClick={() => void refreshWorkspace()} loading={refreshing}>{t("common.refresh")}</Button><Button variant="secondary" size="sm" icon={CheckCircle} onClick={handleValidate} loading={busyAction === "validate"}>{t("action.validate")}</Button><Button variant="primary" size="sm" icon={RocketLaunch} onClick={handlePublish} loading={busyAction === "publish"}>{t("action.publish")}</Button></div></footer>
     </div>
     <Modal open={showHistory} title="Version history" description="Restore a previous project snapshot as a draft." onClose={() => setShowHistory(false)} footer={<Button variant="ghost" onClick={() => setShowHistory(false)}>Close</Button>}><VersionHistory versions={versions} onRollback={rollback} busyAction={busyAction} /></Modal>
     <Modal open={showImportModal} title={`Import ${selectedTable}`} description={`${selectedSchema}.${selectedTable} will become a semantic model draft.`} onClose={() => setShowImportModal(false)} footer={<><Button variant="ghost" onClick={() => setShowImportModal(false)}>Cancel</Button><Button variant="primary" icon={DownloadSimple} onClick={importSelectedTable}>Import table</Button></>}><div className="import-preview"><div className="import-preview-row"><span>Source</span><strong>{sourceLabel(selectedDatasource)}</strong></div><div className="import-preview-row"><span>Columns</span><strong>{columns.length} detected</strong></div><div className="import-preview-row"><span>Primary key</span><strong>{columns.find((column) => column.primaryKey)?.name ?? "Not detected"}</strong></div><InlineNotice tone="info" title="Review after import">The generated model uses source column names and keeps measures empty until you define them.</InlineNotice></div></Modal>
   </div>;
 }
 
-function pageTitle(section: ConsoleSection) { return ({ overview: "Overview", datasources: "Data sources", schema: "Schema browser", models: "Models", relationships: "Relationships", views: "Views", instructions: "Instructions", mdl: "MDL source" })[section]; }
+function pageTitle(section: ConsoleSection, t: (key: string) => string) { return t(({ overview: "page.overview", datasources: "page.datasources", schema: "page.schema", models: "page.models", relationships: "page.relationships", views: "page.views", instructions: "page.instructions", mdl: "page.mdl" })[section]); }
 
 function Sidebar({ projectName, section, onNavigate, open, onClose }: { projectName: string; section: ConsoleSection; onNavigate: (section: ConsoleSection) => void; open: boolean; onClose: () => void }) {
-  return <aside className={`sidebar ${open ? "sidebar-open" : ""}`}><div className="brand"><span className="brand-mark"><Stack size={19} weight="bold" /></span><span><strong>Wren</strong><small>Semantic Console</small></span><button className="icon-button sidebar-close" onClick={onClose} aria-label="Close navigation"><X size={17} /></button></div><div className="project-switcher"><span className="project-icon"><BracketsCurly size={16} /></span><span><small>PROJECT</small><strong>{projectName}</strong></span><CaretDown size={14} /></div><nav aria-label="Primary navigation">{navGroups.map((group) => <div className="nav-group" key={group.label}><p className="nav-label">{group.label}</p>{group.items.map((item) => <button aria-label={item.label} className={`nav-item ${section === item.id ? "nav-item-active" : ""}`} key={item.id} onClick={() => onNavigate(item.id)}><item.icon size={18} weight={section === item.id ? "fill" : "regular"} /><span>{item.label}</span>{item.count ? <span className="nav-count">{item.count}</span> : null}</button>)}</div>)}</nav><div className="sidebar-bottom"><button className="nav-item"><GearSix size={18} /><span>Settings</span></button><div className="sidebar-help"><Info size={16} /><span><strong>Need a hand?</strong><small>Read the semantic layer guide</small></span><ArrowRight size={14} /></div></div></aside>;
+  const { t } = useTranslation();
+  return <aside className={`sidebar ${open ? "sidebar-open" : ""}`}><div className="brand"><span className="brand-mark"><Stack size={19} weight="bold" /></span><span><strong>Wren</strong><small>{t("brand.subtitle")}</small></span><button className="icon-button sidebar-close" onClick={onClose} aria-label={t("nav.close")}><X size={17} /></button></div><div className="project-switcher"><span className="project-icon"><BracketsCurly size={16} /></span><span><small>{t("nav.project")}</small><strong>{projectName}</strong></span><CaretDown size={14} /></div><nav aria-label={t("nav.workspace")}>{navGroups.map((group) => <div className="nav-group" key={group.labelKey}><p className="nav-label">{t(group.labelKey)}</p>{group.items.map((item) => <button aria-label={t(item.labelKey)} className={`nav-item ${section === item.id ? "nav-item-active" : ""}`} key={item.id} onClick={() => onNavigate(item.id)}><item.icon size={18} weight={section === item.id ? "fill" : "regular"} /><span>{t(item.labelKey)}</span>{item.count ? <span className="nav-count">{item.count}</span> : null}</button>)}</div>)}</nav><div className="sidebar-bottom"><button className="nav-item"><GearSix size={18} /><span>{t("nav.settings")}</span></button><div className="sidebar-help"><Info size={16} /><span><strong>{t("nav.helpTitle")}</strong><small>{t("nav.helpBody")}</small></span><ArrowRight size={14} /></div></div></aside>;
 }
 
 function LoadingWorkspace() {
@@ -408,12 +479,31 @@ function FileIndexPage({ title, description, files, pattern, icon: Icon, emptyTi
   return <div className="page"><SectionHeading eyebrow="Semantic layer" title={title} description={description} /><section className="panel table-panel"><div className="list-toolbar"><div><strong>{matches.length} files</strong><span>indexed from the project API</span></div><Badge tone="neutral">Read only</Badge></div>{matches.length === 0 ? <EmptyState icon={Icon} title={emptyTitle} body={emptyBody} /> : <div className="data-table"><div className="data-table-head"><span>Name</span><span>Path</span><span>Size</span><span>Status</span><span aria-hidden="true" /></div>{matches.map((file) => <div className="data-table-row" key={file.path}><span className="name-cell"><span className="row-icon"><Icon size={16} /></span><span><strong>{fileName(file.path)}</strong><small>Source file</small></span></span><span className="muted-code">{file.path}</span><span>{file.size ? `${Math.max(1, Math.round(file.size / 1024))} KB` : "Not available"}</span><span><Badge tone={file.draft ? "amber" : "neutral"} dot>{file.draft ? "Draft" : "Tracked"}</Badge></span><Button variant="ghost" size="sm" onClick={() => onOpenFile(file.path)}>Open source <ArrowRight size={14} /></Button></div>)}</div>}</section><div className="info-strip"><Info size={17} /><span>Structure is indexed from real project files. Use MDL source to edit and save a file through the project API.</span></div></div>;
 }
 
-function ModelsPage({ files, onOpenFile }: { files: ProjectFile[]; onOpenFile: (path: string) => void }) {
-  return <FileIndexPage title="Models" description="Inspect model metadata files generated from the semantic project." files={files} pattern={/^models\/[^/]+\/metadata\.ya?ml$/i} icon={Cube} emptyTitle="No model files" emptyBody="Import a table from Schema browser or import an existing project to create model files." onOpenFile={onOpenFile} />;
+function ModelsPage({ files, onOpenFile, snapshot, loading, sourceContent, sourceLoading, diff, diffLoading, onSave, onOpenSource, onLoadDiff }: { files: ProjectFile[]; onOpenFile: (path: string) => void; snapshot: SemanticProjectSnapshot | null; loading: boolean; sourceContent: string; sourceLoading: boolean; diff: ProjectDiff | null; diffLoading: boolean; onSave: (model: SemanticModel) => Promise<void>; onOpenSource: (path: string) => void; onLoadDiff: (path: string) => void }) {
+  if (loading && !snapshot) return <div className="page"><LoadingRows count={8} /></div>;
+  if (!snapshot) return <FileIndexPage title="Models" description="Inspect model metadata files generated from the semantic project." files={files} pattern={/^models\/[^/]+\/metadata\.ya?ml$/i} icon={Cube} emptyTitle="No model files" emptyBody="Import a table from Schema browser or import an existing project to create model files." onOpenFile={onOpenFile} />;
+  return <ModelEditor snapshot={snapshot} sourceContent={sourceContent} sourceLoading={sourceLoading} diff={diff} diffLoading={diffLoading} onSave={onSave} onOpenSource={onOpenSource} onLoadDiff={onLoadDiff} />;
 }
 
-function RelationshipsPage({ files, onOpenFile }: { files: ProjectFile[]; onOpenFile: (path: string) => void }) {
-  return <FileIndexPage title="Relationships" description="Inspect relationship definitions that are present in the project source." files={files} pattern={/relationship/i} icon={ShareNetwork} emptyTitle="No relationship files" emptyBody="Relationship files will appear here once they are present in the project source." onOpenFile={onOpenFile} />;
+function RelationshipsPage({ snapshot, loading, locale, theme, saving, sourceContent, sourceLoading, diff, diffLoading, onOpenSource, onLoadDiff, onOpenEditor, onSave }: { snapshot: SemanticProjectSnapshot | null; loading: boolean; locale: string; theme: Theme; saving: boolean; sourceContent: string; sourceLoading: boolean; diff: ProjectDiff | null; diffLoading: boolean; onOpenSource: (path: string) => void; onLoadDiff: (path: string) => void; onOpenEditor: () => void; onSave: (relationships: RelationshipGraphRelationship[]) => Promise<void> }) {
+  const { t } = useTranslation();
+  const [sourceTab, setSourceTab] = useState<"source" | "diff">("source");
+  const sourcePath = snapshot?.sourceFiles.find((file) => /relationships?\.ya?ml$/i.test(file.path))?.path ?? "relationships.yml";
+  useEffect(() => {
+    if (snapshot) onOpenSource(sourcePath);
+    // Reload when the semantic revision changes; the callback identity belongs
+    // to the parent render and is intentionally not a trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot?.revision, sourcePath]);
+  const models = (snapshot?.models ?? []).map((model) => ({
+    name: model.name,
+    displayName: model.displayName,
+    table: model.tableReference.table,
+    schema: model.tableReference.schema,
+    primaryKey: model.primaryKey,
+    columns: model.columns,
+  }));
+  return <div className="page relationship-page"><RelationshipGraph models={models} relationships={snapshot?.relationships ?? []} locale={locale} theme={theme} loading={loading} isSaving={saving} onSave={(_relationship, relationships) => onSave(relationships)} onDelete={(_relationship, relationships) => onSave(relationships)} /><section className="panel model-source-panel relationship-source-panel"><div className="source-panel-header"><div><span className="panel-kicker">{t("relationshipSource.file")}</span><strong>{sourcePath}</strong></div><div className="source-view-tabs" role="tablist"><button className={sourceTab === "source" ? "source-view-active" : ""} onClick={() => { setSourceTab("source"); onOpenSource(sourcePath); }}><Code size={14} />{t("relationshipSource.source")}</button><button className={sourceTab === "diff" ? "source-view-active" : ""} onClick={() => { setSourceTab("diff"); onLoadDiff(sourcePath); }}><BracketsCurly size={14} />{t("relationshipSource.diff")}</button></div></div><div className="source-panel-hint"><Eye size={14} />{sourceTab === "source" ? t("relationshipSource.sourceHint") : t("relationshipSource.diffHint")}<button type="button" onClick={onOpenEditor}>{t("relationshipSource.openEditor")}</button></div>{sourceTab === "source" ? sourceLoading ? <div className="source-loading">{t("common.loading")}</div> : <pre className="model-source-code">{sourceContent || t("relationshipSource.unavailable")}</pre> : diffLoading ? <div className="source-loading">{t("common.loading")}</div> : diff?.changed ? <pre className="model-source-code model-diff-code">{diff.diff}</pre> : <div className="model-no-diff"><Check size={18} /><strong>{t("relationshipSource.noDiff")}</strong></div>}</section></div>;
 }
 
 function ViewsPage({ files, onOpenFile }: { files: ProjectFile[]; onOpenFile: (path: string) => void }) {

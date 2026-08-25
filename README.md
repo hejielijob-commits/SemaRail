@@ -54,6 +54,13 @@ rollback. The Client exposes the console through the public
 `sidebar.footer.action` slot and through each completed query card. No Harness
 source or DOM is patched.
 
+The Console projects Wren's file-based model metadata into a bilingual
+business-model editor. Models and fields can be edited visually, relationships
+are shown on an interactive graph, and every visual edit remains traceable to
+its generated `metadata.yml`, `relationships.yml`, localized metadata, and
+unified source diff. English and Simplified Chinese are available without
+changing the technical identifiers used by Wren queries.
+
 Datasource credentials are stored outside the Wren project at a deterministic
 per-project path below `~/.wren/semantic-console`. The query sidecar reads the
 active PostgreSQL profile from that same state on every query and falls back to

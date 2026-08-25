@@ -43,6 +43,9 @@ function main() {
   const reactPackage = require.resolve('react/package.json', { paths: [webRoot] })
   const reactDomPackage = require.resolve('react-dom/package.json', { paths: [webRoot] })
   const phosphorPackage = require.resolve('@phosphor-icons/react/package.json', { paths: [webRoot] })
+  const xyflowPackage = require.resolve('@xyflow/react/package.json', { paths: [webRoot] })
+  const i18nextPackage = require.resolve('i18next/package.json', { paths: [webRoot] })
+  const reactI18nextPackage = require.resolve('react-i18next/package.json', { paths: [webRoot] })
   const schedulerPackage = createRequire(reactDomPackage).resolve('scheduler/package.json')
   assertRegularFile(resolve(repositoryConsole, 'pyproject.toml'))
   assertRegularFile(resolve(sourceWeb, 'index.html'))
@@ -65,6 +68,9 @@ function main() {
     ['react-dom', resolve(dirname(reactDomPackage), 'LICENSE')],
     ['scheduler', resolve(dirname(schedulerPackage), 'LICENSE')],
     ['phosphor-icons-react', resolve(dirname(phosphorPackage), 'LICENSE')],
+    ['xyflow-react', resolve(dirname(xyflowPackage), 'LICENSE')],
+    ['i18next', resolve(dirname(i18nextPackage), 'LICENSE')],
+    ['react-i18next', resolve(dirname(reactI18nextPackage), 'LICENSE')],
   ]
   for (const [name, source] of licenses) {
     copyFile(source, resolve(packagedWeb, 'licenses', name, 'LICENSE'))

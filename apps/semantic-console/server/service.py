@@ -13,10 +13,12 @@ try:
     from .drivers import DriverError, datasource_types, driver_for
     from .models import DatasourceRecord, is_sensitive_key, utc_now
     from .project import ProjectError, ProjectStore
+    from .semantic_models import SemanticModelStore
 except ImportError:  # Direct module loading in a lightweight smoke test.
     from drivers import DriverError, datasource_types, driver_for  # type: ignore[no-redef]
     from models import DatasourceRecord, is_sensitive_key, utc_now  # type: ignore[no-redef]
     from project import ProjectError, ProjectStore  # type: ignore[no-redef]
+    from semantic_models import SemanticModelStore  # type: ignore[no-redef]
 
 
 class ApiServiceError(RuntimeError):
@@ -74,6 +76,7 @@ class SemanticConsoleService:
         self.project = project or ProjectStore()
         self.connection_factory = connection_factory
         self.datasources = self.project.datasource_records()
+        self.semantic_models = SemanticModelStore(self.project)
 
     # ---- simple resources -----------------------------------------------
 
@@ -255,6 +258,30 @@ class SemanticConsoleService:
         except Exception as exc:
             raise _public_error(exc) from exc
 
+    def diff_file(self, path: Any) -> dict[str, Any]:
+        try:
+            return self.project.diff_file(_required_string(path, "path"))
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def semantic_project(self) -> dict[str, Any]:
+        try:
+            return self.semantic_models.snapshot()
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def save_semantic_model(self, model_name: str, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        try:
+            return self.semantic_models.save_model(model_name, payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def save_relationships(self, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        try:
+            return self.semantic_models.save_relationships(payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
     def put_file(self, path: Any, payload: Mapping[str, Any] | str | None) -> dict[str, Any]:
         path = _required_string(path, "path")
         if isinstance(payload, str):
@@ -362,8 +389,17 @@ class SemanticConsoleService:
                 return 200, self.import_project(body if isinstance(body, Mapping) else {})
             if method == "GET" and clean_path == "/api/project/files":
                 return 200, self.files()
+            if method == "GET" and clean_path == "/api/semantic-project":
+                return 200, self.semantic_project()
+            match = re.fullmatch(r"/api/semantic-models/([^/]+)", clean_path)
+            if match and method == "PUT":
+                return 200, self.save_semantic_model(match.group(1), body if isinstance(body, Mapping) else {})
+            if method == "PUT" and clean_path == "/api/semantic-relationships":
+                return 200, self.save_relationships(body if isinstance(body, Mapping) else {})
             if method == "GET" and clean_path == "/api/project/file":
                 return 200, self.read_file(query.get("path"))
+            if method == "GET" and clean_path == "/api/project/diff":
+                return 200, self.diff_file(query.get("path"))
             if method == "PUT" and clean_path == "/api/project/file":
                 return 200, self.put_file(query.get("path"), body)
             if method == "POST" and clean_path == "/api/project/validate":

@@ -3,6 +3,7 @@ lib/
 dist/
 .build/
 .acceptance/
+.desktop-packages/
 coverage/
 .DS_Store
 *.log
