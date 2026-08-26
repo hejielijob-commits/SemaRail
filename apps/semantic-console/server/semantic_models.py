@@ -27,6 +27,13 @@ _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_$-]*$")
 _QUALIFIED_REFERENCE = re.compile(
     r"(?<![A-Za-z0-9_$-])([A-Za-z_][A-Za-z0-9_$-]*)\.([A-Za-z_][A-Za-z0-9_$-]*)"
 )
+_FIELD_EQUALITY = re.compile(
+    r"(?<![A-Za-z0-9_$-])"
+    r"([A-Za-z_][A-Za-z0-9_$-]*)\.([A-Za-z_][A-Za-z0-9_$-]*)"
+    r"\s*=\s*"
+    r"([A-Za-z_][A-Za-z0-9_$-]*)\.([A-Za-z_][A-Za-z0-9_$-]*)"
+)
+_AND_OPERATOR = re.compile(r"\s+\bAND\b\s+", re.IGNORECASE)
 _LOCALES = ("zh-CN", "en-US")
 _JOIN_TYPES = {"ONE_TO_ONE", "ONE_TO_MANY", "MANY_TO_ONE", "MANY_TO_MANY"}
 
@@ -77,6 +84,103 @@ def _localized(value: Any, fallback: str = "", *, code: str = "INVALID_MODEL") -
         raw = source.get(locale, fallback if locale == "en-US" else "")
         result[locale] = _text(raw, code=code)
     return result
+
+
+def _normalize_locale(value: Any, *, code: str = "INVALID_MODEL") -> str | None:
+    """Normalize an input locale without persisting the UI hint.
+
+    The visual editor may send a single text value together with the locale in
+    which it was edited.  This request-only hint is deliberately not part of
+    the Wren or companion-file schema.
+    """
+
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ProjectError(code, "locale must be a string")
+    aliases = {"zh": "zh-CN", "zh-cn": "zh-CN", "en": "en-US", "en-us": "en-US"}
+    normalized = aliases.get(value.strip().lower())
+    if normalized is None:
+        raise ProjectError(code, "locale must be zh-CN or en-US")
+    return normalized
+
+
+def _input_locale(payload: Mapping[str, Any], *, code: str = "INVALID_MODEL") -> str | None:
+    """Read a transient locale hint used by scalar text updates.
+
+    ``locale`` is the documented spelling; the two aliases make the API
+    tolerant of clients that call the control ``inputLocale`` or
+    ``editingLocale``.  None of these keys are copied to project files.
+    """
+
+    for key in ("locale", "inputLocale", "editingLocale"):
+        if key in payload:
+            return _normalize_locale(payload.get(key), code=code)
+    return None
+
+
+def _scalar_locale(existing: Any, explicit: str | None) -> str:
+    """Choose the target locale for a scalar update.
+
+    An explicit request hint always wins.  If an existing record has exactly
+    one populated supported locale, updating that locale is the least
+    surprising backwards-compatible behavior.  Otherwise en-US is the stable
+    Wren/default slot; the other locale is retained unchanged.
+    """
+
+    if explicit:
+        return explicit
+    source = _mapping(existing)
+    populated = [locale for locale in _LOCALES if isinstance(source.get(locale), str) and source.get(locale)]
+    return populated[0] if len(populated) == 1 else "en-US"
+
+
+def _localized_patch(
+    value: Any,
+    *,
+    existing: Any = None,
+    locale: str | None = None,
+    code: str = "INVALID_MODEL",
+) -> dict[str, str]:
+    """Normalize a localized input as a non-destructive patch.
+
+    Old clients send ``{"zh-CN": ..., "en-US": ...}``; the new editor may
+    send one scalar.  A mapping updates only keys that are present, so an old
+    translation cannot disappear merely because a newer client has one input
+    instead of two.  ``None`` means no update, while an empty string is a
+    deliberate clear operation.
+    """
+
+    if value is None:
+        return {}
+    if isinstance(value, str):
+        return {_scalar_locale(existing, locale): _text(value, code=code)}
+    if not isinstance(value, Mapping):
+        raise ProjectError(code, "localized values must be a string or object")
+    result: dict[str, str] = {}
+    for key in _LOCALES:
+        if key in value:
+            result[key] = _text(value.get(key), code=code)
+    return result
+
+
+def _merge_localized(
+    existing: Any,
+    value: Any,
+    *,
+    fallback: str = "",
+    locale: str | None = None,
+    code: str = "INVALID_MODEL",
+) -> dict[str, Any]:
+    """Merge a localized patch while preserving unknown locale extensions."""
+
+    current = _mapping(existing)
+    patch = _localized_patch(value, existing=current, locale=locale, code=code)
+    if not patch:
+        return current
+    merged: dict[str, Any] = dict(current)
+    merged.update(patch)
+    return merged
 
 
 def _yaml(content: str, path: str) -> dict[str, Any]:
@@ -185,6 +289,7 @@ class SemanticModelStore:
         locale_relationships = _mapping(locales.get("relationships"))
         models: list[dict[str, Any]] = []
         model_names: set[str] = set()
+        model_fields: dict[str, set[str]] = {}
 
         for item in files:
             path = str(item.get("path", ""))
@@ -264,6 +369,7 @@ class SemanticModelStore:
                 "columns": columns,
                 "draft": bool(item.get("draft")),
             })
+            model_fields[model_name] = {str(column["name"]) for column in columns}
 
         relationships_raw = self._read_optional_yaml(RELATIONSHIPS_PATH)
         raw_relationships = relationships_raw.get("relationships", [])
@@ -300,6 +406,7 @@ class SemanticModelStore:
                 "models": relation_models,
                 "joinType": str(relationship.get("join_type", "MANY_TO_ONE")),
                 "condition": condition,
+                "fieldPairs": self._field_pairs(condition, relation_models, model_fields),
                 "displayName": _localized(locale.get("display_name"), name),
                 "description": _localized(locale.get("description")),
             })
@@ -337,6 +444,11 @@ class SemanticModelStore:
         path = str(current["sourcePath"])
         raw = _yaml(self.project.read_file(path)["content"], path)
         raw_columns = _model_columns(raw, path)
+        locales = _locale_document(self._read_optional_yaml(LOCALES_PATH))
+        locale_models = _mapping(locales.get("models"))
+        model_locale = _mapping(locale_models.get(model_name))
+        locale_columns = _mapping(model_locale.get("columns"))
+        request_locale = _input_locale(payload)
         existing_by_name = {str(column["name"]): column for column in raw_columns}
         incoming_by_name: dict[str, Mapping[str, Any]] = {}
         for item in incoming_columns:
@@ -373,9 +485,26 @@ class SemanticModelStore:
                     if "is_calculated" in column:
                         column["is_calculated"] = False
             if "description" in incoming:
-                description = _localized(incoming.get("description"))
                 properties = _properties(column.get("properties"), f"{path} column '{column['name']}'")
-                _set_description(properties, description)
+                locale_column = _mapping(locale_columns.get(str(column["name"])))
+                current_description = _description(properties)
+                description_patch = _localized_patch(
+                    incoming.get("description"),
+                    existing=locale_column.get("description"),
+                    locale=_input_locale(incoming) or request_locale,
+                )
+                merged_description = _merge_localized(
+                    locale_column.get("description"),
+                    incoming.get("description"),
+                    fallback=current_description,
+                    locale=_input_locale(incoming) or request_locale,
+                )
+                # Wren's scalar description is the default/English source.
+                # A Chinese-only companion edit must not rewrite it; a new
+                # empty Wren description may still be initialized from the
+                # first supplied locale.
+                if "en-US" in description_patch or not current_description:
+                    _set_description(properties, _localized(merged_description, current_description))
                 if properties:
                     column["properties"] = properties
                 else:
@@ -426,21 +555,46 @@ class SemanticModelStore:
             if current_reference or any(table_reference.get(key) for key in ("schema", "table")):
                 raw["table_reference"] = current_reference
         if "description" in payload:
-            description = _localized(payload.get("description"))
             properties = _properties(raw.get("properties"), path)
-            _set_description(properties, description)
+            current_description = _description(properties)
+            description_patch = _localized_patch(
+                payload.get("description"),
+                existing=model_locale.get("description"),
+                locale=request_locale,
+            )
+            merged_description = _merge_localized(
+                model_locale.get("description"),
+                payload.get("description"),
+                fallback=current_description,
+                locale=request_locale,
+            )
+            if "en-US" in description_patch or not current_description:
+                _set_description(properties, _localized(merged_description, current_description))
             if properties:
                 raw["properties"] = properties
             else:
                 raw.pop("properties", None)
 
-        locales = _locale_document(self._read_optional_yaml(LOCALES_PATH))
-        locale_models = _mapping(locales.get("models"))
-        model_locale = _mapping(locale_models.get(model_name))
         if "displayName" in payload:
-            model_locale["display_name"] = _localized(payload.get("displayName"), model_name)
+            patch = _localized_patch(
+                payload.get("displayName"),
+                existing=model_locale.get("display_name"),
+                locale=request_locale,
+            )
+            if patch:
+                display_name = dict(_mapping(model_locale.get("display_name")))
+                display_name.update(patch)
+                model_locale["display_name"] = display_name
         if "description" in payload:
-            model_locale["description"] = _localized(payload.get("description"))
+            patch = _localized_patch(
+                payload.get("description"),
+                existing=model_locale.get("description"),
+                locale=request_locale,
+            )
+            if patch:
+                description = dict(_mapping(model_locale.get("description")))
+                description.update(patch)
+                model_locale["description"] = description
         if "businessDomain" in payload:
             model_locale["business_domain"] = _text(payload.get("businessDomain"), maximum=255)
         if "visible" in payload:
@@ -449,9 +603,25 @@ class SemanticModelStore:
         for name, incoming in incoming_by_name.items():
             locale_column = _mapping(locale_columns.get(name))
             if "displayName" in incoming:
-                locale_column["display_name"] = _localized(incoming.get("displayName"), name)
+                patch = _localized_patch(
+                    incoming.get("displayName"),
+                    existing=locale_column.get("display_name"),
+                    locale=_input_locale(incoming) or request_locale,
+                )
+                if patch:
+                    display_name = dict(_mapping(locale_column.get("display_name")))
+                    display_name.update(patch)
+                    locale_column["display_name"] = display_name
             if "description" in incoming:
-                locale_column["description"] = _localized(incoming.get("description"))
+                patch = _localized_patch(
+                    incoming.get("description"),
+                    existing=locale_column.get("description"),
+                    locale=_input_locale(incoming) or request_locale,
+                )
+                if patch:
+                    description = dict(_mapping(locale_column.get("description")))
+                    description.update(patch)
+                    locale_column["description"] = description
             if "semanticRole" in incoming:
                 locale_column["semantic_role"] = _text(incoming.get("semanticRole"), maximum=64)
             if "format" in incoming:
@@ -500,11 +670,39 @@ class SemanticModelStore:
             for item in existing_relationships
             if isinstance(item, Mapping) and isinstance(item.get("name"), str)
         }
+        # A graph snapshot omits relationships that reference a model which
+        # is not present in the project.  Those entries still belong to
+        # Wren's source document, so a graph save must carry their complete
+        # records forward instead of treating them as deletions.
+        preserved_relationships: list[dict[str, Any]] = []
+        preserved_relationship_names: set[str] = set()
+        for existing in existing_relationships:
+            if not isinstance(existing, Mapping) or not isinstance(existing.get("name"), str):
+                continue
+            existing_models = existing.get("models")
+            if (
+                isinstance(existing_models, list)
+                and len(existing_models) == 2
+                and all(isinstance(model, str) for model in existing_models)
+                and any(model not in model_name_set for model in existing_models)
+            ):
+                preserved_relationships.append(dict(existing))
+                preserved_relationship_names.add(str(existing["name"]))
+        for name in preserved_relationship_names:
+            locale_record = existing_locale_relationships.get(name)
+            if isinstance(locale_record, Mapping):
+                locale_records[name] = dict(locale_record)
+        request_locale = _input_locale(payload, code="INVALID_RELATIONSHIP")
         for item in incoming:
             if not isinstance(item, Mapping):
                 raise ProjectError("INVALID_RELATIONSHIP", "relationship must be an object")
             name = _text(item.get("name"), maximum=255, code="INVALID_RELATIONSHIP")
             models = item.get("models")
+            if name in preserved_relationship_names:
+                raise ProjectError(
+                    "INVALID_RELATIONSHIP",
+                    f"relationship name '{name}' is reserved by a source relationship that needs repair",
+                )
             if not _IDENTIFIER.fullmatch(name) or name in seen:
                 raise ProjectError("INVALID_RELATIONSHIP", "relationship name must be unique and valid")
             if not isinstance(models, list) or len(models) != 2 or any(not isinstance(model, str) for model in models):
@@ -512,7 +710,17 @@ class SemanticModelStore:
             relation_models = [str(models[0]), str(models[1])]
             if any(model not in model_name_set for model in relation_models):
                 raise ProjectError("INVALID_RELATIONSHIP", "relationship must reference two existing models")
-            condition = _text(item.get("condition"), maximum=8_000, code="INVALID_RELATIONSHIP")
+            raw_condition = item.get("condition")
+            if raw_condition is None:
+                condition = ""
+            elif not isinstance(raw_condition, str):
+                raise ProjectError("INVALID_RELATIONSHIP", f"relationship '{name}' condition must be a string")
+            elif len(raw_condition) > 8_000:
+                raise ProjectError("INVALID_RELATIONSHIP", "text value exceeds the permitted length")
+            else:
+                # ``condition`` is the persisted source of truth.  Keep its
+                # exact spelling and whitespace; fieldPairs is transient.
+                condition = raw_condition
             self._validate_condition(condition, relation_models, model_name_set)
             join_type = _text(item.get("joinType", "MANY_TO_ONE"), maximum=32, code="INVALID_RELATIONSHIP")
             if join_type not in _JOIN_TYPES:
@@ -529,10 +737,29 @@ class SemanticModelStore:
 
             locale_record = _mapping(existing_locale_relationships.get(name))
             if "displayName" in item:
-                locale_record["display_name"] = _localized(item.get("displayName"), name)
+                patch = _localized_patch(
+                    item.get("displayName"),
+                    existing=locale_record.get("display_name"),
+                    locale=_input_locale(item, code="INVALID_RELATIONSHIP") or request_locale,
+                    code="INVALID_RELATIONSHIP",
+                )
+                if patch:
+                    display_name = dict(_mapping(locale_record.get("display_name")))
+                    display_name.update(patch)
+                    locale_record["display_name"] = display_name
             if "description" in item:
-                locale_record["description"] = _localized(item.get("description"))
+                patch = _localized_patch(
+                    item.get("description"),
+                    existing=locale_record.get("description"),
+                    locale=_input_locale(item, code="INVALID_RELATIONSHIP") or request_locale,
+                    code="INVALID_RELATIONSHIP",
+                )
+                if patch:
+                    description = dict(_mapping(locale_record.get("description")))
+                    description.update(patch)
+                    locale_record["description"] = description
             locale_records[name] = locale_record
+        normalized.extend(preserved_relationships)
         relationships_document["relationships"] = normalized
         locales["relationships"] = locale_records
         self.project.put_files(
@@ -584,6 +811,66 @@ class SemanticModelStore:
         if not required.issubset(qualifiers):
             missing = sorted(required - qualifiers)[0]
             raise ProjectError("INVALID_RELATIONSHIP", f"relationship condition must reference model '{missing}'")
+
+    @staticmethod
+    def _field_pairs(
+        condition: str,
+        models: list[str],
+        model_fields: Mapping[str, set[str]] | None = None,
+    ) -> list[dict[str, str]]:
+        """Project direct equality terms into field-level graph connections.
+
+        ``condition`` remains the only persisted relationship truth.  This
+        intentionally conservative projection handles the common composite
+        join form (``a.x = b.x AND a.y = b.y``) and leaves more complex
+        expressions represented only by their original condition.  It never
+        rewrites the Wren file or rejects a valid expression just because it
+        cannot be projected into pairs.
+        """
+
+        if len(models) != 2 or model_fields is None:
+            return []
+        source_model, target_model = models
+        if source_model not in model_fields or target_model not in model_fields:
+            return []
+
+        # Only project a condition when every term is a plain qualified-field
+        # equality and the complete expression is AND-connected.  Matching
+        # terms inside ORs, functions, casts, parentheses, or other SQL is a
+        # lossy projection and must remain represented solely by condition.
+        terms = _AND_OPERATOR.split(condition.strip())
+        if not terms or any(not term for term in terms):
+            return []
+        pairs: list[dict[str, str]] = []
+        seen: set[tuple[str, str, str, str]] = set()
+        for term in terms:
+            match = _FIELD_EQUALITY.fullmatch(term.strip())
+            if match is None:
+                return []
+            left_model, left_field, right_model, right_field = match.groups()
+            if left_model == source_model and right_model == target_model:
+                pair = {
+                    "sourceModel": source_model,
+                    "sourceField": left_field,
+                    "targetModel": target_model,
+                    "targetField": right_field,
+                }
+            elif left_model == target_model and right_model == source_model:
+                pair = {
+                    "sourceModel": source_model,
+                    "sourceField": right_field,
+                    "targetModel": target_model,
+                    "targetField": left_field,
+                }
+            else:
+                return []
+            if left_field not in model_fields[left_model] or right_field not in model_fields[right_model]:
+                return []
+            key = tuple(pair[key] for key in ("sourceModel", "sourceField", "targetModel", "targetField"))
+            if key not in seen:
+                seen.add(key)
+                pairs.append(pair)
+        return pairs
 
     @staticmethod
     def _infer_role(column: Mapping[str, Any]) -> str:

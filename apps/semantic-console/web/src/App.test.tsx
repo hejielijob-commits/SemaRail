@@ -113,4 +113,45 @@ describe("Semantic Console interactions", () => {
     await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/api/datasources/source-b/columns?schema=analytics_b&table=orders"))).toBe(true));
     expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/api/datasources/source-a/columns?schema=analytics_b"))).toBe(false);
   });
+
+  it("keeps relationship graph, source, and changes in one top-level workbench", async () => {
+    const snapshot = {
+      revision: "sha256:relationships",
+      draftCount: 0,
+      models: [],
+      relationships: [],
+      sourceFiles: [{ path: "relationships.yml", revision: "sha256:relationships" }],
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/health")) return Promise.resolve(jsonResponse({ status: "ok" }));
+      if (url.endsWith("/api/project") && init?.method !== "POST") return Promise.resolve(jsonResponse({ name: "Warehouse project", projectExists: true, activeDatasource: null }));
+      if (url.endsWith("/api/datasource-types")) return Promise.resolve(jsonResponse([]));
+      if (url.endsWith("/api/datasources")) return Promise.resolve(jsonResponse([]));
+      if (url.endsWith("/api/project/files")) return Promise.resolve(jsonResponse(snapshot.sourceFiles));
+      if (url.endsWith("/api/versions")) return Promise.resolve(jsonResponse([]));
+      if (url.endsWith("/api/semantic-project")) return Promise.resolve(jsonResponse(snapshot));
+      if (url.includes("/api/project/file?")) return Promise.resolve(jsonResponse({ path: "relationships.yml", content: "relationships: []\n", revision: snapshot.revision }));
+      if (url.includes("/api/project/diff?")) return Promise.resolve(jsonResponse({ path: "relationships.yml", changed: false, diff: "", revision: snapshot.revision }));
+      return Promise.resolve(jsonResponse({ code: "NOT_FOUND", message: `Unhandled test request: ${url}` }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Relationships" }));
+    expect(await screen.findByRole("heading", { name: "Relationships" })).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Relationship map", "Source", "Changes"]);
+    expect(document.querySelector(".relationship-source-panel")).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Source" }));
+    expect(await screen.findByText("relationships: []", { exact: false })).toBeInTheDocument();
+    const readsBeforeEditor = fetchMock.mock.calls.filter(([input]) => String(input).includes("/api/project/file?") && String(input).includes("path=relationships.yml")).length;
+    fireEvent.click(screen.getByRole("button", { name: "Open in source editor" }));
+    expect(await screen.findByRole("textbox", { name: "MDL source editor" })).toHaveValue("relationships: []\n");
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/api/project/file?") && String(input).includes("path=relationships.yml")).length).toBeGreaterThan(readsBeforeEditor));
+
+    fireEvent.click(screen.getByRole("button", { name: "Relationships" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Changes" }));
+    expect(await screen.findByText("No unpublished relationship changes")).toBeInTheDocument();
+  });
 });

@@ -45,8 +45,8 @@ The primary routes are:
 | `GET /api/project/files` | Draft-aware file metadata |
 | `GET/PUT /api/project/file?path=...` | Read/edit a draft file |
 | `GET /api/semantic-project` | Read the structured business-model snapshot used by the visual editor |
-| `PUT /api/semantic-models/{name}` | Update one model, its fields, and bilingual semantic metadata |
-| `PUT /api/semantic-relationships` | Replace validated model relationships and their bilingual metadata |
+| `PUT /api/semantic-models/{name}` | Update one model, its fields, and semantic metadata |
+| `PUT /api/semantic-relationships` | Replace validated model relationships and their semantic metadata |
 | `GET /api/project/diff?path=...` | Read the bounded diff between published and draft content |
 | `POST /api/project/validate` | Validate the effective draft tree |
 | `POST /api/project/publish` | Validate/build then transactionally publish |
@@ -75,18 +75,34 @@ The two write endpoints are draft operations.  Send the `revision` returned by
 the snapshot as `expectedRevision`; a stale revision returns HTTP 409 with the
 current revision and leaves every file unchanged.  A model save updates its
 metadata and locale companion together.  A relationship save replaces the
-relationship list and updates its locale records together.  Both operations
-preserve unknown Wren keys (including custom model/column keys, relationship
-root/entry keys, and extension keys in `locales.yml`) and only overwrite fields
-owned by the visual editor.
+visualizable relationship list and updates its locale records together, while
+retaining source relationships that reference unknown models for later repair.
+Both operations preserve unknown Wren keys (including custom model/column keys,
+relationship root/entry keys, and extension keys in `locales.yml`) and only
+overwrite fields owned by the visual editor.
+
+The snapshot keeps the backwards-compatible `LocalizedText` shape with both
+`zh-CN` and `en-US` keys.  New clients may send a single string for
+`displayName` or `description`; an optional request-only `locale` (`zh-CN` or
+`en-US`, with `zh`/`en` aliases) selects the language slot.  When it is omitted,
+an existing record with only one populated locale is updated in that locale;
+otherwise `en-US` is the stable default.  A localized object may contain either
+or both keys.  Missing keys are patches, not clears, so an English-only edit
+cannot silently remove an existing Chinese translation.  The locale hint is
+never written to Wren files.  Existing callers that send the full bilingual
+object continue to work unchanged.
 
 Relationship entries must name two existing models, use one of Wren's four
 join types, and contain a condition that qualifies both referenced models
 (for example `orders.customer_id = customers.id`).  Existing hand-edited
 relationships that point at an unknown model are omitted from the graph and
 reported in `relationshipErrors`; they remain visible through the underlying
-file view for repair.  `GET /api/project/diff` shows the exact bounded unified
-diff for that underlying file.
+file view for repair.  For direct equality terms, the snapshot also exposes
+transient `fieldPairs` (including composite joins) for field-level graph edges;
+the Wren `condition` remains the only persisted truth, so complex expressions
+are preserved verbatim and are not rewritten into an extension format.
+`GET /api/project/diff` shows the exact bounded unified diff for that underlying
+file.
 
 Datasource passwords and connection URLs are accepted only in create/update
 bodies. They are held in memory and persisted, for restart support, in

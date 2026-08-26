@@ -5,6 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 from server.app import create_app
 from server.project import ProjectStore
 from server.service import ApiServiceError, SemanticConsoleService
@@ -362,3 +364,318 @@ class SemanticConsoleServiceTests(unittest.TestCase):
         metadata = store.read_file("models/monthly/metadata.yml")["content"]
         self.assertIn("ref_sql: SELECT 1 AS id", metadata)
         self.assertNotIn("table_reference:", metadata)
+
+    def test_semantic_scalar_text_patch_preserves_unedited_locale_and_unknown_fields(self):
+        store = self.make_project()
+        model_dir = self.tmp_path / "project" / "models" / "orders"
+        model_dir.mkdir(parents=True)
+        model_dir.joinpath("metadata.yml").write_text(
+            "name: orders\n"
+            "properties:\n"
+            "  description: Legacy Wren description\n"
+            "custom_model_field: keep-me\n"
+            "table_reference:\n"
+            "  schema: public\n"
+            "  table: orders\n"
+            "columns:\n"
+            "  - name: id\n"
+            "    type: INTEGER\n",
+            encoding="utf-8",
+        )
+        locale_dir = self.tmp_path / "project" / "semantic-console"
+        locale_dir.mkdir(parents=True)
+        locale_dir.joinpath("locales.yml").write_text(
+            "models:\n"
+            "  orders:\n"
+            "    custom_model_locale: keep-model-locale\n"
+            "    display_name:\n"
+            "      zh-CN: 旧订单\n"
+            "      en-US: Legacy orders\n"
+            "    description:\n"
+            "      zh-CN: 旧中文描述\n"
+            "      en-US: Legacy English description\n"
+            "    columns:\n"
+            "      id:\n"
+            "        display_name:\n"
+            "          zh-CN: 编号\n"
+            "          en-US: Identifier\n"
+            "        custom_column_locale: keep-column-locale\n",
+            encoding="utf-8",
+        )
+        service = SemanticConsoleService(store)
+        snapshot = service.semantic_project()
+        model = snapshot["models"][0]
+        updated = service.save_semantic_model(
+            "orders",
+            {
+                **model,
+                "displayName": "新订单",
+                "description": "新的中文描述",
+                "locale": "zh-CN",
+                "columns": [{**model["columns"][0], "displayName": "编号（新）", "locale": "zh-CN"}],
+                "expectedRevision": snapshot["revision"],
+            },
+        )
+        saved_model = updated["models"][0]
+        self.assertEqual(saved_model["displayName"], {"zh-CN": "新订单", "en-US": "Legacy orders"})
+        self.assertEqual(saved_model["columns"][0]["displayName"], {"zh-CN": "编号（新）", "en-US": "Identifier"})
+        locales = store.read_file("semantic-console/locales.yml")["content"]
+        metadata = store.read_file("models/orders/metadata.yml")["content"]
+        self.assertIn("Legacy orders", locales)
+        self.assertIn("custom_model_locale: keep-model-locale", locales)
+        self.assertIn("custom_column_locale: keep-column-locale", locales)
+        self.assertIn("custom_model_field: keep-me", metadata)
+        # The Wren-level description keeps its English/default value when only
+        # the Chinese companion text was edited.
+        self.assertIn("description: Legacy Wren description", metadata)
+
+    def test_semantic_noop_save_keeps_partial_locale_records_and_revision_is_atomic(self):
+        store = self.make_project()
+        model_dir = self.tmp_path / "project" / "models" / "orders"
+        model_dir.mkdir(parents=True)
+        model_dir.joinpath("metadata.yml").write_text(
+            "name: orders\ncustom_model_field: keep-me\ncolumns:\n  - name: id\n    type: INTEGER\n",
+            encoding="utf-8",
+        )
+        locale_dir = self.tmp_path / "project" / "semantic-console"
+        locale_dir.mkdir(parents=True)
+        locale_dir.joinpath("locales.yml").write_text(
+            "models:\n  orders:\n    display_name:\n      en-US: Orders\n    custom_model_locale: keep-me\n",
+            encoding="utf-8",
+        )
+        service = SemanticConsoleService(store)
+        snapshot = service.semantic_project()
+        model = snapshot["models"][0]
+        updated = service.save_semantic_model(
+            "orders",
+            {"columns": model["columns"], "expectedRevision": snapshot["revision"]},
+        )
+        self.assertEqual(updated["models"][0]["displayName"]["en-US"], "Orders")
+        self.assertIn("custom_model_locale: keep-me", store.read_file("semantic-console/locales.yml")["content"])
+        self.assertIn("custom_model_field: keep-me", store.read_file("models/orders/metadata.yml")["content"])
+        after_locale = store.read_file("semantic-console/locales.yml")["content"]
+        after_metadata = store.read_file("models/orders/metadata.yml")["content"]
+        stale = {"columns": model["columns"], "displayName": "stale", "expectedRevision": snapshot["revision"]}
+        with self.assertRaises(ApiServiceError) as conflict:
+            service.save_semantic_model("orders", stale)
+        self.assertEqual(conflict.exception.code, "REVISION_CONFLICT")
+        self.assertEqual(store.read_file("semantic-console/locales.yml")["content"], after_locale)
+        self.assertEqual(store.read_file("models/orders/metadata.yml")["content"], after_metadata)
+
+    def test_relationship_field_pairs_are_derived_without_rewriting_composite_condition(self):
+        store = self.make_project()
+        for name in ("orders", "customers"):
+            model_dir = self.tmp_path / "project" / "models" / name
+            model_dir.mkdir(parents=True)
+            model_dir.joinpath("metadata.yml").write_text(
+                f"name: {name}\ncolumns:\n  - name: id\n    type: INTEGER\n  - name: tenant_id\n    type: INTEGER\n",
+                encoding="utf-8",
+            )
+        service = SemanticConsoleService(store)
+        snapshot = service.semantic_project()
+        condition = "orders.tenant_id = customers.tenant_id AND customers.id = orders.id"
+        updated = service.save_relationships(
+            {
+                "expectedRevision": snapshot["revision"],
+                "relationships": [{
+                    "name": "orders_customers",
+                    "models": ["orders", "customers"],
+                    "joinType": "MANY_TO_ONE",
+                    "condition": condition,
+                }],
+            }
+        )
+        relationship = updated["relationships"][0]
+        self.assertEqual(relationship["fieldPairs"], [
+            {"sourceModel": "orders", "sourceField": "tenant_id", "targetModel": "customers", "targetField": "tenant_id"},
+            {"sourceModel": "orders", "sourceField": "id", "targetModel": "customers", "targetField": "id"},
+        ])
+        self.assertIn(condition, store.read_file("relationships.yml")["content"])
+
+    def test_relationship_scalar_locale_patch_preserves_complex_condition_and_does_not_persist_field_pairs(self):
+        store = self.make_project()
+        for name in ("orders", "customers"):
+            model_dir = self.tmp_path / "project" / "models" / name
+            model_dir.mkdir(parents=True)
+            model_dir.joinpath("metadata.yml").write_text(
+                f"name: {name}\ncolumns:\n  - name: customer_id\n    type: INTEGER\n  - name: id\n    type: INTEGER\n",
+                encoding="utf-8",
+            )
+        condition = "orders.customer_id = customers.id AND (orders.deleted_at IS NULL OR customers.deleted_at IS NULL)"
+        (self.tmp_path / "project" / "relationships.yml").write_text(
+            "custom_relationship_root: keep-root\n"
+            "relationships:\n"
+            "  - name: orders_customer\n"
+            "    models: [orders, customers]\n"
+            "    join_type: MANY_TO_ONE\n"
+            f"    condition: {condition}\n"
+            "    custom_relationship_field: keep-entry\n",
+            encoding="utf-8",
+        )
+        locale_dir = self.tmp_path / "project" / "semantic-console"
+        locale_dir.mkdir(parents=True)
+        locale_dir.joinpath("locales.yml").write_text(
+            "custom_locale_root: keep-locale-root\n"
+            "relationships:\n"
+            "  orders_customer:\n"
+            "    display_name:\n"
+            "      zh-CN: 旧订单客户\n"
+            "      en-US: Legacy order customer\n"
+            "    description:\n"
+            "      zh-CN: 旧中文关系\n"
+            "      en-US: Legacy English relationship\n"
+            "    custom_relationship_locale: keep-locale-entry\n",
+            encoding="utf-8",
+        )
+        service = SemanticConsoleService(store)
+        snapshot = service.semantic_project()
+        relationship = snapshot["relationships"][0]
+        self.assertEqual(relationship["fieldPairs"], [])
+        updated = service.save_relationships({
+            "expectedRevision": snapshot["revision"],
+            "locale": "zh-CN",
+            "relationships": [{
+                **relationship,
+                "displayName": "新订单客户",
+                "description": "新的中文关系",
+                # This is a read-only projection and must be ignored on write.
+                "fieldPairs": [{"sourceModel": "evil", "sourceField": "x", "targetModel": "evil", "targetField": "y"}],
+            }],
+        })
+        saved = updated["relationships"][0]
+        self.assertEqual(saved["displayName"], {"zh-CN": "新订单客户", "en-US": "Legacy order customer"})
+        self.assertEqual(saved["description"], {"zh-CN": "新的中文关系", "en-US": "Legacy English relationship"})
+        self.assertEqual(saved["condition"], condition)
+        relationships = store.read_file("relationships.yml")["content"]
+        locales = store.read_file("semantic-console/locales.yml")["content"]
+        self.assertEqual(yaml.safe_load(relationships)["relationships"][0]["condition"], condition)
+        self.assertIn("custom_relationship_root: keep-root", relationships)
+        self.assertIn("custom_relationship_field: keep-entry", relationships)
+        self.assertNotIn("fieldPairs", relationships)
+        self.assertIn("Legacy order customer", locales)
+        self.assertIn("custom_relationship_locale: keep-locale-entry", locales)
+        self.assertNotIn("fieldPairs", locales)
+
+    def test_relationship_save_preserves_unknown_model_records_and_locale_extensions(self):
+        store = self.make_project()
+        for name in ("orders", "customers"):
+            model_dir = self.tmp_path / "project" / "models" / name
+            model_dir.mkdir(parents=True)
+            model_dir.joinpath("metadata.yml").write_text(
+                f"name: {name}\ncolumns:\n  - name: id\n    type: INTEGER\n  - name: customer_id\n    type: INTEGER\n",
+                encoding="utf-8",
+            )
+        (self.tmp_path / "project" / "relationships.yml").write_text(
+            "custom_relationship_root: keep-root\n"
+            "relationships:\n"
+            "  - name: orders_customer\n"
+            "    models: [orders, customers]\n"
+            "    join_type: MANY_TO_ONE\n"
+            "    condition: orders.customer_id = customers.id\n"
+            "    custom_visible_field: keep-visible\n"
+            "  - name: orders_archived_customer\n"
+            "    models: [orders, archived_customers]\n"
+            "    join_type: MANY_TO_ONE\n"
+            "    condition: orders.customer_id = archived_customers.id\n"
+            "    custom_unknown_field: keep-unknown\n",
+            encoding="utf-8",
+        )
+        locale_dir = self.tmp_path / "project" / "semantic-console"
+        locale_dir.mkdir(parents=True)
+        locale_dir.joinpath("locales.yml").write_text(
+            "custom_locale_root: keep-locale-root\n"
+            "relationships:\n"
+            "  orders_archived_customer:\n"
+            "    display_name:\n"
+            "      zh-CN: 历史订单客户\n"
+            "      en-US: Archived order customer\n"
+            "      x-acme: Keep this translation extension\n"
+            "    custom_unknown_locale: keep-unknown-locale\n",
+            encoding="utf-8",
+        )
+        service = SemanticConsoleService(store)
+        snapshot = service.semantic_project()
+        self.assertEqual(snapshot["relationships"][0]["name"], "orders_customer")
+        self.assertEqual(snapshot["relationshipErrors"][0]["name"], "orders_archived_customer")
+
+        visible = snapshot["relationships"][0]
+        updated = service.save_relationships({
+            "expectedRevision": snapshot["revision"],
+            "relationships": [{**visible, "condition": "orders.id = customers.id"}],
+        })
+        saved_document = yaml.safe_load(store.read_file("relationships.yml")["content"])
+        saved_by_name = {entry["name"]: entry for entry in saved_document["relationships"]}
+        self.assertEqual(saved_by_name["orders_archived_customer"]["models"], ["orders", "archived_customers"])
+        self.assertEqual(saved_by_name["orders_archived_customer"]["custom_unknown_field"], "keep-unknown")
+        self.assertEqual(saved_by_name["orders_customer"]["condition"], "orders.id = customers.id")
+        saved_locales = yaml.safe_load(store.read_file("semantic-console/locales.yml")["content"])
+        unknown_locale = saved_locales["relationships"]["orders_archived_customer"]
+        self.assertEqual(unknown_locale["custom_unknown_locale"], "keep-unknown-locale")
+        self.assertEqual(unknown_locale["display_name"]["x-acme"], "Keep this translation extension")
+
+        # Removing a visible relationship still has its normal semantics; it
+        # must not turn the preserved unknown-model entry into a deletion.
+        service.save_relationships({"expectedRevision": updated["revision"], "relationships": []})
+        after_delete = yaml.safe_load(store.read_file("relationships.yml")["content"])
+        self.assertEqual(
+            [entry["name"] for entry in after_delete["relationships"]],
+            ["orders_archived_customer"],
+        )
+        after_delete_locales = yaml.safe_load(store.read_file("semantic-console/locales.yml")["content"])
+        self.assertEqual(list(after_delete_locales["relationships"]), ["orders_archived_customer"])
+
+        # The graph cannot silently create a second entry with the same name
+        # as a hidden source relationship; the source record must be repaired
+        # explicitly first.
+        latest = service.semantic_project()
+        with self.assertRaises(ApiServiceError) as collision:
+            service.save_relationships({
+                "expectedRevision": latest["revision"],
+                "relationships": [{
+                    "name": "orders_archived_customer",
+                    "models": ["orders", "customers"],
+                    "joinType": "MANY_TO_ONE",
+                    "condition": "orders.customer_id = customers.id",
+                }],
+            })
+        self.assertEqual(collision.exception.code, "INVALID_RELATIONSHIP")
+
+    def test_relationship_field_pairs_require_simple_and_terms_and_existing_fields(self):
+        store = self.make_project()
+        for name in ("orders", "customers"):
+            model_dir = self.tmp_path / "project" / "models" / name
+            model_dir.mkdir(parents=True)
+            model_dir.joinpath("metadata.yml").write_text(
+                f"name: {name}\ncolumns:\n  - name: id\n    type: INTEGER\n  - name: customer_id\n    type: INTEGER\n",
+                encoding="utf-8",
+            )
+        service = SemanticConsoleService(store)
+        conditions = {
+            "relationship_or": " orders.customer_id = customers.id OR orders.id = customers.id ",
+            "relationship_function": "LOWER(orders.customer_id) = customers.id",
+            "relationship_cast": "CAST(orders.customer_id AS TEXT) = customers.id",
+            "relationship_parenthesized": "orders.customer_id = customers.id AND (orders.id = customers.id)",
+            "relationship_expression": "orders.customer_id + 1 = customers.id",
+            "relationship_missing_field": "orders.missing_field = customers.id",
+        }
+        snapshot = service.semantic_project()
+        updated = service.save_relationships({
+            "expectedRevision": snapshot["revision"],
+            "relationships": [
+                {
+                    "name": name,
+                    "models": ["orders", "customers"],
+                    "joinType": "MANY_TO_ONE",
+                    "condition": condition,
+                }
+                for name, condition in conditions.items()
+            ],
+        })
+        saved = {relationship["name"]: relationship for relationship in updated["relationships"]}
+        for name, condition in conditions.items():
+            self.assertEqual(saved[name]["fieldPairs"], [], name)
+            self.assertEqual(saved[name]["condition"], condition)
+        persisted = yaml.safe_load(store.read_file("relationships.yml")["content"])
+        persisted_by_name = {entry["name"]: entry for entry in persisted["relationships"]}
+        for name, condition in conditions.items():
+            self.assertEqual(persisted_by_name[name]["condition"], condition)

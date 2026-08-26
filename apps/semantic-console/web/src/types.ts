@@ -222,7 +222,8 @@ export interface SemanticModel {
   name: string;
   sourcePath: string;
   tableReference: { schema: string; table: string };
-  primaryKey: string;
+  /** Wren accepts either one column name or an ordered composite key. */
+  primaryKey: string | string[];
   displayName: LocalizedText;
   description: LocalizedText;
   businessDomain: string;
@@ -239,6 +240,15 @@ export interface SemanticRelationship {
   condition: string;
   displayName: LocalizedText;
   description: LocalizedText;
+  /** Read-only projection derived from simple equality terms in condition. */
+  fieldPairs?: SemanticRelationshipFieldPair[];
+}
+
+export interface SemanticRelationshipFieldPair {
+  sourceModel: string;
+  sourceField: string;
+  targetModel: string;
+  targetField: string;
 }
 
 /** The read model used by the visual semantic console. */
@@ -247,6 +257,7 @@ export interface SemanticProjectSnapshot {
   draftCount: number;
   models: SemanticModel[];
   relationships: SemanticRelationship[];
+  relationshipErrors?: Array<{ name: string; message: string }>;
   sourceFiles: ProjectFile[];
 }
 

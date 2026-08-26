@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from "react";
 import {
   ArrowDown,
   ArrowLeft,
@@ -27,6 +27,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   getBezierPath,
+  useUpdateNodeInternals,
   useReactFlow,
   type Edge,
   type EdgeProps,
@@ -76,6 +77,16 @@ export interface RelationshipGraphRelationship {
   description?: string | RelationshipGraphLocalizedText;
   /** Optional explicit join columns keyed by model name. */
   joinColumns?: Record<string, string | string[]>;
+  /** Optional server-derived field pairs. These are read-only and never written back. */
+  fieldPairs?: readonly RelationshipGraphFieldPair[];
+}
+
+/** A parsed equality between the source and target model columns. */
+export interface RelationshipGraphFieldPair {
+  sourceField: string;
+  targetField: string;
+  sourceModel?: string;
+  targetModel?: string;
 }
 
 /** The locale used for labels and localized metadata fallbacks. */
@@ -93,6 +104,8 @@ export interface RelationshipGraphProps {
   readOnly?: boolean;
   className?: string;
   style?: CSSProperties;
+  /** Hide the outer heading when the graph is embedded in a page-level tab. */
+  showHeading?: boolean;
   /** Called with the full draft relationship list after a create, edit, or delete. */
   onChange?: (relationships: RelationshipGraphRelationship[]) => void;
   /** Called after a relationship is saved through the drawer. */
@@ -121,13 +134,27 @@ type RelationshipGraphCopy = {
   editRelationship: string;
   sourceModel: string;
   targetModel: string;
+  sourceField: string;
+  targetField: string;
   relationshipName: string;
+  displayName: string;
+  relationshipDescription: string;
   cardinality: string;
   condition: string;
-  displayNameZh: string;
-  displayNameEn: string;
-  descriptionZh: string;
-  descriptionEn: string;
+  advancedCondition: string;
+  structuredCondition: string;
+  sourceFieldHint: string;
+  targetFieldHint: string;
+  fields: string;
+  expandFields: string;
+  collapseFields: string;
+  previousPage: string;
+  nextPage: string;
+  fieldPage: (from: number, to: number, total: number) => string;
+  noFields: string;
+  fieldIncoming: string;
+  fieldOutgoing: string;
+  fallbackRelationship: string;
   save: string;
   cancel: string;
   delete: string;
@@ -169,13 +196,27 @@ const COPY: Record<"zh" | "en", RelationshipGraphCopy> = {
     editRelationship: "编辑关系",
     sourceModel: "起点模型",
     targetModel: "终点模型",
+    sourceField: "起点字段",
+    targetField: "终点字段",
     relationshipName: "关系名称",
+    displayName: "显示名称",
+    relationshipDescription: "描述",
     cardinality: "基数",
     condition: "关联条件",
-    displayNameZh: "中文显示名",
-    displayNameEn: "英文显示名",
-    descriptionZh: "中文描述",
-    descriptionEn: "英文描述",
+    advancedCondition: "高级关联条件",
+    structuredCondition: "已按字段生成标准条件",
+    sourceFieldHint: "选择起点字段",
+    targetFieldHint: "选择终点字段",
+    fields: "字段",
+    expandFields: "展开字段",
+    collapseFields: "收起字段",
+    previousPage: "上一页",
+    nextPage: "下一页",
+    fieldPage: (from, to, total) => `${from}-${to} / ${total}`,
+    noFields: "暂无字段",
+    fieldIncoming: "进入关系",
+    fieldOutgoing: "发出关系",
+    fallbackRelationship: "未解析字段，显示模型级关系",
     save: "保存关系",
     cancel: "取消",
     delete: "删除关系",
@@ -187,7 +228,7 @@ const COPY: Record<"zh" | "en", RelationshipGraphCopy> = {
     loading: "正在加载关系图...",
     saving: "正在保存...",
     saveFailed: "关系保存失败，请检查后重试。",
-    validation: "请填写关系名称和两个不同的模型。",
+    validation: "请完整填写关系名称、模型和字段或高级条件。",
     sameModel: "关系两端必须是不同的模型。",
     chooseModels: "请先添加至少两个模型。",
     modelCount: (count) => `${count} 个模型`,
@@ -215,13 +256,27 @@ const COPY: Record<"zh" | "en", RelationshipGraphCopy> = {
     editRelationship: "Edit relationship",
     sourceModel: "Source model",
     targetModel: "Target model",
+    sourceField: "Source field",
+    targetField: "Target field",
     relationshipName: "Relationship name",
+    displayName: "Display name",
+    relationshipDescription: "Description",
     cardinality: "Cardinality",
     condition: "Join condition",
-    displayNameZh: "Chinese display name",
-    displayNameEn: "English display name",
-    descriptionZh: "Chinese description",
-    descriptionEn: "English description",
+    advancedCondition: "Advanced join condition",
+    structuredCondition: "Standard condition generated from fields",
+    sourceFieldHint: "Choose source field",
+    targetFieldHint: "Choose target field",
+    fields: "Fields",
+    expandFields: "Expand fields",
+    collapseFields: "Collapse fields",
+    previousPage: "Previous page",
+    nextPage: "Next page",
+    fieldPage: (from, to, total) => `${from}-${to} / ${total}`,
+    noFields: "No fields",
+    fieldIncoming: "Incoming relationship",
+    fieldOutgoing: "Outgoing relationship",
+    fallbackRelationship: "Fields could not be parsed; showing model-level link",
     save: "Save relationship",
     cancel: "Cancel",
     delete: "Delete relationship",
@@ -233,7 +288,7 @@ const COPY: Record<"zh" | "en", RelationshipGraphCopy> = {
     loading: "Loading relationship map...",
     saving: "Saving...",
     saveFailed: "Could not save this relationship. Check the fields and try again.",
-    validation: "Enter a relationship name and choose two different models.",
+    validation: "Complete the required relationship fields.",
     sameModel: "The two ends of a relationship must be different models.",
     chooseModels: "Add at least two models first.",
     modelCount: (count) => `${count} model${count === 1 ? "" : "s"}`,
@@ -257,9 +312,12 @@ function localizedText(value: string | RelationshipGraphLocalizedText | undefine
   return preferred.map((key) => value[key as keyof RelationshipGraphLocalizedText]).find((item) => Boolean(item)) ?? fallback;
 }
 
-function localizedPair(value: string | RelationshipGraphLocalizedText | undefined) {
-  if (typeof value === "string") return { zh: value, en: value };
-  return { zh: value?.["zh-CN"] ?? value?.zh ?? "", en: value?.["en-US"] ?? value?.en ?? "" };
+function localizedForLocale(value: string | RelationshipGraphLocalizedText | undefined, locale: RelationshipGraphLocale | undefined) {
+  return localizedText(value, locale, "");
+}
+
+function localeKey(locale: RelationshipGraphLocale | undefined): "zh-CN" | "en-US" {
+  return languageFor(locale) === "zh" ? "zh-CN" : "en-US";
 }
 
 function modelReferenceName(reference: RelationshipGraphModelReference | undefined) {
@@ -275,8 +333,8 @@ function modelNodeId(name: string) {
   return `relationship-model-${encodeURIComponent(name)}`;
 }
 
-function relationshipEdgeId(relationship: RelationshipGraphRelationship, index: number) {
-  return `relationship-edge-${index}-${encodeURIComponent(relationship.name || "unnamed")}`;
+function relationshipEdgeId(relationship: RelationshipGraphRelationship, index: number, pairIndex = 0) {
+  return `relationship-edge-${index}-${pairIndex}-${encodeURIComponent(relationship.name || "unnamed")}`;
 }
 
 function normalizedJoinType(value: string | undefined) {
@@ -318,25 +376,172 @@ function wrenJoinType(value: string) {
   } as const)[cardinalityValue(value)];
 }
 
-function relationColumnNames(modelName: string, model: RelationshipGraphModel, relationships: readonly RelationshipGraphRelationship[]) {
+function cleanIdentifier(value: string) {
+  return value.trim().replace(/^(["'`])|(["'`])$/g, "");
+}
+
+function modelQualifiers(model: RelationshipGraphModel) {
+  const table = model.table ?? model.tableName ?? model.physicalName ?? "";
+  const tableBase = table.split(".").pop() ?? table;
+  const schemaTable = model.schema && tableBase ? `${model.schema}.${tableBase}` : "";
+  return new Set([model.name, table, tableBase, schemaTable, model.physicalName, model.tableName].filter(Boolean).map((item) => String(item).toLowerCase()));
+}
+
+function columnExists(model: RelationshipGraphModel, name: string) {
+  return model.columns.some((column) => column.name.toLowerCase() === name.toLowerCase());
+}
+
+function resolveConditionSide(
+  side: string,
+  model: RelationshipGraphModel,
+): string | null {
+  const normalized = side.trim().replace(/^\(+|\)+$/g, "");
+  const match = normalized.match(/^(?:(.+)\.)?(["'`]?[^.\s"'`]+["'`]?)$/);
+  if (!match) return null;
+  const qualifier = match[1] ? cleanIdentifier(match[1]).toLowerCase() : "";
+  const field = cleanIdentifier(match[2]);
+  if (qualifier && !modelQualifiers(model).has(qualifier)) return null;
+  return columnExists(model, field) ? model.columns.find((column) => column.name.toLowerCase() === field.toLowerCase())?.name ?? null : null;
+}
+
+/**
+ * Parse simple equality predicates into field pairs. The parser deliberately
+ * rejects aliases, casts, functions and non-equality expressions so the graph
+ * can safely fall back to model-level handles without inventing a connection.
+ */
+export function parseRelationshipFieldPairs(
+  relationship: RelationshipGraphRelationship,
+  models: readonly RelationshipGraphModel[],
+): RelationshipGraphFieldPair[] {
+  const endpoints = relationshipModels(relationship);
+  if (!endpoints || !relationship.condition?.trim()) return [];
+  const [sourceModelName, targetModelName] = endpoints;
+  const sourceModel = models.find((model) => model.name === sourceModelName);
+  const targetModel = models.find((model) => model.name === targetModelName);
+  if (!sourceModel || !targetModel) return [];
+  const pairs: RelationshipGraphFieldPair[] = [];
+  for (const predicate of relationship.condition.split(/\s+AND\s+/i)) {
+    const equality = predicate.trim().match(/^\(?\s*(.+?)\s*=\s*(.+?)\s*\)?$/);
+    if (!equality) return [];
+    const left = resolveConditionSide(equality[1], sourceModel);
+    const right = resolveConditionSide(equality[2], targetModel);
+    const reverseLeft = resolveConditionSide(equality[1], targetModel);
+    const reverseRight = resolveConditionSide(equality[2], sourceModel);
+    if (left && right) pairs.push({ sourceField: left, targetField: right });
+    else if (reverseLeft && reverseRight) pairs.push({ sourceField: reverseRight, targetField: reverseLeft });
+    else return [];
+  }
+  return pairs;
+}
+
+function relationFieldPairs(
+  relationship: RelationshipGraphRelationship,
+  models: readonly RelationshipGraphModel[],
+): RelationshipGraphFieldPair[] {
+  const endpoints = relationshipModels(relationship);
+  if (endpoints && Array.isArray(relationship.fieldPairs)) {
+    const [sourceModelName, targetModelName] = endpoints;
+    const sourceModel = models.find((model) => model.name === sourceModelName);
+    const targetModel = models.find((model) => model.name === targetModelName);
+    const explicit = relationship.fieldPairs.filter((pair) =>
+      (!pair.sourceModel || pair.sourceModel === sourceModelName)
+      && (!pair.targetModel || pair.targetModel === targetModelName)
+      && Boolean(sourceModel && targetModel && columnExists(sourceModel, pair.sourceField) && columnExists(targetModel, pair.targetField)),
+    ).map((pair) => ({ sourceField: sourceModel?.columns.find((column) => column.name.toLowerCase() === pair.sourceField.toLowerCase())?.name ?? pair.sourceField, targetField: targetModel?.columns.find((column) => column.name.toLowerCase() === pair.targetField.toLowerCase())?.name ?? pair.targetField }));
+    // A present array is an authoritative server projection. In particular,
+    // an empty array means the condition was intentionally judged unsafe for
+    // field-level rendering; do not reinterpret it with the legacy fallback.
+    return explicit;
+  }
+  const parsed = parseRelationshipFieldPairs(relationship, models);
+  if (parsed.length) return parsed;
+  if (!endpoints) return [];
+  const [source, target] = endpoints;
+  const sourceNames = relationship.joinColumns?.[source];
+  const targetNames = relationship.joinColumns?.[target];
+  const sourceFields = sourceNames ? (Array.isArray(sourceNames) ? sourceNames : [sourceNames]) : [];
+  const targetFields = targetNames ? (Array.isArray(targetNames) ? targetNames : [targetNames]) : [];
+  return sourceFields.length === targetFields.length && sourceFields.length > 0
+    ? sourceFields.map((sourceField, index) => ({ sourceField, targetField: targetFields[index] }))
+    : [];
+}
+
+/** Resolve server-provided pairs first, then the safe condition parser. */
+export function getRelationshipFieldPairs(
+  relationship: RelationshipGraphRelationship,
+  models: readonly RelationshipGraphModel[],
+) {
+  return relationFieldPairs(relationship, models);
+}
+
+/** Select the pair represented by a clicked edge, preserving composite joins. */
+export function selectRelationshipFieldPair(
+  relationship: RelationshipGraphRelationship,
+  models: readonly RelationshipGraphModel[],
+  selected?: RelationshipGraphFieldPair,
+) {
+  const pairs = relationFieldPairs(relationship, models);
+  if (!selected) return pairs[0];
+  return pairs.find((pair) => pair.sourceField === selected.sourceField && pair.targetField === selected.targetField) ?? selected;
+}
+
+/** Complex or server-rejected joins stay in the lossless condition editor. */
+export function relationshipUsesAdvancedCondition(
+  relationship: RelationshipGraphRelationship,
+  models: readonly RelationshipGraphModel[],
+) {
+  return relationFieldPairs(relationship, models).length !== 1;
+}
+
+function fieldHandleId(type: "source" | "target", field: string) {
+  return `${type}-field-${encodeURIComponent(field)}`;
+}
+
+function modelHandleId(type: "source" | "target") {
+  return `${type}-model`;
+}
+
+function relationColumnNames(modelName: string, model: RelationshipGraphModel, relationships: readonly RelationshipGraphRelationship[], models: readonly RelationshipGraphModel[]) {
   const names = new Set<string>();
   relationships.forEach((relationship) => {
     const endpoints = relationshipModels(relationship);
     if (!endpoints || !endpoints.includes(modelName)) return;
+    const pairs = relationFieldPairs(relationship, models);
+    const endpointIndex = endpoints[0] === modelName ? 0 : 1;
+    pairs.forEach((pair) => names.add(endpointIndex === 0 ? pair.sourceField : pair.targetField));
     const explicit = relationship.joinColumns?.[modelName];
     if (explicit) (Array.isArray(explicit) ? explicit : [explicit]).forEach((name) => names.add(name));
-    const condition = relationship.condition ?? "";
-    model.columns.forEach((column) => {
-      if (condition.toLowerCase().includes(column.name.toLowerCase())) names.add(column.name);
-    });
   });
   return model.columns.filter((column) => names.has(column.name));
 }
 
-function defaultPositions(models: readonly RelationshipGraphModel[]) {
-  const columns = Math.max(1, Math.ceil(Math.sqrt(Math.max(1, models.length))));
-  return models.reduce<Record<string, { x: number; y: number }>>((positions, model, index) => {
-    positions[modelNodeId(model.name)] = { x: (index % columns) * 350 + 40, y: Math.floor(index / columns) * 250 + 40 };
+function defaultPositions(models: readonly RelationshipGraphModel[], relationships: readonly RelationshipGraphRelationship[] = []) {
+  const modelNames = new Set(models.map((model) => model.name));
+  const rank = new Map(models.map((model) => [model.name, 0]));
+  const indegree = new Map(models.map((model) => [model.name, 0]));
+  const outgoing = new Map(models.map((model) => [model.name, [] as string[]]));
+  relationships.forEach((relationship) => {
+    const endpoints = relationshipModels(relationship);
+    if (!endpoints || !modelNames.has(endpoints[0]) || !modelNames.has(endpoints[1]) || endpoints[0] === endpoints[1]) return;
+    outgoing.get(endpoints[0])?.push(endpoints[1]);
+    indegree.set(endpoints[1], (indegree.get(endpoints[1]) ?? 0) + 1);
+  });
+  const queue = models.filter((model) => (indegree.get(model.name) ?? 0) === 0).map((model) => model.name);
+  for (let index = 0; index < queue.length; index += 1) {
+    const source = queue[index];
+    (outgoing.get(source) ?? []).forEach((target) => {
+      rank.set(target, Math.max(rank.get(target) ?? 0, (rank.get(source) ?? 0) + 1));
+      const nextIndegree = (indegree.get(target) ?? 1) - 1;
+      indegree.set(target, nextIndegree);
+      if (nextIndegree === 0) queue.push(target);
+    });
+  }
+  const layerOffsets = new Map<number, number>();
+  return models.reduce<Record<string, { x: number; y: number }>>((positions, model) => {
+    const layer = rank.get(model.name) ?? 0;
+    const layerIndex = layerOffsets.get(layer) ?? 0;
+    layerOffsets.set(layer, layerIndex + 1);
+    positions[modelNodeId(model.name)] = { x: layer * 390 + 40, y: layerIndex * 260 + 40 };
     return positions;
   }, {});
 }
@@ -347,9 +552,13 @@ type GraphNodeData = {
   tableName: string;
   primaryKeys: string[];
   relatedColumns: RelationshipGraphColumn[];
+  otherColumns: RelationshipGraphColumn[];
+  activeFieldNames: string[];
   locale?: RelationshipGraphLocale;
+  copy: RelationshipGraphCopy;
   isDimmed: boolean;
   isActive: boolean;
+  onFieldFocus: (fieldName: string) => void;
   onOpen: () => void;
 };
 
@@ -358,6 +567,8 @@ type GraphNode = Node<GraphNodeData, "model">;
 type GraphEdgeData = {
   relationship: RelationshipGraphRelationship;
   label: string;
+  fieldPair?: RelationshipGraphFieldPair;
+  labelOffset: number;
   onOpen: () => void;
   isDimmed: boolean;
 };
@@ -370,32 +581,53 @@ function primaryKeyNames(model: RelationshipGraphModel) {
   return Array.from(new Set([...explicit, ...columns]));
 }
 
-function ModelNode({ data }: NodeProps<GraphNode>) {
-  const copy = COPY[languageFor(data.locale)];
+function ModelNode({ id, data }: NodeProps<GraphNode>) {
+  const [expanded, setExpanded] = useState(false);
+  const [page, setPage] = useState(0);
+  const updateNodeInternals = useUpdateNodeInternals();
+  const pageSize = 6;
+  const copy = data.copy;
   const tableName = [data.model.schema, data.tableName].filter(Boolean).join(".");
+  const pages = Math.max(1, Math.ceil(data.otherColumns.length / pageSize));
+  const currentPage = Math.min(page, pages - 1);
+  const visibleColumns = data.otherColumns.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const visibleFieldSignature = [...data.relatedColumns, ...(expanded ? visibleColumns : [])].map((column) => column.name).join("\u0000");
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [currentPage, expanded, id, updateNodeInternals, visibleFieldSignature]);
+  const fieldRow = (column: RelationshipGraphColumn, related: boolean) => {
+    const active = data.activeFieldNames.includes(column.name);
+    const label = column.displayName ? localizedText(column.displayName, data.locale, column.name) : column.name;
+    return (
+      <div className={`relationship-graph-column-row ${related ? "relationship-graph-column-row-related" : ""} ${active ? "relationship-graph-column-row-active" : ""}`} key={column.name} title={column.name} role="button" tabIndex={0} aria-label={column.name} onClick={(event) => { event.stopPropagation(); data.onFieldFocus(column.name); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); data.onFieldFocus(column.name); } }}>
+        <Handle type="target" position={Position.Left} id={fieldHandleId("target", column.name)} className="relationship-graph-field-handle" aria-label={`${copy.fieldIncoming}: ${column.name}`} />
+        <span className="relationship-graph-column-name" title={column.name}><code>{column.name}</code>{column.primaryKey || column.isPrimaryKey ? <span className="relationship-graph-column-key" title={copy.primaryKey}>PK</span> : null}</span>
+        <span className="relationship-graph-column-display" title={label}>{label}</span>
+        <span className="relationship-graph-column-type" title={column.type ?? column.dataType ?? ""}>{column.type ?? column.dataType ?? "-"}</span>
+        <Handle type="source" position={Position.Right} id={fieldHandleId("source", column.name)} className="relationship-graph-field-handle" aria-label={`${copy.fieldOutgoing}: ${column.name}`} />
+      </div>
+    );
+  };
   return (
     <div className={`relationship-graph-node ${data.isDimmed ? "relationship-graph-node-dimmed" : ""} ${data.isActive ? "relationship-graph-node-active" : ""}`}>
-      <Handle type="target" position={Position.Left} aria-label={`Incoming relationship to ${data.displayName}`} />
-      <Handle type="source" position={Position.Right} aria-label={`Outgoing relationship from ${data.displayName}`} />
+      <Handle type="target" position={Position.Left} id={modelHandleId("target")} className="relationship-graph-model-handle" aria-label={`${copy.fieldIncoming}: ${data.displayName}`} />
+      <Handle type="source" position={Position.Right} id={modelHandleId("source")} className="relationship-graph-model-handle" aria-label={`${copy.fieldOutgoing}: ${data.displayName}`} />
       <div className="relationship-graph-node-header">
         <span className="relationship-graph-node-glyph" aria-hidden="true"><MapTrifold size={16} weight="duotone" /></span>
         <div className="relationship-graph-node-title">
           <strong title={data.displayName}>{data.displayName}</strong>
           <small title={data.model.name}>{data.model.name}</small>
         </div>
-        <button type="button" className="relationship-graph-node-edit nodrag nopan" aria-label={`${copy.edit}: ${data.displayName}`} onClick={data.onOpen}>
+        <button type="button" className="relationship-graph-node-edit nodrag nopan" aria-label={`${copy.edit}: ${data.displayName}`} onClick={(event) => { event.stopPropagation(); data.onOpen(); }}>
           <PencilSimple size={15} aria-hidden="true" />
         </button>
       </div>
       <div className="relationship-graph-node-table"><span>{copy.table}</span><code>{tableName || data.model.name}</code></div>
       <div className="relationship-graph-node-fields">
-        <div className="relationship-graph-node-field-heading"><span>{copy.primaryKey}</span><span>{copy.relatedFields}</span></div>
-        <div className="relationship-graph-node-field-row">
-          <span className="relationship-graph-node-pk">{data.primaryKeys.length ? data.primaryKeys.join(", ") : "-"}</span>
-          <span className="relationship-graph-node-joins" title={data.relatedColumns.map((column) => column.name).join(", ") || copy.noRelatedFields}>
-            {data.relatedColumns.length ? data.relatedColumns.map((column) => column.displayName ? localizedText(column.displayName, data.locale, column.name) : column.name).join(", ") : "-"}
-          </span>
-        </div>
+        <div className="relationship-graph-column-heading"><span>{copy.fields}</span><span>{data.model.columns.length}</span></div>
+        {data.relatedColumns.length ? <div className="relationship-graph-column-section"><small>{copy.relatedFields}</small>{data.relatedColumns.map((column) => fieldRow(column, true))}</div> : null}
+        {expanded ? <div className="relationship-graph-column-section"><small>{copy.fields}</small>{visibleColumns.length ? visibleColumns.map((column) => fieldRow(column, false)) : <span className="relationship-graph-column-empty">{copy.noFields}</span>}<div className="relationship-graph-column-pagination"><button type="button" className="relationship-graph-page-button nodrag nopan" onClick={(event) => { event.stopPropagation(); setPage(Math.max(0, currentPage - 1)); }} disabled={currentPage === 0} aria-label={copy.previousPage}><ArrowLeft size={12} /></button><span>{copy.fieldPage(data.otherColumns.length ? currentPage * pageSize + 1 : 0, Math.min((currentPage + 1) * pageSize, data.otherColumns.length), data.otherColumns.length)}</span><button type="button" className="relationship-graph-page-button nodrag nopan" onClick={(event) => { event.stopPropagation(); setPage(Math.min(pages - 1, currentPage + 1)); }} disabled={currentPage >= pages - 1} aria-label={copy.nextPage}><ArrowRight size={12} /></button></div></div> : null}
+        <button type="button" className="relationship-graph-expand-button nodrag nopan" onClick={(event) => { event.stopPropagation(); setExpanded((value) => !value); setPage(0); }} aria-expanded={expanded}>{expanded ? copy.collapseFields : copy.expandFields}<span>{expanded ? "−" : "+"}</span></button>
       </div>
     </div>
   );
@@ -404,6 +636,7 @@ function ModelNode({ data }: NodeProps<GraphNode>) {
 function RelationshipEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, selected }: EdgeProps<GraphEdge>) {
   const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
   const label = data?.label ?? "1:N";
+  const fieldLabel = data?.fieldPair ? `${data.fieldPair.sourceField} → ${data.fieldPair.targetField}` : "";
   return (
     <>
       <BaseEdge id={id} path={edgePath} interactionWidth={28} className={data?.isDimmed ? "relationship-graph-edge-dimmed" : ""} style={{ stroke: selected ? "var(--accent)" : "var(--relationship-edge, var(--border-strong))", strokeWidth: selected ? 2.5 : 1.7 }} />
@@ -411,12 +644,12 @@ function RelationshipEdge({ id, sourceX, sourceY, targetX, targetY, sourcePositi
         <button
           type="button"
           className={`relationship-graph-edge-label nodrag nopan ${selected ? "relationship-graph-edge-label-selected" : ""} ${data?.isDimmed ? "relationship-graph-edge-label-dimmed" : ""}`}
-          style={{ transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)` }}
-          aria-label={`${data?.relationship.name ?? label} (${label})`}
+          style={{ transform: `translate(-50%, -50%) translate(${labelX}px,${labelY + (data?.labelOffset ?? 0)}px)` }}
+          aria-label={`${data?.relationship.name ?? label}${fieldLabel ? `: ${fieldLabel}` : ""} (${label})`}
           onClick={(event) => { event.stopPropagation(); data?.onOpen(); }}
           onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); data?.onOpen(); } }}
         >
-          {label}
+          {fieldLabel ? <><span>{label}</span><small>{fieldLabel}</small></> : label}
         </button>
       </EdgeLabelRenderer>
     </>
@@ -431,29 +664,31 @@ type RelationshipDraft = {
   name: string;
   sourceModel: string;
   targetModel: string;
+  sourceField: string;
+  targetField: string;
   cardinality: string;
   condition: string;
-  displayNameZh: string;
-  displayNameEn: string;
-  descriptionZh: string;
-  descriptionEn: string;
+  displayName: string;
+  description: string;
+  advancedCondition: boolean;
 };
 
-function draftFromRelationship(relationship: RelationshipGraphRelationship): RelationshipDraft {
+function draftFromRelationship(relationship: RelationshipGraphRelationship, models: readonly RelationshipGraphModel[], locale?: RelationshipGraphLocale, selectedPair?: RelationshipGraphFieldPair): RelationshipDraft {
   const endpoints = relationshipModels(relationship) ?? ["", ""];
-  const display = localizedPair(relationship.displayName);
-  const description = localizedPair(relationship.description);
+  const pairs = relationFieldPairs(relationship, models);
+  const selected = selectedPair ?? pairs[0];
   return {
     existingName: relationship.name,
     name: relationship.name,
     sourceModel: endpoints[0],
     targetModel: endpoints[1],
+    sourceField: selected?.sourceField ?? "",
+    targetField: selected?.targetField ?? "",
     cardinality: cardinalityValue(relationship.cardinality ?? relationship.joinType),
     condition: relationship.condition ?? "",
-    displayNameZh: display.zh,
-    displayNameEn: display.en,
-    descriptionZh: description.zh,
-    descriptionEn: description.en,
+    displayName: localizedForLocale(relationship.displayName, locale),
+    description: localizedForLocale(relationship.description, locale),
+    advancedCondition: relationshipUsesAdvancedCondition(relationship, models),
   };
 }
 
@@ -462,25 +697,42 @@ function blankDraft(models: readonly RelationshipGraphModel[]): RelationshipDraf
     name: "",
     sourceModel: models[0]?.name ?? "",
     targetModel: models[1]?.name ?? "",
+    sourceField: "",
+    targetField: "",
     cardinality: "one-to-many",
     condition: "",
-    displayNameZh: "",
-    displayNameEn: "",
-    descriptionZh: "",
-    descriptionEn: "",
+    displayName: "",
+    description: "",
+    advancedCondition: false,
   };
 }
 
-function relationshipFromDraft(draft: RelationshipDraft, original?: RelationshipGraphRelationship): RelationshipGraphRelationship {
+function mergeLocalizedValue(existing: string | RelationshipGraphLocalizedText | undefined, value: string, locale?: RelationshipGraphLocale) {
+  const key = localeKey(locale);
+  const trimmed = value.trim();
+  if (typeof existing === "string") return trimmed || existing ? { [key]: trimmed || existing } : undefined;
+  const next = { ...(existing ?? {}) };
+  if (trimmed || Object.keys(next).length) next[key] = trimmed;
+  return Object.keys(next).length ? next : undefined;
+}
+
+function relationshipFromDraft(draft: RelationshipDraft, original?: RelationshipGraphRelationship, locale?: RelationshipGraphLocale): RelationshipGraphRelationship {
+  const generatedCondition = draft.sourceField && draft.targetField
+    ? `${draft.sourceModel}.${draft.sourceField} = ${draft.targetModel}.${draft.targetField}`
+    : draft.condition;
+  const { fieldPairs: _readOnlyFieldPairs, ...editableOriginal } = original ?? {};
   const next: RelationshipGraphRelationship = {
-    ...(original ?? {}),
+    ...editableOriginal,
     name: draft.name.trim(),
     models: [draft.sourceModel, draft.targetModel],
     joinType: wrenJoinType(draft.cardinality),
     cardinality: cardinalityValue(draft.cardinality),
-    condition: draft.condition.trim(),
-    displayName: { "zh-CN": draft.displayNameZh.trim(), "en-US": draft.displayNameEn.trim() },
-    description: { "zh-CN": draft.descriptionZh.trim(), "en-US": draft.descriptionEn.trim() },
+    // Advanced conditions may contain intentional leading/trailing newlines or
+    // indentation. Treat the editor value as source text and preserve it byte
+    // for byte; structured mode still generates the canonical equality.
+    condition: draft.advancedCondition ? draft.condition : generatedCondition,
+    displayName: mergeLocalizedValue(original?.displayName, draft.displayName, locale),
+    description: mergeLocalizedValue(original?.description, draft.description, locale),
   };
   return next;
 }
@@ -488,6 +740,7 @@ function relationshipFromDraft(draft: RelationshipDraft, original?: Relationship
 function RelationshipDrawer({
   draft,
   models,
+  locale,
   copy,
   isNew,
   isSaving,
@@ -500,6 +753,7 @@ function RelationshipDrawer({
 }: {
   draft: RelationshipDraft;
   models: readonly RelationshipGraphModel[];
+  locale?: RelationshipGraphLocale;
   copy: RelationshipGraphCopy;
   isNew: boolean;
   isSaving: boolean;
@@ -514,28 +768,33 @@ function RelationshipDrawer({
     <aside className="relationship-graph-drawer" role="dialog" aria-modal="false" aria-label={isNew ? copy.addRelationship : copy.editRelationship}>
       <div className="relationship-graph-drawer-header">
         <div><p className="relationship-graph-panel-kicker">{isNew ? copy.add : copy.edit}</p><h3>{isNew ? copy.addRelationship : copy.editRelationship}</h3></div>
-        <button type="button" className="relationship-graph-icon-button" onClick={onClose} aria-label={copy.close}><X size={17} /></button>
+        <button type="button" className="relationship-graph-icon-button" onClick={onClose} aria-label={copy.close} disabled={isSaving}><X size={17} /></button>
       </div>
-      <form className="relationship-graph-form" onSubmit={onSave}>
+      <form className="relationship-graph-form" onSubmit={onSave} aria-busy={isSaving}>
+        <fieldset className="relationship-graph-form-fields" disabled={isSaving || readOnly}>
         {error ? <div className="relationship-graph-form-error" role="alert"><WarningCircle size={16} weight="fill" />{error}</div> : null}
         <label className="relationship-graph-field"><span>{copy.relationshipName}</span><input autoFocus className="relationship-graph-input" value={draft.name} onChange={(event) => onChange({ ...draft, name: event.target.value })} required /></label>
         <div className="relationship-graph-form-grid">
-          <label className="relationship-graph-field"><span>{copy.sourceModel}</span><select className="relationship-graph-input" value={draft.sourceModel} onChange={(event) => onChange({ ...draft, sourceModel: event.target.value })} disabled={!models.length} required><option value="">-</option>{models.map((model) => <option value={model.name} key={model.name}>{localizedText(model.displayName, undefined, model.name)} ({model.name})</option>)}</select></label>
-          <label className="relationship-graph-field"><span>{copy.targetModel}</span><select className="relationship-graph-input" value={draft.targetModel} onChange={(event) => onChange({ ...draft, targetModel: event.target.value })} disabled={!models.length} required><option value="">-</option>{models.map((model) => <option value={model.name} key={model.name}>{localizedText(model.displayName, undefined, model.name)} ({model.name})</option>)}</select></label>
+          <label className="relationship-graph-field"><span>{copy.sourceModel}</span><select className="relationship-graph-input" value={draft.sourceModel} onChange={(event) => onChange({ ...draft, sourceModel: event.target.value, sourceField: "", targetField: "", condition: "" })} disabled={!models.length} required><option value="">-</option>{models.map((model) => <option value={model.name} key={model.name}>{localizedText(model.displayName, locale, model.name)} ({model.name})</option>)}</select></label>
+          <label className="relationship-graph-field"><span>{copy.targetModel}</span><select className="relationship-graph-input" value={draft.targetModel} onChange={(event) => onChange({ ...draft, targetModel: event.target.value, sourceField: "", targetField: "", condition: "" })} disabled={!models.length} required><option value="">-</option>{models.map((model) => <option value={model.name} key={model.name}>{localizedText(model.displayName, locale, model.name)} ({model.name})</option>)}</select></label>
+        </div>
+        <div className="relationship-graph-form-grid">
+          <label className="relationship-graph-field"><span>{copy.sourceField}</span><select className="relationship-graph-input" aria-label={copy.sourceField} value={draft.sourceField} onChange={(event) => { const sourceField = event.target.value; onChange({ ...draft, sourceField, condition: sourceField && draft.targetField ? `${draft.sourceModel}.${sourceField} = ${draft.targetModel}.${draft.targetField}` : "", advancedCondition: false }); }} disabled={!draft.sourceModel || draft.advancedCondition}><option value="">{copy.sourceFieldHint}</option>{(models.find((model) => model.name === draft.sourceModel)?.columns ?? []).map((column) => <option value={column.name} key={column.name}>{column.name}{column.type || column.dataType ? ` (${column.type ?? column.dataType})` : ""}</option>)}</select></label>
+          <label className="relationship-graph-field"><span>{copy.targetField}</span><select className="relationship-graph-input" aria-label={copy.targetField} value={draft.targetField} onChange={(event) => { const targetField = event.target.value; onChange({ ...draft, targetField, condition: draft.sourceField && targetField ? `${draft.sourceModel}.${draft.sourceField} = ${draft.targetModel}.${targetField}` : "", advancedCondition: false }); }} disabled={!draft.targetModel || draft.advancedCondition}><option value="">{copy.targetFieldHint}</option>{(models.find((model) => model.name === draft.targetModel)?.columns ?? []).map((column) => <option value={column.name} key={column.name}>{column.name}{column.type || column.dataType ? ` (${column.type ?? column.dataType})` : ""}</option>)}</select></label>
         </div>
         <label className="relationship-graph-field"><span>{copy.cardinality}</span><select className="relationship-graph-input" value={draft.cardinality} onChange={(event) => onChange({ ...draft, cardinality: event.target.value })}><option value="one-to-one">1:1</option><option value="one-to-many">1:N</option><option value="many-to-one">N:1</option><option value="many-to-many">N:N</option></select></label>
-        <label className="relationship-graph-field"><span>{copy.condition}</span><textarea className="relationship-graph-input relationship-graph-textarea relationship-graph-condition" value={draft.condition} onChange={(event) => onChange({ ...draft, condition: event.target.value })} placeholder="orders.customer_id = customers.id" /></label>
+        <label className="relationship-graph-checkbox"><input type="checkbox" checked={draft.advancedCondition} onChange={(event) => onChange({ ...draft, advancedCondition: event.target.checked })} /><span>{copy.advancedCondition}</span></label>
+        <label className="relationship-graph-field"><span>{copy.condition}</span><textarea className="relationship-graph-input relationship-graph-textarea relationship-graph-condition" value={draft.condition} onChange={(event) => onChange({ ...draft, condition: event.target.value, advancedCondition: true })} placeholder="orders.customer_id = customers.id" aria-describedby="relationship-graph-condition-hint" /><small id="relationship-graph-condition-hint" className="relationship-graph-form-hint">{draft.advancedCondition ? copy.condition : copy.structuredCondition}</small></label>
         <div className="relationship-graph-form-divider" />
-        <label className="relationship-graph-field"><span>{copy.displayNameZh}</span><input className="relationship-graph-input" value={draft.displayNameZh} onChange={(event) => onChange({ ...draft, displayNameZh: event.target.value })} /></label>
-        <label className="relationship-graph-field"><span>{copy.displayNameEn}</span><input className="relationship-graph-input" value={draft.displayNameEn} onChange={(event) => onChange({ ...draft, displayNameEn: event.target.value })} /></label>
-        <label className="relationship-graph-field"><span>{copy.descriptionZh}</span><textarea className="relationship-graph-input relationship-graph-textarea" value={draft.descriptionZh} onChange={(event) => onChange({ ...draft, descriptionZh: event.target.value })} /></label>
-        <label className="relationship-graph-field"><span>{copy.descriptionEn}</span><textarea className="relationship-graph-input relationship-graph-textarea" value={draft.descriptionEn} onChange={(event) => onChange({ ...draft, descriptionEn: event.target.value })} /></label>
+        <label className="relationship-graph-field"><span>{copy.displayName}</span><input className="relationship-graph-input" value={draft.displayName} onChange={(event) => onChange({ ...draft, displayName: event.target.value })} /></label>
+        <label className="relationship-graph-field"><span>{copy.relationshipDescription}</span><textarea className="relationship-graph-input relationship-graph-textarea" value={draft.description} onChange={(event) => onChange({ ...draft, description: event.target.value })} /></label>
         <div className="relationship-graph-drawer-actions">
-          {!isNew && !readOnly ? <button type="button" className="relationship-graph-button relationship-graph-button-danger" onClick={onDelete}><Trash size={15} />{copy.delete}</button> : null}
+          {!isNew && !readOnly ? <button type="button" className="relationship-graph-button relationship-graph-button-danger" onClick={onDelete} disabled={isSaving}><Trash size={15} />{copy.delete}</button> : null}
           <span className="relationship-graph-action-spacer" />
           <button type="button" className="relationship-graph-button relationship-graph-button-secondary" onClick={onClose}>{copy.cancel}</button>
           {!readOnly ? <button type="submit" className="relationship-graph-button relationship-graph-button-primary" disabled={isSaving}><span>{isSaving ? <CircleNotch className="relationship-graph-spin" size={15} /> : null}</span>{isSaving ? copy.saving : copy.save}</button> : null}
         </div>
+        </fieldset>
       </form>
     </aside>
   );
@@ -544,16 +803,22 @@ function RelationshipDrawer({
 function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProps; copy: RelationshipGraphCopy }) {
   const { models, locale, relationships, readOnly = false } = props;
   const reactFlow = useReactFlow<GraphNode, GraphEdge>();
+  const initialFitTimerRef = useRef<number | undefined>(undefined);
   const [localRelationships, setLocalRelationships] = useState<RelationshipGraphRelationship[]>(() => [...relationships]);
-  const [nodePositions, setNodePositions] = useState<Record<string, { x: number; y: number }>>(() => defaultPositions(models));
+  const [nodePositions, setNodePositions] = useState<Record<string, { x: number; y: number }>>(() => defaultPositions(models, relationships));
   const [search, setSearch] = useState("");
   const [focusedModel, setFocusedModel] = useState<string | null>(null);
   const [focusScope, setFocusScope] = useState<"all" | "upstream" | "downstream">("all");
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [highlightedFields, setHighlightedFields] = useState<Record<string, string[]>>({});
   const [draft, setDraft] = useState<RelationshipDraft | null>(null);
   const [isNewDraft, setIsNewDraft] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [localSaving, setLocalSaving] = useState(false);
+
+  useEffect(() => () => {
+    if (initialFitTimerRef.current !== undefined) window.clearTimeout(initialFitTimerRef.current);
+  }, []);
 
   useEffect(() => {
     setLocalRelationships([...relationships]);
@@ -562,7 +827,7 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
   useEffect(() => {
     setNodePositions((current) => {
       const next = { ...current };
-      const defaults = defaultPositions(models);
+      const defaults = defaultPositions(models, localRelationships);
       let changed = false;
       models.forEach((model) => {
         const id = modelNodeId(model.name);
@@ -573,19 +838,29 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
       });
       return changed ? next : current;
     });
-  }, [models]);
+  }, [localRelationships, models]);
 
-  const openRelationship = useCallback((relationship: RelationshipGraphRelationship) => {
+  const openRelationship = useCallback((relationship: RelationshipGraphRelationship, pair?: RelationshipGraphFieldPair) => {
     const index = localRelationships.findIndex((item) => item === relationship || item.name === relationship.name);
-    setSelectedEdgeId(index >= 0 ? relationshipEdgeId(relationship, index) : null);
-    setDraft(draftFromRelationship(relationship));
+    const pairs = relationFieldPairs(relationship, models);
+    const selectedPairIndex = pair ? Math.max(0, pairs.findIndex((item) => item.sourceField === pair.sourceField && item.targetField === pair.targetField)) : 0;
+    const highlightedPairs = pair ? [pair] : pairs;
+    const selectedPair = selectRelationshipFieldPair(relationship, models, pair);
+    setSelectedEdgeId(index >= 0 ? relationshipEdgeId(relationship, index, selectedPairIndex) : null);
+    const endpoints = relationshipModels(relationship);
+    setHighlightedFields(endpoints && highlightedPairs.length ? {
+      [endpoints[0]]: Array.from(new Set(highlightedPairs.map((item) => item.sourceField))),
+      [endpoints[1]]: Array.from(new Set(highlightedPairs.map((item) => item.targetField))),
+    } : {});
+    setDraft(draftFromRelationship(relationship, models, locale, selectedPair));
     setIsNewDraft(false);
     setFormError(null);
     props.onEdit?.(relationship);
-  }, [localRelationships, props]);
+  }, [localRelationships, locale, models, props]);
 
   const openNewRelationship = useCallback(() => {
     setSelectedEdgeId(null);
+    setHighlightedFields({});
     setDraft(blankDraft(models));
     setIsNewDraft(true);
     setFormError(null);
@@ -595,6 +870,7 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
   const closeDrawer = useCallback(() => {
     setDraft(null);
     setSelectedEdgeId(null);
+    setHighlightedFields({});
     setFormError(null);
     props.onEdit?.(null);
   }, [props]);
@@ -604,6 +880,12 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
     if (relation) openRelationship(relation);
     else openNewRelationship();
   }, [localRelationships, openNewRelationship, openRelationship]);
+
+  const focusField = useCallback((modelName: string, fieldName: string) => {
+    setFocusedModel(modelName);
+    setFocusScope("all");
+    setHighlightedFields({ [modelName]: [fieldName] });
+  }, []);
 
   const graphNodes = useMemo<GraphNode[]>(() => {
     const focusNames = new Set<string>();
@@ -623,7 +905,8 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
     }
     return models.map((model) => {
       const primaryKeys = primaryKeyNames(model);
-      const relatedColumns = relationColumnNames(model.name, model, localRelationships);
+      const relatedColumns = relationColumnNames(model.name, model, localRelationships, models);
+      const relatedNames = new Set(relatedColumns.map((column) => column.name));
       const isDimmed = Boolean(focusedModel && !focusNames.has(model.name));
       return {
         id: modelNodeId(model.name),
@@ -635,9 +918,13 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
           tableName: model.table ?? model.tableName ?? model.physicalName ?? model.name,
           primaryKeys,
           relatedColumns,
+          otherColumns: model.columns.filter((column) => !relatedNames.has(column.name)),
+          activeFieldNames: highlightedFields[model.name] ?? [],
           locale,
+          copy,
           isDimmed,
           isActive: focusedModel === model.name,
+          onFieldFocus: (fieldName: string) => focusField(model.name, fieldName),
           onOpen: () => {
             setFocusedModel(model.name);
             setFocusScope("all");
@@ -648,7 +935,7 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
         focusable: true,
       };
     });
-  }, [focusedModel, focusScope, localRelationships, locale, models, nodePositions, openNewOrExistingForModel]);
+  }, [copy, focusedModel, focusField, focusScope, highlightedFields, localRelationships, locale, models, nodePositions, openNewOrExistingForModel]);
 
   const graphEdges = useMemo<GraphEdge[]>(() => {
     const relatedVisible = (relationship: RelationshipGraphRelationship) => {
@@ -661,19 +948,28 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
     return localRelationships.flatMap((relationship, index) => {
       const endpoints = relationshipModels(relationship);
       if (!endpoints || !models.some((model) => model.name === endpoints[0]) || !models.some((model) => model.name === endpoints[1])) return [];
-      const isDimmed = Boolean(focusedModel && focusScope !== "all" && !relatedVisible(relationship) && !endpoints.includes(focusedModel));
-      return [{
-        id: relationshipEdgeId(relationship, index),
-        type: "relationship",
-        source: modelNodeId(endpoints[0]),
-        target: modelNodeId(endpoints[1]),
-        data: { relationship, label: relationshipLabel(relationship), onOpen: () => openRelationship(relationship), isDimmed },
-        selected: selectedEdgeId === relationshipEdgeId(relationship, index),
-        focusable: true,
-        ariaLabel: `${relationship.name} ${relationshipLabel(relationship)}`,
-      }];
+      const pairs = relationFieldPairs(relationship, models);
+      const fieldHighlightActive = Object.keys(highlightedFields).length > 0;
+      const fieldMatches = !fieldHighlightActive || pairs.some((pair) => highlightedFields[endpoints[0]]?.includes(pair.sourceField) || highlightedFields[endpoints[1]]?.includes(pair.targetField));
+      const isDimmed = Boolean((focusedModel && focusScope !== "all" && !relatedVisible(relationship) && !endpoints.includes(focusedModel)) || !fieldMatches);
+      const edgePairs: Array<RelationshipGraphFieldPair | undefined> = pairs.length ? pairs : [undefined];
+      return edgePairs.map((fieldPair, pairIndex) => {
+        const edgeId = relationshipEdgeId(relationship, index, pairIndex);
+        return {
+          id: edgeId,
+          type: "relationship",
+          source: modelNodeId(endpoints[0]),
+          target: modelNodeId(endpoints[1]),
+          sourceHandle: fieldPair ? fieldHandleId("source", fieldPair.sourceField) : modelHandleId("source"),
+          targetHandle: fieldPair ? fieldHandleId("target", fieldPair.targetField) : modelHandleId("target"),
+          data: { relationship, fieldPair, label: relationshipLabel(relationship), labelOffset: pairs.length > 1 ? (pairIndex - (pairs.length - 1) / 2) * 30 : 0, onOpen: () => openRelationship(relationship, fieldPair), isDimmed },
+          selected: selectedEdgeId === edgeId,
+          focusable: true,
+          ariaLabel: `${relationship.name}${fieldPair ? ` ${fieldPair.sourceField} to ${fieldPair.targetField}` : ""} ${relationshipLabel(relationship)}`,
+        };
+      });
     });
-  }, [focusedModel, focusScope, localRelationships, models, openRelationship, selectedEdgeId]);
+  }, [focusedModel, focusScope, highlightedFields, localRelationships, models, openRelationship, selectedEdgeId]);
 
   const searchMatches = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -710,9 +1006,13 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
   }, [reactFlow]);
 
   const autoLayout = useCallback(() => {
-    setNodePositions(defaultPositions(models));
-    window.setTimeout(() => { void reactFlow.fitView({ padding: 0.2, duration: 280 }); }, 0);
-  }, [models, reactFlow]);
+    setNodePositions(defaultPositions(models, localRelationships));
+    if (initialFitTimerRef.current !== undefined) window.clearTimeout(initialFitTimerRef.current);
+    initialFitTimerRef.current = window.setTimeout(() => {
+      initialFitTimerRef.current = undefined;
+      void reactFlow.fitView({ padding: 0.2, duration: 280 });
+    }, 0);
+  }, [localRelationships, models, reactFlow]);
 
   const handleNodesChange = useCallback((changes: NodeChange<GraphNode>[]) => {
     setNodePositions((current) => {
@@ -734,11 +1034,12 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
 
   const handleSave = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!draft) return;
+    if (!draft || localSaving || props.isSaving) return;
     if (!draft.name.trim() || !draft.sourceModel || !draft.targetModel) { setFormError(copy.validation); return; }
     if (draft.sourceModel === draft.targetModel) { setFormError(copy.sameModel); return; }
+    if (draft.advancedCondition ? !draft.condition.trim() : (!draft.sourceField || !draft.targetField)) { setFormError(copy.validation); return; }
     const original = draft.existingName ? localRelationships.find((relationship) => relationship.name === draft.existingName) : undefined;
-    const nextRelationship = relationshipFromDraft(draft, original);
+    const nextRelationship = relationshipFromDraft(draft, original, locale);
     const nextRelationships = original ? localRelationships.map((relationship) => relationship === original ? nextRelationship : relationship) : [...localRelationships, nextRelationship];
     setLocalRelationships(nextRelationships);
     props.onChange?.(nextRelationships);
@@ -754,10 +1055,10 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
     } finally {
       setLocalSaving(false);
     }
-  }, [closeDrawer, copy, draft, localRelationships, props]);
+  }, [closeDrawer, copy, draft, localRelationships, localSaving, locale, props]);
 
   const handleDelete = useCallback(async () => {
-    if (!draft?.existingName) return;
+    if (!draft?.existingName || localSaving || props.isSaving) return;
     const relationship = localRelationships.find((candidate) => candidate.name === draft.existingName);
     if (!relationship) return;
     const nextRelationships = localRelationships.filter((candidate) => candidate !== relationship);
@@ -774,7 +1075,7 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
     } finally {
       setLocalSaving(false);
     }
-  }, [closeDrawer, copy.saveFailed, draft, localRelationships, props]);
+  }, [closeDrawer, copy.saveFailed, draft, localRelationships, localSaving, props]);
 
   const onSearchKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter" && searchMatches[0]) {
@@ -808,11 +1109,20 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
           <ReactFlow<GraphNode, GraphEdge>
             nodes={graphNodes}
             edges={graphEdges}
+            onInit={(instance) => {
+              if (initialFitTimerRef.current !== undefined) window.clearTimeout(initialFitTimerRef.current);
+              // A tab can initialize React Flow before its final layout box is
+              // measurable. Delay the first fit so it cannot clamp to maxZoom.
+              initialFitTimerRef.current = window.setTimeout(() => {
+                initialFitTimerRef.current = undefined;
+                void instance.fitView({ padding: 0.2, duration: 0 });
+              }, 120);
+            }}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             onNodesChange={handleNodesChange}
             onNodeClick={(_, node) => focusModel(node.data.model.name)}
-            onEdgeClick={(_, edge) => { if (edge.data) openRelationship(edge.data.relationship); }}
+            onEdgeClick={(_, edge) => { if (edge.data) openRelationship(edge.data.relationship, edge.data.fieldPair); }}
             onPaneClick={() => { setFocusedModel(null); setFocusScope("all"); }}
             fitView
             fitViewOptions={{ padding: 0.2 }}
@@ -838,7 +1148,7 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
         </div>
         <div className="relationship-graph-legend"><span><i className="relationship-graph-legend-dot" />{copy.modelCount(models.length)}</span><span><i className="relationship-graph-legend-line" />{copy.relationCount(localRelationships.length)}</span><span className="relationship-graph-legend-hint"><ArrowLeft size={13} />{copy.searchHint}</span></div>
       </section>
-      {draft ? <RelationshipDrawer draft={draft} models={models} copy={copy} isNew={isNewDraft} isSaving={Boolean(props.isSaving || localSaving)} readOnly={readOnly} error={formError} onChange={updateDraft} onSave={handleSave} onDelete={handleDelete} onClose={closeDrawer} /> : null}
+      {draft ? <RelationshipDrawer draft={draft} models={models} locale={locale} copy={copy} isNew={isNewDraft} isSaving={Boolean(props.isSaving || localSaving)} readOnly={readOnly} error={formError} onChange={updateDraft} onSave={handleSave} onDelete={handleDelete} onClose={closeDrawer} /> : null}
     </div>
   );
 }
@@ -849,10 +1159,10 @@ export function RelationshipGraph(props: RelationshipGraphProps) {
   const className = ["relationship-graph", props.className].filter(Boolean).join(" ");
   return (
     <section className={className} style={props.style}>
-      <div className="relationship-graph-heading">
+      {props.showHeading !== false ? <div className="relationship-graph-heading">
         <div><p className="relationship-graph-panel-kicker">{copy.eyebrow}</p><h2>{copy.title}</h2><p>{copy.description}</p></div>
         <div className="relationship-graph-heading-meta"><span>{copy.modelCount(props.models.length)}</span><span>{copy.relationCount(props.relationships.length)}</span></div>
-      </div>
+      </div> : null}
       {props.error ? <div className="relationship-graph-error" role="alert"><WarningCircle size={17} weight="fill" /><span>{props.error}</span></div> : null}
       {props.loading ? <div className="relationship-graph-state" role="status" aria-live="polite"><CircleNotch className="relationship-graph-spin" size={24} /><strong>{copy.loading}</strong></div> : props.models.length === 0 ? <div className="relationship-graph-state relationship-graph-state-empty"><MapTrifold size={30} weight="duotone" /><strong>{copy.noModels}</strong><span>{copy.noModelsBody}</span></div> : <ReactFlowProvider><RelationshipGraphCanvas props={props} copy={copy} /></ReactFlowProvider>}
     </section>
