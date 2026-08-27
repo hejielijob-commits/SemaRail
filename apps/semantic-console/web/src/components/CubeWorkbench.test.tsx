@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "../i18n";
@@ -91,5 +91,29 @@ describe("CubeWorkbench", () => {
     fireEvent.change(screen.getByRole("combobox", { name: "Base object" }), { target: { value: "customers" } });
     fireEvent.click(dialog.querySelector(".button-primary") as HTMLButtonElement);
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith({ name: "sales_overview", baseObject: "customers" }));
+  });
+
+  it("requires confirmation before deleting a cube", async () => {
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    renderWorkbench({ onDelete });
+    fireEvent.click(screen.getByRole("button", { name: "Delete cube" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete this cube?" });
+    expect(dialog).toHaveTextContent("cubes/order_metrics/metadata.yml");
+    expect(onDelete).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete cube" }));
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ name: "order_metrics" })));
+  });
+
+  it("locks deletion to the cube that opened the confirmation", async () => {
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    const first = makeCube();
+    const second = { ...makeCube(), name: "customer_metrics", sourcePath: "cubes/customer_metrics/metadata.yml", baseObject: "customers" };
+    renderWorkbench({ snapshot: { ...makeSnapshot(), cubes: [first, second] }, onDelete });
+    fireEvent.click(screen.getByRole("button", { name: "Delete cube" }));
+    fireEvent.click(screen.getByRole("option", { name: /customer_metrics/ }));
+    const dialog = screen.getByRole("dialog", { name: "Delete this cube?" });
+    expect(dialog).toHaveTextContent("order_metrics");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete cube" }));
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ name: "order_metrics" })));
   });
 });

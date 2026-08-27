@@ -32,6 +32,13 @@
   line-height: 1.6;
 }
 
+.kw-heading-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
 .kw-eyebrow,
 .kw-panel-kicker {
   color: var(--muted-soft, #8492a8);
@@ -504,6 +511,14 @@
   white-space: nowrap;
 }
 
+.kw-delete-button {
+  color: var(--danger, #bd3c45);
+}
+
+.kw-delete-button:hover {
+  background: var(--danger-soft, #fff0f1);
+}
+
 .kw-tabs {
   display: flex;
   gap: 17px;
@@ -619,7 +634,46 @@
   padding: 6px 8px;
 }
 
+.kw-token-editor {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  border: 1px solid var(--border-strong, #c9d4e2);
+  border-radius: 7px;
+  background: var(--surface, #fff);
+  padding: 6px 8px;
+  color: var(--muted-soft, #8492a8);
+}
+
+.kw-token-editor:focus-within {
+  border-color: var(--accent, #2166d1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #2166d1) 12%, transparent);
+}
+
+.kw-token-editor input {
+  min-width: 120px;
+  flex: 1 1 120px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-strong, #0f1d32);
+  font-size: 12px;
+}
+
+.kw-token-editor input::placeholder {
+  color: var(--muted-soft, #8492a8);
+}
+
+.kw-token-editor-disabled {
+  opacity: .65;
+}
+
 .kw-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   max-width: 100%;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--accent, #2166d1) 25%, var(--border, #dbe3ed));
@@ -631,6 +685,53 @@
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.kw-token button {
+  display: grid;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.kw-token button:hover,
+.kw-token button:focus-visible {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  outline: none;
+}
+
+.kw-create-rule-form {
+  display: grid;
+  gap: 16px;
+}
+
+.kw-delete-confirm {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--danger, #bd3c45) 24%, var(--border, #dbe3ed));
+  border-radius: 8px;
+  background: var(--danger-soft, #fff0f1);
+  padding: 13px;
+  color: var(--danger, #bd3c45);
+}
+
+.kw-delete-confirm p {
+  margin: 0;
+  color: var(--text, #26364d);
+  line-height: 1.55;
+}
+
+.kw-delete-confirm code {
+  grid-column: 2;
+  overflow-wrap: anywhere;
+  color: var(--muted, #607089);
+  font-size: 11px;
 }
 
 .kw-token-muted {
@@ -1443,6 +1544,10 @@
     align-items: flex-start;
     flex-direction: column;
     gap: 12px;
+  }
+
+  .kw-heading-actions {
+    width: 100%;
   }
 
   .kw-rules-workbench,

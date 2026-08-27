@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import RuleWorkbench, { type KnowledgeRule } from "./RuleWorkbench";
 
@@ -121,5 +121,61 @@ describe("RuleWorkbench", () => {
     fireEvent.change(content, { target: { value: "仅使用已批准的净收入。" } });
     fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ id: "sales", content: "仅使用已批准的净收入。" }), "draft"));
+  });
+
+  it("edits scope and tags as removable tokens and saves them", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<RuleWorkbench rules={[rule({ scope: [], tags: [] })]} scopeOptions={["orders", "customers"]} onSave={onSave} />);
+    const scope = screen.getByRole("combobox", { name: "Applies to" });
+    fireEvent.change(scope, { target: { value: "orders" } });
+    fireEvent.keyDown(scope, { key: "Enter" });
+    const tags = screen.getByRole("textbox", { name: "Tags" });
+    fireEvent.change(tags, { target: { value: "finance, reviewed" } });
+    fireEvent.keyDown(tags, { key: "Enter" });
+    expect(screen.getByRole("button", { name: "Remove orders" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ scope: ["orders"], tags: ["finance", "reviewed"] }), "draft"));
+    fireEvent.click(screen.getByRole("button", { name: "Remove orders" }));
+    expect(screen.queryByRole("button", { name: "Remove orders" })).not.toBeInTheDocument();
+  });
+
+  it("creates a rule through a focused draft modal", async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined);
+    render(<RuleWorkbench rules={[rule()]} scopeOptions={["orders"]} onCreate={onCreate} />);
+    fireEvent.click(screen.getByRole("button", { name: "New rule" }));
+    const dialog = screen.getByRole("dialog", { name: "Create a business rule" });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Rule name" }), { target: { value: "Completed orders" } });
+    const ruleText = within(dialog).getByRole("textbox", { name: "Rule text" });
+    ruleText.focus();
+    fireEvent.change(ruleText, { target: { value: "Only include completed orders." } });
+    await waitFor(() => expect(document.activeElement).toBe(ruleText));
+    const scope = within(dialog).getByRole("combobox", { name: "Applies to" });
+    fireEvent.change(scope, { target: { value: "orders" } });
+    fireEvent.keyDown(scope, { key: "Enter" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create draft" }));
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith({ name: "Completed orders", content: "Only include completed orders.", enabled: true, scope: ["orders"], tags: [] }));
+  });
+
+  it("requires confirmation before deleting a rule", async () => {
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    render(<RuleWorkbench rules={[rule()]} onDelete={onDelete} />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete this rule?" });
+    expect(dialog).toHaveTextContent("knowledge/rules/sales.md");
+    expect(onDelete).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete rule" }));
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: "sales" })));
+  });
+
+  it("locks the delete confirmation to the rule that opened it", async () => {
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    const rules = [rule(), rule({ id: "orders", name: "orders guidance", sourcePath: "knowledge/rules/orders.md" })];
+    render(<RuleWorkbench rules={rules} onDelete={onDelete} />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: /orders guidance/ }));
+    const dialog = screen.getByRole("dialog", { name: "Delete this rule?" });
+    expect(dialog).toHaveTextContent("sales guidance");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete rule" }));
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: "sales" })));
   });
 });

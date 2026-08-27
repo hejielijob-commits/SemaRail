@@ -389,6 +389,32 @@ function App() {
       await Promise.all([refreshWorkspace(), loadRules()]);
     }
   }
+  async function createRule(input: { name: string; content: string; enabled: boolean; scope: string[]; tags: string[] }) {
+    const result = await api.createRule({
+      title: input.name, content: input.content, enabled: input.enabled,
+      scope: input.scope, tags: input.tags, expectedRevision: rulesSnapshot?.revision,
+    });
+    setRulesSnapshot((current) => current ? { ...current, revision: result.revision, rules: result.rules } : current);
+    setSelectedRuleId(result.rule.id);
+    setSelectedFilePath(result.rule.sourcePath);
+    await Promise.all([loadProjectFile(result.rule.sourcePath), loadSemanticDiff(result.rule.sourcePath)]);
+    markSaved();
+  }
+  async function deleteRule(rule: KnowledgeRule) {
+    const currentRules = rulesSnapshot?.rules ?? [];
+    const currentIndex = currentRules.findIndex((item) => item.id === rule.id);
+    const result = await api.deleteRule(rule.id, rulesSnapshot?.revision);
+    setRulesSnapshot((current) => current ? { ...current, revision: result.revision, rules: result.rules } : current);
+    const next = result.rules[Math.min(Math.max(currentIndex, 0), Math.max(result.rules.length - 1, 0))];
+    setSelectedRuleId(next?.id ?? "");
+    if (next) {
+      setSelectedFilePath(next.sourcePath);
+      await Promise.all([loadProjectFile(next.sourcePath), loadSemanticDiff(next.sourcePath)]);
+    } else {
+      setSelectedFilePath(""); setMdlSource(""); setSemanticDiff(null);
+    }
+    markSaved();
+  }
   async function approveCandidate(candidate: SqlKnowledgeCandidate, sql: string) {
     await api.approveSqlCandidate(candidate.id, { sql });
     await loadSqlCandidates();
@@ -419,11 +445,23 @@ function App() {
     setCubeSnapshot(result);
     markSaved();
   }
+  async function deleteCubeDraft(cube: CubeDefinition) {
+    const result = await api.deleteCube(cube.name, cubeSnapshot?.revision);
+    setCubeSnapshot(result);
+    const next = result.cubes[0];
+    if (next) {
+      setSelectedFilePath(next.sourcePath);
+      await Promise.all([loadProjectFile(next.sourcePath), loadSemanticDiff(next.sourcePath)]);
+    } else {
+      setSelectedFilePath(""); setMdlSource(""); setSemanticDiff(null);
+    }
+    markSaved();
+  }
   function openProjectFile(path: string) { setSection("mdl"); setShowMobileNav(false); setNotice(null); void loadProjectFile(path); }
   function navigate(next: ConsoleSection) {
     setSection(next); setShowMobileNav(false); setNotice(null);
     if (next === "models" || next === "relationships") void loadSemanticProject();
-    if (next === "rules") void loadRules();
+    if (next === "rules") { void loadRules(); void loadSemanticProject(); void loadCubes(); }
     if (next === "sqlKnowledge") void loadSqlCandidates();
     if (next === "cubes") void loadCubes();
     if (next === "schema" && activeDatasourceId) void handleLoadSchema();
@@ -540,8 +578,8 @@ function App() {
           {section === "models" ? <ModelsPage files={files} onOpenFile={openProjectFile} snapshot={semanticProject} loading={semanticLoading} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} onSave={async (model) => { const result = await api.updateSemanticModel(model.name, { ...model, expectedRevision: semanticProject?.revision }); if (result) { setSemanticProject(result); markSaved(); } }} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} /> : null}
           {section === "relationships" ? <RelationshipsPage snapshot={semanticProject} loading={semanticLoading} locale={activeI18n.language} theme={theme} saving={busyAction === "relationships"} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} onOpenEditor={(path) => { setSelectedFilePath(path); void loadProjectFile(path); setSection("mdl"); }} onSave={saveRelationshipDraft} /> : null}
           {section === "views" ? <ViewsPage files={files} onOpenFile={openProjectFile} /> : null}
-          {section === "cubes" ? <CubeWorkbench snapshot={cubeSnapshot} loading={cubeLoading} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onSave={saveCube} onCreate={createCubeDraft} onRetry={() => void loadCubes()} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} /> : null}
-          {section === "rules" ? <RuleWorkbench rules={knowledgeRules(rulesSnapshot)} selectedRuleId={selectedRuleId} loading={rulesLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} source={selectedFilePath ? { path: selectedFilePath, content: mdlSource, diff: semanticDiff?.diff } : null} onRetry={() => void loadRules()} onSelectRule={(rule) => { setSelectedRuleId(rule.id); setSelectedFilePath(rule.sourcePath); void loadProjectFile(rule.sourcePath); void loadSemanticDiff(rule.sourcePath); }} onToggleRule={toggleRule} onSave={saveRule} /> : null}
+          {section === "cubes" ? <CubeWorkbench snapshot={cubeSnapshot} loading={cubeLoading} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onSave={saveCube} onCreate={createCubeDraft} onDelete={deleteCubeDraft} onRetry={() => void loadCubes()} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} /> : null}
+          {section === "rules" ? <RuleWorkbench rules={knowledgeRules(rulesSnapshot)} selectedRuleId={selectedRuleId} loading={rulesLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} scopeOptions={[...new Set([...(semanticProject?.models.map((model) => model.name) ?? []), ...(cubeSnapshot?.availableBaseObjects ?? [])])]} source={selectedFilePath ? { path: selectedFilePath, content: mdlSource, diff: semanticDiff?.diff } : null} onRetry={() => void loadRules()} onSelectRule={(rule) => { setSelectedRuleId(rule.id); setSelectedFilePath(rule.sourcePath); void loadProjectFile(rule.sourcePath); void loadSemanticDiff(rule.sourcePath); }} onToggleRule={toggleRule} onSave={saveRule} onCreate={createRule} onDelete={deleteRule} /> : null}
           {section === "sqlKnowledge" ? <SqlKnowledgeWorkbench candidates={knowledgeCandidates(sqlCandidates)} loading={sqlLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onRetry={() => void loadSqlCandidates()} onValidate={validateCandidate} onApprove={approveCandidate} onReject={rejectCandidate} /> : null}
           {section === "instructions" ? <InstructionsPage value={instructions} onChange={setInstructions} onSave={() => { const path = files.find((file) => isInstructionFile(file.path))?.path; if (path) void handleSaveFile(path, instructions); else setNotice({ tone: "error", title: "Draft save failed", body: "The project API did not return an instructions file." }); }} savedAt={draftSavedAt} loading={fileLoading} /> : null}
           {section === "mdl" ? <MdlPage value={mdlSource} onChange={setMdlSource} files={files} selectedFile={selectedFilePath} onSelectFile={(path: string) => void loadProjectFile(path)} onSave={(path?: string) => void handleSaveFile(path ?? selectedFilePath, mdlSource)} onImportProject={handleImportProject} savedAt={draftSavedAt} loading={fileLoading} /> : null}

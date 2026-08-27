@@ -75,4 +75,18 @@ describe("ApiClient", () => {
     expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ relationships: [], expectedRevision: "sha256:1" });
     expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/project/diff?path=models%2Forder%20items%2Fmetadata.yml");
   });
+
+  it("deletes governed rules and cubes with revision protection", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ revision: "sha256:2", rules: [], cubes: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient();
+    await client.deleteRule("rule/a", "sha256:1");
+    await client.deleteCube("sales cube", "sha256:2");
+    await client.deleteCube("empty-revision", "");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/knowledge/rules/rule%2Fa");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "DELETE", body: JSON.stringify({ expectedRevision: "sha256:1" }) });
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/cubes/sales%20cube");
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "DELETE", body: JSON.stringify({ expectedRevision: "sha256:2" }) });
+    expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: "DELETE", body: JSON.stringify({ expectedRevision: "" }) });
+  });
 });

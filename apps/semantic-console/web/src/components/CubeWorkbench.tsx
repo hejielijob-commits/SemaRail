@@ -152,6 +152,8 @@ const copy = {
     duplicate: "Duplicate name",
     unknownBase: (name: string) => `Base object '${name}' is not a model or view in this project.`,
     noMeasuresWarning: "A cube without measures can be saved as a draft, but Wren will warn during validation.",
+    deleteCube: "Delete cube", deleteTitle: "Delete this cube?", deleteDescription: "Its source file will be removed from the project draft. Publish the project to make the deletion effective downstream.",
+    deleteConfirm: (name: string) => `This removes ${name} and its cube definition from the current draft.`, deleting: "Deleting", deleteFailed: "Cube could not be deleted",
   },
   "zh-CN": {
     eyebrow: "语义层",
@@ -228,6 +230,8 @@ const copy = {
     retry: "重试",
     duplicate: "名称重复",
     unknownBase: (name: string) => `基础对象“${name}”不是当前项目中的模型或视图。`,
+    deleteCube: "删除立方体", deleteTitle: "删除这个立方体？", deleteDescription: "源文件将从项目草稿中移除；发布项目后，删除才会影响下游查询。",
+    deleteConfirm: (name: string) => `这会从当前草稿中移除 ${name} 及其立方体定义。`, deleting: "删除中", deleteFailed: "立方体删除失败",
     noMeasuresWarning: "没有度量的立方体仍可保存为草稿，但 Wren 校验时会给出警告。",
   },
 } as const;
@@ -311,6 +315,7 @@ export interface CubeWorkbenchProps {
   onOpenSource: (path: string) => void;
   onLoadDiff: (path: string) => void;
   onCreate?: (input: { name: string; baseObject: string }) => Promise<void> | void;
+  onDelete?: (cube: CubeDefinition) => Promise<void> | void;
   onRetry?: () => void;
 }
 
@@ -328,6 +333,7 @@ export default function CubeWorkbench({
   onOpenSource,
   onLoadDiff,
   onCreate,
+  onDelete,
   onRetry,
 }: CubeWorkbenchProps) {
   const { i18n } = useTranslation();
@@ -343,6 +349,8 @@ export default function CubeWorkbench({
   const [createName, setCreateName] = useState("");
   const [createBaseObject, setCreateBaseObject] = useState("");
   const [createError, setCreateError] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<CubeDefinition | null>(null);
+  const [deletingBusy, setDeletingBusy] = useState(false);
   const [validation, setValidation] = useState<CubeValidationResult | null>(null);
   const [notice, setNotice] = useState<{ tone: "success" | "error" | "warning"; title: string; body?: string } | null>(null);
 
@@ -393,6 +401,23 @@ export default function CubeWorkbench({
   }
 
   const createModal = <Modal open={creating} title={t.createTitle} description={t.createDescription} onClose={() => { if (!creatingBusy) setCreating(false); }} footer={<><Button variant="ghost" onClick={() => setCreating(false)} disabled={creatingBusy}>{t.cancel}</Button><Button variant="primary" icon={Plus} loading={creatingBusy} onClick={() => void confirmCreate()} disabled={!createName.trim() || !createBaseObject}>{creatingBusy ? t.creating : t.createCube}</Button></>}><div className="cube-create-form">{createError ? <InlineNotice tone="error" title={createError} /> : null}<Field label={t.technicalName} hint={t.createNameHint} htmlFor="new-cube-name"><TextInput id="new-cube-name" value={createName} onChange={(event) => { setCreateName(event.target.value); setCreateError(""); }} autoFocus /></Field><Field label={t.baseObject} hint={t.baseObjectHint} htmlFor="new-cube-base"><Select id="new-cube-base" value={createBaseObject} onChange={(event) => { setCreateBaseObject(event.target.value); setCreateError(""); }}><option value="">{t.chooseBaseObject}</option>{baseObjects.map((name) => <option value={name} key={name}>{name}</option>)}</Select></Field><div className="cube-create-path"><span>{t.createPath}</span><code>{createName.trim() ? `cubes/${createName.trim()}/metadata.yml` : "cubes/…/metadata.yml"}</code></div></div></Modal>;
+
+  async function confirmDelete() {
+    if (!deleteTarget || !onDelete || deletingBusy || saving || creatingBusy) return;
+    setDeletingBusy(true);
+    try {
+      await onDelete(deleteTarget);
+      setDrafts((current) => { const next = { ...current }; delete next[deleteTarget.name]; return next; });
+      setDeleteTarget(null); setValidation(null); setNotice(null);
+    } catch (caught) {
+      setDeleteTarget(null);
+      setNotice({ tone: "error", title: t.deleteFailed, body: caught instanceof Error ? caught.message : undefined });
+    } finally {
+      setDeletingBusy(false);
+    }
+  }
+
+  const deleteModal = <Modal open={Boolean(deleteTarget)} title={t.deleteTitle} description={t.deleteDescription} onClose={() => { if (!deletingBusy) setDeleteTarget(null); }} footer={<><Button variant="ghost" onClick={() => setDeleteTarget(null)} disabled={deletingBusy}>{t.cancel}</Button><Button variant="danger" icon={Trash} loading={deletingBusy} onClick={() => void confirmDelete()} disabled={deletingBusy || saving || creatingBusy}>{deletingBusy ? t.deleting : t.deleteCube}</Button></>}><div className="cube-delete-confirm"><WarningCircle size={20} weight="fill" /><p>{t.deleteConfirm(deleteTarget?.name ?? "")}</p>{deleteTarget ? <code>{deleteTarget.sourcePath}</code> : null}</div></Modal>;
 
   function patchActive(patch: Partial<CubeDefinition>) {
     if (!activeCube) return;
@@ -485,7 +510,7 @@ export default function CubeWorkbench({
       </aside>
       <section className="cube-editor-main">
         {!activeCube ? <section className="panel cube-state-panel"><EmptyState icon={Cube} title={t.selectCube} body={t.selectCubeBody} /></section> : <section className="panel cube-workspace-panel">
-          <div className="cube-panel-header"><div><p className="panel-kicker">{activeCube.baseObject}</p><h2>{activeCube.name}</h2><p>{t.pageDescription}</p></div><div className="cube-editor-actions"><Badge tone={activeCube.draft || Boolean(drafts[activeCube.name]) ? "amber" : "neutral"}>{activeCube.draft || drafts[activeCube.name] ? t.draft : t.tracked}</Badge><Button variant="secondary" size="sm" icon={CheckCircle} onClick={runValidation}>{t.validate}</Button><Button variant="primary" size="sm" icon={FloppyDisk} loading={saving} onClick={() => void save()}>{t.saveDraft}</Button></div></div>
+          <div className="cube-panel-header"><div><p className="panel-kicker">{activeCube.baseObject}</p><h2>{activeCube.name}</h2><p>{t.pageDescription}</p></div><div className="cube-editor-actions"><Badge tone={activeCube.draft || Boolean(drafts[activeCube.name]) ? "amber" : "neutral"}>{activeCube.draft || drafts[activeCube.name] ? t.draft : t.tracked}</Badge>{onDelete ? <Button variant="ghost" size="sm" icon={Trash} onClick={() => setDeleteTarget(cloneCube(activeCube))} disabled={saving || creatingBusy || deletingBusy}>{t.deleteCube}</Button> : null}<Button variant="secondary" size="sm" icon={CheckCircle} onClick={runValidation} disabled={deletingBusy}>{t.validate}</Button><Button variant="primary" size="sm" icon={FloppyDisk} loading={saving} onClick={() => void save()} disabled={deletingBusy}>{t.saveDraft}</Button></div></div>
           {notice ? <InlineNotice tone={notice.tone} title={notice.title} onDismiss={() => setNotice(null)}>{notice.body}</InlineNotice> : null}
           {validation && !validation.valid ? <ValidationSummary result={validation} /> : null}
           <div className="cube-workspace-tabs" role="tablist" aria-label={t.title}>
@@ -509,7 +534,7 @@ export default function CubeWorkbench({
         </section>}
       </section>
     </div>
-    {createModal}
+    {createModal}{deleteModal}
   </div>;
 }
 

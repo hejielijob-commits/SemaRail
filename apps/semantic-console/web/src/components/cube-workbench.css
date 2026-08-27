@@ -71,6 +71,30 @@
   font-size: 12px;
 }
 
+.cube-delete-confirm {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--danger) 24%, var(--border));
+  border-radius: 8px;
+  background: var(--danger-soft);
+  padding: 13px;
+  color: var(--danger);
+}
+
+.cube-delete-confirm p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.cube-delete-confirm code {
+  grid-column: 2;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .cube-workbench {
   display: grid;
   min-width: 0;
@@ -568,6 +592,15 @@
 @media (max-width: 1120px) {
   .cube-workbench {
     grid-template-columns: minmax(210px, 0.52fr) minmax(450px, 1.48fr);
+  }
+
+  .cube-panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cube-editor-actions {
+    justify-content: flex-start;
   }
 
   .cube-entry-fields {

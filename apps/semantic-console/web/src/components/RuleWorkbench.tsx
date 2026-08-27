@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import {
   ArrowClockwise,
   ArrowUUpLeft,
@@ -12,10 +12,14 @@ import {
   FloppyDisk,
   MagnifyingGlass,
   PencilSimple,
+  Plus,
   RocketLaunch,
+  Tag,
+  Trash,
   WarningCircle,
   X,
 } from "@phosphor-icons/react";
+import { Button, Field, InlineNotice, Modal, TextArea, TextInput } from "./ui";
 import "./knowledge-workbench.css";
 
 /** The two locales supported by the semantic-console workbenches. */
@@ -45,6 +49,8 @@ export interface KnowledgeRuleSource {
 
 export type RuleSaveAction = "draft" | "publish";
 
+export type NewKnowledgeRule = Pick<KnowledgeRule, "name" | "content" | "enabled"> & { scope: string[]; tags: string[] };
+
 export interface RuleWorkbenchProps {
   rules: KnowledgeRule[];
   selectedRuleId?: string;
@@ -53,11 +59,14 @@ export interface RuleWorkbenchProps {
   error?: string | null;
   readOnly?: boolean;
   source?: KnowledgeRuleSource | null;
+  scopeOptions?: string[];
   onRetry?: () => void;
   onSelectRule?: (rule: KnowledgeRule) => void;
   onDraftChange?: (rule: KnowledgeRule) => void;
   onToggleRule?: (rule: KnowledgeRule, enabled: boolean) => void | Promise<void>;
   onSave?: (rule: KnowledgeRule, action: RuleSaveAction) => void | Promise<void>;
+  onCreate?: (rule: NewKnowledgeRule) => void | Promise<void>;
+  onDelete?: (rule: KnowledgeRule) => void | Promise<void>;
   onDiscard?: (rule: KnowledgeRule) => void;
 }
 
@@ -121,6 +130,11 @@ const ruleCopy = {
     discardNotice: "Local changes were discarded.",
     previous: "Previous rule",
     next: "Next rule",
+    create: "New rule", createTitle: "Create a business rule", createDescription: "Add one focused instruction. It remains a project draft until you publish.",
+    createAction: "Create draft", creating: "Creating", createNameRequired: "Give the rule a clear name.", createContentRequired: "Rule text is required.",
+    delete: "Delete", deleteTitle: "Delete this rule?", deleteDescription: "The rule file will be removed from the project draft. Publish the project to make the deletion effective downstream.",
+    deleteAction: "Delete rule", deleting: "Deleting", deleteConfirm: "This removes {{name}} and its source file from the current draft.",
+    addToken: "Type and press Enter", removeToken: "Remove", operationFailed: "The operation could not be completed.",
   },
   "zh-CN": {
     eyebrow: "语义层",
@@ -178,6 +192,11 @@ const ruleCopy = {
     discardNotice: "本地修改已放弃。",
     previous: "上一条规则",
     next: "下一条规则",
+    create: "新建规则", createTitle: "创建业务规则", createDescription: "新增一条聚焦、可审核的指引；发布前它只会保存为项目草稿。",
+    createAction: "创建草稿", creating: "创建中", createNameRequired: "请填写清晰的规则名称。", createContentRequired: "请填写规则文本。",
+    delete: "删除", deleteTitle: "删除这条规则？", deleteDescription: "规则文件将从项目草稿中移除；发布项目后，删除才会影响下游查询。",
+    deleteAction: "删除规则", deleting: "删除中", deleteConfirm: "这会从当前草稿中移除 {{name}} 及其源文件。",
+    addToken: "输入后按 Enter 添加", removeToken: "移除", operationFailed: "操作未能完成。",
   },
 } as const;
 
@@ -225,11 +244,14 @@ export function RuleWorkbench({
   error = null,
   readOnly = false,
   source,
+  scopeOptions = [],
   onRetry,
   onSelectRule,
   onDraftChange,
   onToggleRule,
   onSave,
+  onCreate,
+  onDelete,
   onDiscard,
 }: RuleWorkbenchProps) {
   const c = ruleCopy[locale];
@@ -239,9 +261,13 @@ export function RuleWorkbench({
   const [tab, setTab] = useState<RuleTab>("content");
   const [drafts, setDrafts] = useState<Record<string, KnowledgeRule>>({});
   const [committed, setCommitted] = useState<Record<string, KnowledgeRule>>({});
-  const [busyAction, setBusyAction] = useState<RuleSaveAction | "toggle" | null>(null);
+  const [busyAction, setBusyAction] = useState<RuleSaveAction | "toggle" | "create" | "delete" | null>(null);
   const [notice, setNotice] = useState<"saved" | "published" | "discarded" | null>(null);
   const [operationError, setOperationError] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<KnowledgeRule | null>(null);
+  const [createDraft, setCreateDraft] = useState<NewKnowledgeRule>({ name: "", content: "", enabled: true, scope: [], tags: [] });
+  const [createError, setCreateError] = useState("");
   const tabRefs = useRef<Record<RuleTab, HTMLButtonElement | null>>({ content: null, source: null, diff: null });
 
   useEffect(() => {
@@ -342,6 +368,45 @@ export function RuleWorkbench({
     }
   }
 
+  function beginCreate() {
+    setCreateDraft({ name: "", content: "", enabled: true, scope: [], tags: [] });
+    setCreateError("");
+    setCreating(true);
+  }
+
+  async function confirmCreate() {
+    if (!onCreate || busyAction) return;
+    const name = createDraft.name.trim();
+    const content = createDraft.content.trim();
+    if (!name) { setCreateError(c.createNameRequired); return; }
+    if (!content) { setCreateError(c.createContentRequired); return; }
+    setBusyAction("create"); setCreateError("");
+    try {
+      await onCreate({ ...createDraft, name, content });
+      setCreating(false);
+      setOperationError("");
+    } catch (caught) {
+      setCreateError(caught instanceof Error ? caught.message : c.operationFailed);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget || !onDelete || busyAction) return;
+    setBusyAction("delete");
+    try {
+      await onDelete(deleteTarget);
+      setDeleteTarget(null);
+      setOperationError("");
+    } catch (caught) {
+      setOperationError(caught instanceof Error ? caught.message : c.operationFailed);
+      setDeleteTarget(null);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   function handleTabKey(event: KeyboardEvent<HTMLButtonElement>, current: RuleTab) {
     if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
     event.preventDefault();
@@ -362,10 +427,13 @@ export function RuleWorkbench({
 
   const noticeText = notice === "saved" ? c.savedNotice : notice === "published" ? c.publishedNotice : notice === "discarded" ? c.discardNotice : "";
 
+  const createModal = <Modal open={creating} title={c.createTitle} description={c.createDescription} onClose={() => { if (!busyAction) setCreating(false); }} footer={<><Button variant="ghost" onClick={() => setCreating(false)} disabled={Boolean(busyAction)}>{locale === "zh-CN" ? "取消" : "Cancel"}</Button><Button variant="primary" icon={Plus} loading={busyAction === "create"} onClick={() => void confirmCreate()} disabled={Boolean(busyAction)}>{busyAction === "create" ? c.creating : c.createAction}</Button></>}><div className="kw-create-rule-form">{createError ? <InlineNotice tone="error" title={createError} /> : null}<Field label={c.nameLabel} htmlFor="new-rule-name"><TextInput id="new-rule-name" value={createDraft.name} onChange={(event) => { setCreateDraft((current) => ({ ...current, name: event.target.value })); setCreateError(""); }} autoFocus /></Field><Field label={c.contentLabel} htmlFor="new-rule-content"><TextArea id="new-rule-content" rows={5} value={createDraft.content} onChange={(event) => { setCreateDraft((current) => ({ ...current, content: event.target.value })); setCreateError(""); }} /></Field><div className="kw-form-grid"><TokenEditor label={c.scopeLabel} values={createDraft.scope} options={scopeOptions} placeholder={c.addToken} removeLabel={c.removeToken} onChange={(scope) => setCreateDraft((current) => ({ ...current, scope }))} /><TokenEditor label={c.tagsLabel} values={createDraft.tags} placeholder={c.addToken} removeLabel={c.removeToken} onChange={(tags) => setCreateDraft((current) => ({ ...current, tags }))} /></div></div></Modal>;
+  const deleteModal = <Modal open={Boolean(deleteTarget)} title={c.deleteTitle} description={c.deleteDescription} onClose={() => { if (!busyAction) setDeleteTarget(null); }} footer={<><Button variant="ghost" onClick={() => setDeleteTarget(null)} disabled={Boolean(busyAction)}>{locale === "zh-CN" ? "取消" : "Cancel"}</Button><Button variant="danger" icon={Trash} loading={busyAction === "delete"} onClick={() => void confirmDelete()} disabled={Boolean(busyAction)}>{busyAction === "delete" ? c.deleting : c.deleteAction}</Button></>}><div className="kw-delete-confirm"><WarningCircle size={20} weight="fill" /><p>{c.deleteConfirm.replace("{{name}}", deleteTarget?.name ?? "")}</p>{deleteTarget ? <code>{deleteTarget.sourcePath}</code> : null}</div></Modal>;
+
   return <div className="page kw-page kw-rules-page">
     <div className="kw-page-heading">
       <div><p className="kw-eyebrow">{c.eyebrow}</p><h1>{c.title}</h1><p>{c.description}</p></div>
-      {readOnly ? <span className="kw-readonly-badge"><Code size={14} />{c.readOnly}</span> : null}
+      <div className="kw-heading-actions">{readOnly ? <span className="kw-readonly-badge"><Code size={14} />{c.readOnly}</span> : null}{onCreate && !readOnly ? <Button variant="primary" icon={Plus} onClick={beginCreate}>{c.create}</Button> : null}</div>
     </div>
     {error || operationError ? <div className="kw-error" role="alert"><WarningCircle size={18} weight="fill" /><span>{operationError || error || c.errorTitle}</span>{error && onRetry ? <button type="button" className="kw-text-button" onClick={onRetry}><ArrowClockwise size={15} />{c.retry}</button> : null}</div> : null}
     {noticeText ? <div className="kw-notice" role="status"><CheckCircle size={18} weight="fill" /><span>{noticeText}</span><button type="button" className="kw-dismiss" onClick={() => setNotice(null)} aria-label={locale === "zh-CN" ? "关闭提示" : "Dismiss notice"}><X size={15} /></button></div> : null}
@@ -388,17 +456,36 @@ export function RuleWorkbench({
       </aside>
       <section className="kw-panel kw-rule-editor-panel" aria-label={selected ? `${c.selected}: ${selected.name}` : c.selected}>
         {!selected ? <RuleEmptyState title={c.noRules} body={c.noRulesBody} /> : <>
-          <div className="kw-editor-header"><div className="kw-editor-title"><span className="kw-editor-icon"><PencilSimple size={17} /></span><div><span className="kw-panel-kicker">{c.selected}</span><h2 title={selected.name}>{selected.name}</h2><div className="kw-editor-status"><StatusBadge rule={selected} text={selected.enabled ? c.ruleEnabled : c.ruleDisabled} />{isDirty ? <span className="kw-draft-state kw-draft-state-dirty">{c.unsaved}</span> : selected.draft ? <span className="kw-draft-state">{c.draft}</span> : <span className="kw-draft-state">{c.published}</span>}</div></div></div><div className="kw-editor-actions"><button type="button" className="button button-ghost button-sm" onClick={discard} disabled={readOnly || !isDirty || Boolean(busyAction)}><ArrowUUpLeft size={15} />{c.discard}</button><button type="button" className="button button-secondary button-sm" onClick={() => void save("draft")} disabled={readOnly || !isDirty || !onSave || Boolean(busyAction)}>{busyAction === "draft" ? <CircleNotch className="spin" size={15} /> : <FloppyDisk size={15} />}{busyAction === "draft" ? c.saving : c.saveDraft}</button><button type="button" className="button button-primary button-sm" onClick={() => void save("publish")} disabled={readOnly || !isDirty || !onSave || Boolean(busyAction)}>{busyAction === "publish" ? <CircleNotch className="spin" size={15} /> : <RocketLaunch size={15} />}{busyAction === "publish" ? c.publishing : c.publish}</button></div></div>
+          <div className="kw-editor-header"><div className="kw-editor-title"><span className="kw-editor-icon"><PencilSimple size={17} /></span><div><span className="kw-panel-kicker">{c.selected}</span><h2 title={selected.name}>{selected.name}</h2><div className="kw-editor-status"><StatusBadge rule={selected} text={selected.enabled ? c.ruleEnabled : c.ruleDisabled} />{isDirty ? <span className="kw-draft-state kw-draft-state-dirty">{c.unsaved}</span> : selected.draft ? <span className="kw-draft-state">{c.draft}</span> : <span className="kw-draft-state">{c.published}</span>}</div></div></div><div className="kw-editor-actions">{onDelete ? <button type="button" className="button button-ghost button-sm kw-delete-button" onClick={() => setDeleteTarget(copyRule(selected))} disabled={readOnly || Boolean(busyAction)}><Trash size={15} />{c.delete}</button> : null}<button type="button" className="button button-ghost button-sm" onClick={discard} disabled={readOnly || !isDirty || Boolean(busyAction)}><ArrowUUpLeft size={15} />{c.discard}</button><button type="button" className="button button-secondary button-sm" onClick={() => void save("draft")} disabled={readOnly || !isDirty || !onSave || Boolean(busyAction)}>{busyAction === "draft" ? <CircleNotch className="spin" size={15} /> : <FloppyDisk size={15} />}{busyAction === "draft" ? c.saving : c.saveDraft}</button><button type="button" className="button button-primary button-sm" onClick={() => void save("publish")} disabled={readOnly || !isDirty || !onSave || Boolean(busyAction)}>{busyAction === "publish" ? <CircleNotch className="spin" size={15} /> : <RocketLaunch size={15} />}{busyAction === "publish" ? c.publishing : c.publish}</button></div></div>
           <div className="kw-tabs" role="tablist" aria-label={`${c.selected} views`}><button type="button" role="tab" id="kw-rule-tab-content" aria-controls="kw-rule-tabpanel" aria-selected={tab === "content"} className={tab === "content" ? "kw-tab-active" : ""} onClick={() => setTab("content")} onKeyDown={(event) => handleTabKey(event, "content")} ref={(element) => { tabRefs.current.content = element; }}>{c.contentTab}</button><button type="button" role="tab" id="kw-rule-tab-source" aria-controls="kw-rule-tabpanel" aria-selected={tab === "source"} className={tab === "source" ? "kw-tab-active" : ""} onClick={() => setTab("source")} onKeyDown={(event) => handleTabKey(event, "source")} ref={(element) => { tabRefs.current.source = element; }}>{c.sourceTab}</button><button type="button" role="tab" id="kw-rule-tab-diff" aria-controls="kw-rule-tabpanel" aria-selected={tab === "diff"} className={tab === "diff" ? "kw-tab-active" : ""} onClick={() => setTab("diff")} onKeyDown={(event) => handleTabKey(event, "diff")} ref={(element) => { tabRefs.current.diff = element; }}>{c.diffTab}{isDirty ? <span className="kw-tab-count" aria-label={c.unsaved}>1</span> : null}</button></div>
           <div className="kw-tab-panel" id="kw-rule-tabpanel" role="tabpanel" aria-labelledby={`kw-rule-tab-${tab}`}>
-            {tab === "content" ? <div className="kw-rule-content"><div className="kw-content-heading"><div><h3>{c.contentTitle}</h3><p>{c.contentHint}</p></div><StatusBadge rule={selected} text={selected.enabled ? c.enabled : c.disabled} /></div><div className="kw-form-grid"><label className="kw-field kw-field-wide"><span>{c.nameLabel}</span><input className="input" value={selected.name} onChange={(event) => updateSelected({ name: event.target.value })} disabled={readOnly} /></label><label className="kw-field kw-field-wide"><span>{c.contentLabel}</span><textarea className="input kw-rule-textarea" value={selected.content} onChange={(event) => updateSelected({ content: event.target.value })} disabled={readOnly} /></label><div className="kw-field"><span>{c.scopeLabel}</span><div className="kw-token-list">{selected.scope?.length ? selected.scope.map((item) => <span className="kw-token" key={item}>{item}</span>) : <span className="kw-field-muted">{c.noScope}</span>}</div></div><div className="kw-field"><span>{c.tagsLabel}</span><div className="kw-token-list">{selected.tags?.length ? selected.tags.map((item) => <span className="kw-token kw-token-muted" key={item}>{item}</span>) : <span className="kw-field-muted">{c.noTags}</span>}</div></div></div><div className="kw-rule-toggle-row"><div><strong>{selected.enabled ? c.ruleEnabled : c.ruleDisabled}</strong><small>{selected.enabled ? c.enabled : c.disabled}</small></div><button type="button" role="switch" aria-checked={selected.enabled} aria-label={selected.enabled ? `${c.onLabel}: ${selected.name}` : `${c.offLabel}: ${selected.name}`} className={`kw-large-toggle ${selected.enabled ? "kw-large-toggle-on" : ""}`} onClick={(event) => void toggleRule(selected, event)} disabled={readOnly || busyAction === "toggle"}><span aria-hidden="true" /></button></div></div> : null}
+            {tab === "content" ? <div className="kw-rule-content"><div className="kw-content-heading"><div><h3>{c.contentTitle}</h3><p>{c.contentHint}</p></div><StatusBadge rule={selected} text={selected.enabled ? c.enabled : c.disabled} /></div><div className="kw-form-grid"><label className="kw-field kw-field-wide"><span>{c.nameLabel}</span><input className="input" value={selected.name} onChange={(event) => updateSelected({ name: event.target.value })} disabled={readOnly} /></label><label className="kw-field kw-field-wide"><span>{c.contentLabel}</span><textarea className="input kw-rule-textarea" value={selected.content} onChange={(event) => updateSelected({ content: event.target.value })} disabled={readOnly} /></label><TokenEditor label={c.scopeLabel} values={selected.scope ?? []} options={scopeOptions} placeholder={c.addToken} removeLabel={c.removeToken} disabled={readOnly} onChange={(scope) => updateSelected({ scope })} /><TokenEditor label={c.tagsLabel} values={selected.tags ?? []} placeholder={c.addToken} removeLabel={c.removeToken} disabled={readOnly} onChange={(tags) => updateSelected({ tags })} /></div><div className="kw-rule-toggle-row"><div><strong>{selected.enabled ? c.ruleEnabled : c.ruleDisabled}</strong><small>{selected.enabled ? c.enabled : c.disabled}</small></div><button type="button" role="switch" aria-checked={selected.enabled} aria-label={selected.enabled ? `${c.onLabel}: ${selected.name}` : `${c.offLabel}: ${selected.name}`} className={`kw-large-toggle ${selected.enabled ? "kw-large-toggle-on" : ""}`} onClick={(event) => void toggleRule(selected, event)} disabled={readOnly || busyAction === "toggle"}><span aria-hidden="true" /></button></div></div> : null}
             {tab === "source" ? <div className="kw-source-view"><div className="kw-source-heading"><div><h3>{c.sourceTab}</h3><p>{c.sourceHint}</p></div><code title={selected.sourcePath}>{selected.sourcePath}</code></div>{sourceContent ? <pre className="kw-code"><code>{sourceContent}</code></pre> : <RuleEmptyState title={c.sourceUnavailable} body={c.sourceLabel} icon={<Code size={22} weight="duotone" />} />}</div> : null}
             {tab === "diff" ? <div className="kw-source-view"><div className="kw-source-heading"><div><h3>{c.diffTab}</h3><p>{c.diffHint}</p></div><code title={selected.sourcePath}>{selected.sourcePath}</code></div>{diffContent ? <pre className="kw-code kw-diff-code"><code>{diffContent}</code></pre> : <RuleEmptyState title={c.noDiff} body={c.noDiffBody} icon={<Check size={22} weight="bold" />} />}</div> : null}
           </div>
         </>}
       </section>
-    </div>}
+    </div>}{createModal}{deleteModal}
   </div>;
+}
+
+function TokenEditor({ label, values, options = [], placeholder, removeLabel, disabled = false, onChange }: { label: string; values: string[]; options?: string[]; placeholder: string; removeLabel: string; disabled?: boolean; onChange: (values: string[]) => void }) {
+  const [input, setInput] = useState("");
+  const listId = useId();
+  const normalizedValues = new Set(values.map((value) => value.toLocaleLowerCase()));
+  const suggestions = options.filter((option) => !normalizedValues.has(option.toLocaleLowerCase()));
+  function commit(raw = input) {
+    const additions = raw.split(/[,，]/).map((value) => value.trim()).filter(Boolean);
+    if (!additions.length) return;
+    const next = [...values];
+    for (const addition of additions) if (!next.some((value) => value.toLocaleLowerCase() === addition.toLocaleLowerCase())) next.push(addition);
+    onChange(next); setInput("");
+  }
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter" || event.key === ",") { event.preventDefault(); commit(); }
+    if (event.key === "Backspace" && !input && values.length) onChange(values.slice(0, -1));
+  }
+  return <label className="kw-field kw-token-field"><span>{label}</span><div className={`kw-token-editor ${disabled ? "kw-token-editor-disabled" : ""}`}><Tag size={15} aria-hidden="true" />{values.map((item) => <span className="kw-token" key={item}>{item}{!disabled ? <button type="button" onClick={() => onChange(values.filter((value) => value !== item))} aria-label={`${removeLabel} ${item}`}><X size={12} /></button> : null}</span>)}<input value={input} onChange={(event: ChangeEvent<HTMLInputElement>) => setInput(event.target.value)} onKeyDown={handleKeyDown} onBlur={() => commit()} placeholder={values.length ? "" : placeholder} list={suggestions.length ? listId : undefined} disabled={disabled} aria-label={label} /></div>{suggestions.length ? <datalist id={listId}>{suggestions.map((option) => <option value={option} key={option} />)}</datalist> : null}</label>;
 }
 
 export default RuleWorkbench;

@@ -121,6 +121,12 @@ export class ApiClient {
     });
   }
 
+  deleteRule(id: string, expectedRevision?: string): Promise<{ deleted: boolean; id: string; rules: KnowledgeRuleRecord[]; revision: string }> {
+    return this.request(`/api/knowledge/rules/${encodeURIComponent(id)}`, {
+      method: "DELETE", body: JSON.stringify(expectedRevision !== undefined ? { expectedRevision } : {}),
+    });
+  }
+
   getSqlCandidates(status?: string): Promise<SqlCandidatesResponse> {
     return this.request(`/api/knowledge/sql-candidates${status ? `?status=${encodeURIComponent(status)}` : ""}`);
   }
@@ -149,6 +155,12 @@ export class ApiClient {
 
   saveCube(name: string, payload: CubeRecord & { expectedRevision?: string }): Promise<CubeSnapshot> {
     return this.request<CubeSnapshot>(`/api/cubes/${encodeURIComponent(name)}`, { method: "PUT", body: JSON.stringify(payload) });
+  }
+
+  deleteCube(name: string, expectedRevision?: string): Promise<CubeSnapshot> {
+    return this.request<CubeSnapshot>(`/api/cubes/${encodeURIComponent(name)}`, {
+      method: "DELETE", body: JSON.stringify(expectedRevision !== undefined ? { expectedRevision } : {}),
+    });
   }
 
   validateCube(name: string, payload: CubeRecord): Promise<CubeValidationResponse> {

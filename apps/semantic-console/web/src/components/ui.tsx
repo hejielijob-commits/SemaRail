@@ -93,6 +93,8 @@ export function SectionHeading({ eyebrow, title, description, action }: { eyebro
 export function Modal({ open, title, description, onClose, children, footer }: { open: boolean; title: string; description?: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
   const { t } = useTranslation();
   const modalRef = useRef<HTMLElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -100,7 +102,7 @@ export function Modal({ open, title, description, onClose, children, footer }: {
     const focusableSelector = "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex=\"-1\"])";
     const focusFirst = () => (modal?.querySelector<HTMLElement>("[autofocus]") ?? modal?.querySelector<HTMLElement>(focusableSelector))?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
+      if (event.key === "Escape") { event.preventDefault(); onCloseRef.current(); return; }
       if (event.key !== "Tab" || !modal) return;
       const focusable = Array.from(modal.querySelectorAll<HTMLElement>(focusableSelector));
       if (!focusable.length) return;
@@ -112,7 +114,7 @@ export function Modal({ open, title, description, onClose, children, footer }: {
     const timer = window.setTimeout(focusFirst, 0);
     document.addEventListener("keydown", onKeyDown);
     return () => { window.clearTimeout(timer); document.removeEventListener("keydown", onKeyDown); previous?.focus(); };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section ref={modalRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="modal-header"><div><h2 id="modal-title">{translateLegacy(title)}</h2>{description ? <p>{translateLegacy(description)}</p> : null}</div><button className="icon-button" onClick={onClose} aria-label={t("common.closeDialog")}><X size={18} /></button></div><div className="modal-body">{children}</div>{footer ? <div className="modal-footer">{footer}</div> : null}</section></div>;
 }
