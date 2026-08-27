@@ -47,6 +47,10 @@ describe('semantic context and ChartSpecV1', () => {
       models: [{ name: 'orders', columns: [{ name: 'amount', type: 'DECIMAL(18,2)' }] }],
       relationships: [],
     }).models[0]?.name).toBe('orders')
+    expect(parseSemanticContext({
+      schemaVersion: 1, projectRevision: 'rev-2', models: [], relationships: [],
+      sqlHistory: [{ id: 'sql:one', question: 'Revenue?', sql: 'SELECT SUM(amount) FROM orders', sourcePath: 'knowledge/sql/revenue.md' }],
+    }).sqlHistory?.[0]?.sourcePath).toBe('knowledge/sql/revenue.md')
     expect(parseChartSpecV1({ version: 1, type: 'line', x: 'day', y: ['total'], tooltip: true }).tooltip).toBe(true)
     expect(() => parseChartSpecV1({ version: 2, type: 'line', x: 'day', y: ['total'], tooltip: true })).toThrow(/unsupported version/)
   })
@@ -56,6 +60,18 @@ describe('DataQuery presentation limits and scalar policy', () => {
   it('uses returnedRows and accepts exact decimal strings', () => {
     expect(parseDataQueryPresentation(success())).toMatchObject({ stats: { returnedRows: 1 } })
     expect(() => parseDataQueryPresentation({ ...success([{ total: 12.5 }]), stats: { returnedRows: 1, durationMs: 1, truncated: false } })).toThrow(/exact strings/)
+  })
+
+  it('preserves optional question and bounded SQL history for durable replay', () => {
+    expect(parseDataQueryPresentation({
+      ...success(),
+      question: 'What is revenue?',
+      sqlHistory: [{ id: 'sql:revenue', question: 'Revenue by day', sql: 'SELECT day, SUM(amount) FROM orders GROUP BY day' }],
+    })).toMatchObject({ question: 'What is revenue?', sqlHistory: [{ id: 'sql:revenue' }] })
+    expect(() => parseDataQueryPresentation({
+      ...success(),
+      sqlHistory: Array.from({ length: 6 }, (_, index) => ({ id: `sql:${index}`, question: 'q', sql: 'SELECT 1' })),
+    })).toThrow(/at most 5/)
   })
 
   it('rejects BigInt/Date previews and enforces row and byte caps', () => {

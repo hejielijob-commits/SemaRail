@@ -21,6 +21,13 @@ import type {
   SemanticModelUpdate,
   SemanticProjectSnapshot,
   SemanticRelationshipsUpdate,
+  KnowledgeRulesResponse,
+  KnowledgeRuleRecord,
+  SqlCandidatesResponse,
+  SqlCandidateRecord,
+  CubeSnapshot,
+  CubeRecord,
+  CubeValidationResponse,
 } from "../types";
 
 export class ApiClientError extends Error {
@@ -94,6 +101,58 @@ export class ApiClient {
       method: "PUT",
       body: JSON.stringify(payload),
     });
+  }
+
+  getRules(): Promise<KnowledgeRulesResponse> {
+    return this.request<KnowledgeRulesResponse>("/api/knowledge/rules");
+  }
+
+  createRule(payload: Partial<KnowledgeRuleRecord> & { content: string; expectedRevision?: string }): Promise<{ rule: KnowledgeRuleRecord; rules: KnowledgeRuleRecord[]; revision: string }> {
+    return this.request("/api/knowledge/rules", { method: "POST", body: JSON.stringify(payload) });
+  }
+
+  updateRule(id: string, payload: Partial<KnowledgeRuleRecord> & { expectedRevision?: string }): Promise<{ rule: KnowledgeRuleRecord; rules: KnowledgeRuleRecord[]; revision: string }> {
+    return this.request(`/api/knowledge/rules/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(payload) });
+  }
+
+  setRuleEnabled(id: string, enabled: boolean, expectedRevision?: string): Promise<{ rule: KnowledgeRuleRecord; rules: KnowledgeRuleRecord[]; revision: string }> {
+    return this.request(`/api/knowledge/rules/${encodeURIComponent(id)}/${enabled ? "enable" : "disable"}`, {
+      method: "POST", body: JSON.stringify(expectedRevision ? { expectedRevision } : {}),
+    });
+  }
+
+  getSqlCandidates(status?: string): Promise<SqlCandidatesResponse> {
+    return this.request(`/api/knowledge/sql-candidates${status ? `?status=${encodeURIComponent(status)}` : ""}`);
+  }
+
+  approveSqlCandidate(id: string, payload: { sql?: string; reviewer?: string; reviewNote?: string } = {}): Promise<{ candidate: SqlCandidateRecord; approved: boolean; path?: string }> {
+    return this.request(`/api/knowledge/sql-candidates/${encodeURIComponent(id)}/approve`, { method: "POST", body: JSON.stringify(payload) });
+  }
+
+  validateSqlCandidate(id: string, sql?: string): Promise<{ valid: boolean; status: "passed"; message?: string }> {
+    return this.request(`/api/knowledge/sql-candidates/${encodeURIComponent(id)}/validate`, {
+      method: "POST", body: JSON.stringify(sql === undefined ? {} : { sql }),
+    });
+  }
+
+  rejectSqlCandidate(id: string, reviewNote: string): Promise<{ candidate: SqlCandidateRecord; rejected: boolean }> {
+    return this.request(`/api/knowledge/sql-candidates/${encodeURIComponent(id)}/reject`, { method: "POST", body: JSON.stringify({ reviewNote }) });
+  }
+
+  getCubes(): Promise<CubeSnapshot> {
+    return this.request<CubeSnapshot>("/api/cubes");
+  }
+
+  createCube(payload: CubeRecord & { expectedRevision?: string }): Promise<CubeSnapshot> {
+    return this.request<CubeSnapshot>("/api/cubes", { method: "POST", body: JSON.stringify(payload) });
+  }
+
+  saveCube(name: string, payload: CubeRecord & { expectedRevision?: string }): Promise<CubeSnapshot> {
+    return this.request<CubeSnapshot>(`/api/cubes/${encodeURIComponent(name)}`, { method: "PUT", body: JSON.stringify(payload) });
+  }
+
+  validateCube(name: string, payload: CubeRecord): Promise<CubeValidationResponse> {
+    return this.request<CubeValidationResponse>(`/api/cubes/${encodeURIComponent(name)}/validate`, { method: "POST", body: JSON.stringify(payload) });
   }
 
   /** Read the unified diff between a published file and its current draft. */

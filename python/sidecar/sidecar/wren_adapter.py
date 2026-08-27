@@ -189,6 +189,7 @@ class LazyWrenAdapter:
                 question,
                 project_path,
             )
+            sql_history = self._recall_sql_history(question, project_path)
             result: dict[str, Any] = {
                 "schemaVersion": 1,
                 "projectRevision": revision,
@@ -202,6 +203,8 @@ class LazyWrenAdapter:
                 result["summary"] = summary
             if knowledge:
                 result["knowledge"] = knowledge
+            if sql_history:
+                result["sqlHistory"] = sql_history
             return result
         except RpcFault:
             raise
@@ -511,6 +514,65 @@ class LazyWrenAdapter:
             # Missing knowledge is not a fatal Wren runtime error; the MDL
             # context remains useful.  Never expose loader exception text.
             return None
+
+    def _recall_sql_history(
+        self,
+        question: str,
+        project_path: Path,
+    ) -> list[dict[str, str]]:
+        """Recall confirmed SQL through Wren's public pluggable index.
+
+        ``knowledge/sql`` remains the source of truth. Wren chooses its
+        semantic or dependency-free grep backend; this adapter only bounds and
+        sanitizes the public recall rows for the JSON contract.
+        """
+
+        try:
+            memory = self._module_loader("wren.memory.index_backend")
+            get_index = getattr(memory, "get_index", None)
+            if not callable(get_index):
+                return []
+            index = get_index(project_path, str(project_path / ".wren" / "memory"))
+            search = getattr(index, "search", None)
+            if not callable(search):
+                return []
+            rows = search(question, limit=3)
+        except Exception:
+            return []
+        if not isinstance(rows, list):
+            return []
+        recalled: list[dict[str, str]] = []
+        for raw in rows[:3]:
+            if not isinstance(raw, Mapping):
+                continue
+            nl = _safe_text(raw.get("nl_query"), project_path, maximum=16_000)
+            sql = _safe_text(raw.get("sql_query"), project_path, maximum=64_000)
+            if not nl or not sql:
+                continue
+            source_path: str | None = None
+            raw_path = raw.get("path")
+            if isinstance(raw_path, (str, Path)):
+                try:
+                    candidate = Path(raw_path)
+                    if candidate.is_absolute():
+                        candidate = candidate.resolve().relative_to(project_path.resolve())
+                    normalized = candidate.as_posix().lstrip("/")
+                    if normalized.startswith("knowledge/sql/") and ".." not in candidate.parts:
+                        source_path = normalized[:512]
+                except (OSError, ValueError):
+                    source_path = None
+            identity = hashlib.sha256(
+                json.dumps(
+                    {"question": nl, "sql": sql, "sourcePath": source_path or ""},
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()[:24]
+            item = {"id": f"sql:{identity}", "question": nl, "sql": sql}
+            if source_path:
+                item["sourcePath"] = source_path
+            recalled.append(item)
+        return recalled
 
     def _load_engine_factory(self) -> EngineFactory:
         try:

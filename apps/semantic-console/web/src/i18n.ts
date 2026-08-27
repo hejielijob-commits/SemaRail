@@ -13,16 +13,18 @@ const resources = {
         connected: "Connected", unavailable: "API unavailable", current: "Current", readOnly: "Read only",
         yes: "Yes", no: "No", visible: "Visible", hidden: "Hidden", optional: "Optional", required: "Required",
         unknown: "Unknown", none: "None", columns: "columns", files: "files", detected: "detected",
+        closeDialog: "Close dialog", switchToDark: "Switch to dark theme", switchToLight: "Switch to light theme",
+        openHistory: "Open version history", signedIn: "Signed in as WS",
       },
       nav: {
         workspace: "Workspace", overview: "Overview", datasources: "Data sources", schema: "Schema browser",
         semanticLayer: "Semantic layer", models: "Models", relationships: "Relationships", views: "Views",
-        instructions: "Instructions", mdl: "MDL source", settings: "Settings", helpTitle: "Need a hand?",
+        cubes: "Cubes", rules: "Business rules", sqlKnowledge: "SQL knowledge", instructions: "Instructions", mdl: "MDL source", settings: "Settings", helpTitle: "Need a hand?",
         helpBody: "Read the semantic layer guide", project: "PROJECT", close: "Close navigation", open: "Open navigation",
       },
       page: {
         overview: "Overview", datasources: "Data sources", schema: "Schema browser", models: "Models",
-        relationships: "Relationships", views: "Views", instructions: "Instructions", mdl: "MDL source",
+        relationships: "Relationships", views: "Views", cubes: "Cubes", rules: "Business rules", sqlKnowledge: "SQL knowledge", instructions: "Instructions", mdl: "MDL source",
       },
       model: {
         eyebrow: "Semantic layer", title: "Business models", pageDescription: "Shape the business language around your source tables, then publish it as one reliable semantic layer.",
@@ -58,7 +60,7 @@ const resources = {
       status: {
         offlineTitle: "Semantic Console is offline", offlineBody: "Could not load {{items}}. No local project data was substituted.",
         validationPassed: "Validation passed", validationNeedsAttention: "Validation needs attention", publishFailed: "Publish failed",
-        projectPublished: "Project published", draftSaved: "Draft saved", sourceReadFailed: "Could not read project file",
+        projectPublished: "Project published", draftSaved: "Draft saved", draftSafe: "Your semantic project is safe to continue editing.", sourceReadFailed: "Could not read project file",
       },
       action: { addDatasource: "Add data source", importSchema: "Import schema", viewModels: "View models", manage: "Manage", publish: "Publish", validate: "Validate" },
       language: { label: "Language", english: "English", chinese: "简体中文", switchTo: "Switch language" },
@@ -74,16 +76,18 @@ const resources = {
         connected: "已连接", unavailable: "API 不可用", current: "当前", readOnly: "只读",
         yes: "是", no: "否", visible: "可见", hidden: "隐藏", optional: "可选", required: "必填",
         unknown: "未知", none: "无", columns: "列", files: "文件", detected: "已检测",
+        closeDialog: "关闭对话框", switchToDark: "切换到深色主题", switchToLight: "切换到浅色主题",
+        openHistory: "打开版本历史", signedIn: "当前用户 WS",
       },
       nav: {
         workspace: "工作区", overview: "概览", datasources: "数据源", schema: "Schema 浏览器",
         semanticLayer: "语义层", models: "业务模型", relationships: "关系", views: "视图",
-        instructions: "指令", mdl: "MDL 源文件", settings: "设置", helpTitle: "需要帮助？",
+        cubes: "指标立方体", rules: "业务规则", sqlKnowledge: "SQL 知识", instructions: "指令", mdl: "MDL 源文件", settings: "设置", helpTitle: "需要帮助？",
         helpBody: "阅读语义层指南", project: "项目", close: "关闭导航", open: "打开导航",
       },
       page: {
         overview: "概览", datasources: "数据源", schema: "Schema 浏览器", models: "业务模型",
-        relationships: "关系", views: "视图", instructions: "指令", mdl: "MDL 源文件",
+        relationships: "关系", views: "视图", cubes: "指标立方体", rules: "业务规则", sqlKnowledge: "SQL 知识", instructions: "指令", mdl: "MDL 源文件",
       },
       model: {
         eyebrow: "语义层", title: "业务模型", pageDescription: "围绕源表定义业务语言，并将其发布为可靠的统一语义层。",
@@ -117,7 +121,7 @@ const resources = {
       status: {
         offlineTitle: "语义控制台离线", offlineBody: "无法加载 {{items}}，未使用本地模拟数据。",
         validationPassed: "校验通过", validationNeedsAttention: "校验需要处理", publishFailed: "发布失败",
-        projectPublished: "项目已发布", draftSaved: "草稿已保存", sourceReadFailed: "无法读取项目文件",
+        projectPublished: "项目已发布", draftSaved: "草稿已保存", draftSafe: "语义项目已安全保存，可以继续编辑。", sourceReadFailed: "无法读取项目文件",
       },
       action: { addDatasource: "添加数据源", importSchema: "导入 Schema", viewModels: "查看模型", manage: "管理", publish: "发布", validate: "校验" },
       language: { label: "语言", english: "English", chinese: "简体中文", switchTo: "切换语言" },

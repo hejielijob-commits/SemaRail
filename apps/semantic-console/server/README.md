@@ -47,6 +47,15 @@ The primary routes are:
 | `GET /api/semantic-project` | Read the structured business-model snapshot used by the visual editor |
 | `PUT /api/semantic-models/{name}` | Update one model, its fields, and semantic metadata |
 | `PUT /api/semantic-relationships` | Replace validated model relationships and their semantic metadata |
+| `GET/POST /api/knowledge/rules` | List or create one-rule records |
+| `GET/PUT/DELETE /api/knowledge/rules/{id}` | Read/edit/delete one rule |
+| `POST /api/knowledge/rules/{id}/enable` | Enable a rule in the effective Wren knowledge directory |
+| `POST /api/knowledge/rules/{id}/disable` | Disable a rule and move its content out of the effective directory |
+| `GET/POST /api/knowledge/sql-candidates` | List or submit SQL candidates for review |
+| `GET/PUT /api/knowledge/sql-candidates/{id}` | Read or edit a pending SQL candidate |
+| `POST /api/knowledge/sql-candidates/{id}/approve` | Approve and create a `knowledge/sql/<slug>.md` draft |
+| `POST /api/knowledge/sql-candidates/{id}/reject` | Reject a candidate without writing `knowledge/sql` |
+| `POST /api/knowledge/sql-candidates/{id}/resubmit` | Move a rejected candidate back to pending review |
 | `GET /api/project/diff?path=...` | Read the bounded diff between published and draft content |
 | `POST /api/project/validate` | Validate the effective draft tree |
 | `POST /api/project/publish` | Validate/build then transactionally publish |
@@ -103,6 +112,44 @@ the Wren `condition` remains the only persisted truth, so complex expressions
 are preserved verbatim and are not rewritten into an extension format.
 `GET /api/project/diff` shows the exact bounded unified diff for that underlying
 file.
+
+### Knowledge governance API
+
+Rules are returned as individual records even when an existing Markdown file
+contains several top-level bullet rules. Such a legacy file is split
+logically, without discarding its original bytes. Before the first edit the
+source is copied to `semantic-console/rules-archive/`; disabling a single
+legacy rule removes that bullet from the active `knowledge/rules/` draft and
+stores its exact content under `semantic-console/rules-disabled/`. A disabled
+rule is never left in `knowledge/rules/`, and enabling it reconstructs the
+archived document in its original order. The index at
+`semantic-console/rules-index.json` retains unknown root/record fields for
+forward compatibility. Rule changes are project drafts and become effective
+after the normal validate/publish operation.
+
+SQL candidates are deliberately kept outside the Wren project in the
+sidecar's private state directory (`sql-candidates.json`). `POST
+/api/knowledge/sql-candidates` accepts `question`, `sql`, optional `queryId`,
+`sessionId`, `dialect`, `stats`, and `sqlHistory` (an array of JSON-safe
+`{id, question, sql, sourcePath?}` references). Legacy aliases `nl`,
+`historySql`, and `historySqlRefs` remain accepted. Submitting the same
+normalized question/SQL/dialect returns the existing candidate instead of
+creating a duplicate. New candidates always start as `pending`; a client
+cannot bypass review by supplying `status: approved`.
+
+`POST /api/knowledge/sql-candidates/{id}/validate` parses a pending candidate
+without changing its review status. It accepts one read-only query root
+(`SELECT`, including set operations), rejects DDL/DML and dangerous functions,
+and the approve endpoint repeats the same validation before writing a draft.
+
+Only the approve endpoint can create a SQL example, and it writes it as a
+validated project draft. Approval is idempotent and may include a reviewer SQL
+correction before the file is generated. If the private queue cannot be
+persisted, the project draft is rolled back and the candidate remains pending.
+Approved candidates are immutable; rejected candidates can be explicitly
+resubmitted. Candidate metadata is recursively checked for JSON-safe values,
+bounded in size, and rejected when it contains credential-shaped keys or
+connection strings.
 
 Datasource passwords and connection URLs are accepted only in create/update
 bodies. They are held in memory and persisted, for restart support, in

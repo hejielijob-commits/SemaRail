@@ -125,12 +125,22 @@ export interface DataQueryMeta {
   readonly queryId: string
   readonly status: 'success' | 'error'
   readonly semanticSql: string
+  readonly question?: string
+  readonly sqlHistory?: readonly DataQuerySqlHistoryReference[]
   readonly nativeSql?: string
   readonly columns: readonly DataQueryMetaColumn[]
   readonly previewRows: readonly Readonly<Record<string, DataQueryScalar>>[]
   readonly chart?: DataQueryChart
   readonly stats: DataQueryStats
   readonly error?: DataQueryError
+}
+
+/** Confirmed Wren NL-to-SQL example actually recalled for this query. */
+export interface DataQuerySqlHistoryReference {
+  readonly id: string
+  readonly question: string
+  readonly sql: string
+  readonly sourcePath?: string
 }
 
 /** Result column metadata. */
@@ -239,6 +249,7 @@ const DATA_QUERY_STYLES = `
   color: var(--wren-text);
   font: var(--dsw-font-s-14, 14px/1.5 system-ui, sans-serif);
 }
+
 [data-dsh-wren-data-query] *, [data-dsh-wren-data-query] *::before, [data-dsh-wren-data-query] *::after { box-sizing: border-box; }
 ${SEMANTIC_CONSOLE_CARD_STYLES}
 [data-query-status] { display: inline-flex; align-items: center; min-height: 24px; padding: 2px 9px; border-radius: 6px; background: color-mix(in srgb, var(--wren-success) 12%, transparent); color: var(--wren-success); font-weight: 600; font-size: 12px; line-height: 18px; }
@@ -283,6 +294,17 @@ ${SEMANTIC_CONSOLE_CARD_STYLES}
 .data-query-sql-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px; border-bottom: 1px solid var(--wren-border); }
 .data-query-sql-toolbar [aria-pressed="true"] { border-color: var(--wren-accent); background: color-mix(in srgb, var(--wren-accent) 12%, transparent); color: var(--wren-text); }
 .data-query-sql-toolbar [data-query-sql-copy] { margin-left: auto; }
+[data-query-sql-history] { padding: 14px 16px; border-bottom: 1px solid var(--wren-border); background: var(--wren-bg); }
+[data-query-sql-history] h4 { margin: 0 0 4px; color: var(--wren-text); font-size: 13px; }
+[data-query-sql-history] > p { margin: 0; color: var(--wren-text-tertiary); font-size: 12px; }
+[data-query-sql-history] details { margin-top: 8px; border: 1px solid var(--wren-border); border-radius: 7px; background: var(--wren-bg-subtle); }
+[data-query-sql-history] summary { display: flex; min-width: 0; cursor: pointer; gap: 8px; padding: 9px 10px; color: var(--wren-text-secondary); font-size: 12px; }
+[data-query-sql-history] summary span:first-child { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-query-sql-history] summary code { color: var(--wren-text-tertiary); font-size: 11px; }
+[data-query-sql-history] pre { max-height: 220px; margin: 0; overflow: auto; border-top: 1px solid var(--wren-border); padding: 12px; color: var(--wren-text); font: 12px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+[data-query-sql-submit-state] { color: var(--wren-text-tertiary); font-size: 12px; }
+[data-query-sql-submit-state="pending"] { color: var(--dsw-alias-state-success-primary, #22875a); }
+[data-query-sql-submit-state="error"] { color: var(--dsw-alias-state-error-primary, #c33b43); }
 [data-query-sql-code-block] { width: 100%; max-width: 100%; max-height: 440px; margin: 0; overflow: auto; padding: 16px; color: var(--wren-text); font: var(--dsw-font-markdown-code-block, 13px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace); tab-size: 2; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
 [data-query-sql-code] { display: block; min-width: 0; white-space: inherit; overflow-wrap: inherit; word-break: inherit; }
 .sql-keyword { color: var(--dsw-static-deepseek-500, #356ac3); font-weight: 600; }
@@ -402,11 +424,27 @@ function parseError(value: unknown): DataQueryError | undefined {
  * or HTML attribute without this check.
  */
 export function parseDataQueryMeta(value: unknown): DataQueryMeta | null {
-  if (!isRecord(value) || !hasOnlyKeys(value, ['schemaVersion', 'queryId', 'status', 'semanticSql', 'nativeSql', 'columns', 'previewRows', 'chart', 'stats', 'error'])) return null
+  if (!isRecord(value) || !hasOnlyKeys(value, ['schemaVersion', 'queryId', 'status', 'semanticSql', 'question', 'sqlHistory', 'nativeSql', 'columns', 'previewRows', 'chart', 'stats', 'error'])) return null
   if (value.schemaVersion !== 1 || (value.status !== 'success' && value.status !== 'error')) return null
   const queryId = boundedString(value.queryId, 128)
   const semanticSql = boundedString(value.semanticSql, MAX_SQL)
   if (queryId === undefined || semanticSql === undefined) return null
+  const question = value.question === undefined ? undefined : boundedString(value.question, 16_000)
+  if (value.question !== undefined && question === undefined) return null
+  let sqlHistory: DataQuerySqlHistoryReference[] | undefined
+  if (value.sqlHistory !== undefined) {
+    if (!Array.isArray(value.sqlHistory) || value.sqlHistory.length > 5) return null
+    sqlHistory = []
+    for (const raw of value.sqlHistory) {
+      if (!isRecord(raw) || !hasOnlyKeys(raw, ['id', 'question', 'sql', 'sourcePath'])) return null
+      const id = boundedString(raw.id, 128)
+      const historicalQuestion = boundedString(raw.question, 16_000)
+      const sql = boundedString(raw.sql, MAX_SQL)
+      const sourcePath = raw.sourcePath === undefined ? undefined : boundedString(raw.sourcePath, 512)
+      if (id === undefined || historicalQuestion === undefined || sql === undefined || (raw.sourcePath !== undefined && sourcePath === undefined)) return null
+      sqlHistory.push({ id, question: historicalQuestion, sql, ...(sourcePath === undefined ? {} : { sourcePath }) })
+    }
+  }
   if (!Array.isArray(value.columns) || value.columns.length > MAX_COLUMNS) return null
   const columns = value.columns.map(parseColumn)
   if (columns.some(column => column === undefined)) return null
@@ -446,6 +484,8 @@ export function parseDataQueryMeta(value: unknown): DataQueryMeta | null {
     queryId,
     status: value.status,
     semanticSql,
+    ...(question === undefined ? {} : { question }),
+    ...(sqlHistory === undefined ? {} : { sqlHistory }),
     ...(nativeSql === undefined ? {} : { nativeSql }),
     columns: parsedColumns,
     previewRows,
@@ -721,10 +761,12 @@ export interface DataQuerySqlViewProps {
   readonly copied: boolean
   readonly onModeChange: (mode: 'semantic' | 'native') => void
   readonly onCopy: () => void
+  readonly submissionState?: 'idle' | 'submitting' | 'pending' | 'error'
+  readonly onSubmit?: () => void
 }
 
 /** Render the selected SQL directly; the SQL tab is the only disclosure. */
-export function DataQuerySqlView({ meta, mode, copied, onModeChange, onCopy }: DataQuerySqlViewProps): ReactNode {
+export function DataQuerySqlView({ meta, mode, copied, onModeChange, onCopy, submissionState = 'idle', onSubmit }: DataQuerySqlViewProps): ReactNode {
   const nativeAvailable = meta.nativeSql !== undefined
   const selectedMode = mode === 'native' && nativeAvailable ? 'native' : 'semantic'
   const sql = selectedMode === 'native' ? meta.nativeSql as string : meta.semanticSql
@@ -733,15 +775,64 @@ export function DataQuerySqlView({ meta, mode, copied, onModeChange, onCopy }: D
     element('div', { className: 'data-query-sql-toolbar' },
       element('button', { type: 'button', 'data-query-sql-mode': 'semantic', 'aria-pressed': selectedMode === 'semantic', onClick: () => onModeChange('semantic') }, 'Semantic SQL'),
       element('button', { type: 'button', 'data-query-sql-mode': 'native', 'aria-pressed': selectedMode === 'native', disabled: !nativeAvailable, onClick: () => { if (nativeAvailable) onModeChange('native') } }, 'Native SQL'),
+      element('button', {
+        type: 'button',
+        'data-query-sql-submit': true,
+        disabled: meta.status !== 'success' || submissionState === 'submitting' || submissionState === 'pending' || onSubmit === undefined,
+        onClick: onSubmit,
+      }, submissionState === 'submitting' ? 'Submitting…' : submissionState === 'pending' ? 'Pending review' : submissionState === 'error' ? 'Retry submission' : 'Record for review'),
       element('button', { type: 'button', 'data-query-sql-copy': true, onClick: onCopy }, copied ? 'Copied' : 'Copy'),
+    ),
+    element('div', { 'data-query-sql-submit-state': submissionState, role: 'status', 'aria-live': 'polite' },
+      submissionState === 'pending' ? 'Saved to the review queue. It is not active Wren memory until approved.'
+        : submissionState === 'error' ? 'Could not reach the semantic console. Nothing was recorded.' : ''),
+    element('section', { 'data-query-sql-history': true, 'aria-label': 'Confirmed SQL history used' },
+      element('h4', null, 'Confirmed SQL references'),
+      meta.sqlHistory === undefined || meta.sqlHistory.length === 0
+        ? element('p', null, 'No confirmed historical SQL was recalled for this query.')
+        : element('div', null, ...meta.sqlHistory.map(reference => element('details', { key: reference.id },
+          element('summary', null,
+            element('span', null, reference.question),
+            ...(reference.sourcePath === undefined ? [] : [element('code', { key: 'path' }, reference.sourcePath)]),
+          ),
+          element('pre', null, element(HighlightedSql, { sql: reference.sql })),
+        ))),
     ),
     element('pre', { 'data-query-sql-code-block': true, 'data-query-sql-current': selectedMode }, element(HighlightedSql, { sql })),
   )
 }
 
-function DataQuerySql({ meta }: { readonly meta: DataQueryMeta }): ReactNode {
+/** Submit one successful query as a pending candidate; approval remains server-side. */
+export async function submitSqlCandidate(
+  meta: DataQueryMeta,
+  consoleUrl?: unknown,
+  request: typeof fetch = fetch,
+): Promise<{ readonly candidate?: { readonly status?: string }; readonly created?: boolean; readonly duplicate?: boolean }> {
+  if (meta.status !== 'success' || meta.question === undefined) throw new Error('query is not eligible for review')
+  const endpoint = new URL('/api/knowledge/sql-candidates', resolveSemanticConsoleUrl(consoleUrl)).toString()
+  const response = await request(endpoint, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      question: meta.question,
+      sql: meta.semanticSql,
+      dialect: 'wren-semantic',
+      queryId: meta.queryId,
+      status: 'pending',
+      stats: meta.stats,
+      sqlHistory: meta.sqlHistory ?? [],
+      executionStatus: meta.status,
+    }),
+  })
+  const body = await response.json().catch(() => undefined) as { candidate?: { status?: string }; created?: boolean; duplicate?: boolean; message?: string } | undefined
+  if (!response.ok) throw new Error(body?.message ?? `review submission failed (${response.status})`)
+  return body ?? {}
+}
+
+function DataQuerySql({ meta, consoleUrl }: { readonly meta: DataQueryMeta; readonly consoleUrl?: unknown }): ReactNode {
   const [mode, setMode] = useState<'semantic' | 'native'>('semantic')
   const [copied, setCopied] = useState(false)
+  const [submissionState, setSubmissionState] = useState<'idle' | 'submitting' | 'pending' | 'error'>('idle')
   const nativeAvailable = meta.nativeSql !== undefined
   const sql = mode === 'native' && nativeAvailable ? meta.nativeSql as string : meta.semanticSql
   const copySql = async (): Promise<void> => {
@@ -753,12 +844,24 @@ function DataQuerySql({ meta }: { readonly meta: DataQueryMeta }): ReactNode {
       setCopied(false)
     }
   }
+  const submit = async (): Promise<void> => {
+    setSubmissionState('submitting')
+    try {
+      await submitSqlCandidate(meta, consoleUrl)
+      setSubmissionState('pending')
+    } catch {
+      setSubmissionState('error')
+    }
+  }
+  useEffect(() => setSubmissionState('idle'), [meta.queryId])
   return element(DataQuerySqlView, {
     meta,
     mode,
     copied,
     onModeChange: setMode,
     onCopy: () => { void copySql() },
+    submissionState,
+    onSubmit: meta.question === undefined ? undefined : () => { void submit() },
   })
 }
 
@@ -863,14 +966,14 @@ export const DEFAULT_DATA_QUERY_TAB = 'chart' as const
 
 type QueryTab = typeof DATA_QUERY_TAB_ORDER[number]
 
-function DataQueryTabs({ meta }: { readonly meta: DataQueryMeta }): ReactNode {
+function DataQueryTabs({ meta, consoleUrl }: { readonly meta: DataQueryMeta; readonly consoleUrl?: unknown }): ReactNode {
   const chartAvailable = buildDataQueryChartOption(meta) !== null
   const tabIdPrefix = `wren-query-${useId().replace(/:/gu, '')}`
   const tabPanelId = `${tabIdPrefix}-panel`
   const [tab, setTab] = useState<QueryTab>(chartAvailable ? DEFAULT_DATA_QUERY_TAB : 'table')
   const panel = tab === 'chart'
     ? (chartAvailable ? element(DataQueryChartPanel, { meta }) : element('div', { role: 'status' }, 'Chart unavailable for this result'))
-    : tab === 'table' ? element(DataQueryTable, { meta }) : element(DataQuerySql, { meta })
+    : tab === 'table' ? element(DataQueryTable, { meta }) : element(DataQuerySql, { meta, consoleUrl })
   return element('div', { 'data-query-tabs': true },
     element('nav', { role: 'tablist', 'aria-label': 'Data query views' },
       ...DATA_QUERY_TAB_ORDER.map(item => element('button', {
@@ -915,7 +1018,7 @@ export function DataQueryRow(props: DataQueryViewProps): ReactNode {
       element(SemanticConsoleLink, { consoleUrl: props.semanticConsoleUrl, surface: 'card' }),
     ),
     error,
-    element(DataQueryTabs, { meta }),
+    element(DataQueryTabs, { meta, consoleUrl: props.semanticConsoleUrl }),
   )
 }
 

@@ -43,23 +43,26 @@ import {
 import { api } from "./api/client";
 import "./i18n";
 import { setConsoleLocale } from "./i18n";
-import type { ColumnRecord, ConsoleSection, Datasource, DatasourceField, DatasourceType, LocalizedText, ProjectDiff, ProjectFile, ProjectSummary, SchemaRecord, SemanticModel, SemanticProjectSnapshot, SemanticRelationship, TableRecord, Theme, ValidationIssue, VersionRecord } from "./types";
+import type { ColumnRecord, ConsoleSection, CubeSnapshot, Datasource, DatasourceField, DatasourceType, KnowledgeRulesResponse, LocalizedText, ProjectDiff, ProjectFile, ProjectSummary, SchemaRecord, SemanticModel, SemanticProjectSnapshot, SemanticRelationship, SqlCandidatesResponse, TableRecord, Theme, ValidationIssue, VersionRecord } from "./types";
 import { Badge, Button, EmptyState, Field, InlineNotice, LoadingRows, Modal, SectionHeading, Select, TextArea, TextInput } from "./components/ui";
 import ModelEditor from "./components/ModelEditor";
 import { RelationshipGraph, type RelationshipGraphLocalizedText, type RelationshipGraphRelationship } from "./components/RelationshipGraph";
+import RuleWorkbench, { type KnowledgeRule, type RuleSaveAction } from "./components/RuleWorkbench";
+import SqlKnowledgeWorkbench, { type SqlKnowledgeCandidate, type SqlValidation } from "./components/SqlKnowledgeWorkbench";
+import CubeWorkbench, { type CubeDefinition } from "./components/CubeWorkbench";
 
 type Notice = { tone: "info" | "success" | "warning" | "error"; title: string; body?: string } | null;
 
 const navGroups: { labelKey: string; items: { id: ConsoleSection; labelKey: string; icon: typeof House; count?: string }[] }[] = [
   { labelKey: "nav.workspace", items: [{ id: "overview", labelKey: "nav.overview", icon: House }, { id: "datasources", labelKey: "nav.datasources", icon: Database }, { id: "schema", labelKey: "nav.schema", icon: Table }] },
-  { labelKey: "nav.semanticLayer", items: [{ id: "models", labelKey: "nav.models", icon: Cube }, { id: "relationships", labelKey: "nav.relationships", icon: ShareNetwork }, { id: "views", labelKey: "nav.views", icon: Eye }, { id: "instructions", labelKey: "nav.instructions", icon: BookOpenText }, { id: "mdl", labelKey: "nav.mdl", icon: BracketsCurly }] },
+  { labelKey: "nav.semanticLayer", items: [{ id: "models", labelKey: "nav.models", icon: Cube }, { id: "relationships", labelKey: "nav.relationships", icon: ShareNetwork }, { id: "views", labelKey: "nav.views", icon: Eye }, { id: "cubes", labelKey: "nav.cubes", icon: Stack }, { id: "rules", labelKey: "nav.rules", icon: BookOpenText }, { id: "sqlKnowledge", labelKey: "nav.sqlKnowledge", icon: Code }, { id: "mdl", labelKey: "nav.mdl", icon: BracketsCurly }] },
 ];
 
-function formatDate(value?: string) {
+function formatDate(value?: string, locale = "en-US") {
   if (!value) return "No activity yet";
   const date = new Date(value);
   if (Number.isNaN(date.valueOf())) return value;
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
+  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
 }
 
 function sourceLabel(source?: Datasource) {
@@ -93,6 +96,30 @@ function semanticRelationships(value: RelationshipGraphRelationship[]): Semantic
     condition: relationship.condition ?? "",
     displayName: localizedValue(relationship.displayName, relationship.name),
     description: localizedValue(relationship.description, ""),
+  }));
+}
+
+function knowledgeRules(snapshot: KnowledgeRulesResponse | null): KnowledgeRule[] {
+  return (snapshot?.rules ?? []).map((rule) => ({
+    id: rule.id, name: rule.title, content: rule.content, enabled: rule.enabled,
+    sourcePath: rule.sourcePath, scope: rule.scope, tags: rule.tags,
+    updatedAt: rule.updatedAt, draft: rule.draft, sourceContent: rule.sourceContent, diff: rule.diff,
+  }));
+}
+
+function knowledgeCandidates(snapshot: SqlCandidatesResponse | null): SqlKnowledgeCandidate[] {
+  return (snapshot?.candidates ?? []).map((candidate) => ({
+    id: candidate.id, question: candidate.question, sql: candidate.sql,
+    queryId: candidate.queryId, sessionId: candidate.sessionId, status: candidate.status,
+    submittedAt: candidate.createdAt, reviewedAt: candidate.reviewedAt,
+    reviewer: candidate.reviewer, reviewNote: candidate.reviewNote,
+    stats: candidate.stats === undefined ? undefined : {
+      durationMs: typeof candidate.stats.durationMs === "number" ? candidate.stats.durationMs : undefined,
+      rowCount: typeof candidate.stats.returnedRows === "number" ? candidate.stats.returnedRows : undefined,
+      dialect: candidate.dialect ?? (typeof candidate.stats.dialect === "string" ? candidate.stats.dialect : undefined),
+    },
+    sqlHistory: candidate.sqlHistory,
+    sourcePath: candidate.approvedPath,
   }));
 }
 
@@ -131,6 +158,15 @@ function App() {
   const [semanticLoading, setSemanticLoading] = useState(false);
   const [semanticDiff, setSemanticDiff] = useState<ProjectDiff | null>(null);
   const [semanticDiffLoading, setSemanticDiffLoading] = useState(false);
+  const [rulesSnapshot, setRulesSnapshot] = useState<KnowledgeRulesResponse | null>(null);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [selectedRuleId, setSelectedRuleId] = useState("");
+  const [sqlCandidates, setSqlCandidates] = useState<SqlCandidatesResponse | null>(null);
+  const [sqlLoading, setSqlLoading] = useState(false);
+  const [cubeSnapshot, setCubeSnapshot] = useState<CubeSnapshot | null>(null);
+  const [cubeLoading, setCubeLoading] = useState(false);
+  const fileRequestRef = useRef(0);
+  const diffRequestRef = useRef(0);
 
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("semantic-console-theme", theme); }, [theme]);
 
@@ -150,21 +186,69 @@ function App() {
 
   async function loadSemanticDiff(path: string) {
     if (!path) return;
+    const requestId = ++diffRequestRef.current;
     setSemanticDiffLoading(true);
+    setSemanticDiff(null);
     const result = await api.getProjectDiff(path).catch(() => null);
-    setSemanticDiff(result);
-    setSemanticDiffLoading(false);
+    if (requestId === diffRequestRef.current) {
+      setSemanticDiff(result);
+      setSemanticDiffLoading(false);
+    }
+  }
+
+  async function loadRules() {
+    setRulesLoading(true);
+    const result = await api.getRules().catch((error: unknown) => {
+      setNotice({ tone: "error", title: "Rules could not be loaded", body: error instanceof Error ? error.message : undefined });
+      return null;
+    });
+    if (result) {
+      setRulesSnapshot(result);
+      const selected = result.rules.find((rule) => rule.id === selectedRuleId) ?? result.rules[0];
+      setSelectedRuleId(selected?.id ?? "");
+      if (selected) {
+        setSelectedFilePath(selected.sourcePath);
+        void loadProjectFile(selected.sourcePath);
+        void loadSemanticDiff(selected.sourcePath);
+      }
+    }
+    setRulesLoading(false);
+  }
+
+  async function loadSqlCandidates() {
+    setSqlLoading(true);
+    const result = await api.getSqlCandidates().catch((error: unknown) => {
+      setNotice({ tone: "error", title: "SQL review queue could not be loaded", body: error instanceof Error ? error.message : undefined });
+      return null;
+    });
+    if (result) setSqlCandidates(result);
+    setSqlLoading(false);
+  }
+
+  async function loadCubes() {
+    setCubeLoading(true);
+    const result = await api.getCubes().catch((error: unknown) => {
+      setNotice({ tone: "error", title: "Cubes could not be loaded", body: error instanceof Error ? error.message : undefined });
+      return null;
+    });
+    if (result) setCubeSnapshot(result);
+    setCubeLoading(false);
   }
 
   async function loadProjectFile(path: string, fileList = files) {
     if (!path || !isEditableProjectFile(path)) return;
+    const requestId = ++fileRequestRef.current;
     setFileLoading(true);
     setSelectedFilePath(path);
+    if (isInstructionFile(path)) setInstructions("");
+    else setMdlSource("");
     const result = await api.getProjectFile(path).catch((error: unknown) => {
+      if (requestId !== fileRequestRef.current) return null;
       const message = error instanceof Error ? error.message : "The project file could not be read.";
       setNotice({ tone: "error", title: "Could not read project file", body: message });
       return null;
     });
+    if (requestId !== fileRequestRef.current) return;
     if (result?.content !== undefined) {
       if (isInstructionFile(path)) setInstructions(result.content);
       else setMdlSource(result.content);
@@ -288,10 +372,60 @@ function App() {
       setBusyAction(null);
     }
   }
+  async function toggleRule(rule: KnowledgeRule, enabled: boolean) {
+    const result = await api.setRuleEnabled(rule.id, enabled, rulesSnapshot?.revision);
+    setRulesSnapshot((current) => current ? { ...current, revision: result.revision, rules: result.rules } : current);
+    markSaved();
+  }
+  async function saveRule(rule: KnowledgeRule, action: RuleSaveAction) {
+    const result = await api.updateRule(rule.id, {
+      title: rule.name, content: rule.content, enabled: rule.enabled,
+      scope: rule.scope, tags: rule.tags, expectedRevision: rulesSnapshot?.revision,
+    });
+    setRulesSnapshot((current) => current ? { ...current, revision: result.revision, rules: result.rules } : current);
+    markSaved();
+    if (action === "publish") {
+      await api.publishProject();
+      await Promise.all([refreshWorkspace(), loadRules()]);
+    }
+  }
+  async function approveCandidate(candidate: SqlKnowledgeCandidate, sql: string) {
+    await api.approveSqlCandidate(candidate.id, { sql });
+    await loadSqlCandidates();
+    markSaved();
+  }
+  async function rejectCandidate(candidate: SqlKnowledgeCandidate, note: string) {
+    await api.rejectSqlCandidate(candidate.id, note);
+    await loadSqlCandidates();
+  }
+  async function validateCandidate(candidate: SqlKnowledgeCandidate): Promise<SqlValidation> {
+    const result = await api.validateSqlCandidate(candidate.id, candidate.sql);
+    return { status: result.valid ? "passed" : "failed", message: result.message, checkedAt: new Date().toISOString() };
+  }
+  async function saveCube(cube: CubeDefinition) {
+    const result = await api.saveCube(cube.name, { ...cube, expectedRevision: cubeSnapshot?.revision });
+    setCubeSnapshot(result);
+    markSaved();
+  }
+  async function createCubeDraft(input: { name: string; baseObject: string }) {
+    if (!input.baseObject || !cubeSnapshot) {
+      setNotice({ tone: "warning", title: "A base object is required", body: "Create a model or view before adding a cube." });
+      return;
+    }
+    const result = await api.createCube({
+      name: input.name, sourcePath: `cubes/${input.name}/metadata.yml`, baseObject: input.baseObject,
+      measures: [], dimensions: [], timeDimensions: [], hierarchies: {}, expectedRevision: cubeSnapshot.revision,
+    });
+    setCubeSnapshot(result);
+    markSaved();
+  }
   function openProjectFile(path: string) { setSection("mdl"); setShowMobileNav(false); setNotice(null); void loadProjectFile(path); }
   function navigate(next: ConsoleSection) {
     setSection(next); setShowMobileNav(false); setNotice(null);
     if (next === "models" || next === "relationships") void loadSemanticProject();
+    if (next === "rules") void loadRules();
+    if (next === "sqlKnowledge") void loadSqlCandidates();
+    if (next === "cubes") void loadCubes();
     if (next === "schema" && activeDatasourceId) void handleLoadSchema();
     if (next === "instructions") {
       const instructionFile = files.find((file) => isInstructionFile(file.path));
@@ -306,7 +440,7 @@ function App() {
       else { setSelectedFilePath(""); setMdlSource(""); }
     }
   }
-  function markSaved() { const saved = new Date().toISOString(); setDraftSavedAt(saved); setProject((current) => ({ ...current, status: "draft", updatedAt: saved })); setNotice({ tone: "success", title: "Draft saved", body: "Your semantic project is safe to continue editing." }); }
+  function markSaved() { const saved = new Date().toISOString(); setDraftSavedAt(saved); setProject((current) => ({ ...current, status: "draft", updatedAt: saved })); setNotice({ tone: "success", title: t("status.draftSaved"), body: t("status.draftSafe") }); }
   async function handleSaveFile(path: string, content: string) {
     if (!path) {
       setNotice({ tone: "error", title: "Draft save failed", body: "Choose a project file before saving." });
@@ -396,16 +530,31 @@ function App() {
   return <div className="app-shell">
     <Sidebar projectName={project.name || project.projectName || "Semantic project"} section={section} onNavigate={navigate} open={showMobileNav} onClose={() => setShowMobileNav(false)} />
     <div className="app-main">
-      <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" onClick={() => setShowMobileNav(true)} aria-label={t("nav.open")}><SidebarSimple size={19} /></button><div className="breadcrumbs"><span>{t("nav.workspace")}</span><CaretRight size={13} /><strong>{pageTitle(section, t)}</strong></div></div><div className="topbar-actions"><span className={`connection-state ${apiOnline ? "online" : "offline"}`}><span className="connection-dot" />{apiOnline ? t("common.connected") : t("common.unavailable")}</span><label className="locale-switcher"><span className="sr-only">{t("language.label")}</span><select aria-label={t("language.switchTo")} value={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onChange={(event) => setConsoleLocale(event.target.value as "zh-CN" | "en-US")}><option value="en-US">EN</option><option value="zh-CN">中</option></select></label><button className="icon-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="icon-button" onClick={() => setShowHistory(true)} aria-label="Open version history"><ClockCounterClockwise size={18} /></button><div className="avatar" aria-label="Signed in as WS">WS</div></div></header>
-      <main className="content">{notice ? <InlineNotice tone={notice.tone} title={notice.title} onDismiss={() => { setNotice(null); setLoadError(null); }}>{notice.body}</InlineNotice> : null}{loading ? <LoadingWorkspace /> : <>{section === "overview" ? <Overview project={project} datasources={datasources} versions={versions} files={files} onNavigate={navigate} onHistory={() => setShowHistory(true)} /> : null}{section === "datasources" ? <DatasourcesPage datasources={datasources} types={datasourceTypes} selectedId={activeDatasourceId} activeId={project.activeDatasource?.id ?? ""} setSelectedId={setSelectedDatasourceId} showForm={showDatasourceForm} setShowForm={setShowDatasourceForm} onAdd={addDatasource} selected={selectedDatasource} selectedType={selectedType} onUpdate={updateSelectedDatasource} onSave={handleSaveDatasource} onTest={handleTestDatasource} onActivate={handleActivateDatasource} busyAction={busyAction} /> : null}{section === "schema" ? <SchemaPage datasources={datasources} selectedDatasource={selectedDatasource} selectedSchema={selectedSchema} setSelectedSchema={(value) => { setSelectedSchema(value); void handleLoadSchema(value); }} schemas={schemas} tables={filteredTables} search={schemaSearch} setSearch={setSchemaSearch} selectedTable={selectedTable} onSelectTable={handleSelectTable} columns={columns} onImport={() => setShowImportModal(true)} busyAction={busyAction} onRefresh={() => void handleLoadSchema()} onDatasourceChange={(id: string) => { setSelectedDatasourceId(id); setSelectedSchema(""); setSelectedTable(""); void handleLoadSchema("", id); }} /> : null}{section === "models" ? <ModelsPage files={files} onOpenFile={openProjectFile} snapshot={semanticProject} loading={semanticLoading} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} onSave={async (model) => { const result = await api.updateSemanticModel(model.name, { ...model, expectedRevision: semanticProject?.revision }); if (result) { setSemanticProject(result); markSaved(); } }} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} /> : null}{section === "relationships" ? <RelationshipsPage snapshot={semanticProject} loading={semanticLoading} locale={activeI18n.language} theme={theme} saving={busyAction === "relationships"} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} onOpenEditor={(path) => { setSelectedFilePath(path); void loadProjectFile(path); setSection("mdl"); }} onSave={saveRelationshipDraft} /> : null}{section === "views" ? <ViewsPage files={files} onOpenFile={openProjectFile} /> : null}{section === "instructions" ? <InstructionsPage value={instructions} onChange={setInstructions} onSave={() => { const path = files.find((file) => isInstructionFile(file.path))?.path; if (path) void handleSaveFile(path, instructions); else setNotice({ tone: "error", title: "Draft save failed", body: "The project API did not return an instructions file." }); }} savedAt={draftSavedAt} loading={fileLoading} /> : null}{section === "mdl" ? <MdlPage value={mdlSource} onChange={setMdlSource} files={files} selectedFile={selectedFilePath} onSelectFile={(path: string) => void loadProjectFile(path)} onSave={(path?: string) => void handleSaveFile(path ?? selectedFilePath, mdlSource)} onImportProject={handleImportProject} savedAt={draftSavedAt} loading={fileLoading} /> : null}</>}</main>
-      <footer className="command-bar"><div className="command-context"><span className="draft-indicator" /><span>{project.status === "published" ? t("common.published") : t("common.draft")}</span>{draftSavedAt ? <span className="saved-time">{t("status.draftSaved")} {formatDate(draftSavedAt)}</span> : null}</div><div className="command-actions"><Button variant="ghost" size="sm" icon={ArrowsClockwise} onClick={() => void refreshWorkspace()} loading={refreshing}>{t("common.refresh")}</Button><Button variant="secondary" size="sm" icon={CheckCircle} onClick={handleValidate} loading={busyAction === "validate"}>{t("action.validate")}</Button><Button variant="primary" size="sm" icon={RocketLaunch} onClick={handlePublish} loading={busyAction === "publish"}>{t("action.publish")}</Button></div></footer>
+      <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" onClick={() => setShowMobileNav(true)} aria-label={t("nav.open")}><SidebarSimple size={19} /></button><div className="breadcrumbs"><span>{t("nav.workspace")}</span><CaretRight size={13} /><strong>{pageTitle(section, t)}</strong></div></div><div className="topbar-actions"><span className={`connection-state ${apiOnline ? "online" : "offline"}`}><span className="connection-dot" />{apiOnline ? t("common.connected") : t("common.unavailable")}</span><label className="locale-switcher"><span className="sr-only">{t("language.label")}</span><select aria-label={t("language.switchTo")} value={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onChange={(event) => setConsoleLocale(event.target.value as "zh-CN" | "en-US")}><option value="en-US">EN</option><option value="zh-CN">中</option></select></label><button className="icon-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={t(theme === "light" ? "common.switchToDark" : "common.switchToLight")}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="icon-button" onClick={() => setShowHistory(true)} aria-label={t("common.openHistory")}><ClockCounterClockwise size={18} /></button><div className="avatar" aria-label={t("common.signedIn")}>WS</div></div></header>
+      <main className="content">
+        {notice ? <InlineNotice tone={notice.tone} title={notice.title} onDismiss={() => { setNotice(null); setLoadError(null); }}>{notice.body}</InlineNotice> : null}
+        {loading ? <LoadingWorkspace /> : <>
+          {section === "overview" ? <Overview project={project} datasources={datasources} versions={versions} files={files} onNavigate={navigate} onHistory={() => setShowHistory(true)} /> : null}
+          {section === "datasources" ? <DatasourcesPage datasources={datasources} types={datasourceTypes} selectedId={activeDatasourceId} activeId={project.activeDatasource?.id ?? ""} setSelectedId={setSelectedDatasourceId} showForm={showDatasourceForm} setShowForm={setShowDatasourceForm} onAdd={addDatasource} selected={selectedDatasource} selectedType={selectedType} onUpdate={updateSelectedDatasource} onSave={handleSaveDatasource} onTest={handleTestDatasource} onActivate={handleActivateDatasource} busyAction={busyAction} /> : null}
+          {section === "schema" ? <SchemaPage datasources={datasources} selectedDatasource={selectedDatasource} selectedSchema={selectedSchema} setSelectedSchema={(value) => { setSelectedSchema(value); void handleLoadSchema(value); }} schemas={schemas} tables={filteredTables} search={schemaSearch} setSearch={setSchemaSearch} selectedTable={selectedTable} onSelectTable={handleSelectTable} columns={columns} onImport={() => setShowImportModal(true)} busyAction={busyAction} onRefresh={() => void handleLoadSchema()} onDatasourceChange={(id: string) => { setSelectedDatasourceId(id); setSelectedSchema(""); setSelectedTable(""); void handleLoadSchema("", id); }} /> : null}
+          {section === "models" ? <ModelsPage files={files} onOpenFile={openProjectFile} snapshot={semanticProject} loading={semanticLoading} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} onSave={async (model) => { const result = await api.updateSemanticModel(model.name, { ...model, expectedRevision: semanticProject?.revision }); if (result) { setSemanticProject(result); markSaved(); } }} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} /> : null}
+          {section === "relationships" ? <RelationshipsPage snapshot={semanticProject} loading={semanticLoading} locale={activeI18n.language} theme={theme} saving={busyAction === "relationships"} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} onOpenEditor={(path) => { setSelectedFilePath(path); void loadProjectFile(path); setSection("mdl"); }} onSave={saveRelationshipDraft} /> : null}
+          {section === "views" ? <ViewsPage files={files} onOpenFile={openProjectFile} /> : null}
+          {section === "cubes" ? <CubeWorkbench snapshot={cubeSnapshot} loading={cubeLoading} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onSave={saveCube} onCreate={createCubeDraft} onRetry={() => void loadCubes()} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} /> : null}
+          {section === "rules" ? <RuleWorkbench rules={knowledgeRules(rulesSnapshot)} selectedRuleId={selectedRuleId} loading={rulesLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} source={selectedFilePath ? { path: selectedFilePath, content: mdlSource, diff: semanticDiff?.diff } : null} onRetry={() => void loadRules()} onSelectRule={(rule) => { setSelectedRuleId(rule.id); setSelectedFilePath(rule.sourcePath); void loadProjectFile(rule.sourcePath); void loadSemanticDiff(rule.sourcePath); }} onToggleRule={toggleRule} onSave={saveRule} /> : null}
+          {section === "sqlKnowledge" ? <SqlKnowledgeWorkbench candidates={knowledgeCandidates(sqlCandidates)} loading={sqlLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onRetry={() => void loadSqlCandidates()} onValidate={validateCandidate} onApprove={approveCandidate} onReject={rejectCandidate} /> : null}
+          {section === "instructions" ? <InstructionsPage value={instructions} onChange={setInstructions} onSave={() => { const path = files.find((file) => isInstructionFile(file.path))?.path; if (path) void handleSaveFile(path, instructions); else setNotice({ tone: "error", title: "Draft save failed", body: "The project API did not return an instructions file." }); }} savedAt={draftSavedAt} loading={fileLoading} /> : null}
+          {section === "mdl" ? <MdlPage value={mdlSource} onChange={setMdlSource} files={files} selectedFile={selectedFilePath} onSelectFile={(path: string) => void loadProjectFile(path)} onSave={(path?: string) => void handleSaveFile(path ?? selectedFilePath, mdlSource)} onImportProject={handleImportProject} savedAt={draftSavedAt} loading={fileLoading} /> : null}
+        </>}
+      </main>
+      <footer className="command-bar"><div className="command-context"><span className="draft-indicator" /><span>{project.status === "published" ? t("common.published") : t("common.draft")}</span>{draftSavedAt ? <span className="saved-time">{t("status.draftSaved")} {formatDate(draftSavedAt, activeI18n.language)}</span> : null}</div><div className="command-actions"><Button variant="ghost" size="sm" icon={ArrowsClockwise} onClick={() => void refreshWorkspace()} loading={refreshing}>{t("common.refresh")}</Button><Button variant="secondary" size="sm" icon={CheckCircle} onClick={handleValidate} loading={busyAction === "validate"}>{t("action.validate")}</Button><Button variant="primary" size="sm" icon={RocketLaunch} onClick={handlePublish} loading={busyAction === "publish"}>{t("action.publish")}</Button></div></footer>
     </div>
     <Modal open={showHistory} title="Version history" description="Restore a previous project snapshot as a draft." onClose={() => setShowHistory(false)} footer={<Button variant="ghost" onClick={() => setShowHistory(false)}>Close</Button>}><VersionHistory versions={versions} onRollback={rollback} busyAction={busyAction} /></Modal>
     <Modal open={showImportModal} title={`Import ${selectedTable}`} description={`${selectedSchema}.${selectedTable} will become a semantic model draft.`} onClose={() => setShowImportModal(false)} footer={<><Button variant="ghost" onClick={() => setShowImportModal(false)}>Cancel</Button><Button variant="primary" icon={DownloadSimple} onClick={importSelectedTable}>Import table</Button></>}><div className="import-preview"><div className="import-preview-row"><span>Source</span><strong>{sourceLabel(selectedDatasource)}</strong></div><div className="import-preview-row"><span>Columns</span><strong>{columns.length} detected</strong></div><div className="import-preview-row"><span>Primary key</span><strong>{columns.find((column) => column.primaryKey)?.name ?? "Not detected"}</strong></div><InlineNotice tone="info" title="Review after import">The generated model uses source column names and keeps measures empty until you define them.</InlineNotice></div></Modal>
   </div>;
 }
 
-function pageTitle(section: ConsoleSection, t: (key: string) => string) { return t(({ overview: "page.overview", datasources: "page.datasources", schema: "page.schema", models: "page.models", relationships: "page.relationships", views: "page.views", instructions: "page.instructions", mdl: "page.mdl" })[section]); }
+function pageTitle(section: ConsoleSection, t: (key: string) => string) { return t(({ overview: "page.overview", datasources: "page.datasources", schema: "page.schema", models: "page.models", relationships: "page.relationships", views: "page.views", cubes: "page.cubes", rules: "page.rules", sqlKnowledge: "page.sqlKnowledge", instructions: "page.instructions", mdl: "page.mdl" })[section]); }
 
 function Sidebar({ projectName, section, onNavigate, open, onClose }: { projectName: string; section: ConsoleSection; onNavigate: (section: ConsoleSection) => void; open: boolean; onClose: () => void }) {
   const { t } = useTranslation();

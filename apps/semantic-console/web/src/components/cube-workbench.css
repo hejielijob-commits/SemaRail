@@ -1,0 +1,644 @@
+/* Cube workbench: a compact, calm B2B editing surface. It intentionally
+   reuses the semantic console's neutral and blue token system. */
+.cube-workbench-page {
+  min-width: 0;
+}
+
+.cube-page-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.cube-page-heading h1 {
+  font-size: clamp(24px, 2.3vw, 31px);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+}
+
+.cube-page-heading p:last-child {
+  max-width: 675px;
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.cube-heading-meta,
+.cube-editor-actions,
+.cube-tab-intro,
+.cube-source-header,
+.cube-list-toolbar,
+.cube-entry-header {
+  display: flex;
+  align-items: center;
+}
+
+.cube-heading-meta,
+.cube-editor-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cube-create-form {
+  display: grid;
+  gap: 16px;
+}
+
+.cube-create-path {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 11px 12px;
+}
+
+.cube-create-path span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.cube-create-path code {
+  overflow-wrap: anywhere;
+  color: var(--text-strong);
+  font-size: 12px;
+}
+
+.cube-workbench {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(240px, 0.62fr) minmax(560px, 1.58fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.cube-list-panel {
+  min-height: 610px;
+  padding: 17px 11px;
+}
+
+.cube-list-toolbar {
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 8px 12px;
+}
+
+.cube-list-toolbar > div {
+  display: grid;
+  min-width: 0;
+}
+
+.cube-list-toolbar strong {
+  margin-top: 3px;
+  color: var(--text-strong);
+  font-size: 12px;
+}
+
+.cube-search {
+  display: flex;
+  min-height: 37px;
+  align-items: center;
+  gap: 8px;
+  margin: 0 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-soft);
+  padding: 0 10px;
+  color: var(--muted-soft);
+}
+
+.cube-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.cube-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-strong);
+  font-size: 12px;
+}
+
+.cube-search input::placeholder {
+  color: var(--muted-soft);
+}
+
+.cube-list {
+  display: grid;
+  gap: 2px;
+}
+
+.cube-list-item {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  padding: 11px 8px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cube-list-item:hover {
+  background: var(--surface-soft);
+}
+
+.cube-list-item-active {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  background: var(--accent-faint);
+}
+
+.cube-list-icon {
+  display: grid;
+  width: 33px;
+  height: 33px;
+  flex: 0 0 33px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.cube-list-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+
+.cube-list-copy strong,
+.cube-list-copy small,
+.cube-list-copy em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cube-list-copy strong {
+  color: var(--text-strong);
+  font-size: 12px;
+}
+
+.cube-list-copy small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.cube-list-copy em {
+  margin-top: 3px;
+  color: var(--muted-soft);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.cube-status-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.cube-status-draft {
+  background: var(--warning);
+}
+
+.cube-editor-main {
+  min-width: 0;
+}
+
+.cube-workspace-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.cube-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 25px 28px 20px;
+}
+
+.cube-panel-header > div:first-child {
+  min-width: 0;
+}
+
+.cube-panel-header h2 {
+  margin-top: 5px;
+  color: var(--text-strong);
+  font-size: 21px;
+  letter-spacing: -0.025em;
+}
+
+.cube-panel-header p:last-child {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.cube-editor-actions {
+  flex: 0 0 auto;
+}
+
+.cube-workspace-panel > .notice {
+  margin: 0 28px 16px;
+}
+
+.cube-workspace-tabs {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 0 18px;
+  scrollbar-width: thin;
+}
+
+.cube-workspace-tab {
+  display: inline-flex;
+  min-height: 51px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 0 10px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cube-workspace-tab:hover {
+  color: var(--text-strong);
+}
+
+.cube-workspace-tab-active {
+  border-bottom-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.cube-workspace-tab > span {
+  display: inline-grid;
+  min-width: 20px;
+  min-height: 19px;
+  place-items: center;
+  border-radius: 5px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cube-workspace-tab-active > span {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.cube-workspace-content {
+  min-width: 0;
+  padding: 26px 28px 30px;
+}
+
+.cube-details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px 24px;
+}
+
+.cube-details-grid > .field:last-child {
+  grid-column: 1 / -1;
+}
+
+.cube-inline-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--warning);
+  font-size: 11px;
+}
+
+.cube-tab-intro {
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 19px;
+}
+
+.cube-tab-intro > div {
+  display: grid;
+  min-width: 0;
+}
+
+.cube-tab-intro h3 {
+  margin-top: 5px;
+  color: var(--text-strong);
+  font-size: 16px;
+  letter-spacing: -0.015em;
+}
+
+.cube-entry-list,
+.cube-hierarchy-list {
+  display: grid;
+  gap: 12px;
+}
+
+.cube-entry-row,
+.cube-hierarchy-row {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-soft);
+  padding: 16px;
+}
+
+.cube-entry-header {
+  gap: 9px;
+  min-width: 0;
+  margin-bottom: 14px;
+}
+
+.cube-entry-header strong {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.cube-entry-index {
+  color: var(--muted-soft);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cube-remove-button {
+  display: inline-grid;
+  width: 29px;
+  height: 29px;
+  flex: 0 0 29px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.cube-remove-button:hover {
+  border-color: var(--danger-soft);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.cube-entry-fields {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.85fr) minmax(120px, 0.45fr) minmax(280px, 1.7fr);
+  gap: 14px 16px;
+  align-items: start;
+}
+
+.cube-entry-fields > .field:last-child {
+  min-width: 0;
+}
+
+.cube-code-input,
+.cube-code-block {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-variant-ligatures: none;
+}
+
+.cube-code-input {
+  min-height: 73px;
+  resize: vertical;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.cube-hierarchy-fields {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.65fr) minmax(280px, 1.35fr);
+  gap: 14px 16px;
+}
+
+.cube-empty-collection {
+  border: 1px dashed var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface-soft);
+  padding: 12px;
+}
+
+.cube-empty-collection .empty-state {
+  min-height: 180px;
+}
+
+.cube-validation-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 0 28px 16px;
+  border: 1px solid color-mix(in srgb, var(--danger) 27%, var(--border));
+  border-radius: 8px;
+  background: var(--danger-soft);
+  padding: 11px 12px;
+  color: var(--danger);
+}
+
+.cube-validation-summary > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cube-validation-summary span {
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.cube-validation-summary strong {
+  color: var(--danger);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+}
+
+.cube-source-tab {
+  min-width: 0;
+}
+
+.cube-source-header {
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 13px;
+}
+
+.cube-source-header > div {
+  display: grid;
+  min-width: 0;
+}
+
+.cube-source-header strong {
+  max-width: 100%;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  color: var(--text-strong);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+}
+
+.cube-source-header > svg {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.cube-source-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 15px;
+  border: 1px solid color-mix(in srgb, var(--accent) 23%, var(--border));
+  border-radius: 8px;
+  background: var(--accent-faint);
+  padding: 10px 11px;
+  color: var(--accent);
+}
+
+.cube-source-notice span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.cube-code-block {
+  max-height: 590px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-soft) 68%, var(--surface));
+  padding: 16px;
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.cube-diff-block {
+  color: var(--text);
+}
+
+.cube-state-panel {
+  min-height: 360px;
+  padding: 24px;
+}
+
+.cube-loading-panel {
+  min-height: 530px;
+  padding: 24px;
+}
+
+.cube-heading-skeleton {
+  max-width: 620px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 1120px) {
+  .cube-workbench {
+    grid-template-columns: minmax(210px, 0.52fr) minmax(450px, 1.48fr);
+  }
+
+  .cube-entry-fields {
+    grid-template-columns: 1fr 0.7fr;
+  }
+
+  .cube-entry-fields > .field:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 820px) {
+  .cube-page-heading,
+  .cube-panel-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cube-heading-meta,
+  .cube-editor-actions {
+    justify-content: flex-start;
+  }
+
+  .cube-workbench {
+    grid-template-columns: 1fr;
+  }
+
+  .cube-list-panel {
+    min-height: 0;
+  }
+
+  .cube-list {
+    max-height: 240px;
+    overflow: auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .cube-workspace-content,
+  .cube-panel-header {
+    padding-right: 17px;
+    padding-left: 17px;
+  }
+
+  .cube-workspace-panel > .notice,
+  .cube-validation-summary {
+    margin-right: 17px;
+    margin-left: 17px;
+  }
+
+  .cube-details-grid,
+  .cube-hierarchy-fields,
+  .cube-entry-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .cube-entry-fields > .field:last-child,
+  .cube-details-grid > .field:last-child {
+    grid-column: auto;
+  }
+
+  .cube-tab-intro {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cube-search,
+  .cube-list-item,
+  .cube-remove-button {
+    transition: none;
+  }
+}

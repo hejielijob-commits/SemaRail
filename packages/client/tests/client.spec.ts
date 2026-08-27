@@ -13,6 +13,7 @@ import {
   resolveSemanticConsoleUrl,
   SemanticConsoleLink,
   SemanticConsoleSidebarAction,
+  submitSqlCandidate,
   SEMANTIC_CONSOLE_URL_STORAGE_KEY,
   parseDataQueryMeta,
   tokenizeSql,
@@ -88,6 +89,43 @@ describe('data_query Client adapter', () => {
       { name: 'sidebar.footer.action', id: 'wren-semantic-console' },
       SemanticConsoleSidebarAction,
     )
+  })
+
+  it('accepts durable question and confirmed SQL history but rejects oversized history', () => {
+    const parsed = parseDataQueryMeta({
+      ...validMeta,
+      question: 'Show daily revenue',
+      sqlHistory: [{
+        id: 'sql:revenue', question: 'Revenue by day',
+        sql: 'SELECT day, SUM(amount) FROM orders GROUP BY day',
+        sourcePath: 'knowledge/sql/revenue.md',
+      }],
+    })
+    expect(parsed?.question).toBe('Show daily revenue')
+    expect(parsed?.sqlHistory?.[0]?.sourcePath).toBe('knowledge/sql/revenue.md')
+    expect(parseDataQueryMeta({
+      ...validMeta,
+      sqlHistory: Array.from({ length: 6 }, (_, index) => ({ id: `sql:${index}`, question: 'q', sql: 'SELECT 1' })),
+    })).toBeNull()
+  })
+
+  it('submits a successful query only as a pending SQL review candidate', async () => {
+    const request = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => ({
+      ok: true,
+      status: 201,
+      json: async () => ({ candidate: { status: 'pending' }, created: true }),
+      requestInit: init,
+    }))
+    const result = await submitSqlCandidate({
+      ...validMeta,
+      question: 'Show daily revenue',
+      sqlHistory: [{ id: 'sql:revenue', question: 'Revenue', sql: 'SELECT SUM(amount) FROM orders' }],
+    }, 'http://127.0.0.1:48763', request as unknown as typeof fetch)
+    expect(result.candidate?.status).toBe('pending')
+    expect(request).toHaveBeenCalledWith('http://127.0.0.1:48763/api/knowledge/sql-candidates', expect.objectContaining({ method: 'POST' }))
+    const payload = JSON.parse(String((request.mock.calls[0]?.[1] as RequestInit).body))
+    expect(payload).toMatchObject({ status: 'pending', dialect: 'wren-semantic', queryId: 'q-1', executionStatus: 'success' })
+    expect(payload.sqlHistory[0].id).toBe('sql:revenue')
   })
 
   it('accepts only absolute HTTP(S) console URLs and falls back to loopback', () => {

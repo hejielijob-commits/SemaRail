@@ -160,6 +160,38 @@ class PresentationExecutor:
 
 
 class QueryTests(unittest.TestCase):
+    def test_query_presentation_carries_question_and_actual_recalled_sql(self) -> None:
+        class RecallPlanner(FakePlanner):
+            def ask(self, params: dict[str, Any]) -> dict[str, Any]:
+                self.context_params = params
+                return {
+                    "sqlHistory": [{
+                        "id": "sql:revenue",
+                        "question": "Daily revenue",
+                        "sql": "SELECT day, SUM(amount) FROM orders GROUP BY day",
+                        "sourcePath": "knowledge/sql/revenue.md",
+                    }]
+                }
+
+        planner = RecallPlanner()
+        executor = PresentationExecutor(
+            [{"name": "amount", "type": "DECIMAL", "semanticRole": "measure"}],
+            [{"amount": "12.50"}],
+        )
+        result = WrenQueryService(
+            planner,
+            executor,
+            connection_resolver=lambda *_: {"dsn": "process-local"},
+        ).run({
+            "projectDir": ".",
+            "question": "Show revenue",
+            "semanticSql": "SELECT amount FROM orders",
+            "queryId": "q-history",
+        })
+        self.assertEqual(result["question"], "Show revenue")
+        self.assertEqual(result["sqlHistory"][0]["id"], "sql:revenue")
+        self.assertEqual(planner.context_params["question"], "Show revenue")
+
     def _chart_query(
         self,
         columns: list[dict[str, str]],

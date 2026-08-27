@@ -265,7 +265,7 @@ do not verify AC02.
 
 ## AC05 replay evidence
 
-The API-only replay collector uses only the rc.7 public
+The API-only replay collector uses only the rc.10-compatible public
 `session.list/history/fork` endpoints. It reads the durable
 `tool/result.message.meta` projection, hashes the complete data-query
 presentation, forks at the last completed turn, and checks that the fork

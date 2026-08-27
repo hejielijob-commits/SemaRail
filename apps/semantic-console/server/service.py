@@ -12,13 +12,17 @@ import yaml
 try:
     from .drivers import DriverError, datasource_types, driver_for
     from .models import DatasourceRecord, is_sensitive_key, utc_now
+    from .knowledge import RuleStore, SqlCandidateStore, sql_markdown, validate_review_sql, SQL_ROOT, _assert_safe_knowledge_text, _safe_slug
     from .project import ProjectError, ProjectStore
     from .semantic_models import SemanticModelStore
+    from .cubes import CubeStore
 except ImportError:  # Direct module loading in a lightweight smoke test.
     from drivers import DriverError, datasource_types, driver_for  # type: ignore[no-redef]
     from models import DatasourceRecord, is_sensitive_key, utc_now  # type: ignore[no-redef]
+    from knowledge import RuleStore, SqlCandidateStore, sql_markdown, validate_review_sql, SQL_ROOT, _assert_safe_knowledge_text, _safe_slug  # type: ignore[no-redef]
     from project import ProjectError, ProjectStore  # type: ignore[no-redef]
     from semantic_models import SemanticModelStore  # type: ignore[no-redef]
+    from cubes import CubeStore  # type: ignore[no-redef]
 
 
 class ApiServiceError(RuntimeError):
@@ -52,7 +56,7 @@ def _public_error(exc: Exception) -> ApiServiceError:
     if isinstance(exc, ApiServiceError):
         return exc
     if isinstance(exc, ProjectError):
-        status = 409 if exc.code == "REVISION_CONFLICT" else 400
+        status = 409 if exc.code in {"REVISION_CONFLICT", "FILE_EXISTS"} else 400
         return ApiServiceError(exc.code, exc.safe_message, exc.details, status)
     if isinstance(exc, DriverError):
         status = 503 if exc.code in {"DRIVER_UNAVAILABLE", "CONNECTION_FAILED"} else 400
@@ -77,6 +81,9 @@ class SemanticConsoleService:
         self.connection_factory = connection_factory
         self.datasources = self.project.datasource_records()
         self.semantic_models = SemanticModelStore(self.project)
+        self.rules = RuleStore(self.project)
+        self.sql_candidates = SqlCandidateStore(self.project)
+        self.cubes = CubeStore(self.project)
 
     # ---- simple resources -----------------------------------------------
 
@@ -282,6 +289,226 @@ class SemanticConsoleService:
         except Exception as exc:
             raise _public_error(exc) from exc
 
+    # ---- knowledge governance ------------------------------------------
+
+    def list_rules(self) -> dict[str, Any]:
+        try:
+            return self.rules.list()
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def get_rule(self, rule_id: str) -> dict[str, Any]:
+        try:
+            return self.rules.get(rule_id)
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def create_rule(self, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        try:
+            return self.rules.create(payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def update_rule(self, rule_id: str, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        try:
+            return self.rules.save(rule_id, payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def set_rule_enabled(self, rule_id: str, enabled: bool, payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        try:
+            return self.rules.set_enabled(rule_id, enabled, payload)
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def delete_rule(self, rule_id: str, payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        try:
+            return self.rules.delete(rule_id, payload)
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def list_sql_candidates(self, status: Any = None) -> dict[str, Any]:
+        try:
+            return self.sql_candidates.list(status if status is not None else None)
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def get_sql_candidate(self, candidate_id: str) -> dict[str, Any]:
+        try:
+            return self.sql_candidates.get(candidate_id)
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def submit_sql_candidate(self, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        try:
+            return self.sql_candidates.submit(payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def update_sql_candidate(self, candidate_id: str, payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        try:
+            return self.sql_candidates.update_pending(candidate_id, payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def reject_sql_candidate(self, candidate_id: str, payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        payload = payload if isinstance(payload, Mapping) else {}
+        try:
+            return self.sql_candidates.mark_review(
+                candidate_id,
+                "rejected",
+                note=payload.get("reviewNote", payload.get("note")),
+                reviewer=payload.get("reviewer", payload.get("reviewedBy")),
+                extra=payload,
+            )
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def resubmit_sql_candidate(self, candidate_id: str, payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        try:
+            return self.sql_candidates.reset_rejected(candidate_id, payload)
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def validate_sql_candidate(self, candidate_id: str, payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        try:
+            candidate = self.sql_candidates.get(candidate_id)
+            body = payload if isinstance(payload, Mapping) else {}
+            return validate_review_sql(body.get("sql", candidate.get("sql")))
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def approve_sql_candidate(self, candidate_id: str, payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        """Approve a candidate and create its SQL example as one draft step.
+
+        The project draft is applied before the private queue state changes.
+        If persisting the queue fails, the exact previous draft entries are
+        restored, so an approval can never report success with a half-written
+        SQL file.
+        """
+
+        body = payload if isinstance(payload, Mapping) else {}
+        try:
+            candidate = self.sql_candidates.get(candidate_id)
+            if candidate.get("status") not in {"pending", "approved"}:
+                raise ProjectError("SQL_CANDIDATE_STATE", "only pending SQL candidates can be approved")
+            already_approved = candidate.get("status") == "approved"
+            slug = body.get("slug", candidate.get("slug"))
+            # A candidate generated by this service always has a validated
+            # slug.  A reviewer may supply a replacement, but it remains a
+            # single component; this explicitly rejects ``../`` paths.
+            slug = _safe_slug(slug, name="slug")
+            if already_approved:
+                approved_path = candidate.get("approvedPath")
+                if not isinstance(approved_path, str):
+                    raise ProjectError("INVALID_KNOWLEDGE_STATE", "approved candidate has no safe output path")
+                approved_parts = approved_path.split("/")
+                if len(approved_parts) != 3 or approved_parts[:2] != SQL_ROOT.split("/") or not approved_parts[2].endswith(".md"):
+                    raise ProjectError("INVALID_PATH", "approved SQL output path is invalid")
+                approved_slug = _safe_slug(approved_parts[2][:-3], name="slug")
+                if slug != approved_slug:
+                    raise ProjectError("SQL_CANDIDATE_LOCKED", "approved SQL candidates cannot be moved")
+                relative = approved_path
+                # Approval is idempotent for a durable queue record, but the
+                # approved SQL itself is immutable.
+                if any(key in body for key in ("question", "nl", "sql")):
+                    raise ProjectError("SQL_CANDIDATE_LOCKED", "approved SQL candidates cannot be edited")
+            else:
+                relative = f"{SQL_ROOT}/{slug}.md"
+            question = body.get("question", body.get("nl", candidate.get("question", "")))
+            if not isinstance(question, str) or not question.strip():
+                raise ApiServiceError("INVALID_KNOWLEDGE", "question must be a non-empty string")
+            _assert_safe_knowledge_text(question, "SQL candidate")
+            edited_sql = body.get("sql", candidate.get("sql", ""))
+            if not isinstance(edited_sql, str) or not edited_sql.strip():
+                raise ApiServiceError("INVALID_KNOWLEDGE", "sql must be a non-empty string")
+            _assert_safe_knowledge_text(edited_sql, "SQL candidate")
+            validate_review_sql(edited_sql)
+            note = body.get("note", candidate.get("reviewNote") if already_approved else None)
+            if note is not None:
+                if not isinstance(note, str):
+                    raise ApiServiceError("INVALID_KNOWLEDGE", "note must be a string")
+                _assert_safe_knowledge_text(note, "SQL review note")
+            rendered = sql_markdown(
+                question,
+                edited_sql,
+                note=note,
+            )
+            existing = None
+            try:
+                existing = self.project.read_file(relative)["content"]
+            except ProjectError as exc:
+                if exc.code != "FILE_NOT_FOUND":
+                    raise
+            if existing is not None and existing != rendered:
+                raise ApiServiceError("FILE_EXISTS", "an SQL example already exists at this path", status=409)
+
+            # ``put_files`` is the project transaction primitive.  Keep the
+            # prior draft entry so queue persistence failure can roll it back.
+            with self.project._lock:  # type: ignore[attr-defined]
+                had_previous = relative in self.project.drafts
+                previous = self.project.drafts.get(relative)
+                self.project.put_file(relative, rendered)
+                try:
+                    reviewed = self.sql_candidates.set_approved(
+                        candidate_id,
+                        relative,
+                        reviewer=body.get("reviewer", body.get("reviewedBy")) if isinstance(body.get("reviewer", body.get("reviewedBy")), str) else None,
+                        note=body.get("reviewNote", body.get("note")) if isinstance(body.get("reviewNote", body.get("note")), str) else None,
+                        updates={
+                            **({"question": question} if question != candidate.get("question") else {}),
+                            **({"sql": edited_sql} if edited_sql != candidate.get("sql") else {}),
+                            **({"slug": slug} if slug != candidate.get("slug") else {}),
+                        },
+                    )
+                except Exception:
+                    if had_previous:
+                        self.project.drafts[relative] = previous  # type: ignore[assignment]
+                    else:
+                        self.project.drafts.pop(relative, None)
+                    raise
+            return {"candidate": reviewed, "approved": True, "path": relative, "draft": True, "needsPublish": True, **({"duplicate": True} if already_approved else {})}
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    # ---- cube metadata --------------------------------------------------
+
+    def cubes_snapshot(self) -> dict[str, Any]:
+        try:
+            return self.cubes.snapshot()
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def get_cube(self, cube_name: str) -> dict[str, Any]:
+        try:
+            return self.cubes.get_cube(cube_name)
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def create_cube(self, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        try:
+            return self.cubes.create_cube(payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def validate_cube(self, cube_name: str, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        try:
+            return self.cubes.validate(cube_name, payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def save_cube(self, cube_name: str, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        try:
+            return self.cubes.save_cube(cube_name, payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def delete_cube(self, cube_name: str, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        try:
+            return self.cubes.delete_cube(cube_name, payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
     def put_file(self, path: Any, payload: Mapping[str, Any] | str | None) -> dict[str, Any]:
         path = _required_string(path, "path")
         if isinstance(payload, str):
@@ -396,6 +623,74 @@ class SemanticConsoleService:
                 return 200, self.save_semantic_model(match.group(1), body if isinstance(body, Mapping) else {})
             if method == "PUT" and clean_path == "/api/semantic-relationships":
                 return 200, self.save_relationships(body if isinstance(body, Mapping) else {})
+            if method == "GET" and clean_path in {"/api/knowledge/rules", "/api/rules"}:
+                result = self.list_rules()
+                return 200, result
+            if method == "POST" and clean_path in {"/api/knowledge/rules", "/api/rules"}:
+                result = self.create_rule(body if isinstance(body, Mapping) else {})
+                return 201, result
+            match = re.fullmatch(r"/api/(?:knowledge/)?rules/([^/]+)", clean_path)
+            if match:
+                rule_id = match.group(1)
+                if method == "GET":
+                    return 200, self.get_rule(rule_id)
+                if method == "PUT":
+                    return 200, self.update_rule(rule_id, body if isinstance(body, Mapping) else {})
+                if method == "DELETE":
+                    return 200, self.delete_rule(rule_id, body if isinstance(body, Mapping) else {})
+            match = re.fullmatch(r"/api/(?:knowledge/)?rules/([^/]+)/(enable|disable|toggle)", clean_path)
+            if match and method == "POST":
+                action = match.group(2)
+                if action == "toggle":
+                    current = self.get_rule(match.group(1))
+                    enabled = not bool(current.get("enabled", True))
+                else:
+                    enabled = action == "enable"
+                return 200, self.set_rule_enabled(match.group(1), enabled, body if isinstance(body, Mapping) else {})
+            if method == "GET" and clean_path in {
+                "/api/knowledge/sql-candidates",
+                "/api/sql-candidates",
+                "/api/knowledge/sql/review",
+            }:
+                return 200, self.list_sql_candidates(query.get("status"))
+            if method == "POST" and clean_path in {
+                "/api/knowledge/sql-candidates",
+                "/api/sql-candidates",
+            }:
+                result = self.submit_sql_candidate(body if isinstance(body, Mapping) else {})
+                return (201 if result.get("created") else 200), result
+            match = re.fullmatch(r"/api/(?:knowledge/)?sql-candidates/([^/]+)", clean_path)
+            if match:
+                if method == "GET":
+                    return 200, self.get_sql_candidate(match.group(1))
+                if method == "PUT":
+                    return 200, {"candidate": self.update_sql_candidate(match.group(1), body if isinstance(body, Mapping) else {})}
+            match = re.fullmatch(r"/api/(?:knowledge/)?sql-candidates/([^/]+)/(validate|approve|reject|resubmit)", clean_path)
+            if match and method == "POST":
+                candidate_id, action = match.groups()
+                payload = body if isinstance(body, Mapping) else {}
+                if action == "validate":
+                    return 200, self.validate_sql_candidate(candidate_id, payload)
+                if action == "approve":
+                    return 200, self.approve_sql_candidate(candidate_id, payload)
+                if action == "reject":
+                    return 200, {"candidate": self.reject_sql_candidate(candidate_id, payload), "rejected": True}
+                return 200, {"candidate": self.resubmit_sql_candidate(candidate_id, payload), "resubmitted": True}
+            if method == "GET" and clean_path == "/api/cubes":
+                return 200, self.cubes_snapshot()
+            if method == "POST" and clean_path == "/api/cubes":
+                return 201, self.create_cube(body if isinstance(body, Mapping) else {})
+            match = re.fullmatch(r"/api/cubes/([^/]+)/validate", clean_path)
+            if match and method == "POST":
+                return 200, self.validate_cube(match.group(1), body if isinstance(body, Mapping) else {})
+            match = re.fullmatch(r"/api/cubes/([^/]+)", clean_path)
+            if match:
+                if method == "GET":
+                    return 200, self.get_cube(match.group(1))
+                if method == "PUT":
+                    return 200, self.save_cube(match.group(1), body if isinstance(body, Mapping) else {})
+                if method == "DELETE":
+                    return 200, self.delete_cube(match.group(1), body if isinstance(body, Mapping) else {})
             if method == "GET" and clean_path == "/api/project/file":
                 return 200, self.read_file(query.get("path"))
             if method == "GET" and clean_path == "/api/project/diff":

@@ -3,7 +3,7 @@
 /**
  * AC05 public-API replay evidence collector.
  *
- * This intentionally uses only rc.7's HTTP session.list/history/fork API and
+ * This intentionally uses only the rc.10-compatible HTTP session.list/history/fork API and
  * the durable tool/result message metadata. It does not read JSONL files or
  * Harness internals. It proves that a fork preserves the same data_query
  * presentation metadata; browser refresh/visual rendering remains a separate
@@ -114,7 +114,7 @@ function extractDataQueryMetas(entries) {
   for (const entry of entries) {
     const event = entry?.event
     if (event?.type !== 'tool/result') continue
-    // rc.7 stores presentation metadata beside the tool message in the
+    // Harness stores presentation metadata beside the tool message in the
     // durable tool/result payload. Keep the nested form as a compatibility
     // fallback for older fixtures, but prefer the public durable shape.
     const meta = event?.data?.meta ?? event?.data?.message?.meta

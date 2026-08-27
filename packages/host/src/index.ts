@@ -124,6 +124,7 @@ function failurePresentation(
     queryId: 'wren-unavailable',
     status: 'error',
     semanticSql: input.semanticSql,
+    question: input.question,
     columns: [],
     previewRows: [],
     stats: { returnedRows: 0, durationMs: 0, truncated: false },
@@ -143,6 +144,7 @@ function normalizeGatewayResult(input: DataQueryInput, value: DataQueryPresentat
   const normalized = {
     ...parsed,
     semanticSql: input.semanticSql,
+    question: input.question,
   }
   return parseDataQueryPresentation(parsed.status === 'error'
     ? {
@@ -298,6 +300,7 @@ export const inject = ['tools', 'subprocess', 'systemPrompt'] as const
 export const SYSTEM_PROMPT_GUIDANCE = [
   'For data questions, first call `wren_semantic_context` with the exact user question.',
   'Treat the successful semantic-context response as the authoritative allowlist: use only its returned models, tables, columns, relationships, and semantic roles.',
+  'When semantic context includes `sqlHistory`, use only those confirmed examples as optional few-shot guidance; never invent or claim an unreturned historical SQL reference.',
   'Do not guess or invent fields, entities, joins, filters, or metric definitions that are absent from the returned context.',
   'Only after context succeeds, generate semanticSql and call `data_query`; treat generated SQL as untrusted and keep it read-only.',
   'If a recoverable semantic/query validation failure occurs, make at most one repair attempt using only the same returned entities.',

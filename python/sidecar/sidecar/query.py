@@ -456,7 +456,7 @@ class WrenQueryService:
         if set(params) - fields:
             raise RpcFault(INVALID_PARAMS, "validation", "query.run params are invalid")
         project_dir = _required_query_string(params, "projectDir", 32_768)
-        _required_query_string(params, "question", 16_000)
+        question = _required_query_string(params, "question", 16_000)
         semantic_sql = _required_query_string(params, "semanticSql", 64_000)
         query_id = _query_id(params.get("queryId"))
         limits = _query_limits(params)
@@ -476,6 +476,18 @@ class WrenQueryService:
                 "semantic SQL must be one read-only query",
                 retryable=False,
             ) from exc
+        sql_history: list[dict[str, Any]] = []
+        context_lookup = getattr(self.planner, "ask", None)
+        if callable(context_lookup):
+            try:
+                context = context_lookup({"projectDir": project_dir, "question": question})
+                raw_history = context.get("sqlHistory", []) if isinstance(context, Mapping) else []
+                if isinstance(raw_history, list):
+                    sql_history = [dict(item) for item in raw_history[:5] if isinstance(item, Mapping)]
+            except Exception:
+                # Recall is advisory. A missing/stale optional index must not
+                # turn a safe database read into a failed query.
+                sql_history = []
         try:
             plan = self.planner.dry_plan(
                 {"projectDir": project_dir, "semanticSql": semantic_sql}
@@ -566,7 +578,11 @@ class WrenQueryService:
             connection_info=info,
             limits=limits,
         )
-        return _apply_chart_spec(result, chart_intent)
+        presentation = _apply_chart_spec(result, chart_intent)
+        presentation["question"] = question
+        if sql_history:
+            presentation["sqlHistory"] = sql_history
+        return presentation
 
     def cancel(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Request cancellation by query id; unknown ids are harmless."""

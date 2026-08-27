@@ -389,6 +389,7 @@
 }
 
 .relationship-graph-node {
+  position: relative;
   width: 272px;
   overflow: hidden;
   border: 1px solid var(--border-strong);
@@ -511,7 +512,33 @@
 }
 
 .relationship-graph-node-fields {
+  position: relative;
   padding: 5px 12px 11px;
+}
+
+/*
+ * A field can be on a later page while its relationship edge still needs a
+ * stable field-level anchor. Keep those anchors mounted in a compact rail so
+ * pagination controls the visible copy without falling back to a model-level
+ * connection or expanding the node for every long identifier.
+ */
+.relationship-graph-field-handle-rail {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+}
+
+.relationship-graph-field-handle-rail-row {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 0;
+}
+
+.relationship-graph-field-handle-hidden {
+  opacity: 0;
+  pointer-events: none !important;
 }
 
 .relationship-graph-column-heading,

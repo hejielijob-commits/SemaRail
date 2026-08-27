@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import RelationshipGraph, { getRelationshipFieldPairs, parseRelationshipFieldPairs, relationshipUsesAdvancedCondition, selectRelationshipFieldPair, type RelationshipGraphModel, type RelationshipGraphRelationship } from "./RelationshipGraph";
 
@@ -202,13 +202,57 @@ describe("RelationshipGraph", () => {
     fireEvent.click(document.querySelector<HTMLButtonElement>(".relationship-graph-expand-button")!);
     expect(screen.getByRole("textbox", { name: "Search models" })).toHaveValue("");
     expect(screen.queryByText(/Focus:/)).not.toBeInTheDocument();
-    expect(screen.getByText("1-6 / 9")).toBeInTheDocument();
+    expect(screen.getByText("1-6 / 10")).toBeInTheDocument();
     expect(screen.getAllByTitle("very_long_order_field_name_0").length).toBeGreaterThan(0);
     fireEvent.click(document.querySelector<HTMLButtonElement>(".relationship-graph-page-button:not(:disabled)")!);
-    expect(screen.getByText("7-9 / 9")).toBeInTheDocument();
+    expect(screen.getByText("7-10 / 10")).toBeInTheDocument();
     expect(screen.getAllByTitle("very_long_order_field_name_6").length).toBeGreaterThan(0);
     expect(document.querySelector('[data-handleid="source-field-customer_id"]')).toBeInTheDocument();
     expect(document.querySelector('[data-handleid="target-field-id"]')).toBeInTheDocument();
+  });
+
+  it("paginates join fields without dropping exact field-level handles", async () => {
+    const sourceFields = Array.from({ length: 8 }, (_, index) => `customer_join_field_with_a_very_long_identifier_${index}`);
+    const targetFields = Array.from({ length: 8 }, (_, index) => `order_join_field_with_a_very_long_identifier_${index}`);
+    const sourceModel: RelationshipGraphModel = {
+      ...models[0],
+      columns: [...models[0].columns, ...sourceFields.map((name) => ({ name, type: "varchar" }))],
+    };
+    const targetModel: RelationshipGraphModel = {
+      ...models[1],
+      columns: targetFields.map((name) => ({ name, type: "varchar" })),
+    };
+    const compositeRelationship: RelationshipGraphRelationship = {
+      ...relationship,
+      fieldPairs: sourceFields.map((sourceField, index) => ({ sourceModel: "orders", sourceField, targetModel: "customers", targetField: targetFields[index] })),
+    };
+
+    render(<RelationshipGraph models={[sourceModel, targetModel]} relationships={[compositeRelationship]} locale="en-US" />);
+    const sourceNode = (await screen.findByText("Orders")).closest(".relationship-graph-node") as HTMLElement | null;
+    expect(sourceNode).not.toBeNull();
+    const expandButton = sourceNode!.querySelector<HTMLButtonElement>(".relationship-graph-expand-button");
+    expect(expandButton).toBeInTheDocument();
+
+    // The first page includes six join fields, while the remaining fields
+    // keep their source/target handles mounted in the compact connection rail.
+    fireEvent.click(expandButton!);
+    expect(within(sourceNode!).getByText("1-6 / 11")).toBeInTheDocument();
+    expect(within(sourceNode!).getAllByTitle(sourceFields[0]).length).toBeGreaterThan(0);
+    sourceFields.forEach((field) => {
+      expect(sourceNode!.querySelector(`[data-handleid="source-field-${encodeURIComponent(field)}"]`)).toBeInTheDocument();
+      expect(sourceNode!.querySelector(`[data-handleid="target-field-${encodeURIComponent(field)}"]`)).toBeInTheDocument();
+    });
+
+    const pageButtons = sourceNode!.querySelectorAll<HTMLButtonElement>(".relationship-graph-page-button");
+    expect(pageButtons).toHaveLength(2);
+    fireEvent.click(pageButtons[1]);
+    expect(within(sourceNode!).getByText("7-11 / 11")).toBeInTheDocument();
+    expect(within(sourceNode!).getAllByTitle(sourceFields[7]).length).toBeGreaterThan(0);
+    expect(within(sourceNode!).queryAllByTitle(sourceFields[0])).toHaveLength(0);
+    expect(sourceNode!.querySelector(`[data-handleid="source-field-${encodeURIComponent(sourceFields[0])}"]`)).toBeInTheDocument();
+
+    fireEvent.click(sourceNode!.querySelector<HTMLButtonElement>(".relationship-graph-expand-button")!);
+    expect(within(sourceNode!).getAllByTitle(sourceFields[0]).length).toBeGreaterThan(0);
   });
 
   it("uses validated server field pairs before parsing the condition", () => {

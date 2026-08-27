@@ -67,6 +67,16 @@ export interface SemanticView {
   readonly description?: string
 }
 
+/** One confirmed NL-to-SQL example returned by Wren's public recall index. */
+export interface SqlHistoryReference {
+  /** Stable content-derived identifier; never an absolute filesystem path. */
+  readonly id: string
+  readonly question: string
+  readonly sql: string
+  /** Project-relative `knowledge/sql/*.md` path when Wren exposes it. */
+  readonly sourcePath?: string
+}
+
 /** Business context returned by `context.ask`. */
 export interface SemanticContext {
   readonly schemaVersion: typeof SCHEMA_VERSION
@@ -77,6 +87,7 @@ export interface SemanticContext {
   readonly views?: readonly SemanticView[]
   readonly summary?: string
   readonly knowledge?: readonly string[]
+  readonly sqlHistory?: readonly SqlHistoryReference[]
   readonly defaultGrain?: string
   readonly defaultFilters?: readonly string[]
 }
@@ -167,6 +178,19 @@ function parseView(value: unknown, path: string): SemanticView {
   }
 }
 
+/** Parse a bounded, JSON-safe SQL history reference. */
+export function parseSqlHistoryReference(value: unknown, path = 'sqlHistoryReference'): SqlHistoryReference {
+  const object = _record(value, path)
+  _keys(object, ['id', 'question', 'sql', 'sourcePath'], path)
+  const sourcePath = optionalString(object, 'sourcePath', path, 512)
+  return {
+    id: _string(_required(object, 'id', path), `${path}.id`, 1, 128),
+    question: _string(_required(object, 'question', path), `${path}.question`, 1, 16_000),
+    sql: _string(_required(object, 'sql', path), `${path}.sql`, 1, 64_000),
+    ...(sourcePath === undefined ? {} : { sourcePath }),
+  }
+}
+
 /** Parse input for `context.ask`. */
 export function parseSemanticContextInput(value: unknown): SemanticContextInput {
   const object = _record(value, 'contextInput')
@@ -177,7 +201,7 @@ export function parseSemanticContextInput(value: unknown): SemanticContextInput 
 /** Parse semantic context and fail closed on unknown schema versions. */
 export function parseSemanticContext(value: unknown): SemanticContext {
   const object = _record(value, 'semanticContext')
-  _keys(object, ['schemaVersion', 'projectRevision', 'models', 'relationships', 'metrics', 'views', 'summary', 'knowledge', 'defaultGrain', 'defaultFilters'], 'semanticContext')
+  _keys(object, ['schemaVersion', 'projectRevision', 'models', 'relationships', 'metrics', 'views', 'summary', 'knowledge', 'sqlHistory', 'defaultGrain', 'defaultFilters'], 'semanticContext')
   _version(_required(object, 'schemaVersion', 'semanticContext'), SCHEMA_VERSION, 'semanticContext.schemaVersion')
   const models = _required(object, 'models', 'semanticContext')
   const relationships = _required(object, 'relationships', 'semanticContext')
@@ -186,6 +210,7 @@ export function parseSemanticContext(value: unknown): SemanticContext {
   const metrics = _optional(object, 'metrics')
   const views = _optional(object, 'views')
   const knowledge = _optional(object, 'knowledge')
+  const sqlHistory = _optional(object, 'sqlHistory')
   const defaultFilters = _optional(object, 'defaultFilters')
   const summary = optionalString(object, 'summary', 'semanticContext', 16_000)
   const defaultGrain = optionalString(object, 'defaultGrain', 'semanticContext', 128)
@@ -204,6 +229,11 @@ export function parseSemanticContext(value: unknown): SemanticContext {
     })()),
     ...(summary === undefined ? {} : { summary }),
     ...(knowledge === undefined ? {} : { knowledge: _strings(knowledge, 'semanticContext.knowledge') }),
+    ...(sqlHistory === undefined ? {} : (() => {
+      if (!Array.isArray(sqlHistory)) _fail('semanticContext.sqlHistory', 'expected an array')
+      if (sqlHistory.length > 5) _fail('semanticContext.sqlHistory', 'must contain at most 5 item(s)')
+      return { sqlHistory: sqlHistory.map((item, index) => parseSqlHistoryReference(item, `semanticContext.sqlHistory[${index}]`)) }
+    })()),
     ...(defaultGrain === undefined ? {} : { defaultGrain }),
     ...(defaultFilters === undefined ? {} : { defaultFilters: _strings(defaultFilters, 'semanticContext.defaultFilters') }),
   }
@@ -224,6 +254,7 @@ export const SEMANTIC_CONTEXT_JSON_SCHEMA: JsonSchema = {
     views: { type: 'array' },
     summary: { type: 'string', minLength: 1 },
     knowledge: { type: 'array', items: { type: 'string', minLength: 1 } },
+    sqlHistory: { type: 'array', maxItems: 5 },
     defaultGrain: { type: 'string', minLength: 1 },
     defaultFilters: { type: 'array', items: { type: 'string', minLength: 1 } },
   },

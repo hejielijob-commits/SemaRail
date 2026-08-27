@@ -7,6 +7,9 @@ export type ConsoleSection =
   | "models"
   | "relationships"
   | "views"
+  | "cubes"
+  | "rules"
+  | "sqlKnowledge"
   | "instructions"
   | "mdl";
 
@@ -123,6 +126,7 @@ export interface ProjectFile {
   revision?: string;
   /** Optional client classification used by fixtures and file index views. */
   kind?: string;
+  [key: string]: unknown;
 }
 
 export interface ValidationIssue {
@@ -276,4 +280,80 @@ export interface ProjectDiff {
   changed: boolean;
   diff: string;
   revision: string;
+}
+
+export interface KnowledgeRuleRecord {
+  id: string;
+  title: string;
+  content: string;
+  enabled: boolean;
+  sourcePath: string;
+  scope?: string[];
+  tags?: string[];
+  updatedAt?: string;
+  draft?: boolean;
+  sourceContent?: string;
+  diff?: string;
+}
+
+export interface KnowledgeRulesResponse {
+  schemaVersion: number;
+  revision: string;
+  rules: KnowledgeRuleRecord[];
+  enabledCount: number;
+  disabledCount: number;
+}
+
+export interface SqlCandidateRecord {
+  id: string;
+  question: string;
+  sql: string;
+  dialect?: string;
+  queryId?: string;
+  sessionId?: string;
+  status: "pending" | "approved" | "rejected";
+  stats?: Record<string, unknown>;
+  sqlHistory?: Array<{ id: string; question: string; sql: string; sourcePath?: string }>;
+  createdAt?: string;
+  updatedAt?: string;
+  reviewedAt?: string;
+  reviewer?: string;
+  reviewNote?: string;
+  approvedPath?: string;
+}
+
+export interface SqlCandidatesResponse {
+  schemaVersion: number;
+  candidates: SqlCandidateRecord[];
+  pendingCount: number;
+  approvedCount: number;
+  rejectedCount: number;
+}
+
+export interface CubeRecord {
+  name: string;
+  sourcePath: string;
+  baseObject: string;
+  measures: Array<{ name: string; expression: string; type: string }>;
+  dimensions: Array<{ name: string; expression: string; type: string }>;
+  timeDimensions: Array<{ name: string; expression: string; type: string }>;
+  hierarchies: Record<string, string[]>;
+  refreshTime?: string;
+  properties?: Record<string, unknown>;
+  draft?: boolean;
+  [key: string]: unknown;
+}
+
+export interface CubeSnapshot {
+  revision: string;
+  draftCount: number;
+  cubes: CubeRecord[];
+  sourceFiles: ProjectFile[];
+  availableBaseObjects?: string[];
+}
+
+export interface CubeValidationResponse {
+  valid: boolean;
+  errors: Array<{ path: string; message: string; severity: "error" }>;
+  warnings: Array<{ path: string; message: string; severity: "warning" }>;
 }

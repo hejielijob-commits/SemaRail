@@ -28,6 +28,30 @@ except ImportError:  # Direct ``python app.py`` / test loading by file path.
 MAX_REQUEST_BYTES = 4 * 1024 * 1024
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 48763
+
+
+def _allowed_browser_origin(origin: str | None) -> bool:
+    """Allow the console itself, configured origins, and local Desktop UI.
+
+    DSH Desktop serves its renderer from an ephemeral loopback port.  Matching
+    the parsed hostname (not a string prefix) keeps arbitrary web origins out
+    while allowing the out-of-tree Client plugin to submit review candidates.
+    """
+
+    if not origin:
+        return True
+    allowed = {
+        item.strip()
+        for item in os.environ.get("SEMANTIC_CONSOLE_ORIGINS", "").split(",")
+        if item.strip()
+    }
+    if origin in allowed:
+        return True
+    try:
+        parsed = urlsplit(origin)
+    except ValueError:
+        return False
+    return parsed.scheme in {"http", "https"} and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
 _LOGGER = logging.getLogger("semantic-console")
 
 
@@ -142,15 +166,7 @@ class _Handler(BaseHTTPRequestHandler):
         return host.lower() in {"localhost", "127.0.0.1", "::1"}
 
     def _origin_allowed(self) -> bool:
-        origin = self.headers.get("Origin")
-        if not origin:
-            return True
-        allowed = {
-            item.strip()
-            for item in os.environ.get("SEMANTIC_CONSOLE_ORIGINS", "").split(",")
-            if item.strip()
-        }
-        return origin in allowed
+        return _allowed_browser_origin(self.headers.get("Origin"))
 
     def _serve_static(self) -> bool:
         root = self.application.static_dir
@@ -212,7 +228,7 @@ class _Handler(BaseHTTPRequestHandler):
             for item in os.environ.get("SEMANTIC_CONSOLE_ORIGINS", "").split(",")
             if item.strip()
         }
-        if origin and origin in allowed:
+        if origin and _allowed_browser_origin(origin):
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")

@@ -575,6 +575,17 @@ type GraphEdgeData = {
 
 type GraphEdge = Edge<GraphEdgeData, "relationship">;
 
+const RELATIONSHIP_GRAPH_FIELD_PAGE_SIZE = 6;
+
+function uniqueRelationshipColumns(...groups: readonly RelationshipGraphColumn[][]) {
+  const seen = new Set<string>();
+  return groups.flat().filter((column) => {
+    if (seen.has(column.name)) return false;
+    seen.add(column.name);
+    return true;
+  });
+}
+
 function primaryKeyNames(model: RelationshipGraphModel) {
   const explicit = model.primaryKey ? (Array.isArray(model.primaryKey) ? model.primaryKey : [model.primaryKey]) : [];
   const columns = model.columns.filter((column) => column.primaryKey || column.isPrimaryKey).map((column) => column.name);
@@ -585,13 +596,25 @@ function ModelNode({ id, data }: NodeProps<GraphNode>) {
   const [expanded, setExpanded] = useState(false);
   const [page, setPage] = useState(0);
   const updateNodeInternals = useUpdateNodeInternals();
-  const pageSize = 6;
+  const pageSize = RELATIONSHIP_GRAPH_FIELD_PAGE_SIZE;
   const copy = data.copy;
   const tableName = [data.model.schema, data.tableName].filter(Boolean).join(".");
-  const pages = Math.max(1, Math.ceil(data.otherColumns.length / pageSize));
+  const allColumns = uniqueRelationshipColumns(data.relatedColumns, data.otherColumns);
+  const relatedNames = new Set(data.relatedColumns.map((column) => column.name));
+  const allFieldSignature = allColumns.map((column) => column.name).join("\u0000");
+  const pages = Math.max(1, Math.ceil(allColumns.length / pageSize));
   const currentPage = Math.min(page, pages - 1);
-  const visibleColumns = data.otherColumns.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
-  const visibleFieldSignature = [...data.relatedColumns, ...(expanded ? visibleColumns : [])].map((column) => column.name).join("\u0000");
+  const visibleColumns = expanded
+    ? allColumns.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
+    : data.relatedColumns.slice(0, pageSize);
+  const visibleColumnNames = new Set(visibleColumns.map((column) => column.name));
+  const visibleRelatedColumns = visibleColumns.filter((column) => relatedNames.has(column.name));
+  const visibleOtherColumns = visibleColumns.filter((column) => !relatedNames.has(column.name));
+  const hiddenRelatedColumns = data.relatedColumns.filter((column) => !visibleColumnNames.has(column.name));
+  const visibleFieldSignature = visibleColumns.map((column) => column.name).join("\u0000");
+  useEffect(() => {
+    setPage(0);
+  }, [allFieldSignature]);
   useEffect(() => {
     updateNodeInternals(id);
   }, [currentPage, expanded, id, updateNodeInternals, visibleFieldSignature]);
@@ -625,8 +648,14 @@ function ModelNode({ id, data }: NodeProps<GraphNode>) {
       <div className="relationship-graph-node-table"><span>{copy.table}</span><code>{tableName || data.model.name}</code></div>
       <div className="relationship-graph-node-fields">
         <div className="relationship-graph-column-heading"><span>{copy.fields}</span><span>{data.model.columns.length}</span></div>
-        {data.relatedColumns.length ? <div className="relationship-graph-column-section"><small>{copy.relatedFields}</small>{data.relatedColumns.map((column) => fieldRow(column, true))}</div> : null}
-        {expanded ? <div className="relationship-graph-column-section"><small>{copy.fields}</small>{visibleColumns.length ? visibleColumns.map((column) => fieldRow(column, false)) : <span className="relationship-graph-column-empty">{copy.noFields}</span>}<div className="relationship-graph-column-pagination"><button type="button" className="relationship-graph-page-button nodrag nopan" onClick={(event) => { event.stopPropagation(); setPage(Math.max(0, currentPage - 1)); }} disabled={currentPage === 0} aria-label={copy.previousPage}><ArrowLeft size={12} /></button><span>{copy.fieldPage(data.otherColumns.length ? currentPage * pageSize + 1 : 0, Math.min((currentPage + 1) * pageSize, data.otherColumns.length), data.otherColumns.length)}</span><button type="button" className="relationship-graph-page-button nodrag nopan" onClick={(event) => { event.stopPropagation(); setPage(Math.min(pages - 1, currentPage + 1)); }} disabled={currentPage >= pages - 1} aria-label={copy.nextPage}><ArrowRight size={12} /></button></div></div> : null}
+        {!expanded && visibleRelatedColumns.length ? <div className="relationship-graph-column-section"><small>{copy.relatedFields}</small>{visibleRelatedColumns.map((column) => fieldRow(column, true))}</div> : null}
+        {expanded ? <>
+          {visibleRelatedColumns.length ? <div className="relationship-graph-column-section"><small>{copy.relatedFields}</small>{visibleRelatedColumns.map((column) => fieldRow(column, true))}</div> : null}
+          {visibleOtherColumns.length ? <div className="relationship-graph-column-section"><small>{copy.fields}</small>{visibleOtherColumns.map((column) => fieldRow(column, false))}</div> : null}
+          {!visibleColumns.length ? <span className="relationship-graph-column-empty">{copy.noFields}</span> : null}
+          {allColumns.length > pageSize ? <div className="relationship-graph-column-pagination"><button type="button" className="relationship-graph-page-button nodrag nopan" onClick={(event) => { event.stopPropagation(); setPage(Math.max(0, currentPage - 1)); }} disabled={currentPage === 0} aria-label={copy.previousPage}><ArrowLeft size={12} /></button><span>{copy.fieldPage(allColumns.length ? currentPage * pageSize + 1 : 0, Math.min((currentPage + 1) * pageSize, allColumns.length), allColumns.length)}</span><button type="button" className="relationship-graph-page-button nodrag nopan" onClick={(event) => { event.stopPropagation(); setPage(Math.min(pages - 1, currentPage + 1)); }} disabled={currentPage >= pages - 1} aria-label={copy.nextPage}><ArrowRight size={12} /></button></div> : null}
+        </> : null}
+        {hiddenRelatedColumns.length ? <div className="relationship-graph-field-handle-rail" aria-hidden="true">{hiddenRelatedColumns.map((column, index) => <div className="relationship-graph-field-handle-rail-row" key={column.name} style={{ top: `${((index + 1) / (hiddenRelatedColumns.length + 1)) * 100}%` }}><Handle type="target" position={Position.Left} id={fieldHandleId("target", column.name)} className="relationship-graph-field-handle relationship-graph-field-handle-hidden" /><Handle type="source" position={Position.Right} id={fieldHandleId("source", column.name)} className="relationship-graph-field-handle relationship-graph-field-handle-hidden" /></div>)}</div> : null}
         <button type="button" className="relationship-graph-expand-button nodrag nopan" onClick={(event) => { event.stopPropagation(); setExpanded((value) => !value); setPage(0); }} aria-expanded={expanded}>{expanded ? copy.collapseFields : copy.expandFields}<span>{expanded ? "−" : "+"}</span></button>
       </div>
     </div>

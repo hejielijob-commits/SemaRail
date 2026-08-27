@@ -78,6 +78,47 @@ class FakeEngine:
 
 
 class ContextAndDryPlanTests(unittest.TestCase):
+    def test_context_ask_recalls_confirmed_sql_with_stable_safe_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            project = Path(temp)
+            (project / "wren_project.yml").write_text("name: demo\n", encoding="utf-8")
+            source = project / "knowledge" / "sql" / "revenue.md"
+
+            class FakeIndex:
+                def search(self, question: str, *, limit: int) -> list[dict[str, Any]]:
+                    self.question = question
+                    self.limit = limit
+                    return [{
+                        "nl_query": "Daily revenue",
+                        "sql_query": "SELECT day, SUM(amount) FROM orders GROUP BY day",
+                        "path": str(source),
+                    }]
+
+            fake_index = FakeIndex()
+            context_module = SimpleNamespace(build_json=lambda path: manifest(path))
+            index_module = SimpleNamespace(get_index=lambda *_: fake_index)
+
+            def load(name: str) -> Any:
+                return index_module if name == "wren.memory.index_backend" else context_module
+
+            adapter = LazyWrenAdapter(
+                module_loader=load,
+                context_retriever=lambda *_: None,
+                schema_describer=lambda _: "orders schema",
+            )
+            response = Dispatcher(context_provider=adapter).dispatch(rpc_request(
+                "context.ask",
+                {"projectDir": str(project), "question": "Show revenue"},
+            ))
+
+            reference = response["result"]["sqlHistory"][0]
+            self.assertTrue(reference["id"].startswith("sql:"))
+            self.assertEqual(reference["question"], "Daily revenue")
+            self.assertEqual(reference["sourcePath"], "knowledge/sql/revenue.md")
+            self.assertNotIn(str(project), json.dumps(reference))
+            self.assertEqual(fake_index.question, "Show revenue")
+            self.assertEqual(fake_index.limit, 3)
+
     def test_context_ask_builds_versioned_contract_and_uses_context_retriever(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             project = Path(temp)
@@ -223,4 +264,3 @@ class ContextAndDryPlanTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

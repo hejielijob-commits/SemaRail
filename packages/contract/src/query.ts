@@ -21,6 +21,7 @@ import {
 import { ERROR_JSON_SCHEMA, _parseError, type DataAgentError } from './errors.js'
 import { parseChartSpecV1, CHART_SPEC_V1_JSON_SCHEMA, type ChartSpecV1 } from './chart.js'
 import { _schema, type ContractSchema } from './schema.js'
+import { parseSqlHistoryReference, type SqlHistoryReference } from './context.js'
 
 /** Chart preference supplied to `data_query`. */
 export type ChartIntent = 'auto' | 'table' | 'line' | 'bar' | 'pie'
@@ -52,6 +53,8 @@ export interface DataQuerySuccessPresentation {
   readonly queryId: string
   readonly status: 'success'
   readonly semanticSql: string
+  readonly question?: string
+  readonly sqlHistory?: readonly SqlHistoryReference[]
   readonly nativeSql?: string
   readonly columns: readonly DataQueryColumn[]
   readonly previewRows: readonly Readonly<Record<string, JsonSafeScalar>>[]
@@ -65,6 +68,8 @@ export interface DataQueryErrorPresentation {
   readonly queryId: string
   readonly status: 'error'
   readonly semanticSql: string
+  readonly question?: string
+  readonly sqlHistory?: readonly SqlHistoryReference[]
   readonly nativeSql?: string
   readonly columns: readonly DataQueryColumn[]
   readonly previewRows: readonly Readonly<Record<string, JsonSafeScalar>>[]
@@ -141,7 +146,7 @@ function parsePreviewRows(value: unknown, columns: readonly DataQueryColumn[]): 
 /** Parse a bounded DataQueryPresentation. */
 export function parseDataQueryPresentation(value: unknown): DataQueryPresentation {
   const object = _record(value, 'dataQueryPresentation')
-  _keys(object, ['schemaVersion', 'queryId', 'status', 'semanticSql', 'nativeSql', 'columns', 'previewRows', 'chart', 'stats', 'error'], 'dataQueryPresentation')
+  _keys(object, ['schemaVersion', 'queryId', 'status', 'semanticSql', 'question', 'sqlHistory', 'nativeSql', 'columns', 'previewRows', 'chart', 'stats', 'error'], 'dataQueryPresentation')
   _version(_required(object, 'schemaVersion', 'dataQueryPresentation'), SCHEMA_VERSION, 'dataQueryPresentation.schemaVersion')
   const status = _enum(_required(object, 'status', 'dataQueryPresentation'), ['success', 'error'] as const, 'dataQueryPresentation.status')
   const columns = _required(object, 'columns', 'dataQueryPresentation')
@@ -152,10 +157,16 @@ export function parseDataQueryPresentation(value: unknown): DataQueryPresentatio
   if (previewRows.length > stats.returnedRows) _fail('dataQueryPresentation.previewRows', 'cannot contain more rows than returnedRows')
   if (!stats.truncated && previewRows.length !== stats.returnedRows) _fail('dataQueryPresentation.stats.truncated', 'must be true when preview rows omit returned rows')
   const nativeSql = _optional(object, 'nativeSql')
+  const question = _optional(object, 'question')
+  const sqlHistory = _optional(object, 'sqlHistory')
+  if (sqlHistory !== undefined && !Array.isArray(sqlHistory)) _fail('dataQueryPresentation.sqlHistory', 'expected an array')
+  if (Array.isArray(sqlHistory) && sqlHistory.length > 5) _fail('dataQueryPresentation.sqlHistory', 'must contain at most 5 item(s)')
   const base = {
     schemaVersion: SCHEMA_VERSION,
     queryId: _string(_required(object, 'queryId', 'dataQueryPresentation'), 'dataQueryPresentation.queryId', 1, 128),
     semanticSql: _string(_required(object, 'semanticSql', 'dataQueryPresentation'), 'dataQueryPresentation.semanticSql', 1, 64_000),
+    ...(question === undefined ? {} : { question: _string(question, 'dataQueryPresentation.question', 1, 16_000) }),
+    ...(sqlHistory === undefined ? {} : { sqlHistory: sqlHistory.map((item, index) => parseSqlHistoryReference(item, `dataQueryPresentation.sqlHistory[${index}]`)) }),
     ...(nativeSql === undefined ? {} : { nativeSql: _string(nativeSql, 'dataQueryPresentation.nativeSql', 1, 64_000) }),
     columns: parsedColumns,
     previewRows,
@@ -188,7 +199,8 @@ export const DATA_QUERY_PRESENTATION_JSON_SCHEMA: JsonSchema = {
   required: ['schemaVersion', 'queryId', 'status', 'semanticSql', 'columns', 'previewRows', 'stats'],
   properties: {
     schemaVersion: { const: SCHEMA_VERSION }, queryId: { type: 'string', minLength: 1, maxLength: 128 },
-    status: { enum: ['success', 'error'] }, semanticSql: { type: 'string', minLength: 1 }, nativeSql: { type: 'string' },
+    status: { enum: ['success', 'error'] }, semanticSql: { type: 'string', minLength: 1 }, question: { type: 'string', minLength: 1 },
+    sqlHistory: { type: 'array', maxItems: 5 }, nativeSql: { type: 'string' },
     columns: { type: 'array' }, previewRows: { type: 'array', maxItems: MAX_PREVIEW_ROWS },
     chart: CHART_SPEC_V1_JSON_SCHEMA, stats: { type: 'object' }, error: ERROR_JSON_SCHEMA,
   },

@@ -139,6 +139,13 @@ class SemanticConsoleProcessTests(unittest.TestCase):
                 with self.assertRaises(urllib.error.HTTPError) as raised:
                     urllib.request.urlopen(blocked, timeout=3)
                 self.assertEqual(raised.exception.code, 403)
+                desktop = urllib.request.Request(
+                    base + "/api/health",
+                    headers={"Host": f"127.0.0.1:{server.server_port}", "Origin": "http://127.0.0.1:43120"},
+                )
+                with urllib.request.urlopen(desktop, timeout=3) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(response.headers["Access-Control-Allow-Origin"], "http://127.0.0.1:43120")
             finally:
                 server.shutdown()
                 server.server_close()
