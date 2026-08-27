@@ -1,8 +1,9 @@
-import { useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
   ArrowClockwise,
   ArrowUUpLeft,
   BookOpenText,
+  CaretDown,
   CaretRight,
   Check,
   CheckCircle,
@@ -59,7 +60,6 @@ export interface RuleWorkbenchProps {
   error?: string | null;
   readOnly?: boolean;
   source?: KnowledgeRuleSource | null;
-  scopeOptions?: string[];
   onRetry?: () => void;
   onSelectRule?: (rule: KnowledgeRule) => void;
   onDraftChange?: (rule: KnowledgeRule) => void;
@@ -88,7 +88,7 @@ const ruleCopy = {
     noRules: "No business rules",
     noRulesBody: "Create a rule file in knowledge/rules to make query guidance available here.",
     noMatches: "No matching rules",
-    noMatchesBody: "Try a different name, scope, tag, or status filter.",
+    noMatchesBody: "Try a different name, tag, or status filter.",
     loading: "Loading rules",
     errorTitle: "Rules could not be loaded",
     retry: "Try again",
@@ -105,10 +105,14 @@ const ruleCopy = {
     contentLabel: "Rule text",
     nameLabel: "Rule name",
     sourceLabel: "Source file",
-    scopeLabel: "Applies to",
     tagsLabel: "Tags",
-    noScope: "No scope set",
     noTags: "No tags set",
+    tagPlaceholder: "Search or create a tag",
+    tagHint: "Reuse an existing tag or enter a new name.",
+    reusableTags: "Reusable tags",
+    noReusableTags: "No reusable tags yet. Enter a name to create one.",
+    createTag: (tag: string) => `Create “${tag}”`,
+    selectedTags: (count: number) => `${count} selected`,
     onLabel: "Disable rule",
     offLabel: "Enable rule",
     saveDraft: "Save draft",
@@ -134,7 +138,7 @@ const ruleCopy = {
     createAction: "Create draft", creating: "Creating", createNameRequired: "Give the rule a clear name.", createContentRequired: "Rule text is required.",
     delete: "Delete", deleteTitle: "Delete this rule?", deleteDescription: "The rule file will be removed from the project draft. Publish the project to make the deletion effective downstream.",
     deleteAction: "Delete rule", deleting: "Deleting", deleteConfirm: "This removes {{name}} and its source file from the current draft.",
-    addToken: "Type and press Enter", removeToken: "Remove", operationFailed: "The operation could not be completed.",
+    removeToken: "Remove", operationFailed: "The operation could not be completed.",
   },
   "zh-CN": {
     eyebrow: "语义层",
@@ -150,7 +154,7 @@ const ruleCopy = {
     noRules: "暂无业务规则",
     noRulesBody: "在 knowledge/rules 中创建规则文件后，规则会显示在这里。",
     noMatches: "没有匹配的规则",
-    noMatchesBody: "请更换名称、范围、标签或状态筛选条件。",
+    noMatchesBody: "请更换名称、标签或状态筛选条件。",
     loading: "正在加载规则",
     errorTitle: "规则加载失败",
     retry: "重试",
@@ -167,10 +171,14 @@ const ruleCopy = {
     contentLabel: "规则文本",
     nameLabel: "规则名称",
     sourceLabel: "源文件",
-    scopeLabel: "适用范围",
     tagsLabel: "标签",
-    noScope: "未设置范围",
     noTags: "未设置标签",
+    tagPlaceholder: "搜索或创建标签",
+    tagHint: "选择已有标签，或输入新名称直接创建。",
+    reusableTags: "可复用标签",
+    noReusableTags: "暂无可复用标签，可以输入名称创建。",
+    createTag: (tag: string) => `创建“${tag}”`,
+    selectedTags: (count: number) => `已选择 ${count} 个`,
     onLabel: "停用规则",
     offLabel: "启用规则",
     saveDraft: "保存草稿",
@@ -196,7 +204,7 @@ const ruleCopy = {
     createAction: "创建草稿", creating: "创建中", createNameRequired: "请填写清晰的规则名称。", createContentRequired: "请填写规则文本。",
     delete: "删除", deleteTitle: "删除这条规则？", deleteDescription: "规则文件将从项目草稿中移除；发布项目后，删除才会影响下游查询。",
     deleteAction: "删除规则", deleting: "删除中", deleteConfirm: "这会从当前草稿中移除 {{name}} 及其源文件。",
-    addToken: "输入后按 Enter 添加", removeToken: "移除", operationFailed: "操作未能完成。",
+    removeToken: "移除", operationFailed: "操作未能完成。",
   },
 } as const;
 
@@ -244,7 +252,6 @@ export function RuleWorkbench({
   error = null,
   readOnly = false,
   source,
-  scopeOptions = [],
   onRetry,
   onSelectRule,
   onDraftChange,
@@ -294,9 +301,20 @@ export function RuleWorkbench({
       if (filter === "enabled" && !rule.enabled) return false;
       if (filter === "disabled" && rule.enabled) return false;
       if (!normalized) return true;
-      return [rule.name, rule.content, rule.sourcePath, ...(rule.scope ?? []), ...(rule.tags ?? [])].join(" ").toLocaleLowerCase().includes(normalized);
+      return [rule.name, rule.content, rule.sourcePath, ...(rule.tags ?? [])].join(" ").toLocaleLowerCase().includes(normalized);
     });
   }, [filter, rules, search]);
+
+  const reusableTags = useMemo(() => {
+    const unique = new Map<string, string>();
+    for (const rule of [...rules, ...Object.values(drafts)]) {
+      for (const tag of rule.tags ?? []) {
+        const value = tag.trim();
+        if (value && !unique.has(value.toLocaleLowerCase())) unique.set(value.toLocaleLowerCase(), value);
+      }
+    }
+    return [...unique.values()].sort((left, right) => left.localeCompare(right, locale));
+  }, [drafts, locale, rules]);
 
   const selectedSourceRule = rules.find((rule) => rule.id === internalSelectedId);
   const selected = selectedSourceRule ? drafts[selectedSourceRule.id] ?? selectedSourceRule : undefined;
@@ -427,7 +445,8 @@ export function RuleWorkbench({
 
   const noticeText = notice === "saved" ? c.savedNotice : notice === "published" ? c.publishedNotice : notice === "discarded" ? c.discardNotice : "";
 
-  const createModal = <Modal open={creating} title={c.createTitle} description={c.createDescription} onClose={() => { if (!busyAction) setCreating(false); }} footer={<><Button variant="ghost" onClick={() => setCreating(false)} disabled={Boolean(busyAction)}>{locale === "zh-CN" ? "取消" : "Cancel"}</Button><Button variant="primary" icon={Plus} loading={busyAction === "create"} onClick={() => void confirmCreate()} disabled={Boolean(busyAction)}>{busyAction === "create" ? c.creating : c.createAction}</Button></>}><div className="kw-create-rule-form">{createError ? <InlineNotice tone="error" title={createError} /> : null}<Field label={c.nameLabel} htmlFor="new-rule-name"><TextInput id="new-rule-name" value={createDraft.name} onChange={(event) => { setCreateDraft((current) => ({ ...current, name: event.target.value })); setCreateError(""); }} autoFocus /></Field><Field label={c.contentLabel} htmlFor="new-rule-content"><TextArea id="new-rule-content" rows={5} value={createDraft.content} onChange={(event) => { setCreateDraft((current) => ({ ...current, content: event.target.value })); setCreateError(""); }} /></Field><div className="kw-form-grid"><TokenEditor label={c.scopeLabel} values={createDraft.scope} options={scopeOptions} placeholder={c.addToken} removeLabel={c.removeToken} onChange={(scope) => setCreateDraft((current) => ({ ...current, scope }))} /><TokenEditor label={c.tagsLabel} values={createDraft.tags} placeholder={c.addToken} removeLabel={c.removeToken} onChange={(tags) => setCreateDraft((current) => ({ ...current, tags }))} /></div></div></Modal>;
+  const tagSelectCopy = { placeholder: c.tagPlaceholder, hint: c.tagHint, availableLabel: c.reusableTags, emptyLabel: c.noReusableTags, createLabel: c.createTag, selectedLabel: c.selectedTags, removeLabel: c.removeToken };
+  const createModal = <Modal open={creating} title={c.createTitle} description={c.createDescription} onClose={() => { if (!busyAction) setCreating(false); }} footer={<><Button variant="ghost" onClick={() => setCreating(false)} disabled={Boolean(busyAction)}>{locale === "zh-CN" ? "取消" : "Cancel"}</Button><Button variant="primary" icon={Plus} loading={busyAction === "create"} onClick={() => void confirmCreate()} disabled={Boolean(busyAction)}>{busyAction === "create" ? c.creating : c.createAction}</Button></>}><div className="kw-create-rule-form">{createError ? <InlineNotice tone="error" title={createError} /> : null}<Field label={c.nameLabel} htmlFor="new-rule-name"><TextInput id="new-rule-name" value={createDraft.name} onChange={(event) => { setCreateDraft((current) => ({ ...current, name: event.target.value })); setCreateError(""); }} autoFocus /></Field><Field label={c.contentLabel} htmlFor="new-rule-content"><TextArea id="new-rule-content" rows={5} value={createDraft.content} onChange={(event) => { setCreateDraft((current) => ({ ...current, content: event.target.value })); setCreateError(""); }} /></Field><CreatableTagSelect label={c.tagsLabel} values={createDraft.tags} options={reusableTags} copy={tagSelectCopy} onChange={(tags) => setCreateDraft((current) => ({ ...current, tags }))} /></div></Modal>;
   const deleteModal = <Modal open={Boolean(deleteTarget)} title={c.deleteTitle} description={c.deleteDescription} onClose={() => { if (!busyAction) setDeleteTarget(null); }} footer={<><Button variant="ghost" onClick={() => setDeleteTarget(null)} disabled={Boolean(busyAction)}>{locale === "zh-CN" ? "取消" : "Cancel"}</Button><Button variant="danger" icon={Trash} loading={busyAction === "delete"} onClick={() => void confirmDelete()} disabled={Boolean(busyAction)}>{busyAction === "delete" ? c.deleting : c.deleteAction}</Button></>}><div className="kw-delete-confirm"><WarningCircle size={20} weight="fill" /><p>{c.deleteConfirm.replace("{{name}}", deleteTarget?.name ?? "")}</p>{deleteTarget ? <code>{deleteTarget.sourcePath}</code> : null}</div></Modal>;
 
   return <div className="page kw-page kw-rules-page">
@@ -446,7 +465,7 @@ export function RuleWorkbench({
           {filteredRules.map((rule, index) => { const draft = drafts[rule.id] ?? rule; const active = rule.id === internalSelectedId; return <div className={`kw-rule-row ${active ? "kw-rule-row-active" : ""}`} role="listitem" key={rule.id}>
             <button type="button" className="kw-rule-select" aria-current={active ? "true" : undefined} onClick={() => selectRule(rule)} onKeyDown={(event) => handleSelectKey(event, index)}>
               <span className="kw-rule-leading"><FileText size={16} weight={active ? "fill" : "regular"} aria-hidden="true" /></span>
-              <span className="kw-rule-copy"><strong title={rule.name}>{rule.name}</strong><small>{rule.scope?.join(", ") || c.noScope}</small><span className="kw-rule-meta">{draft.draft || !sameRule(draft, committed[rule.id] ?? rule) ? c.draft : c.published}{formatRuleDate(rule.updatedAt, locale) ? `  ${formatRuleDate(rule.updatedAt, locale)}` : ""}</span></span>
+              <span className="kw-rule-copy"><strong title={rule.name}>{rule.name}</strong><small>{draft.tags?.join(", ") || c.noTags}</small><span className="kw-rule-meta">{draft.draft || !sameRule(draft, committed[rule.id] ?? rule) ? c.draft : c.published}{formatRuleDate(rule.updatedAt, locale) ? `  ${formatRuleDate(rule.updatedAt, locale)}` : ""}</span></span>
               <CaretRight size={15} className="kw-rule-arrow" aria-hidden="true" />
             </button>
             <button type="button" role="switch" aria-checked={draft.enabled} aria-label={draft.enabled ? `${c.onLabel}: ${rule.name}` : `${c.offLabel}: ${rule.name}`} className={`kw-rule-toggle ${draft.enabled ? "kw-rule-toggle-on" : ""}`} onClick={(event) => void toggleRule(rule, event)} disabled={readOnly || busyAction === "toggle"}><span aria-hidden="true" /></button>
@@ -459,7 +478,7 @@ export function RuleWorkbench({
           <div className="kw-editor-header"><div className="kw-editor-title"><span className="kw-editor-icon"><PencilSimple size={17} /></span><div><span className="kw-panel-kicker">{c.selected}</span><h2 title={selected.name}>{selected.name}</h2><div className="kw-editor-status"><StatusBadge rule={selected} text={selected.enabled ? c.ruleEnabled : c.ruleDisabled} />{isDirty ? <span className="kw-draft-state kw-draft-state-dirty">{c.unsaved}</span> : selected.draft ? <span className="kw-draft-state">{c.draft}</span> : <span className="kw-draft-state">{c.published}</span>}</div></div></div><div className="kw-editor-actions">{onDelete ? <button type="button" className="button button-ghost button-sm kw-delete-button" onClick={() => setDeleteTarget(copyRule(selected))} disabled={readOnly || Boolean(busyAction)}><Trash size={15} />{c.delete}</button> : null}<button type="button" className="button button-ghost button-sm" onClick={discard} disabled={readOnly || !isDirty || Boolean(busyAction)}><ArrowUUpLeft size={15} />{c.discard}</button><button type="button" className="button button-secondary button-sm" onClick={() => void save("draft")} disabled={readOnly || !isDirty || !onSave || Boolean(busyAction)}>{busyAction === "draft" ? <CircleNotch className="spin" size={15} /> : <FloppyDisk size={15} />}{busyAction === "draft" ? c.saving : c.saveDraft}</button><button type="button" className="button button-primary button-sm" onClick={() => void save("publish")} disabled={readOnly || !isDirty || !onSave || Boolean(busyAction)}>{busyAction === "publish" ? <CircleNotch className="spin" size={15} /> : <RocketLaunch size={15} />}{busyAction === "publish" ? c.publishing : c.publish}</button></div></div>
           <div className="kw-tabs" role="tablist" aria-label={`${c.selected} views`}><button type="button" role="tab" id="kw-rule-tab-content" aria-controls="kw-rule-tabpanel" aria-selected={tab === "content"} className={tab === "content" ? "kw-tab-active" : ""} onClick={() => setTab("content")} onKeyDown={(event) => handleTabKey(event, "content")} ref={(element) => { tabRefs.current.content = element; }}>{c.contentTab}</button><button type="button" role="tab" id="kw-rule-tab-source" aria-controls="kw-rule-tabpanel" aria-selected={tab === "source"} className={tab === "source" ? "kw-tab-active" : ""} onClick={() => setTab("source")} onKeyDown={(event) => handleTabKey(event, "source")} ref={(element) => { tabRefs.current.source = element; }}>{c.sourceTab}</button><button type="button" role="tab" id="kw-rule-tab-diff" aria-controls="kw-rule-tabpanel" aria-selected={tab === "diff"} className={tab === "diff" ? "kw-tab-active" : ""} onClick={() => setTab("diff")} onKeyDown={(event) => handleTabKey(event, "diff")} ref={(element) => { tabRefs.current.diff = element; }}>{c.diffTab}{isDirty ? <span className="kw-tab-count" aria-label={c.unsaved}>1</span> : null}</button></div>
           <div className="kw-tab-panel" id="kw-rule-tabpanel" role="tabpanel" aria-labelledby={`kw-rule-tab-${tab}`}>
-            {tab === "content" ? <div className="kw-rule-content"><div className="kw-content-heading"><div><h3>{c.contentTitle}</h3><p>{c.contentHint}</p></div><StatusBadge rule={selected} text={selected.enabled ? c.enabled : c.disabled} /></div><div className="kw-form-grid"><label className="kw-field kw-field-wide"><span>{c.nameLabel}</span><input className="input" value={selected.name} onChange={(event) => updateSelected({ name: event.target.value })} disabled={readOnly} /></label><label className="kw-field kw-field-wide"><span>{c.contentLabel}</span><textarea className="input kw-rule-textarea" value={selected.content} onChange={(event) => updateSelected({ content: event.target.value })} disabled={readOnly} /></label><TokenEditor label={c.scopeLabel} values={selected.scope ?? []} options={scopeOptions} placeholder={c.addToken} removeLabel={c.removeToken} disabled={readOnly} onChange={(scope) => updateSelected({ scope })} /><TokenEditor label={c.tagsLabel} values={selected.tags ?? []} placeholder={c.addToken} removeLabel={c.removeToken} disabled={readOnly} onChange={(tags) => updateSelected({ tags })} /></div><div className="kw-rule-toggle-row"><div><strong>{selected.enabled ? c.ruleEnabled : c.ruleDisabled}</strong><small>{selected.enabled ? c.enabled : c.disabled}</small></div><button type="button" role="switch" aria-checked={selected.enabled} aria-label={selected.enabled ? `${c.onLabel}: ${selected.name}` : `${c.offLabel}: ${selected.name}`} className={`kw-large-toggle ${selected.enabled ? "kw-large-toggle-on" : ""}`} onClick={(event) => void toggleRule(selected, event)} disabled={readOnly || busyAction === "toggle"}><span aria-hidden="true" /></button></div></div> : null}
+            {tab === "content" ? <div className="kw-rule-content"><div className="kw-content-heading"><div><h3>{c.contentTitle}</h3><p>{c.contentHint}</p></div><StatusBadge rule={selected} text={selected.enabled ? c.enabled : c.disabled} /></div><div className="kw-form-grid"><label className="kw-field kw-field-wide"><span>{c.nameLabel}</span><input className="input" value={selected.name} onChange={(event) => updateSelected({ name: event.target.value })} disabled={readOnly} /></label><label className="kw-field kw-field-wide"><span>{c.contentLabel}</span><textarea className="input kw-rule-textarea" value={selected.content} onChange={(event) => updateSelected({ content: event.target.value })} disabled={readOnly} /></label><CreatableTagSelect label={c.tagsLabel} values={selected.tags ?? []} options={reusableTags} copy={tagSelectCopy} disabled={readOnly} onChange={(tags) => updateSelected({ tags })} /></div><div className="kw-rule-toggle-row"><div><strong>{selected.enabled ? c.ruleEnabled : c.ruleDisabled}</strong><small>{selected.enabled ? c.enabled : c.disabled}</small></div><button type="button" role="switch" aria-checked={selected.enabled} aria-label={selected.enabled ? `${c.onLabel}: ${selected.name}` : `${c.offLabel}: ${selected.name}`} className={`kw-large-toggle ${selected.enabled ? "kw-large-toggle-on" : ""}`} onClick={(event) => void toggleRule(selected, event)} disabled={readOnly || busyAction === "toggle"}><span aria-hidden="true" /></button></div></div> : null}
             {tab === "source" ? <div className="kw-source-view"><div className="kw-source-heading"><div><h3>{c.sourceTab}</h3><p>{c.sourceHint}</p></div><code title={selected.sourcePath}>{selected.sourcePath}</code></div>{sourceContent ? <pre className="kw-code"><code>{sourceContent}</code></pre> : <RuleEmptyState title={c.sourceUnavailable} body={c.sourceLabel} icon={<Code size={22} weight="duotone" />} />}</div> : null}
             {tab === "diff" ? <div className="kw-source-view"><div className="kw-source-heading"><div><h3>{c.diffTab}</h3><p>{c.diffHint}</p></div><code title={selected.sourcePath}>{selected.sourcePath}</code></div>{diffContent ? <pre className="kw-code kw-diff-code"><code>{diffContent}</code></pre> : <RuleEmptyState title={c.noDiff} body={c.noDiffBody} icon={<Check size={22} weight="bold" />} />}</div> : null}
           </div>
@@ -469,23 +488,105 @@ export function RuleWorkbench({
   </div>;
 }
 
-function TokenEditor({ label, values, options = [], placeholder, removeLabel, disabled = false, onChange }: { label: string; values: string[]; options?: string[]; placeholder: string; removeLabel: string; disabled?: boolean; onChange: (values: string[]) => void }) {
-  const [input, setInput] = useState("");
+interface TagSelectCopy {
+  placeholder: string;
+  hint: string;
+  availableLabel: string;
+  emptyLabel: string;
+  createLabel: (tag: string) => string;
+  selectedLabel: (count: number) => string;
+  removeLabel: string;
+}
+
+function CreatableTagSelect({ label, values, options, copy, disabled = false, onChange }: { label: string; values: string[]; options: string[]; copy: TagSelectCopy; disabled?: boolean; onChange: (values: string[]) => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(-1);
   const listId = useId();
-  const normalizedValues = new Set(values.map((value) => value.toLocaleLowerCase()));
-  const suggestions = options.filter((option) => !normalizedValues.has(option.toLocaleLowerCase()));
-  function commit(raw = input) {
-    const additions = raw.split(/[,，]/).map((value) => value.trim()).filter(Boolean);
-    if (!additions.length) return;
-    const next = [...values];
-    for (const addition of additions) if (!next.some((value) => value.toLocaleLowerCase() === addition.toLocaleLowerCase())) next.push(addition);
-    onChange(next); setInput("");
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const normalizedQuery = query.trim();
+  const allOptions = useMemo(() => {
+    const unique = new Map<string, string>();
+    for (const tag of [...options, ...values]) {
+      const value = tag.trim();
+      if (value && !unique.has(value.toLocaleLowerCase())) unique.set(value.toLocaleLowerCase(), value);
+    }
+    return [...unique.values()];
+  }, [options, values]);
+  const filteredOptions = allOptions.filter((tag) => tag.toLocaleLowerCase().includes(normalizedQuery.toLocaleLowerCase()));
+  const canCreate = Boolean(normalizedQuery) && !allOptions.some((tag) => tag.toLocaleLowerCase() === normalizedQuery.toLocaleLowerCase());
+  const actionRows = [...filteredOptions.map((tag) => ({ kind: "tag" as const, tag })), ...(canCreate ? [{ kind: "create" as const, tag: normalizedQuery }] : [])];
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [open]);
+
+  function isSelected(tag: string) {
+    return values.some((value) => value.toLocaleLowerCase() === tag.toLocaleLowerCase());
   }
+
+  function toggleTag(tag: string) {
+    const value = tag.trim();
+    if (!value) return;
+    if (isSelected(value)) onChange(values.filter((item) => item.toLocaleLowerCase() !== value.toLocaleLowerCase()));
+    else onChange([...values, value]);
+    setQuery("");
+    setActiveIndex(-1);
+    setOpen(true);
+    inputRef.current?.focus();
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter" || event.key === ",") { event.preventDefault(); commit(); }
-    if (event.key === "Backspace" && !input && values.length) onChange(values.slice(0, -1));
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setOpen(true);
+      if (!actionRows.length) return;
+      const offset = event.key === "ArrowDown" ? 1 : -1;
+      setActiveIndex((current) => (current + offset + actionRows.length) % actionRows.length);
+      return;
+    }
+    if (event.key === "Enter" && open) {
+      const row = actionRows[activeIndex] ?? (canCreate ? actionRows[actionRows.length - 1] : actionRows.length === 1 ? actionRows[0] : undefined);
+      if (row) { event.preventDefault(); toggleTag(row.tag); }
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      setActiveIndex(-1);
+      return;
+    }
+    if (event.key === "Backspace" && !query && values.length) onChange(values.slice(0, -1));
   }
-  return <label className="kw-field kw-token-field"><span>{label}</span><div className={`kw-token-editor ${disabled ? "kw-token-editor-disabled" : ""}`}><Tag size={15} aria-hidden="true" />{values.map((item) => <span className="kw-token" key={item}>{item}{!disabled ? <button type="button" onClick={() => onChange(values.filter((value) => value !== item))} aria-label={`${removeLabel} ${item}`}><X size={12} /></button> : null}</span>)}<input value={input} onChange={(event: ChangeEvent<HTMLInputElement>) => setInput(event.target.value)} onKeyDown={handleKeyDown} onBlur={() => commit()} placeholder={values.length ? "" : placeholder} list={suggestions.length ? listId : undefined} disabled={disabled} aria-label={label} /></div>{suggestions.length ? <datalist id={listId}>{suggestions.map((option) => <option value={option} key={option} />)}</datalist> : null}</label>;
+
+  return <label className="kw-field kw-field-wide kw-tags-field">
+    <span>{label}</span>
+    <div className="kw-tag-select" ref={rootRef}>
+      <div className={`kw-tag-control ${open ? "kw-tag-control-open" : ""} ${disabled ? "kw-tag-control-disabled" : ""}`} onMouseDown={(event) => { if (disabled || (event.target as HTMLElement).closest("button")) return; event.preventDefault(); inputRef.current?.focus(); setOpen(true); }}>
+        <Tag size={16} aria-hidden="true" className="kw-tag-leading" />
+        <div className="kw-tag-values">
+          {values.map((tag) => <span className="kw-tag-chip" key={tag}>{tag}{!disabled ? <button type="button" onClick={() => toggleTag(tag)} aria-label={`${copy.removeLabel} ${tag}`}><X size={12} /></button> : null}</span>)}
+          <input ref={inputRef} role="combobox" value={query} aria-label={label} aria-expanded={open} aria-controls={listId} aria-autocomplete="list" aria-activedescendant={activeIndex >= 0 ? `${listId}-option-${activeIndex}` : undefined} placeholder={copy.placeholder} disabled={disabled} onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => { if (!rootRef.current?.contains(document.activeElement)) setOpen(false); }, 0)} onChange={(event) => { setQuery(event.target.value); setActiveIndex(-1); setOpen(true); }} onKeyDown={handleKeyDown} />
+        </div>
+        <CaretDown size={15} aria-hidden="true" className={`kw-tag-caret ${open ? "kw-tag-caret-open" : ""}`} />
+      </div>
+      {open && !disabled ? <div className="kw-tag-menu">
+        <div className="kw-tag-menu-header"><span>{copy.availableLabel}</span><small>{copy.selectedLabel(values.length)}</small></div>
+        <div className="kw-tag-options" id={listId} role="listbox" aria-multiselectable="true" aria-label={copy.availableLabel}>
+          {filteredOptions.map((tag, index) => <button type="button" id={`${listId}-option-${index}`} role="option" aria-selected={isSelected(tag)} className={`kw-tag-option ${activeIndex === index ? "kw-tag-option-active" : ""}`} key={tag} onMouseDown={(event) => event.preventDefault()} onClick={() => toggleTag(tag)} onMouseEnter={() => setActiveIndex(index)}><span className="kw-tag-option-check">{isSelected(tag) ? <Check size={14} weight="bold" /> : null}</span><span>{tag}</span></button>)}
+          {canCreate ? <button type="button" id={`${listId}-option-${filteredOptions.length}`} role="option" aria-selected="false" className={`kw-tag-option kw-tag-create ${activeIndex === filteredOptions.length ? "kw-tag-option-active" : ""}`} onMouseDown={(event) => event.preventDefault()} onClick={() => toggleTag(normalizedQuery)} onMouseEnter={() => setActiveIndex(filteredOptions.length)}><span className="kw-tag-option-check"><Plus size={14} weight="bold" /></span><span>{copy.createLabel(normalizedQuery)}</span></button> : null}
+          {!filteredOptions.length && !canCreate ? <div className="kw-tag-empty" role="status">{copy.emptyLabel}</div> : null}
+        </div>
+      </div> : null}
+    </div>
+    <small className="kw-field-hint">{copy.hint}</small>
+  </label>;
 }
 
 export default RuleWorkbench;
