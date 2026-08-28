@@ -997,8 +997,17 @@ def _project_revision(
 WrenAdapter = LazyWrenAdapter
 
 
-def default_dependencies(*, logger: logging.Logger | None = None) -> Any:
-    """Build the CLI's default dependency set around one lazy adapter."""
+def default_dependencies(
+    *,
+    logger: logging.Logger | None = None,
+    connection_resolver: Callable[[str, str], Mapping[str, Any] | None] | None = None,
+) -> Any:
+    """Build the default dependency set around one lazy adapter.
+
+    Embedders may pin connection lookup to a canonical project directory while
+    planning against an ephemeral draft snapshot. Credentials remain entirely
+    process-local and never become request parameters or result fields.
+    """
 
     # Import locally to keep this module's Wren-facing boundary independent of
     # dispatch construction and to avoid a circular import at module import.
@@ -1006,7 +1015,11 @@ def default_dependencies(*, logger: logging.Logger | None = None) -> Any:
     from .query import EnvPsycopgExecutor, WrenQueryService
 
     adapter = LazyWrenAdapter(logger=logger)
-    query_service = WrenQueryService(adapter, EnvPsycopgExecutor())
+    query_service = WrenQueryService(
+        adapter,
+        EnvPsycopgExecutor(),
+        connection_resolver=connection_resolver,
+    )
     return SidecarDependencies(
         project_validator=adapter,
         context_provider=adapter,

@@ -16,6 +16,8 @@ try:
     from .project import ProjectError, ProjectStore
     from .semantic_models import SemanticModelStore
     from .cubes import CubeStore
+    from .views import ViewStore
+    from .view_preview import ViewPreviewError, ViewPreviewService
 except ImportError:  # Direct module loading in a lightweight smoke test.
     from drivers import DriverError, datasource_types, driver_for  # type: ignore[no-redef]
     from models import DatasourceRecord, is_sensitive_key, utc_now  # type: ignore[no-redef]
@@ -23,6 +25,8 @@ except ImportError:  # Direct module loading in a lightweight smoke test.
     from project import ProjectError, ProjectStore  # type: ignore[no-redef]
     from semantic_models import SemanticModelStore  # type: ignore[no-redef]
     from cubes import CubeStore  # type: ignore[no-redef]
+    from views import ViewStore  # type: ignore[no-redef]
+    from view_preview import ViewPreviewError, ViewPreviewService  # type: ignore[no-redef]
 
 
 class ApiServiceError(RuntimeError):
@@ -55,8 +59,12 @@ def _safe_identifier(value: Any, name: str) -> str:
 def _public_error(exc: Exception) -> ApiServiceError:
     if isinstance(exc, ApiServiceError):
         return exc
+    if isinstance(exc, ViewPreviewError):
+        return ApiServiceError(exc.code, exc.safe_message, exc.details, exc.status)
     if isinstance(exc, ProjectError):
-        status = 409 if exc.code in {"REVISION_CONFLICT", "FILE_EXISTS"} else 400
+        status = 409 if exc.code in {"REVISION_CONFLICT", "FILE_EXISTS", "NAME_CONFLICT", "VIEW_IN_USE"} else 400
+        if exc.code == "VIEW_NOT_FOUND":
+            status = 404
         return ApiServiceError(exc.code, exc.safe_message, exc.details, status)
     if isinstance(exc, DriverError):
         status = 503 if exc.code in {"DRIVER_UNAVAILABLE", "CONNECTION_FAILED"} else 400
@@ -76,6 +84,7 @@ class SemanticConsoleService:
         project: ProjectStore | None = None,
         *,
         connection_factory: Callable[..., Any] | None = None,
+        view_preview: ViewPreviewService | None = None,
     ) -> None:
         self.project = project or ProjectStore()
         self.connection_factory = connection_factory
@@ -84,6 +93,8 @@ class SemanticConsoleService:
         self.rules = RuleStore(self.project)
         self.sql_candidates = SqlCandidateStore(self.project)
         self.cubes = CubeStore(self.project)
+        self.views = ViewStore(self.project)
+        self.view_preview = view_preview or ViewPreviewService(self.project)
 
     # ---- simple resources -----------------------------------------------
 
@@ -509,6 +520,53 @@ class SemanticConsoleService:
         except Exception as exc:
             raise _public_error(exc) from exc
 
+    # ---- view metadata --------------------------------------------------
+
+    def views_snapshot(self) -> dict[str, Any]:
+        try:
+            return self.views.snapshot()
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def get_view(self, view_name: str) -> dict[str, Any]:
+        try:
+            return self.views.get_view(view_name)
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def create_view(self, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        try:
+            return self.views.create_view(payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def validate_view(self, view_name: str, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        try:
+            return self.views.validate(view_name, payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def save_view(self, view_name: str, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        try:
+            return self.views.save_view(view_name, payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def delete_view(self, view_name: str, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        try:
+            return self.views.delete_view(view_name, payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def preview_view(self, view_name: str, payload: Mapping[str, Any] | None) -> dict[str, Any]:
+        try:
+            # Preserve VIEW_NOT_FOUND semantics before invoking Wren. The
+            # preview SQL itself is generated server-side from this record.
+            view = self.views.get_view(view_name)
+            return self.view_preview.run(str(view["name"]), payload if isinstance(payload, Mapping) else {})
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
     def put_file(self, path: Any, payload: Mapping[str, Any] | str | None) -> dict[str, Any]:
         path = _required_string(path, "path")
         if isinstance(payload, str):
@@ -691,6 +749,24 @@ class SemanticConsoleService:
                     return 200, self.save_cube(match.group(1), body if isinstance(body, Mapping) else {})
                 if method == "DELETE":
                     return 200, self.delete_cube(match.group(1), body if isinstance(body, Mapping) else {})
+            if method == "GET" and clean_path == "/api/views":
+                return 200, self.views_snapshot()
+            if method == "POST" and clean_path == "/api/views":
+                return 201, self.create_view(body if isinstance(body, Mapping) else {})
+            match = re.fullmatch(r"/api/views/([^/]+)/validate", clean_path)
+            if match and method == "POST":
+                return 200, self.validate_view(match.group(1), body if isinstance(body, Mapping) else {})
+            match = re.fullmatch(r"/api/views/([^/]+)/preview", clean_path)
+            if match and method == "POST":
+                return 200, self.preview_view(match.group(1), body if isinstance(body, Mapping) else {})
+            match = re.fullmatch(r"/api/views/([^/]+)", clean_path)
+            if match:
+                if method == "GET":
+                    return 200, self.get_view(match.group(1))
+                if method == "PUT":
+                    return 200, self.save_view(match.group(1), body if isinstance(body, Mapping) else {})
+                if method == "DELETE":
+                    return 200, self.delete_view(match.group(1), body if isinstance(body, Mapping) else {})
             if method == "GET" and clean_path == "/api/project/file":
                 return 200, self.read_file(query.get("path"))
             if method == "GET" and clean_path == "/api/project/diff":

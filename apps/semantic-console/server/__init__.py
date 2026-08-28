@@ -10,6 +10,8 @@ from .app import (
 )
 from .project import ProjectError, ProjectStore, WrenProjectAdapter
 from .service import ApiServiceError, SemanticConsoleService
+from .views import ViewStore
+from .view_preview import ViewPreviewError, ViewPreviewService
 
 __all__ = [
     "ApiServiceError",
@@ -20,6 +22,9 @@ __all__ = [
     "SemanticConsoleApplication",
     "SemanticConsoleHTTPServer",
     "SemanticConsoleService",
+    "ViewStore",
+    "ViewPreviewError",
+    "ViewPreviewService",
     "WrenProjectAdapter",
     "create_app",
     "serve",

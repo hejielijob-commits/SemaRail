@@ -357,3 +357,77 @@ export interface CubeValidationResponse {
   errors: Array<{ path: string; message: string; severity: "error" }>;
   warnings: Array<{ path: string; message: string; severity: "warning" }>;
 }
+
+/** The actual Wren v5 view record exposed by the semantic-console server. */
+export interface ViewDefinition {
+  name: string;
+  sourcePath: string;
+  sqlPath?: string | null;
+  statement: string;
+  statementSource: "metadata" | "sql" | string;
+  storage: "metadata" | "sql" | string;
+  dialect?: string;
+  properties: Record<string, unknown>;
+  draft?: boolean;
+  [key: string]: unknown;
+}
+
+/** A read model returned by GET /api/views. */
+export interface ViewSnapshot {
+  schemaVersion: number;
+  revision: string;
+  draftCount: number;
+  views: ViewDefinition[];
+  sourceFiles: ProjectFile[];
+}
+
+export type ViewWritePayload = Pick<ViewDefinition, "name" | "statement" | "storage" | "properties"> & {
+  dialect?: string;
+  expectedRevision?: string;
+};
+
+export interface ViewValidationIssue {
+  path?: string;
+  line?: number;
+  severity?: "error" | "warning" | "info" | string;
+  message: string;
+  code?: string;
+}
+
+export interface ViewValidationResponse {
+  valid: boolean;
+  ok?: boolean;
+  errorCount: number;
+  warningCount: number;
+  errors: ViewValidationIssue[];
+  warnings: ViewValidationIssue[];
+  [key: string]: unknown;
+}
+
+export interface ViewPreviewColumn {
+  name: string;
+  type?: string;
+  semanticRole?: string;
+}
+
+export interface ViewPreviewStats {
+  returnedRows: number;
+  durationMs: number;
+  truncated: boolean;
+  [key: string]: unknown;
+}
+
+/** A bounded data_query-style SQL preview. The unavailable status is
+ * intentional when the configured backend has no safe preview endpoint. */
+export interface ViewPreviewResult {
+  schemaVersion?: number;
+  queryId?: string;
+  status: "success" | "PREVIEW_UNAVAILABLE" | "error";
+  semanticSql?: string;
+  nativeSql?: string;
+  columns?: ViewPreviewColumn[];
+  previewRows?: Array<Record<string, unknown>>;
+  stats?: ViewPreviewStats;
+  message?: string;
+  [key: string]: unknown;
+}

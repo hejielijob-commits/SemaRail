@@ -28,6 +28,10 @@ import type {
   CubeSnapshot,
   CubeRecord,
   CubeValidationResponse,
+  ViewSnapshot,
+  ViewWritePayload,
+  ViewValidationResponse,
+  ViewPreviewResult,
 } from "../types";
 
 export class ApiClientError extends Error {
@@ -165,6 +169,54 @@ export class ApiClient {
 
   validateCube(name: string, payload: CubeRecord): Promise<CubeValidationResponse> {
     return this.request<CubeValidationResponse>(`/api/cubes/${encodeURIComponent(name)}/validate`, { method: "POST", body: JSON.stringify(payload) });
+  }
+
+  /** Load the structured view projection used by the View Workbench. */
+  getViews(): Promise<ViewSnapshot> {
+    return this.request<ViewSnapshot>("/api/views");
+  }
+
+  /** Create one view as a project draft. The server owns YAML serialization. */
+  createView(payload: ViewWritePayload): Promise<ViewSnapshot> {
+    return this.request<ViewSnapshot>("/api/views", { method: "POST", body: JSON.stringify(payload) });
+  }
+
+  /** Save one view with optimistic revision protection. */
+  saveView(name: string, payload: ViewWritePayload): Promise<ViewSnapshot> {
+    return this.request<ViewSnapshot>(`/api/views/${encodeURIComponent(name)}`, { method: "PUT", body: JSON.stringify(payload) });
+  }
+
+  /** Alias for callers that use the REST verb in their adapter naming. */
+  updateView(name: string, payload: ViewWritePayload): Promise<ViewSnapshot> {
+    return this.saveView(name, payload);
+  }
+
+  /** Remove one view from the current project draft. */
+  deleteView(name: string, expectedRevision?: string): Promise<ViewSnapshot> {
+    return this.request<ViewSnapshot>(`/api/views/${encodeURIComponent(name)}`, {
+      method: "DELETE",
+      body: JSON.stringify(expectedRevision !== undefined ? { expectedRevision } : {}),
+    });
+  }
+
+  /** Validate a view without writing it to the project. */
+  validateView(name: string, payload: ViewWritePayload): Promise<ViewValidationResponse> {
+    return this.request<ViewValidationResponse>(`/api/views/${encodeURIComponent(name)}/validate`, { method: "POST", body: JSON.stringify(payload) });
+  }
+
+  /**
+   * Request a bounded read-only preview when a server provides one. A missing
+   * endpoint is represented explicitly so the workbench never invents rows.
+   */
+  async previewView(name: string, payload: { limit?: number; maxBytes?: number } = {}): Promise<ViewPreviewResult> {
+    try {
+      return await this.request<ViewPreviewResult>(`/api/views/${encodeURIComponent(name)}/preview`, { method: "POST", body: JSON.stringify(payload) });
+    } catch (error) {
+      if (error instanceof ApiClientError && (error.status === 404 || error.status === 501)) {
+        return { status: "PREVIEW_UNAVAILABLE", message: error.message };
+      }
+      throw error;
+    }
   }
 
   /** Read the unified diff between a published file and its current draft. */

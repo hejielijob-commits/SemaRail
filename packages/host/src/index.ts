@@ -61,6 +61,7 @@ export { DEFAULT_MAX_FRAME_BYTES, SidecarFrameDecoder, SidecarFrameError, encode
 export {
   packagedSemanticConsoleDirectory,
   packagedSemanticConsoleWebDirectory,
+  packagedSidecarPythonDirectory,
   SEMANTIC_CONSOLE_HOST,
   SEMANTIC_CONSOLE_PORT,
   SemanticConsoleProcess,

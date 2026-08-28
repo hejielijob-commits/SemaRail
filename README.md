@@ -61,6 +61,15 @@ its generated `metadata.yml`, `relationships.yml`, localized metadata, and
 unified source diff. English and Simplified Chinese are available without
 changing the technical identifiers used by Wren queries.
 
+The View Workbench manages Wren v5 `views/<name>/metadata.yml` and optional
+`sql.yml` files as revision-protected drafts. It provides SQL editing,
+validation, source and diff inspection, dependency hints, create/delete flows,
+and a bounded runtime preview backed by the same read-only query policy as the
+data agent. Preview rows are always returned by Wren plus the configured
+PostgreSQL datasource; the UI never substitutes fixture data. Wren Python
+0.13.2 does not support View-to-View references, so nested View dependencies
+are called out as unsupported before execution.
+
 Datasource credentials are stored outside the Wren project at a deterministic
 per-project path below `~/.wren/semantic-console`. The query sidecar reads the
 active PostgreSQL profile from that same state on every query and falls back to

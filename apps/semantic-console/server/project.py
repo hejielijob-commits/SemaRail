@@ -18,7 +18,8 @@ import re
 import shutil
 import tempfile
 import threading
-from collections.abc import Iterable, Mapping
+from contextlib import contextmanager
+from collections.abc import Iterable, Iterator, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from secrets import token_hex
@@ -403,6 +404,19 @@ def _structural_validate(project_dir: Path) -> dict[str, Any]:
                 errors.append({"level": "error", "path": relative, "message": "model name is required"})
             if isinstance(model, dict) and not model.get("columns"):
                 errors.append({"level": "error", "path": relative, "message": "model columns are required"})
+    # Keep the no-Wren fallback honest for v5 views as well.  Import lazily to
+    # avoid a module cycle: views.py uses ProjectStore for its regular CRUD,
+    # while this function is called only after project.py has initialized.
+    try:
+        try:
+            from .views import validate_view_tree
+        except ImportError:  # pragma: no cover - direct module loading
+            from views import validate_view_tree  # type: ignore[no-redef]
+        errors.extend(validate_view_tree(project_dir))
+    except ProjectError as exc:
+        errors.append({"level": "error", "path": "views", "message": exc.safe_message})
+    except Exception:
+        errors.append({"level": "error", "path": "views", "message": "view validation failed"})
     return {"valid": not errors, "errors": errors, "warnings": [], "errorCount": len(errors), "warningCount": 0}
 
 
@@ -690,6 +704,24 @@ class ProjectStore:
                 return result
             finally:
                 shutil.rmtree(stage, ignore_errors=True)
+
+    @contextmanager
+    def staged_snapshot(self) -> Iterator[tuple[Path, str]]:
+        """Yield an isolated source tree containing the current draft overlay.
+
+        The project lock is held only while the snapshot is materialized. Long
+        Wren planning or database preview work therefore cannot block another
+        editor from saving a newer draft. Callers receive the captured revision
+        so they can mark a result stale if the project changes meanwhile.
+        """
+
+        with self._lock:
+            stage = self._stage()
+            revision = _file_digest(self.project_dir, self.drafts, exclude=self.state_dir)
+        try:
+            yield stage, revision
+        finally:
+            shutil.rmtree(stage, ignore_errors=True)
 
     # ---- publish/version operations ------------------------------------
 

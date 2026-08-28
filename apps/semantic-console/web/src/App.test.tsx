@@ -2,6 +2,12 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
+vi.mock("@uiw/react-codemirror", () => ({
+  default: ({ value, onChange, "aria-label": label }: { value: string; onChange: (value: string) => void; "aria-label"?: string }) => (
+    <textarea aria-label={label ?? "SQL editor"} value={value} onChange={(event) => onChange(event.target.value)} />
+  ),
+}));
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
@@ -153,5 +159,55 @@ describe("Semantic Console interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Relationships" }));
     fireEvent.click(screen.getByRole("tab", { name: "Changes" }));
     expect(await screen.findByText("No unpublished relationship changes")).toBeInTheDocument();
+  });
+
+  it("loads Views as a structured workbench and runs the bounded preview endpoint", async () => {
+    const views = {
+      schemaVersion: 1,
+      revision: "sha256:views",
+      draftCount: 0,
+      views: [{
+        name: "daily_orders",
+        sourcePath: "views/daily_orders/metadata.yml",
+        sqlPath: "views/daily_orders/sql.yml",
+        statement: "SELECT id FROM orders",
+        statementSource: "sql",
+        storage: "sql",
+        properties: { description: "Daily orders" },
+        draft: false,
+      }],
+      sourceFiles: [],
+    };
+    const semanticProject = { revision: "sha256:views", draftCount: 0, models: [{ name: "orders", columns: [] }], relationships: [], sourceFiles: [] };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/health")) return Promise.resolve(jsonResponse({ status: "ok" }));
+      if (url.endsWith("/api/project") && init?.method !== "POST") return Promise.resolve(jsonResponse({ name: "Warehouse project", projectExists: true, activeDatasource: null }));
+      if (url.endsWith("/api/datasource-types") || url.endsWith("/api/datasources") || url.endsWith("/api/project/files") || url.endsWith("/api/versions")) return Promise.resolve(jsonResponse([]));
+      if (url.endsWith("/api/semantic-project")) return Promise.resolve(jsonResponse(semanticProject));
+      if (url.endsWith("/api/views")) return Promise.resolve(jsonResponse(views));
+      if (url.endsWith("/api/views/daily_orders/preview") && init?.method === "POST") return Promise.resolve(jsonResponse({
+        schemaVersion: 1,
+        queryId: "preview-app-1",
+        status: "success",
+        semanticSql: "SELECT * FROM daily_orders",
+        nativeSql: "SELECT id FROM orders",
+        columns: [{ name: "id", type: "BIGINT", semanticRole: "dimension" }],
+        previewRows: [{ id: 7 }],
+        stats: { returnedRows: 1, durationMs: 4, truncated: false },
+      }));
+      return Promise.resolve(jsonResponse({ code: "NOT_FOUND", message: `Unhandled test request: ${url}` }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Views" }));
+    expect(await screen.findByRole("heading", { name: "daily_orders", level: 2 })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /Preview/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Run preview" })[0]);
+
+    expect(await screen.findByRole("table")).toHaveTextContent("7");
+    const previewCall = fetchMock.mock.calls.find(([input]) => String(input).endsWith("/api/views/daily_orders/preview"));
+    expect(previewCall?.[1]).toMatchObject({ method: "POST", body: JSON.stringify({ limit: 100, maxBytes: 524288 }) });
   });
 });

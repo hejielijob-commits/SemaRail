@@ -8,10 +8,19 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from sidecar.dispatch import Dispatcher, SidecarDependencies
-from sidecar.wren_adapter import LazyWrenAdapter
+from sidecar.wren_adapter import LazyWrenAdapter, default_dependencies
 
 
 class WrenAdapterTests(unittest.TestCase):
+    def test_default_dependencies_accepts_canonical_connection_resolver(self) -> None:
+        def resolver(_project_dir: str, _env_name: str) -> dict[str, str]:
+            return {"datasource": "postgres", "connectionUrl": "redacted-in-test"}
+
+        dependencies = default_dependencies(connection_resolver=resolver)
+
+        self.assertIsNotNone(dependencies.query_service)
+        self.assertIs(dependencies.query_service.connection_resolver, resolver)
+
     def test_import_is_lazy_and_health_reports_fake_wren(self) -> None:
         calls: list[str] = []
 
@@ -124,4 +133,3 @@ class WrenAdapterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

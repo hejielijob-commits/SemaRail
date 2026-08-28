@@ -89,4 +89,52 @@ describe("ApiClient", () => {
     expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "DELETE", body: JSON.stringify({ expectedRevision: "sha256:2" }) });
     expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: "DELETE", body: JSON.stringify({ expectedRevision: "" }) });
   });
+
+  it("uses encoded View Workbench routes and preserves optimistic revisions", async () => {
+    const viewSnapshot = { schemaVersion: 1, revision: "sha256:2", draftCount: 1, views: [], sourceFiles: [] };
+    const validation = { valid: true, errorCount: 0, warningCount: 0, errors: [], warnings: [] };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(viewSnapshot))
+      .mockResolvedValueOnce(jsonResponse(viewSnapshot))
+      .mockResolvedValueOnce(jsonResponse(validation))
+      .mockResolvedValueOnce(jsonResponse(viewSnapshot));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient();
+    const payload = {
+      name: "order summary",
+      statement: "SELECT * FROM orders",
+      storage: "sql" as const,
+      properties: { description: "Order summary" },
+      expectedRevision: "sha256:1",
+    };
+
+    await client.getViews();
+    await client.saveView("order summary", payload);
+    await client.validateView("order summary", payload);
+    await client.deleteView("order summary", "sha256:2");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/views");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/views/order%20summary");
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "PUT", body: JSON.stringify(payload) });
+    expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/views/order%20summary/validate");
+    expect(fetchMock.mock.calls[3]?.[1]).toMatchObject({ method: "DELETE", body: JSON.stringify({ expectedRevision: "sha256:2" }) });
+  });
+
+  it("requests bounded View previews and reports an unsupported runtime explicitly", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ status: "success", columns: [], previewRows: [], stats: { returnedRows: 0, durationMs: 2, truncated: false } }))
+      .mockResolvedValueOnce(jsonResponse({ code: "PREVIEW_UNAVAILABLE", message: "safe runtime missing" }, 501));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient();
+
+    await expect(client.previewView("daily/orders", { limit: 25, maxBytes: 262144 })).resolves.toMatchObject({ status: "success" });
+    await expect(client.previewView("daily/orders")).resolves.toEqual({ status: "PREVIEW_UNAVAILABLE", message: "safe runtime missing" });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/views/daily%2Forders/preview");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "POST", body: JSON.stringify({ limit: 25, maxBytes: 262144 }) });
+  });
 });
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}

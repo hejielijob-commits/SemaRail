@@ -9,6 +9,7 @@ import {
   SemanticConsoleProcess,
   packagedSemanticConsoleDirectory,
   packagedSemanticConsoleWebDirectory,
+  packagedSidecarPythonDirectory,
 } from '../src/semantic-console.ts'
 
 function fakeHandle(): SubprocessHandle & {
@@ -55,6 +56,7 @@ describe('Semantic Console managed process', () => {
       },
       env: {
         SEMANTIC_CONSOLE_ORIGINS: `http://127.0.0.1:${SEMANTIC_CONSOLE_PORT},http://localhost:${SEMANTIC_CONSOLE_PORT}`,
+        PYTHONPATH: packagedSidecarPythonDirectory(),
         PYTHONDONTWRITEBYTECODE: '1',
       },
     })

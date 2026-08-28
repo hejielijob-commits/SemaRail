@@ -25,6 +25,11 @@ export function packagedSemanticConsoleWebDirectory(): string {
   return fileURLToPath(new URL('../semantic-console-web/', import.meta.url))
 }
 
+/** Python import root for the sibling packaged query sidecar. */
+export function packagedSidecarPythonDirectory(): string {
+  return fileURLToPath(new URL('../python/sidecar/', import.meta.url))
+}
+
 function requiredString(value: string, name: string): string {
   const normalized = value.trim()
   if (normalized.length === 0) throw new RangeError(`${name} must not be empty`)
@@ -79,6 +84,7 @@ export class SemanticConsoleProcess {
       graceMs: DEFAULT_GRACE_MS,
       env: {
         SEMANTIC_CONSOLE_ORIGINS: `${origin},${localhostOrigin}`,
+        PYTHONPATH: packagedSidecarPythonDirectory(),
         PYTHONDONTWRITEBYTECODE: '1',
       },
     }

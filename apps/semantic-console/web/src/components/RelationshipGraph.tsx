@@ -833,6 +833,7 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
   const { models, locale, relationships, readOnly = false } = props;
   const reactFlow = useReactFlow<GraphNode, GraphEdge>();
   const initialFitTimerRef = useRef<number | undefined>(undefined);
+  const mountedRef = useRef(true);
   const [localRelationships, setLocalRelationships] = useState<RelationshipGraphRelationship[]>(() => [...relationships]);
   const [nodePositions, setNodePositions] = useState<Record<string, { x: number; y: number }>>(() => defaultPositions(models, relationships));
   const [search, setSearch] = useState("");
@@ -845,8 +846,12 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
   const [formError, setFormError] = useState<string | null>(null);
   const [localSaving, setLocalSaving] = useState(false);
 
-  useEffect(() => () => {
-    if (initialFitTimerRef.current !== undefined) window.clearTimeout(initialFitTimerRef.current);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (initialFitTimerRef.current !== undefined) window.clearTimeout(initialFitTimerRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -1039,6 +1044,7 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
     if (initialFitTimerRef.current !== undefined) window.clearTimeout(initialFitTimerRef.current);
     initialFitTimerRef.current = window.setTimeout(() => {
       initialFitTimerRef.current = undefined;
+      if (!mountedRef.current) return;
       void reactFlow.fitView({ padding: 0.2, duration: 280 });
     }, 0);
   }, [localRelationships, models, reactFlow]);
@@ -1139,11 +1145,13 @@ function RelationshipGraphCanvas({ props, copy }: { props: RelationshipGraphProp
             nodes={graphNodes}
             edges={graphEdges}
             onInit={(instance) => {
+              if (!mountedRef.current) return;
               if (initialFitTimerRef.current !== undefined) window.clearTimeout(initialFitTimerRef.current);
               // A tab can initialize React Flow before its final layout box is
               // measurable. Delay the first fit so it cannot clamp to maxZoom.
               initialFitTimerRef.current = window.setTimeout(() => {
                 initialFitTimerRef.current = undefined;
+                if (!mountedRef.current) return;
                 void instance.fitView({ padding: 0.2, duration: 0 });
               }, 120);
             }}

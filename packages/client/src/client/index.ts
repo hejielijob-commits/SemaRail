@@ -293,7 +293,8 @@ ${SEMANTIC_CONSOLE_CARD_STYLES}
 [data-query-sql-heading] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .data-query-sql-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px; border-bottom: 1px solid var(--wren-border); }
 .data-query-sql-toolbar [aria-pressed="true"] { border-color: var(--wren-accent); background: color-mix(in srgb, var(--wren-accent) 12%, transparent); color: var(--wren-text); }
-.data-query-sql-toolbar [data-query-sql-copy] { margin-left: auto; }
+.data-query-sql-modes, .data-query-sql-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.data-query-sql-actions { margin-left: auto; }
 [data-query-sql-history] { padding: 14px 16px; border-bottom: 1px solid var(--wren-border); background: var(--wren-bg); }
 [data-query-sql-history] h4 { margin: 0 0 4px; color: var(--wren-text); font-size: 13px; }
 [data-query-sql-history] > p { margin: 0; color: var(--wren-text-tertiary); font-size: 12px; }
@@ -773,15 +774,19 @@ export function DataQuerySqlView({ meta, mode, copied, onModeChange, onCopy, sub
   return element('section', { 'data-query-sql': true, role: 'region', 'aria-label': 'SQL' },
     element('div', { 'data-query-sql-heading': true }, 'SQL'),
     element('div', { className: 'data-query-sql-toolbar' },
-      element('button', { type: 'button', 'data-query-sql-mode': 'semantic', 'aria-pressed': selectedMode === 'semantic', onClick: () => onModeChange('semantic') }, 'Semantic SQL'),
-      element('button', { type: 'button', 'data-query-sql-mode': 'native', 'aria-pressed': selectedMode === 'native', disabled: !nativeAvailable, onClick: () => { if (nativeAvailable) onModeChange('native') } }, 'Native SQL'),
-      element('button', {
-        type: 'button',
-        'data-query-sql-submit': true,
-        disabled: meta.status !== 'success' || submissionState === 'submitting' || submissionState === 'pending' || onSubmit === undefined,
-        onClick: onSubmit,
-      }, submissionState === 'submitting' ? 'Submitting…' : submissionState === 'pending' ? 'Pending review' : submissionState === 'error' ? 'Retry submission' : 'Record for review'),
-      element('button', { type: 'button', 'data-query-sql-copy': true, onClick: onCopy }, copied ? 'Copied' : 'Copy'),
+      element('div', { className: 'data-query-sql-modes', role: 'group', 'aria-label': 'SQL source' },
+        element('button', { type: 'button', 'data-query-sql-mode': 'semantic', 'aria-pressed': selectedMode === 'semantic', onClick: () => onModeChange('semantic') }, 'Semantic SQL'),
+        element('button', { type: 'button', 'data-query-sql-mode': 'native', 'aria-pressed': selectedMode === 'native', disabled: !nativeAvailable, onClick: () => { if (nativeAvailable) onModeChange('native') } }, 'Native SQL'),
+      ),
+      element('div', { className: 'data-query-sql-actions', role: 'group', 'aria-label': 'SQL actions' },
+        element('button', {
+          type: 'button',
+          'data-query-sql-submit': true,
+          disabled: meta.status !== 'success' || submissionState === 'submitting' || submissionState === 'pending' || onSubmit === undefined,
+          onClick: onSubmit,
+        }, submissionState === 'submitting' ? 'Submitting…' : submissionState === 'pending' ? 'Pending review' : submissionState === 'error' ? 'Retry submission' : 'Record for review'),
+        element('button', { type: 'button', 'data-query-sql-copy': true, onClick: onCopy }, copied ? 'Copied' : 'Copy'),
+      ),
     ),
     element('div', { 'data-query-sql-submit-state': submissionState, role: 'status', 'aria-live': 'polite' },
       submissionState === 'pending' ? 'Saved to the review queue. It is not active Wren memory until approved.'

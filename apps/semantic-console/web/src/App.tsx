@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ArrowClockwise,
@@ -43,13 +43,15 @@ import {
 import { api } from "./api/client";
 import "./i18n";
 import { setConsoleLocale } from "./i18n";
-import type { ColumnRecord, ConsoleSection, CubeSnapshot, Datasource, DatasourceField, DatasourceType, KnowledgeRulesResponse, LocalizedText, ProjectDiff, ProjectFile, ProjectSummary, SchemaRecord, SemanticModel, SemanticProjectSnapshot, SemanticRelationship, SqlCandidatesResponse, TableRecord, Theme, ValidationIssue, VersionRecord } from "./types";
+import type { ColumnRecord, ConsoleSection, CubeSnapshot, Datasource, DatasourceField, DatasourceType, KnowledgeRulesResponse, LocalizedText, ProjectDiff, ProjectFile, ProjectSummary, SchemaRecord, SemanticModel, SemanticProjectSnapshot, SemanticRelationship, SqlCandidatesResponse, TableRecord, Theme, ValidationIssue, VersionRecord, ViewDefinition, ViewPreviewResult, ViewSnapshot, ViewValidationResponse, ViewWritePayload } from "./types";
 import { Badge, Button, EmptyState, Field, InlineNotice, LoadingRows, Modal, SectionHeading, Select, TextArea, TextInput } from "./components/ui";
 import ModelEditor from "./components/ModelEditor";
 import { RelationshipGraph, type RelationshipGraphLocalizedText, type RelationshipGraphRelationship } from "./components/RelationshipGraph";
 import RuleWorkbench, { type KnowledgeRule, type RuleSaveAction } from "./components/RuleWorkbench";
 import SqlKnowledgeWorkbench, { type SqlKnowledgeCandidate, type SqlValidation } from "./components/SqlKnowledgeWorkbench";
 import CubeWorkbench, { type CubeDefinition } from "./components/CubeWorkbench";
+
+const ViewWorkbench = lazy(() => import("./components/ViewWorkbench"));
 
 type Notice = { tone: "info" | "success" | "warning" | "error"; title: string; body?: string } | null;
 
@@ -165,6 +167,9 @@ function App() {
   const [sqlLoading, setSqlLoading] = useState(false);
   const [cubeSnapshot, setCubeSnapshot] = useState<CubeSnapshot | null>(null);
   const [cubeLoading, setCubeLoading] = useState(false);
+  const [viewSnapshot, setViewSnapshot] = useState<ViewSnapshot | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewError, setViewError] = useState<string | null>(null);
   const fileRequestRef = useRef(0);
   const diffRequestRef = useRef(0);
 
@@ -233,6 +238,17 @@ function App() {
     });
     if (result) setCubeSnapshot(result);
     setCubeLoading(false);
+  }
+
+  async function loadViews() {
+    setViewLoading(true);
+    setViewError(null);
+    const result = await api.getViews().catch((error: unknown) => {
+      setViewError(error instanceof Error ? error.message : "Views could not be loaded.");
+      return null;
+    });
+    if (result) setViewSnapshot(result);
+    setViewLoading(false);
   }
 
   async function loadProjectFile(path: string, fileList = files) {
@@ -457,13 +473,72 @@ function App() {
     }
     markSaved();
   }
+  async function saveViewDraft(view: ViewDefinition) {
+    const result = await api.saveView(view.name, {
+      name: view.name,
+      statement: view.statement,
+      storage: view.storage,
+      properties: view.properties ?? {},
+      ...(view.dialect ? { dialect: view.dialect } : {}),
+      expectedRevision: viewSnapshot?.revision,
+    });
+    setViewSnapshot(result);
+    const saved = result.views.find((item) => item.name === view.name);
+    if (saved) {
+      setSelectedFilePath(saved.storage === "sql" && saved.sqlPath ? saved.sqlPath : saved.sourcePath);
+      await loadProjectFile(saved.storage === "sql" && saved.sqlPath ? saved.sqlPath : saved.sourcePath);
+    }
+    markSaved();
+  }
+  async function createViewDraft(input: ViewWritePayload) {
+    const result = await api.createView({ ...input, expectedRevision: viewSnapshot?.revision });
+    setViewSnapshot(result);
+    const created = result.views.find((view) => view.name === input.name);
+    if (created) {
+      const path = created.storage === "sql" && created.sqlPath ? created.sqlPath : created.sourcePath;
+      setSelectedFilePath(path);
+      await loadProjectFile(path);
+    }
+    markSaved();
+  }
+  async function deleteViewDraft(view: ViewDefinition) {
+    const result = await api.deleteView(view.name, viewSnapshot?.revision);
+    setViewSnapshot(result);
+    const next = result.views[0];
+    if (next) {
+      const path = next.storage === "sql" && next.sqlPath ? next.sqlPath : next.sourcePath;
+      setSelectedFilePath(path);
+      await Promise.all([loadProjectFile(path), loadSemanticDiff(path)]);
+    } else {
+      setSelectedFilePath(""); setMdlSource(""); setSemanticDiff(null);
+    }
+    markSaved();
+  }
+  async function validateViewDraft(view: ViewDefinition): Promise<ViewValidationResponse> {
+    return api.validateView(view.name, {
+      name: view.name,
+      statement: view.statement,
+      storage: view.storage,
+      properties: view.properties ?? {},
+      ...(view.dialect ? { dialect: view.dialect } : {}),
+      expectedRevision: viewSnapshot?.revision,
+    });
+  }
+  async function previewViewDraft(view: ViewDefinition): Promise<ViewPreviewResult> {
+    const current = viewSnapshot?.views.find((item) => item.name === view.name);
+    const currentShape = current ? JSON.stringify({ statement: current.statement, storage: current.storage, dialect: current.dialect ?? "", properties: current.properties ?? {} }) : "";
+    const draftShape = JSON.stringify({ statement: view.statement, storage: view.storage, dialect: view.dialect ?? "", properties: view.properties ?? {} });
+    if (currentShape !== draftShape) await saveViewDraft(view);
+    return api.previewView(view.name, { limit: 100, maxBytes: 524_288 });
+  }
   function openProjectFile(path: string) { setSection("mdl"); setShowMobileNav(false); setNotice(null); void loadProjectFile(path); }
   function navigate(next: ConsoleSection) {
     setSection(next); setShowMobileNav(false); setNotice(null);
-    if (next === "models" || next === "relationships") void loadSemanticProject();
+    if (next === "models" || next === "relationships" || next === "views") void loadSemanticProject();
     if (next === "rules") void loadRules();
     if (next === "sqlKnowledge") void loadSqlCandidates();
     if (next === "cubes") void loadCubes();
+    if (next === "views") void loadViews();
     if (next === "schema" && activeDatasourceId) void handleLoadSchema();
     if (next === "instructions") {
       const instructionFile = files.find((file) => isInstructionFile(file.path));
@@ -577,7 +652,7 @@ function App() {
           {section === "schema" ? <SchemaPage datasources={datasources} selectedDatasource={selectedDatasource} selectedSchema={selectedSchema} setSelectedSchema={(value) => { setSelectedSchema(value); void handleLoadSchema(value); }} schemas={schemas} tables={filteredTables} search={schemaSearch} setSearch={setSchemaSearch} selectedTable={selectedTable} onSelectTable={handleSelectTable} columns={columns} onImport={() => setShowImportModal(true)} busyAction={busyAction} onRefresh={() => void handleLoadSchema()} onDatasourceChange={(id: string) => { setSelectedDatasourceId(id); setSelectedSchema(""); setSelectedTable(""); void handleLoadSchema("", id); }} /> : null}
           {section === "models" ? <ModelsPage files={files} onOpenFile={openProjectFile} snapshot={semanticProject} loading={semanticLoading} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} onSave={async (model) => { const result = await api.updateSemanticModel(model.name, { ...model, expectedRevision: semanticProject?.revision }); if (result) { setSemanticProject(result); markSaved(); } }} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} /> : null}
           {section === "relationships" ? <RelationshipsPage snapshot={semanticProject} loading={semanticLoading} locale={activeI18n.language} theme={theme} saving={busyAction === "relationships"} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} onOpenEditor={(path) => { setSelectedFilePath(path); void loadProjectFile(path); setSection("mdl"); }} onSave={saveRelationshipDraft} /> : null}
-          {section === "views" ? <ViewsPage files={files} onOpenFile={openProjectFile} /> : null}
+          {section === "views" ? <Suspense fallback={<div className="panel" role="status" aria-label={t("nav.views")}><LoadingRows /></div>}><ViewWorkbench snapshot={viewSnapshot} loading={viewLoading} error={viewError} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} theme={theme} modelNames={(semanticProject?.models ?? []).map((model) => model.name)} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} onSave={saveViewDraft} onCreate={createViewDraft} onDelete={deleteViewDraft} onValidate={validateViewDraft} onPreview={previewViewDraft} onRetry={() => void loadViews()} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} /></Suspense> : null}
           {section === "cubes" ? <CubeWorkbench snapshot={cubeSnapshot} loading={cubeLoading} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onSave={saveCube} onCreate={createCubeDraft} onDelete={deleteCubeDraft} onRetry={() => void loadCubes()} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} /> : null}
           {section === "rules" ? <RuleWorkbench rules={knowledgeRules(rulesSnapshot)} selectedRuleId={selectedRuleId} loading={rulesLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} source={selectedFilePath ? { path: selectedFilePath, content: mdlSource, diff: semanticDiff?.diff } : null} onRetry={() => void loadRules()} onSelectRule={(rule) => { setSelectedRuleId(rule.id); setSelectedFilePath(rule.sourcePath); void loadProjectFile(rule.sourcePath); void loadSemanticDiff(rule.sourcePath); }} onToggleRule={toggleRule} onSave={saveRule} onCreate={createRule} onDelete={deleteRule} /> : null}
           {section === "sqlKnowledge" ? <SqlKnowledgeWorkbench candidates={knowledgeCandidates(sqlCandidates)} loading={sqlLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onRetry={() => void loadSqlCandidates()} onValidate={validateCandidate} onApprove={approveCandidate} onReject={rejectCandidate} /> : null}
@@ -710,10 +785,6 @@ function RelationshipsPage({ snapshot, loading, locale, theme, saving, sourceCon
       </div>
     </section>
   </div>;
-}
-
-function ViewsPage({ files, onOpenFile }: { files: ProjectFile[]; onOpenFile: (path: string) => void }) {
-  return <FileIndexPage title="Views" description="Inspect view definitions that are present in the project source." files={files} pattern={/view/i} icon={Eye} emptyTitle="No view files" emptyBody="View files will appear here once they are present in the project source." onOpenFile={onOpenFile} />;
 }
 
 function InstructionsPage({ value, onChange, onSave, savedAt, loading }: { value: string; onChange: (value: string) => void; onSave: () => void; savedAt: string | null; loading: boolean }) {

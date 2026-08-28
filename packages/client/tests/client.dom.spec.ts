@@ -148,6 +148,11 @@ describe('DataQueryRow browser interactions', () => {
     expect(container.querySelector('style')?.textContent).toContain('white-space: pre-wrap')
     expect(sqlBlock?.getAttribute('data-query-sql-current')).toBe('semantic')
     expect(sqlBlock?.textContent).toBe(replayMeta.semanticSql)
+    const sqlModes = container.querySelector('.data-query-sql-modes')
+    const sqlActions = container.querySelector('.data-query-sql-actions')
+    expect([...sqlModes!.querySelectorAll('button')].map(item => item.textContent)).toEqual(['Semantic SQL', 'Native SQL'])
+    expect([...sqlActions!.querySelectorAll('button')].map(item => item.textContent)).toEqual(['Record for review', 'Copy'])
+    expect(container.querySelector('[data-query-sql-submit]')?.parentElement).toBe(container.querySelector('[data-query-sql-copy]')?.parentElement)
 
     click(button(container, 'Native SQL'))
     expect(sqlBlock?.getAttribute('data-query-sql-current')).toBe('native')
