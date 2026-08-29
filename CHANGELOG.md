@@ -15,5 +15,6 @@ All notable user-visible changes to this project are documented here. The format
 
 ### Changed
 
+- Renamed the GitHub repository to `dsh-data-agent` to match the independent project branding.
 - Rebranded the management interface as DSH Data Agent while retaining clear WrenAI attribution.
 - Datasource selection now shows only drivers configured in the running Python environment.
