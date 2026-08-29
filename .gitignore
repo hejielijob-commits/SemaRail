@@ -16,5 +16,6 @@ target/
 __pycache__/
 .pytest_cache/
 *.py[cod]
+*.egg-info/
 packages/host/python/
 packages/host/semantic-console-web/
