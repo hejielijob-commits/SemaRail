@@ -23,12 +23,13 @@ DSH will not duplicate Wren's complete MCP tool surface. The Semantic Console
 remains a separate local management plane; datasource credentials, project
 publication, and rollback are not exposed through the default MCP server.
 
-The native MCP query tools and the DSH Harness query sidecar do not currently
-share one enforcement path. Native MCP is read-only by default because its
-write tool requires an explicit `--allow-write`, but it does not inherit DSH's
-PostgreSQL AST allowlist, byte/time/concurrency limits, or cancellation policy.
-Streamable HTTP must therefore remain loopback-only until authentication and an
-explicit deployment policy are added.
+Native MCP query tools do not inherit DSH's PostgreSQL AST allowlist,
+byte/time/concurrency limits, or cancellation policy. Governed deployments
+therefore run native MCP with `--no-connect` and compose it with the thin DSH
+execution adapter defined in
+[`0003-governed-query-mcp.md`](0003-governed-query-mcp.md). Streamable HTTP must
+remain loopback-only until authentication and an explicit deployment policy are
+added.
 
 ## Consequences
 
@@ -39,5 +40,5 @@ explicit deployment policy are added.
   conversation-native presentation path.
 - MySQL support in the Semantic Console remains metadata, connection testing,
   schema browsing, and model import; it is not yet DSH governed query execution.
-- A future host-neutral governed-query gateway can be shared by Harness and a
-  thin DSH MCP adapter without replacing Wren's native semantic tools.
+- The host-neutral governed query service is shared by Harness and the thin DSH
+  MCP adapter without replacing Wren's native semantic tools.

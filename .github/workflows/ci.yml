@@ -55,7 +55,7 @@ jobs:
           PYTHON: python
         run: pnpm test
 
-      - name: Wren native MCP acceptance
+      - name: Native and governed MCP acceptance
         run: pnpm acceptance:mcp
 
       - name: Build

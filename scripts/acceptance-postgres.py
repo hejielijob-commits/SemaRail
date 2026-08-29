@@ -30,6 +30,7 @@ Examples (PowerShell):
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import queue
@@ -723,6 +724,129 @@ def _run_bounds_and_policy(client: SidecarClient, project_dir: Path) -> None:
         )
 
 
+def _mcp_result_payload(result: Any, label: str) -> Mapping[str, Any]:
+    if getattr(result, "isError", False):
+        raise E2EFailure(f"{label} returned an MCP tool error")
+    structured = getattr(result, "structuredContent", None)
+    if isinstance(structured, Mapping):
+        return structured
+    for content in getattr(result, "content", []):
+        text = getattr(content, "text", None)
+        if isinstance(text, str):
+            try:
+                payload = json.loads(text)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, Mapping):
+                return payload
+    raise E2EFailure(f"{label} returned no structured MCP result")
+
+
+async def _run_governed_mcp_smoke_async(
+    python_path: Path,
+    project_dir: Path,
+    process_env: Mapping[str, str],
+    sidecar_root: Path,
+) -> None:
+    try:
+        from mcp import ClientSession, StdioServerParameters
+        from mcp.client.stdio import stdio_client
+    except ImportError as exc:
+        raise E2EFailure(
+            "MCP client is unavailable; install python/sidecar with the mcp extra"
+        ) from exc
+
+    child_env = dict(process_env)
+    existing_pythonpath = child_env.get("PYTHONPATH", "")
+    child_env["PYTHONPATH"] = (
+        str(sidecar_root)
+        if not existing_pythonpath
+        else str(sidecar_root) + os.pathsep + existing_pythonpath
+    )
+    child_env["PYTHONUTF8"] = "1"
+    child_env["PYTHONIOENCODING"] = "utf-8"
+    params = StdioServerParameters(
+        command=str(python_path),
+        args=[
+            "-m",
+            "sidecar.mcp_gateway",
+            "--project",
+            str(project_dir),
+            "--database-dsn-env",
+            "WREN_DATABASE_URL",
+        ],
+        cwd=str(sidecar_root),
+        env=child_env,
+    )
+
+    async with stdio_client(params) as (reader, writer):
+        async with ClientSession(reader, writer) as session:
+            initialized = await session.initialize()
+            if initialized.serverInfo.name != "dsh-governed-query":
+                raise E2EFailure("governed MCP returned an unexpected server identity")
+            tools = await session.list_tools()
+            names = {tool.name for tool in tools.tools}
+            if names != {"dsh_governed_query"}:
+                raise E2EFailure("governed MCP exposed an unexpected tool surface")
+
+            successful = await session.call_tool(
+                "dsh_governed_query",
+                {
+                    "question": "List order identifiers",
+                    "semantic_sql": "SELECT orders.id FROM orders ORDER BY orders.id",
+                    "chart_intent": "table",
+                    "max_rows": 2,
+                    "preview_rows": 1,
+                },
+            )
+            payload = _mcp_result_payload(successful, "governed MCP query")
+            stats = payload.get("stats")
+            if (
+                payload.get("schemaVersion") != 1
+                or payload.get("status") != "success"
+                or not isinstance(stats, Mapping)
+                or stats.get("returnedRows") != 2
+                or stats.get("truncated") is not True
+                or len(payload.get("previewRows", [])) > 1
+            ):
+                raise E2EFailure("governed MCP did not preserve DSH result bounds")
+
+            denied = await session.call_tool(
+                "dsh_governed_query",
+                {
+                    "question": "policy probe",
+                    "semantic_sql": "SELECT pg_sleep(1) AS waited",
+                },
+            )
+            if not getattr(denied, "isError", False):
+                raise E2EFailure("governed MCP unexpectedly accepted dangerous SQL")
+            diagnostic = " ".join(
+                str(getattr(content, "text", ""))
+                for content in getattr(denied, "content", [])
+            )
+            if "POLICY_DENIED" not in diagnostic:
+                raise E2EFailure("governed MCP returned an unexpected policy error")
+            dsn = child_env.get("WREN_DATABASE_URL", "")
+            if dsn and dsn in diagnostic:
+                raise E2EFailure("governed MCP diagnostics leaked the database DSN")
+
+
+def _run_governed_mcp_smoke(
+    python_path: Path,
+    project_dir: Path,
+    process_env: Mapping[str, str],
+    sidecar_root: Path,
+) -> None:
+    asyncio.run(
+        _run_governed_mcp_smoke_async(
+            python_path,
+            project_dir,
+            process_env,
+            sidecar_root,
+        )
+    )
+
+
 def _long_running_sql() -> str:
     aliases = [f"orders AS o{index}" for index in range(1, 13)]
     return "SELECT COUNT(*) AS n FROM " + " CROSS JOIN ".join(aliases)
@@ -904,6 +1028,12 @@ def main(argv: Iterable[str] | None = None) -> int:
             raise E2EFailure("Wren example project validation failed")
         _run_smoke_cases(client, project_dir, json.loads((project_dir / "smoke-cases.json").read_text(encoding="utf-8")))
         _run_bounds_and_policy(client, project_dir)
+        _run_governed_mcp_smoke(
+            python_path,
+            project_dir,
+            process_env,
+            repo_dir / "python" / "sidecar",
+        )
         _run_timeout_and_cancel(client, project_dir)
         stderr = client.stderr_text
         if target is not None and target.password in stderr:
@@ -914,6 +1044,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         print("POSTGRES_E2E_PASS")
         print(f"  mode={args.mode}")
         print("  health/project validation/smoke result metadata: passed")
+        print("  framed sidecar and governed MCP query paths: passed")
         print("  row bounds/policy/read-only account/timeout/cancel: passed")
         return 0
     except E2EFailure as exc:

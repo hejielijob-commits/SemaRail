@@ -78,11 +78,29 @@ and the CLI default uses `LazyWrenAdapter` plus a lazy psycopg executor.
 Protocol and adapter tests can inject fake Wren/database implementations, so
 they do not need Wren or a database installed.
 
-## Local development
+## Governed MCP adapter
 
-From this directory, run the standard-library test suite with:
+The optional MCP entry point reuses the same `WrenQueryService` and
+`EnvPsycopgExecutor` instead of reimplementing query policy:
 
 ```text
+dsh-data-agent-mcp --project C:\data\wren-project
+```
+
+It exposes only `dsh_governed_query` over stdio. The project directory and DSN
+environment-variable name are fixed at process startup and never appear as tool
+arguments. MCP request cancellation is forwarded to the executor's database
+cancellation hook. Install `.[wren,mcp]` to use this entry point.
+
+For governed Agent deployments, pair it with `wren serve mcp --no-connect`.
+Wren supplies semantic discovery and planning; DSH owns database execution.
+
+## Local development
+
+From this directory, install the test extra and run the test suite with:
+
+```text
+python -m pip install -e ".[test]"
 python -m unittest discover -s tests -v
 ```
 

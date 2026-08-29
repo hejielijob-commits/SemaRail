@@ -9,7 +9,7 @@
 ![Node.js](https://img.shields.io/badge/Node.js-%5E22.19_%7C%7C_%3E%3D24-339933)
 ![Python](https://img.shields.io/badge/Python-%3E%3D3.11-3776ab)
 
-DSH Data Agent is an agent-facing semantic data layer built on [WrenAI](https://github.com/Canner/WrenAI). Any MCP-capable agent can use Wren's native context, planning, validation, query, knowledge, resource, and prompt tools. DeepSeek Harness is an optional enhanced adapter that adds stricter governed PostgreSQL execution and conversation-native Chart, Table, and SQL views. A local visual console maintains the semantic project.
+DSH Data Agent is an agent-facing semantic data layer built on [WrenAI](https://github.com/Canner/WrenAI). Any MCP-capable agent can use Wren's native context, planning, validation, knowledge, resource, and prompt tools together with DSH's governed PostgreSQL execution tool. DeepSeek Harness is an optional enhanced adapter that adds conversation-native Chart, Table, and SQL views over the same governed query service. A local visual console maintains the semantic project.
 
 > **Project status:** Alpha. The repository is open for evaluation and contribution, but its APIs, configuration, and storage formats may change before the first stable release. The current code is built and installed from source; npm and PyPI publication are intentionally out of scope.
 
@@ -23,7 +23,7 @@ This repository depends on the WrenAI Python SDK/Core package `wrenai==0.13.2` a
 
 | Capability | What it provides |
 | --- | --- |
-| Agent-neutral MCP | Wren-native semantic context, planning, validation, queries, knowledge, resources, and workflow prompts for any MCP-capable agent. |
+| Agent-neutral MCP | Wren-native semantic tools plus an optional DSH governed-query MCP server for any MCP-capable agent. |
 | Semantic-aware agent tools | Retrieves Wren context before SQL generation and returns versioned, JSON-safe query results. |
 | Governed query execution | PostgreSQL AST validation, object allowlists, read-only execution, row/byte/time limits, and cancellation. |
 | Conversation-native results | Reconstructable Chart, Table, and SQL views rendered from durable `tool/result.meta`. |
@@ -45,24 +45,26 @@ The SQL view keeps the generated Semantic SQL inspectable, lets users switch to 
 
 ```mermaid
 flowchart LR
-    A[Any MCP-capable agent] --> N[Wren native MCP server]
+    A[Any MCP-capable agent] --> N[Wren native MCP --no-connect]
+    A --> G[DSH governed-query MCP]
     N --> W[Wren semantic layer]
-    N --> DB[(Configured datasource)]
+    G --> Q[Shared governed query service]
+    Q --> W
+    Q --> P[(PostgreSQL)]
 
     U[Harness conversation] --> C[Chart / Table / SQL views]
     U --> H[Optional DSH Harness adapter]
-    H --> S[Python query sidecar]
-    S --> W
-    S --> P[(PostgreSQL)]
+    H --> Q
     H --> M[Semantic Console]
     M --> F[Wren project files]
     M --> D[(PostgreSQL / MySQL metadata)]
     H -. durable result metadata .-> C
 ```
 
-The native MCP server is the portable agent boundary. The optional Harness Host owns two independently supervised Python processes:
+Wren native MCP supplies the portable semantic tools. The DSH MCP adapter and
+the optional Harness Host share the same governed query service:
 
-- The query sidecar validates semantic context and untrusted SQL, executes bounded PostgreSQL queries, and produces table/chart presentation contracts.
+- The query service validates semantic context and untrusted SQL, executes bounded PostgreSQL queries, and produces table/chart presentation contracts.
 - The Semantic Console serves a local REST API and production SPA for managing Wren projects and datasource profiles.
 
 Datasource credentials stay server-side. They never enter Client payloads, tool output, session metadata, fixtures, or default logs.
@@ -139,22 +141,41 @@ Open [http://127.0.0.1:48763](http://127.0.0.1:48763). The server binds to loopb
 
 ## Use with any MCP-capable agent
 
-Configure a Wren datasource profile and build a semantic project with the Wren
-CLI, then start its native MCP server over stdio:
+Build the semantic project, then register two stdio MCP servers. Run Wren native
+MCP without a database connection for schema, context, knowledge, resources,
+prompts, and planning:
 
 ```powershell
-wren profile add my-data --from-file C:\path\to\profile.yml --activate
 wren context build --path C:\path\to\wren-project
-wren serve mcp --project C:\path\to\wren-project --profile my-data
+wren serve mcp --project C:\path\to\wren-project --no-connect
 ```
 
-Register that stdio command in the MCP client's server configuration. The
-client can then discover Wren's tools and use the recommended workflow:
-semantic context, SQL planning, dry-run validation, and query execution. No DSH
-Harness package is required. Write-oriented MCP functionality is disabled
-unless the server is deliberately started with `--allow-write`.
+Start the DSH execution server against the same project. Provide the read-only
+PostgreSQL DSN through the named operating-system environment variable or a
+secret manager; never put the DSN in an Agent prompt or MCP tool arguments.
 
-For a credential-free proof that exercises a real MCP client and DuckDB query:
+```powershell
+# WREN_DATABASE_URL is inherited from the OS or your secret manager.
+dsh-data-agent-mcp `
+  --project C:\path\to\wren-project `
+  --database-dsn-env WREN_DATABASE_URL
+```
+
+The MCP client discovers Wren's semantic tools from the first server and the
+single `dsh_governed_query` execution tool from the second. The latter uses the
+same MDL-derived physical allowlist, dangerous-function policy, read-only
+transaction, 30-second ceiling, row/byte bounds, two-query concurrency cap,
+stable errors, and database cancellation path as the Harness adapter. Project
+and credential-source selection are fixed at server startup and are not exposed
+to the Agent. DeepSeek Harness is not required.
+
+Direct Wren native query tools remain useful for local evaluation and supported
+Wren datasources. To make the DSH controls non-bypassable, governed deployments
+should keep the native server on `--no-connect` and route execution only through
+`dsh_governed_query`.
+
+For a credential-free proof that exercises a real MCP client against both
+servers, including a native DuckDB query and the DSH policy boundary:
 
 ```powershell
 pnpm acceptance:mcp
@@ -208,11 +229,11 @@ All model-generated SQL is treated as untrusted input.
 - Console credentials are stored outside the Wren project below `~/.wren/semantic-console` and are redacted from API responses.
 - The Console is loopback-only and unauthenticated in this MVP. Team authentication, RBAC, approvals, and audit logging remain deployment work.
 
-These stricter SQL, byte, timeout, concurrency, and cancellation controls belong
-to the current Harness query sidecar. Wren's native MCP server is read-only by
-default, but does not automatically inherit those DSH controls. Treat native MCP
-as a separate local trust boundary until the planned shared governed-query
-gateway exists.
+These stricter controls are shared by the Harness sidecar and
+`dsh-data-agent-mcp`. Wren's own native query tools do not automatically
+inherit them; use native MCP with `--no-connect` when the DSH policy must be
+mandatory. The DSH MCP adapter is stdio-only, so it does not create an
+unauthenticated network listener.
 
 ## Repository layout
 
@@ -222,7 +243,7 @@ gateway exists.
 | `packages/host` | Harness tools, process supervision, cancellation, and durable result projection. |
 | `packages/client` | Conversation Chart/Table/SQL views and Semantic Console entry points. |
 | `packages/bundle` | Installable `dsh.bundle` composition. |
-| `python/sidecar` | Wren planning, PostgreSQL policy/execution, limits, and chart specifications. |
+| `python/sidecar` | Shared Wren planning, PostgreSQL policy/execution, limits, framed RPC, and governed MCP adapter. |
 | `apps/semantic-console` | Local REST server and React management console. |
 | `examples/wren-postgres` | Deterministic sales project, seed data, and golden-question corpus. |
 | `scripts` | Packaging, acceptance, replay, and evaluation gates. |
@@ -239,16 +260,17 @@ pnpm test
 pnpm build
 ```
 
-Run the agent-neutral native MCP gate:
+Run the agent-neutral MCP gates:
 
 ```powershell
 pnpm acceptance:mcp
 ```
 
 It creates a temporary DuckDB database, isolated Wren home and semantic project,
-then drives the real stdio server through the official Python MCP client. It
-verifies tool discovery and the context, plan, dry-run, and query workflow
-without reading local profiles or credentials.
+then drives both real stdio server adapters through the official Python MCP
+client. It verifies native tool discovery and the context/plan/query workflow,
+plus the DSH tool surface, fixed operator policy, result bounds, and policy
+denial without reading local profiles or credentials.
 
 Run the isolated Harness packaging gate:
 
@@ -265,7 +287,10 @@ Run the real PostgreSQL boundary gate after configuring an existing administrato
 & .\.venv\Scripts\python.exe scripts\acceptance-postgres.py
 ```
 
-The default provision mode creates and later removes only a uniquely named temporary database and read-only role. For a managed database that must not be changed, use:
+The default provision mode creates and later removes only a uniquely named
+temporary database and read-only role. It exercises both the framed Harness
+sidecar and the real stdio `dsh_governed_query` MCP path. For a managed database
+that must not be changed, use:
 
 ```powershell
 & .\.venv\Scripts\python.exe scripts\acceptance-postgres.py `
@@ -288,7 +313,7 @@ The golden evaluator never calls an LLM or manufactures a quality result. A real
 - Compiled and accepted against DSH Desktop runtime `0.1.1-rc.2` while keeping public peer compatibility with Harness `>=0.1.0-rc.10 <0.2.0`.
 - Wren Python CLI/Core is pinned to `0.13.2`.
 - Wren's native MCP interface can use datasources supported by the configured Wren profile.
-- DSH governed query execution in the Harness sidecar is currently PostgreSQL-only.
+- DSH governed query execution through Harness or MCP is currently PostgreSQL-only.
 - The Semantic Console supports PostgreSQL and MySQL connection metadata, testing, browsing, and model import.
 - Wren Python `0.13.2` does not support View-to-View references; nested View dependencies are rejected before execution.
 - Browser hard-refresh rendering remains a separate real-Client acceptance step beyond the API-only replay gate.

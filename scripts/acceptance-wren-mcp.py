@@ -271,7 +271,7 @@ async def _verify(root: Path) -> dict[str, Any]:
             if "wren_workflow" not in prompt_names:
                 raise AcceptanceFailure("native MCP workflow prompt is unavailable")
 
-            return {
+            native_result = {
                 "status": "passed",
                 "server": initialized.serverInfo.name,
                 "toolCount": len(tool_names),
@@ -282,10 +282,126 @@ async def _verify(root: Path) -> dict[str, Any]:
                 "query": query,
             }
 
+    semantic_only_params = StdioServerParameters(
+        command=str(wren),
+        args=[
+            "serve",
+            "mcp",
+            "--project",
+            str(project),
+            "--no-connect",
+            "--quiet",
+        ],
+        cwd=str(project),
+        env=env,
+    )
+    async with stdio_client(semantic_only_params) as (reader, writer):
+        async with ClientSession(reader, writer) as session:
+            await session.initialize()
+            tools = await session.list_tools()
+            semantic_tool_names = {tool.name for tool in tools.tools}
+            required_semantic = {"get_context", "list_models", "dry_plan"}
+            forbidden_execution = {"run_sql", "dry_run", "query_cube", "store_query"}
+            if not required_semantic.issubset(semantic_tool_names):
+                raise AcceptanceFailure("native --no-connect omitted semantic tools")
+            exposed = forbidden_execution & semantic_tool_names
+            if exposed:
+                raise AcceptanceFailure(
+                    f"native --no-connect exposed execution tools: {sorted(exposed)}"
+                )
+            semantic_context = _tool_payload(
+                await session.call_tool(
+                    "get_context", {"question": "What is daily order revenue?"}
+                )
+            )
+            if "orders" not in json.dumps(semantic_context).lower():
+                raise AcceptanceFailure("native --no-connect context omitted orders")
+            native_result["semanticOnly"] = {
+                "requiredTools": sorted(required_semantic),
+                "executionToolsAbsent": sorted(forbidden_execution),
+            }
+
+    repository = Path(__file__).resolve().parents[1]
+    governed_env = dict(env)
+    sidecar_root = repository / "python" / "sidecar"
+    existing_pythonpath = governed_env.get("PYTHONPATH", "")
+    governed_env["PYTHONPATH"] = (
+        str(sidecar_root)
+        if not existing_pythonpath
+        else str(sidecar_root) + os.pathsep + existing_pythonpath
+    )
+    governed_params = StdioServerParameters(
+        command=sys.executable,
+        args=[
+            str(repository / "scripts" / "fixtures" / "governed-mcp-server.py"),
+            "--project",
+            str(project),
+        ],
+        cwd=str(repository),
+        env=governed_env,
+    )
+    async with stdio_client(governed_params) as (reader, writer):
+        async with ClientSession(reader, writer) as session:
+            initialized = await session.initialize()
+            if initialized.serverInfo.name != "dsh-governed-query":
+                raise AcceptanceFailure("governed MCP returned an unexpected identity")
+            tools = await session.list_tools()
+            if [tool.name for tool in tools.tools] != ["dsh_governed_query"]:
+                raise AcceptanceFailure("governed MCP exposed an unexpected tool surface")
+            properties = tools.tools[0].inputSchema.get("properties", {})
+            if "project_dir" in properties or "database_dsn_env" in properties:
+                raise AcceptanceFailure("governed MCP exposed operator policy as tool input")
+
+            governed_query = await session.call_tool(
+                "dsh_governed_query",
+                {
+                    "question": "List order identifiers",
+                    "semantic_sql": "SELECT orders.id FROM orders ORDER BY orders.id",
+                    "chart_intent": "table",
+                    "max_rows": 2,
+                    "preview_rows": 1,
+                },
+            )
+            if getattr(governed_query, "isError", False):
+                raise AcceptanceFailure("governed MCP query returned a tool error")
+            governed_payload = _tool_payload(governed_query)
+            stats = governed_payload.get("stats", {})
+            if (
+                governed_payload.get("schemaVersion") != 1
+                or governed_payload.get("status") != "success"
+                or stats.get("returnedRows") != 2
+                or stats.get("truncated") is not True
+                or len(governed_payload.get("previewRows", [])) != 1
+            ):
+                raise AcceptanceFailure("governed MCP did not preserve DSH bounds")
+
+            denied = await session.call_tool(
+                "dsh_governed_query",
+                {
+                    "question": "policy probe",
+                    "semantic_sql": "SELECT pg_sleep(1) AS waited",
+                },
+            )
+            diagnostic = " ".join(
+                str(getattr(content, "text", ""))
+                for content in getattr(denied, "content", [])
+            )
+            if not getattr(denied, "isError", False) or "POLICY_DENIED" not in diagnostic:
+                raise AcceptanceFailure("governed MCP did not enforce DSH SQL policy")
+
+    native_result["governedGateway"] = {
+        "server": "dsh-governed-query",
+        "tools": ["dsh_governed_query"],
+        "operatorPolicyPinned": True,
+        "bounds": "passed",
+        "policyDenial": "passed",
+    }
+    return native_result
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Run a credential-free Wren native MCP end-to-end acceptance"
+        description="Run credential-free native and governed MCP acceptance"
     )
     parser.add_argument(
         "--keep-temp",

@@ -28,7 +28,7 @@ Create the Python environment used by the complete local runtime:
 
 ```powershell
 py -3.11 -m venv .venv
-& .\.venv\Scripts\python.exe -m pip install -e ".\python\sidecar[test,wren]" -e ".\apps\semantic-console[wren]"
+& .\.venv\Scripts\python.exe -m pip install -e ".\python\sidecar[test,wren,mcp]" -e ".\apps\semantic-console[wren]"
 ```
 
 ## Change requirements

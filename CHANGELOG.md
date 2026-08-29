@@ -13,6 +13,8 @@ All notable user-visible changes to this project are documented here. The format
 - English project screenshots and a public-project README.
 - Security policy, contribution guide, GitHub issue forms, pull-request template, and continuous integration checks.
 - Agent-neutral Wren MCP setup documentation and a credential-free native MCP end-to-end CI gate.
+- A stdio `dsh_governed_query` MCP tool that reuses the Harness query policy,
+  limits, error contract, and database cancellation path.
 
 ### Changed
 
