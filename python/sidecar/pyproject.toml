@@ -17,10 +17,10 @@ test = ["pytest>=8"]
 # The MVP query path is PostgreSQL-only; include Wren's pinned psycopg extra
 # when the optional runtime is installed.  The default sidecar remains
 # dependency-free and reports DATABASE_ERROR until a driver is available.
-wren = ["wrenai[postgres]==0.13.2"]
+wren = ["wrenai[postgres]==0.13.3"]
 # Agent-neutral MCP runtime and official Python client. Wren 0.13.2 still uses
 # the v1 FastMCP API, so keep the SDK at its upstream lockfile version.
-mcp = ["wrenai[mcp]==0.13.2", "mcp[cli]==1.28.1"]
+mcp = ["wrenai[mcp]==0.13.3", "mcp[cli]==1.28.1"]
 
 [project.scripts]
 dsh-wren-sidecar = "sidecar.main:main"
