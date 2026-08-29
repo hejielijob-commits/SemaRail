@@ -18,9 +18,9 @@ test = ["pytest>=8"]
 # when the optional runtime is installed.  The default sidecar remains
 # dependency-free and reports DATABASE_ERROR until a driver is available.
 wren = ["wrenai[postgres]==0.13.2"]
-# Agent-neutral MCP runtime and official Python client. This exposes Wren's
-# native MCP surface without making DeepSeek Harness a required dependency.
-mcp = ["wrenai[mcp]==0.13.2"]
+# Agent-neutral MCP runtime and official Python client. Wren 0.13.2 still uses
+# the v1 FastMCP API, so keep the SDK at its upstream lockfile version.
+mcp = ["wrenai[mcp]==0.13.2", "mcp[cli]==1.28.1"]
 
 [project.scripts]
 dsh-wren-sidecar = "sidecar.main:main"
