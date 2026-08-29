@@ -3,8 +3,10 @@
 This server is a local-only REST API for onboarding a datasource and editing a
 Wren 0.13.2 project. It uses the public Wren APIs `wren.context.validate_project`,
 `wren.context.build_json`, and `wren.context.save_target` when the runtime is
-installed. PostgreSQL is supported through `psycopg`/`psycopg2`; MySQL uses
-`mysql.connector` or `pymysql` when available.
+installed. The standard Console install includes PostgreSQL (`psycopg`) and
+MySQL (`mysql.connector`) drivers. The datasource type API and UI expose only
+these configured types, and omit either one if its driver cannot be imported
+by the running Python environment.
 
 Start it from the repository root with:
 
@@ -32,7 +34,7 @@ The primary routes are:
 | --- | --- |
 | `GET /api/health` | Process/Wren readiness |
 | `GET /api/project` | Project overview, draft count, revision, active datasource |
-| `GET /api/datasource-types` | Wren field metadata and driver availability |
+| `GET /api/datasource-types` | Field metadata for configured, runtime-available drivers |
 | `GET/POST /api/datasources` | Redacted datasource list/create |
 | `GET/PUT/DELETE /api/datasources/{id}` | Redacted datasource CRUD |
 | `POST /api/datasources/{id}/test` | `SELECT 1` connection test |

@@ -35,6 +35,7 @@ describe("Semantic Console interactions", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     render(<App />);
 
+    expect(await screen.findByText("DSH Data Agent")).toBeInTheDocument();
     expect(await screen.findByText("Semantic Console is offline")).toBeInTheDocument();
     expect(screen.getByText("API unavailable")).toBeInTheDocument();
     expect(screen.queryByText("Revenue intelligence")).not.toBeInTheDocument();
@@ -60,6 +61,34 @@ describe("Semantic Console interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
     expect(await screen.findByText("Publish failed")).toBeInTheDocument();
     expect(screen.queryByText("Project published")).not.toBeInTheDocument();
+  });
+
+  it("offers MySQL and hides datasource types that are not configured", async () => {
+    const datasource = { id: "mysql-source", name: "MySQL Warehouse", type: "mysql", connection: { database: "analytics" } };
+    const fetchMock = emptyWorkspaceFetch();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/project") && init?.method !== "POST") return Promise.resolve(jsonResponse({ name: "Warehouse project", projectExists: true, activeDatasource: datasource }));
+      if (url.endsWith("/api/datasource-types")) return Promise.resolve(jsonResponse([
+        { type: "postgres", label: "PostgreSQL", available: true, fields: [] },
+        { type: "mysql", label: "MySQL", available: true, fields: [] },
+        { type: "snowflake", label: "Snowflake", available: false, fields: [] },
+      ]));
+      if (url.endsWith("/api/datasources")) return Promise.resolve(jsonResponse([datasource]));
+      return emptyWorkspaceFetch()(input, init);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    await screen.findByText("Connected");
+    fireEvent.click(await screen.findByRole("button", { name: "Data sources" }));
+    await screen.findByRole("heading", { name: "Data sources" });
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    await screen.findByRole("heading", { name: "Edit data source" });
+    const typeSelect = screen.getByLabelText(/Data source type/);
+    expect(typeSelect).toHaveTextContent("PostgreSQL");
+    expect(typeSelect).toHaveTextContent("MySQL");
+    expect(typeSelect).not.toHaveTextContent("Snowflake");
   });
 
   it("loads a real project file and sends its content to the file endpoint", async () => {

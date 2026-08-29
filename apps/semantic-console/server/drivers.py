@@ -18,6 +18,9 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 
+CONFIGURED_DATASOURCES = ("postgres", "mysql")
+
+
 class DriverError(RuntimeError):
     """A safe datasource error suitable for an API response."""
 
@@ -59,22 +62,17 @@ def _module_available(name: str) -> bool:
 
 
 def datasource_types() -> list[dict[str, Any]]:
-    """Return selectable Wren datasource types and redacted field metadata.
+    """Return configured, runtime-available datasource types and field metadata.
 
-    The Wren field registry is a public API in 0.13.2.  The fallback keeps the
-    Console usable in a minimal test environment where Wren is not installed.
+    Wren exposes many connector definitions, but the Console intentionally
+    advertises only drivers it implements and can import in this runtime.
     """
 
-    names: list[str]
     fields_by_type: dict[str, list[dict[str, Any]]] = {}
     try:
-        from wren.model.field_registry import (  # type: ignore[import-not-found]
-            get_fields,
-            get_selectable_datasources,
-        )
+        from wren.model.field_registry import get_fields  # type: ignore[import-not-found]
 
-        names = list(get_selectable_datasources())
-        for name in names:
+        for name in CONFIGURED_DATASOURCES:
             try:
                 fields_by_type[name] = [
                     {
@@ -92,18 +90,16 @@ def datasource_types() -> list[dict[str, Any]]:
                     for item in get_fields(name)
                 ]
             except Exception:
-                # A datasource-specific Wren extra may be missing even though
-                # the enum is present.  It stays selectable with no fields.
                 fields_by_type[name] = []
     except Exception:
-        names = ["postgres", "mysql"]
+        fields_by_type = {}
 
     labels = {
         "postgres": "PostgreSQL",
         "mysql": "MySQL",
     }
     result: list[dict[str, Any]] = []
-    for name in names:
+    for name in CONFIGURED_DATASOURCES:
         if name == "postgres":
             status = DriverStatus(
                 name,
@@ -131,17 +127,8 @@ def datasource_types() -> list[dict[str, Any]]:
                 if mysql_module
                 else "Install mysql-connector-python or pymysql for MySQL browsing",
             )
-        else:
-            status = DriverStatus(
-                name,
-                labels.get(name, name.replace("_", " ").title()),
-                False,
-                None,
-                supports_schema_browse=False,
-                supports_test=False,
-                note="Driver is not enabled by the Semantic Console MVP",
-            )
-        result.append({**status.as_dict(), "fields": fields_by_type.get(name, [])})
+        if status.available:
+            result.append({**status.as_dict(), "fields": fields_by_type.get(name, [])})
     return result
 
 
@@ -506,6 +493,7 @@ def driver_for(name: str, connection_factory: Callable[..., Any] | None = None) 
 
 __all__ = [
     "BaseDriver",
+    "CONFIGURED_DATASOURCES",
     "DriverError",
     "DriverStatus",
     "MysqlDriver",

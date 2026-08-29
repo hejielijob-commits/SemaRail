@@ -129,8 +129,8 @@ class SemanticConsoleService:
         kind = str(payload.get("type", payload.get("datasource", ""))).strip().lower()
         if kind == "postgresql":
             kind = "postgres"
-        if kind not in {item.get("type") for item in datasource_types()} and kind not in {"postgres", "mysql"}:
-            raise ApiServiceError("UNSUPPORTED_DATASOURCE", "datasource type is not recognized")
+        if kind not in {item.get("type") for item in datasource_types()}:
+            raise ApiServiceError("UNSUPPORTED_DATASOURCE", "datasource type is not configured in this runtime")
         name = str(payload.get("name", kind.title())).strip()
         if not name or len(name) > 120:
             raise ApiServiceError("INVALID_PARAMS", "datasource name is required")
@@ -155,8 +155,8 @@ class SemanticConsoleService:
             kind = str(payload.get("type", payload.get("datasource", record.type))).strip().lower()
             if kind == "postgresql":
                 kind = "postgres"
-            if kind not in {"postgres", "mysql"}:
-                raise ApiServiceError("UNSUPPORTED_DATASOURCE", "datasource type is not supported by this MVP")
+            if kind not in {item.get("type") for item in datasource_types()}:
+                raise ApiServiceError("UNSUPPORTED_DATASOURCE", "datasource type is not configured in this runtime")
             record.type = kind
         incoming = self._connection_payload(payload)
         # Updates are patch-like.  Omitted password means "keep existing" and

@@ -6,7 +6,7 @@ export type ConsoleLocale = "en-US" | "zh-CN";
 const resources = {
   "en-US": {
     translation: {
-      brand: { subtitle: "Semantic Console" },
+      brand: { name: "DSH Data Agent", subtitle: "Semantic Console" },
       common: {
         cancel: "Cancel", close: "Close", save: "Save", refresh: "Refresh", loading: "Loading…",
         draft: "Draft", published: "Published", tracked: "Tracked", source: "Source", diff: "Diff",
@@ -69,7 +69,7 @@ const resources = {
   },
   "zh-CN": {
     translation: {
-      brand: { subtitle: "语义控制台" },
+      brand: { name: "DSH Data Agent", subtitle: "语义控制台" },
       common: {
         cancel: "取消", close: "关闭", save: "保存", refresh: "刷新", loading: "加载中…",
         draft: "草稿", published: "已发布", tracked: "已跟踪", source: "源文件", diff: "差异",

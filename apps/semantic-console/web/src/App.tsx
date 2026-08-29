@@ -69,7 +69,13 @@ function formatDate(value?: string, locale = "en-US") {
 
 function sourceLabel(source?: Datasource) {
   if (!source) return "No source selected";
-  return `${source.name} (${source.type === "postgres" ? "PostgreSQL" : "MySQL"})`;
+  return `${source.name} (${datasourceTypeLabel(source.type)})`;
+}
+
+function datasourceTypeLabel(type: string) {
+  if (type === "postgres" || type === "postgresql") return "PostgreSQL";
+  if (type === "mysql" || type === "mariadb") return "MySQL";
+  return type;
 }
 
 const endpointLabels = ["project", "datasource types", "data sources", "project files", "versions", "health"];
@@ -671,7 +677,7 @@ function pageTitle(section: ConsoleSection, t: (key: string) => string) { return
 
 function Sidebar({ projectName, section, onNavigate, open, onClose }: { projectName: string; section: ConsoleSection; onNavigate: (section: ConsoleSection) => void; open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
-  return <aside className={`sidebar ${open ? "sidebar-open" : ""}`}><div className="brand"><span className="brand-mark"><Stack size={19} weight="bold" /></span><span><strong>Wren</strong><small>{t("brand.subtitle")}</small></span><button className="icon-button sidebar-close" onClick={onClose} aria-label={t("nav.close")}><X size={17} /></button></div><div className="project-switcher"><span className="project-icon"><BracketsCurly size={16} /></span><span><small>{t("nav.project")}</small><strong>{projectName}</strong></span><CaretDown size={14} /></div><nav aria-label={t("nav.workspace")}>{navGroups.map((group) => <div className="nav-group" key={group.labelKey}><p className="nav-label">{t(group.labelKey)}</p>{group.items.map((item) => <button aria-label={t(item.labelKey)} className={`nav-item ${section === item.id ? "nav-item-active" : ""}`} key={item.id} onClick={() => onNavigate(item.id)}><item.icon size={18} weight={section === item.id ? "fill" : "regular"} /><span>{t(item.labelKey)}</span>{item.count ? <span className="nav-count">{item.count}</span> : null}</button>)}</div>)}</nav><div className="sidebar-bottom"><button className="nav-item"><GearSix size={18} /><span>{t("nav.settings")}</span></button><div className="sidebar-help"><Info size={16} /><span><strong>{t("nav.helpTitle")}</strong><small>{t("nav.helpBody")}</small></span><ArrowRight size={14} /></div></div></aside>;
+  return <aside className={`sidebar ${open ? "sidebar-open" : ""}`}><div className="brand"><span className="brand-mark"><Stack size={19} weight="bold" /></span><span><strong>{t("brand.name")}</strong><small>{t("brand.subtitle")}</small></span><button className="icon-button sidebar-close" onClick={onClose} aria-label={t("nav.close")}><X size={17} /></button></div><div className="project-switcher"><span className="project-icon"><BracketsCurly size={16} /></span><span><small>{t("nav.project")}</small><strong>{projectName}</strong></span><CaretDown size={14} /></div><nav aria-label={t("nav.workspace")}>{navGroups.map((group) => <div className="nav-group" key={group.labelKey}><p className="nav-label">{t(group.labelKey)}</p>{group.items.map((item) => <button aria-label={t(item.labelKey)} className={`nav-item ${section === item.id ? "nav-item-active" : ""}`} key={item.id} onClick={() => onNavigate(item.id)}><item.icon size={18} weight={section === item.id ? "fill" : "regular"} /><span>{t(item.labelKey)}</span>{item.count ? <span className="nav-count">{item.count}</span> : null}</button>)}</div>)}</nav><div className="sidebar-bottom"><button className="nav-item"><GearSix size={18} /><span>{t("nav.settings")}</span></button><div className="sidebar-help"><Info size={16} /><span><strong>{t("nav.helpTitle")}</strong><small>{t("nav.helpBody")}</small></span><ArrowRight size={14} /></div></div></aside>;
 }
 
 function LoadingWorkspace() {
@@ -705,6 +711,7 @@ function DatasourceDetail({ source, active, onEdit, onTest, onActivate, busyActi
 
 function DatasourceForm({ source, type, types, onUpdate, onCancel, onSave, onTest, busyAction }: { source: Datasource; type?: DatasourceType; types: DatasourceType[]; onUpdate: (patch: Partial<Datasource>) => void; onCancel: () => void; onSave: () => void; onTest: () => void; busyAction: string | null }) {
   const fields = type?.fields ?? [];
+  types = types.filter((item) => item.available !== false);
   const connection = source.connection ?? {};
   function updateConnection(name: string, value: string) { onUpdate({ connection: { ...connection, [name]: value } }); }
   function switchType(value: string) { onUpdate({ type: value, connection: {} }); }
