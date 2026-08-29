@@ -14,6 +14,7 @@
     "typecheck": "pnpm --filter @hejielijob/dsh-wren-data-agent-contract build && pnpm -r --if-present typecheck",
     "lint": "pnpm -r --if-present lint",
     "acceptance": "pwsh -NoLogo -NoProfile -File scripts/acceptance.ps1",
+    "acceptance:mcp": "node scripts/run-wren-mcp-acceptance.mjs",
     "acceptance:postgres": "pwsh -NoLogo -NoProfile -File scripts/acceptance-postgres.ps1",
     "acceptance:replay": "node scripts/acceptance-replay.mjs",
     "evaluate:golden": "pwsh -NoLogo -NoProfile -File scripts/evaluate-golden.ps1",

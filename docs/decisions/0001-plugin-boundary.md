@@ -15,6 +15,10 @@ isolated behind the Host tool adapter and Client slot adapter; the current
 Desktop 2.0.2 runtime ships the later `0.1.1-rc.2` package line and is the
 real installation target used for release acceptance.
 
+This decision applies to the optional Harness adapter. The agent-neutral
+integration boundary is defined separately in
+[`0002-native-mcp-agent-boundary.md`](0002-native-mcp-agent-boundary.md).
+
 ## Consequences
 
 - Installation and removal use the official `dsh plugin --profile` lifecycle.
