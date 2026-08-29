@@ -254,11 +254,11 @@ class BaseDriver:
     def _fetch_rows(cursor: Any) -> list[dict[str, Any]]:
         rows = cursor.fetchall()
         description = getattr(cursor, "description", None) or []
-        names = [str(column[0]) for column in description]
+        names = [str(column[0]).lower() for column in description]
         result: list[dict[str, Any]] = []
         for row in rows:
             if isinstance(row, Mapping):
-                result.append({str(key): value for key, value in row.items()})
+                result.append({str(key).lower(): value for key, value in row.items()})
             else:
                 result.append({name: value for name, value in zip(names, row)})
         return result

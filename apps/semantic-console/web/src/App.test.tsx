@@ -71,7 +71,9 @@ describe("Semantic Console interactions", () => {
       if (url.endsWith("/api/project") && init?.method !== "POST") return Promise.resolve(jsonResponse({ name: "Warehouse project", projectExists: true, activeDatasource: datasource }));
       if (url.endsWith("/api/datasource-types")) return Promise.resolve(jsonResponse([
         { type: "postgres", label: "PostgreSQL", available: true, fields: [] },
-        { type: "mysql", label: "MySQL", available: true, fields: [] },
+        { type: "mysql", label: "MySQL", available: true, fields: [
+          { name: "host", label: "Host", inputType: "text", placeholder: "localhost", required: true, examples: ["localhost"] },
+        ] },
         { type: "snowflake", label: "Snowflake", available: false, fields: [] },
       ]));
       if (url.endsWith("/api/datasources")) return Promise.resolve(jsonResponse([datasource]));
@@ -89,6 +91,8 @@ describe("Semantic Console interactions", () => {
     expect(typeSelect).toHaveTextContent("PostgreSQL");
     expect(typeSelect).toHaveTextContent("MySQL");
     expect(typeSelect).not.toHaveTextContent("Snowflake");
+    expect(screen.getByLabelText(/Host/).tagName).toBe("INPUT");
+    expect(screen.getByLabelText(/Host/)).toHaveAttribute("placeholder", "localhost");
   });
 
   it("loads a real project file and sends its content to the file endpoint", async () => {

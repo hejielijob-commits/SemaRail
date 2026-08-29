@@ -3,7 +3,15 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from server.drivers import datasource_types
+from server.drivers import BaseDriver, datasource_types
+
+
+class FakeCursor:
+    description = [("SCHEMA_NAME",)]
+
+    @staticmethod
+    def fetchall() -> list[tuple[str]]:
+        return [("dsh_data_agent_e2e",)]
 
 
 class DatasourceTypeTests(unittest.TestCase):
@@ -26,6 +34,12 @@ class DatasourceTypeTests(unittest.TestCase):
             result = datasource_types()
 
         self.assertEqual([item["type"] for item in result], ["postgres"])
+
+    def test_dbapi_column_names_are_normalized_for_mysql_metadata(self) -> None:
+        self.assertEqual(
+            BaseDriver._fetch_rows(FakeCursor()),
+            [{"schema_name": "dsh_data_agent_e2e"}],
+        )
 
 
 if __name__ == "__main__":
