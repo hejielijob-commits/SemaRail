@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
@@ -84,6 +85,21 @@ class SemanticConsoleServiceTests(unittest.TestCase):
         self.assertTrue(restarted.list_datasources()[0]["hasPassword"])
         self.assertNotIn("never-return", json.dumps(restarted.list_datasources()))
         self.assertEqual(restarted.project_overview()["activeDatasource"]["id"], public["id"])
+
+    def test_create_and_update_reject_unavailable_datasource_drivers(self):
+        service = SemanticConsoleService(self.make_project())
+
+        with patch("server.drivers._module_available", return_value=False):
+            with self.assertRaises(ApiServiceError) as create_error:
+                service.create_datasource({"name": "missing", "type": "mysql", "connection": {}})
+        self.assertEqual(create_error.exception.code, "UNSUPPORTED_DATASOURCE")
+
+        with patch("server.drivers._module_available", return_value=True):
+            datasource = service.create_datasource({"name": "available", "type": "postgres", "connection": {}})
+        with patch("server.drivers._module_available", return_value=False):
+            with self.assertRaises(ApiServiceError) as update_error:
+                service.update_datasource(datasource["id"], {"type": "mysql"})
+        self.assertEqual(update_error.exception.code, "UNSUPPORTED_DATASOURCE")
 
     def test_drafts_publish_without_touching_git_and_rollback(self):
         store = self.make_project()

@@ -11,7 +11,7 @@
     "build": "pnpm -r --if-present build",
     "test": "pnpm -r --if-present test && pnpm run test:semantic-console",
     "test:semantic-console": "node scripts/test-semantic-console.mjs",
-    "typecheck": "pnpm -r --if-present typecheck",
+    "typecheck": "pnpm --filter @hejielijob/dsh-wren-data-agent-contract build && pnpm -r --if-present typecheck",
     "lint": "pnpm -r --if-present lint",
     "acceptance": "pwsh -NoLogo -NoProfile -File scripts/acceptance.ps1",
     "acceptance:postgres": "pwsh -NoLogo -NoProfile -File scripts/acceptance-postgres.ps1",

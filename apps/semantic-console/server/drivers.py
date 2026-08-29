@@ -101,14 +101,19 @@ def datasource_types() -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for name in CONFIGURED_DATASOURCES:
         if name == "postgres":
+            postgres_module = (
+                "psycopg"
+                if _module_available("psycopg")
+                else "psycopg2"
+                if _module_available("psycopg2")
+                else None
+            )
             status = DriverStatus(
                 name,
                 labels.get(name, name.title()),
-                _module_available("psycopg") or _module_available("psycopg2"),
-                "psycopg",
-                note=None
-                if _module_available("psycopg") or _module_available("psycopg2")
-                else "Install psycopg[binary] to browse PostgreSQL metadata",
+                postgres_module is not None,
+                postgres_module,
+                note=None if postgres_module else "Install psycopg[binary] to browse PostgreSQL metadata",
             )
         elif name == "mysql":
             mysql_module = (

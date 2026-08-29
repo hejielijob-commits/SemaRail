@@ -56,6 +56,17 @@ def _safe_identifier(value: Any, name: str) -> str:
     return text
 
 
+def _configured_datasource_type(value: Any) -> str:
+    """Normalize a datasource type and reject unavailable runtime drivers."""
+
+    kind = str(value).strip().lower()
+    if kind == "postgresql":
+        kind = "postgres"
+    if kind not in {item.get("type") for item in datasource_types()}:
+        raise ApiServiceError("UNSUPPORTED_DATASOURCE", "datasource type is not configured in this runtime")
+    return kind
+
+
 def _public_error(exc: Exception) -> ApiServiceError:
     if isinstance(exc, ApiServiceError):
         return exc
@@ -126,11 +137,7 @@ class SemanticConsoleService:
     def create_datasource(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, Mapping):
             raise ApiServiceError("INVALID_PARAMS", "request body must be an object")
-        kind = str(payload.get("type", payload.get("datasource", ""))).strip().lower()
-        if kind == "postgresql":
-            kind = "postgres"
-        if kind not in {item.get("type") for item in datasource_types()}:
-            raise ApiServiceError("UNSUPPORTED_DATASOURCE", "datasource type is not configured in this runtime")
+        kind = _configured_datasource_type(payload.get("type", payload.get("datasource", "")))
         name = str(payload.get("name", kind.title())).strip()
         if not name or len(name) > 120:
             raise ApiServiceError("INVALID_PARAMS", "datasource name is required")
@@ -152,12 +159,7 @@ class SemanticConsoleService:
                 raise ApiServiceError("INVALID_PARAMS", "datasource name is too long")
             record.name = name
         if "type" in payload or "datasource" in payload:
-            kind = str(payload.get("type", payload.get("datasource", record.type))).strip().lower()
-            if kind == "postgresql":
-                kind = "postgres"
-            if kind not in {item.get("type") for item in datasource_types()}:
-                raise ApiServiceError("UNSUPPORTED_DATASOURCE", "datasource type is not configured in this runtime")
-            record.type = kind
+            record.type = _configured_datasource_type(payload.get("type", payload.get("datasource", record.type)))
         incoming = self._connection_payload(payload)
         # Updates are patch-like.  Omitted password means "keep existing" and
         # omitted host/database/etc. preserve the prior profile; a null value
