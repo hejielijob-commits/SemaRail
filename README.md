@@ -30,6 +30,16 @@ This repository depends on the WrenAI Python SDK/Core package `wrenai==0.13.2` a
 | Bilingual editing | English and Simplified Chinese display metadata without changing Wren's technical identifiers. |
 | Verifiable delivery | Unit, package, isolated Harness, real PostgreSQL, replay, and golden-question acceptance gates. |
 
+## Inside DeepSeek Harness
+
+DSH Data Agent renders query results directly in the conversation. The chart view below shows a successful six-row daily-revenue query using the durable result metadata returned by the tool.
+
+![Daily revenue chart rendered inside DeepSeek Harness](docs/images/deepseek-harness-chart.png)
+
+The SQL view keeps the generated Semantic SQL inspectable and links it to confirmed SQL knowledge used for the answer.
+
+![Semantic SQL and confirmed SQL reference inside DeepSeek Harness](docs/images/deepseek-harness-semantic-sql.png)
+
 ## How it works
 
 ```mermaid
