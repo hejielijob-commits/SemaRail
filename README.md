@@ -36,9 +36,9 @@ DSH Data Agent renders query results directly in the conversation. The chart vie
 
 ![Daily revenue chart rendered inside DeepSeek Harness](docs/images/deepseek-harness-chart.png)
 
-The SQL view keeps the generated Semantic SQL inspectable and links it to confirmed SQL knowledge used for the answer.
+The SQL view keeps the generated Semantic SQL inspectable, lets users switch to Native SQL, and reports whether confirmed historical SQL was recalled for the answer.
 
-![Semantic SQL and confirmed SQL reference inside DeepSeek Harness](docs/images/deepseek-harness-semantic-sql.png)
+![Semantic SQL inspection inside DeepSeek Harness](docs/images/deepseek-harness-semantic-sql.png)
 
 ## How it works
 
