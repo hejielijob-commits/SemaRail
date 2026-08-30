@@ -32,6 +32,7 @@ import type {
   ViewWritePayload,
   ViewValidationResponse,
   ViewPreviewResult,
+  McpIntegrationResponse,
 } from "../types";
 
 export class ApiClientError extends Error {
@@ -84,6 +85,11 @@ export class ApiClient {
 
   getProject(): Promise<ProjectSummary> {
     return this.request<ProjectSummary>("/api/project");
+  }
+
+  /** Load secret-free stdio MCP commands and readiness for the active project. */
+  getMcpIntegration(): Promise<McpIntegrationResponse> {
+    return this.request<McpIntegrationResponse>("/api/mcp-integration");
   }
 
   /** Load the structured business-model projection used by the visual editor. */

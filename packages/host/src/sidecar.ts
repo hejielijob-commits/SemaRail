@@ -35,7 +35,7 @@ const DEFAULT_TIMEOUT_MS = 30_000
 const DEFAULT_STARTUP_TIMEOUT_MS = 10_000
 const DEFAULT_CANCEL_GRACE_MS = 500
 const DEFAULT_MAX_STDERR_BYTES = 32 * 1024
-const DEFAULT_DSN_ENV = 'WREN_DATABASE_URL'
+const DEFAULT_DSN_ENV = 'SEMARAIL_DATABASE_URL'
 
 /**
  * Resolve the sidecar directory shipped beside the compiled Host module.
@@ -64,7 +64,7 @@ export class SidecarRpcError extends Error {
   readonly retryable: boolean
 
   constructor(code: DataAgentErrorCode, retryable: boolean) {
-    super('The Wren sidecar request failed.')
+    super('The SemaRail sidecar request failed.')
     this.name = 'SidecarRpcError'
     this.code = code
     this.retryable = retryable
@@ -77,7 +77,7 @@ export class SidecarProcessError extends Error {
   readonly retryable: boolean
 
   constructor(code: StableTransportCode = 'SIDECAR_UNAVAILABLE', retryable = true) {
-    super('The Wren sidecar process is unavailable.')
+    super('The SemaRail sidecar process is unavailable.')
     this.name = 'SidecarProcessError'
     this.code = code
     this.retryable = retryable

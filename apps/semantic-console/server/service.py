@@ -1,4 +1,4 @@
-"""Application service for the Wren Semantic Console REST API."""
+"""Application service for the SemaRail Semantic Console REST API."""
 
 from __future__ import annotations
 
@@ -122,6 +122,58 @@ class SemanticConsoleService:
 
     def project_overview(self) -> dict[str, Any]:
         return self.project.overview()
+
+    def mcp_integration(self) -> dict[str, Any]:
+        """Describe the local stdio MCP composition without exposing secrets.
+
+        MCP servers are spawned by the consuming agent, so this endpoint reports
+        configuration readiness rather than pretending they are persistent
+        background services.  The database DSN remains an explicit placeholder:
+        saved Console credentials never cross this read boundary.
+        """
+
+        overview = self.project.overview()
+        project_path = str(self.project.project_dir)
+        project_exists = bool(overview.get("projectExists"))
+        wren = overview.get("wren") if isinstance(overview.get("wren"), Mapping) else {}
+        active = overview.get("activeDatasource") if isinstance(overview.get("activeDatasource"), Mapping) else {}
+        datasource_type = str(active.get("type", "")).strip().lower()
+        if datasource_type == "postgresql":
+            datasource_type = "postgres"
+
+        semantic_ready = project_exists and bool(wren.get("available"))
+        governed_ready = project_exists and datasource_type == "postgres"
+        semantic_args = ["--project", project_path]
+        governed_args = ["--project", project_path, "--database-dsn-env", "SEMARAIL_DATABASE_URL"]
+        client_config = {
+            "mcpServers": {
+                "semarail-semantic": {"command": "semarail-mcp", "args": semantic_args},
+                "semarail-query": {
+                    "command": "semarail-query-mcp",
+                    "args": governed_args,
+                    "env": {"SEMARAIL_DATABASE_URL": "<POSTGRESQL_DSN>"},
+                },
+            }
+        }
+        return {
+            "schemaVersion": 1,
+            "transport": "stdio",
+            "projectPath": project_path,
+            "semantic": {
+                "status": "ready" if semantic_ready else "setup_required",
+                "command": "semarail-mcp",
+                "args": semantic_args,
+                "toolMode": "semantic_only",
+            },
+            "governedQuery": {
+                "status": "ready" if governed_ready else "setup_required",
+                "command": "semarail-query-mcp",
+                "args": governed_args,
+                "databaseDsnEnv": "SEMARAIL_DATABASE_URL",
+                "datasourceType": datasource_type or None,
+            },
+            "clientConfig": client_config,
+        }
 
     def datasource_type_list(self) -> list[dict[str, Any]]:
         return datasource_types()
@@ -634,6 +686,8 @@ class SemanticConsoleService:
                 return 200, self.health()
             if method == "GET" and clean_path == "/api/project":
                 return 200, self.project_overview()
+            if method == "GET" and clean_path == "/api/mcp-integration":
+                return 200, self.mcp_integration()
             if method == "GET" and clean_path == "/api/datasource-types":
                 return 200, self.datasource_type_list()
             if method == "GET" and clean_path == "/api/datasources":

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "dsh-wren-data-agent-sidecar"
 version = "0.1.0"
-description = "Framed JSON-RPC sidecar boundary for the Wren data agent"
+description = "Framed JSON-RPC sidecar boundary for SemaRail"
 requires-python = ">=3.11"
 # sqlglot is the actual PostgreSQL AST boundary for both semantic preflight
 # and native post-plan policy.  It is intentionally not replaced by a lexical
@@ -25,6 +25,8 @@ mcp = ["wrenai[mcp]==0.13.2", "mcp[cli]==1.28.1"]
 [project.scripts]
 dsh-wren-sidecar = "sidecar.main:main"
 dsh-data-agent-mcp = "sidecar.mcp_gateway:main"
+semarail-mcp = "sidecar.semantic_mcp:main"
+semarail-query-mcp = "sidecar.mcp_gateway:main"
 
 [tool.setuptools]
 packages = ["sidecar"]

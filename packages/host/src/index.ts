@@ -70,9 +70,9 @@ export type { SemanticConsoleConfig } from './semantic-console.js'
 
 export const TOOL_NAME = 'data_query' as const
 /** Stable wire name of the semantic-context Tool. */
-export const CONTEXT_TOOL_NAME = 'wren_semantic_context' as const
+export const CONTEXT_TOOL_NAME = 'semarail_semantic_context' as const
 /** Stable SystemPrompt section name for the Wren data-agent operating rules. */
-export const SYSTEM_PROMPT_SECTION_NAME = 'wren:data-agent' as const
+export const SYSTEM_PROMPT_SECTION_NAME = 'semarail:data-agent' as const
 export { MAX_PREVIEW_BYTES, MAX_PREVIEW_ROWS, MAX_QUERY_ROWS, SCHEMA_VERSION }
 
 /** Stable bounds shared with the version-one contract. */
@@ -87,26 +87,26 @@ export const unavailableQueryGateway: QueryGateway = {
 
 function safeErrorMessage(code: DataAgentErrorCode): string {
   switch (code) {
-    case 'SEMANTIC_ERROR': return 'Wren rejected the semantic query.'
+    case 'SEMANTIC_ERROR': return 'SemaRail rejected the semantic query.'
     case 'POLICY_DENIED': return 'The query was denied by policy.'
-    case 'DATABASE_ERROR': return 'Wren could not read the data source.'
-    case 'TIMEOUT': return 'The Wren query timed out.'
-    case 'CANCELLED': return 'The Wren query was cancelled.'
-    case 'SIDECAR_UNAVAILABLE': return 'The Wren sidecar is unavailable.'
-    case 'INVALID_PARAMS': return 'The Wren query parameters were invalid.'
-    case 'METHOD_NOT_FOUND': return 'The Wren sidecar does not support this query.'
-    case 'PROJECT_VALIDATION_FAILED': return 'The Wren project failed validation.'
-    case 'HEALTHCHECK_FAILED': return 'The Wren sidecar health check failed.'
-    case 'FRAME_TOO_LARGE': return 'The Wren sidecar response was too large.'
-    case 'TRUNCATED_FRAME': return 'The Wren sidecar response was truncated.'
-    case 'INVALID_REQUEST': return 'The Wren sidecar rejected the request.'
-    case 'PROTOCOL_ERROR': return 'The Wren sidecar returned an invalid response.'
-    case 'UNSUPPORTED_PROTOCOL': return 'The Wren sidecar protocol is unsupported.'
-    case 'UNSUPPORTED_VERSION': return 'The Wren data contract version is unsupported.'
-    case 'INTERNAL_ERROR': return 'The Wren query gateway returned an internal error.'
-    case 'WREN_UNAVAILABLE': return 'Wren query gateway is unavailable.'
+    case 'DATABASE_ERROR': return 'SemaRail could not read the data source.'
+    case 'TIMEOUT': return 'The SemaRail query timed out.'
+    case 'CANCELLED': return 'The SemaRail query was cancelled.'
+    case 'SIDECAR_UNAVAILABLE': return 'The SemaRail sidecar is unavailable.'
+    case 'INVALID_PARAMS': return 'The SemaRail query parameters were invalid.'
+    case 'METHOD_NOT_FOUND': return 'The SemaRail sidecar does not support this query.'
+    case 'PROJECT_VALIDATION_FAILED': return 'The semantic project failed validation.'
+    case 'HEALTHCHECK_FAILED': return 'The SemaRail sidecar health check failed.'
+    case 'FRAME_TOO_LARGE': return 'The SemaRail sidecar response was too large.'
+    case 'TRUNCATED_FRAME': return 'The SemaRail sidecar response was truncated.'
+    case 'INVALID_REQUEST': return 'The SemaRail sidecar rejected the request.'
+    case 'PROTOCOL_ERROR': return 'The SemaRail sidecar returned an invalid response.'
+    case 'UNSUPPORTED_PROTOCOL': return 'The SemaRail sidecar protocol is unsupported.'
+    case 'UNSUPPORTED_VERSION': return 'The SemaRail data contract version is unsupported.'
+    case 'INTERNAL_ERROR': return 'The SemaRail query gateway returned an internal error.'
+    case 'WREN_UNAVAILABLE': return 'The SemaRail semantic runtime is unavailable.'
   }
-  return 'The Wren query gateway returned an internal error.'
+  return 'The SemaRail query gateway returned an internal error.'
 }
 
 function failurePresentation(
@@ -164,9 +164,9 @@ function normalizeGatewayResult(input: DataQueryInput, value: DataQueryPresentat
 function renderResult(value: unknown): Array<{ type: 'text'; text: string }> {
   const result = parseDataQueryPresentation(value)
   if (result.status === 'error') {
-    return [{ type: 'text', text: `Wren query failed (${result.error.code}).` }]
+    return [{ type: 'text', text: `SemaRail query failed (${result.error.code}).` }]
   }
-  return [{ type: 'text', text: `Wren query returned ${result.stats.returnedRows} row(s).` }]
+  return [{ type: 'text', text: `SemaRail query returned ${result.stats.returnedRows} row(s).` }]
 }
 
 type SemanticContextToolError = {
@@ -202,17 +202,17 @@ function normalizeContextResult(value: SemanticContext): SemanticContext {
 function renderContextResult(value: unknown): Array<{ type: 'text'; text: string }> {
   if (typeof value === 'object' && value !== null && 'status' in value && value.status === 'error') {
     const failure = value as SemanticContextToolError
-    return [{ type: 'text', text: `Wren semantic context failed (${failure.error.code}).` }]
+    return [{ type: 'text', text: `SemaRail semantic context failed (${failure.error.code}).` }]
   }
   const context = parseSemanticContext(value)
-  return [{ type: 'text', text: `Wren semantic context resolved ${context.models.length} model(s).` }]
+  return [{ type: 'text', text: `SemaRail semantic context resolved ${context.models.length} model(s).` }]
 }
 
 /** Build a registry-ready `data_query` definition around an injected gateway. */
 export function createDataQueryTool(gateway: QueryGateway): ToolDefinition {
   return defineTool({
     name: TOOL_NAME,
-    description: 'Query Wren through the configured semantic layer and return a bounded JSON preview.',
+    description: 'Query SemaRail through the configured semantic layer and return a bounded JSON preview.',
     parameters: {
       question: {
         type: 'string',
@@ -254,11 +254,11 @@ export function installDataQueryTool(ctx: Context, gateway: QueryGateway): () =>
   return ctx.tools.register(createDataQueryTool(gateway))
 }
 
-/** Build the registry-ready `wren_semantic_context` definition. */
+/** Build the registry-ready `semarail_semantic_context` definition. */
 export function createSemanticContextTool(gateway: SemanticContextGateway): ToolDefinition {
   return defineTool({
     name: CONTEXT_TOOL_NAME,
-    description: 'Resolve the Wren semantic context before generating semantic SQL.',
+    description: 'Resolve the SemaRail semantic context before generating semantic SQL.',
     parameters: {
       question: {
         type: 'string',
@@ -299,14 +299,14 @@ export const inject = ['tools', 'subprocess', 'systemPrompt'] as const
  * credential-free and does not reveal the sidecar project path or DSN name.
  */
 export const SYSTEM_PROMPT_GUIDANCE = [
-  'For data questions, first call `wren_semantic_context` with the exact user question.',
+  'For data questions, first call `semarail_semantic_context` with the exact user question.',
   'Treat the successful semantic-context response as the authoritative allowlist: use only its returned models, tables, columns, relationships, and semantic roles.',
   'When semantic context includes `sqlHistory`, use only those confirmed examples as optional few-shot guidance; never invent or claim an unreturned historical SQL reference.',
   'Do not guess or invent fields, entities, joins, filters, or metric definitions that are absent from the returned context.',
   'Only after context succeeds, generate semanticSql and call `data_query`; treat generated SQL as untrusted and keep it read-only.',
   'If a recoverable semantic/query validation failure occurs, make at most one repair attempt using only the same returned entities.',
   'Never retry `POLICY_DENIED`, `TIMEOUT`, or `CANCELLED`; report the bounded failure instead of guessing or bypassing policy.',
-  'If Wren is unavailable or context cannot be resolved, explain that data is unavailable and do not fabricate an answer.',
+  'If SemaRail is unavailable or context cannot be resolved, explain that data is unavailable and do not fabricate an answer.',
 ].join('\n')
 
 function configuredProjectDir(config: SidecarGatewayConfig | undefined): string | undefined {
@@ -345,10 +345,10 @@ export function apply(ctx: Context, config?: SidecarGatewayConfig): void {
       order: 125,
       text: SYSTEM_PROMPT_GUIDANCE,
     }),
-    'wren-data-agent-host.system-prompt',
+    'semarail-data-agent-host.system-prompt',
   )
   if (gateway !== undefined) {
-    ctx.effect(() => () => gateway.dispose(), 'wren-data-agent-host.sidecar()')
+    ctx.effect(() => () => gateway.dispose(), 'semarail-data-agent-host.sidecar()')
     // Cordis apply hooks are synchronous. Startup is deterministic and lazy
     // requests await the same health → project.validate promise.
     void gateway.start().catch(() => undefined)
@@ -367,7 +367,7 @@ export function apply(ctx: Context, config?: SidecarGatewayConfig): void {
       ctx.effect(() => {
         consoleProcess.start()
         return async () => consoleProcess.dispose()
-      }, 'wren-data-agent-host.semantic-console()')
+      }, 'semarail-data-agent-host.semantic-console()')
     } catch {
       // The query boundary remains usable if the optional administration UI
       // is unavailable or misconfigured.

@@ -500,14 +500,14 @@ class WrenQueryService:
             raise RpcFault(
                 WREN_UNAVAILABLE,
                 "query.dryPlan",
-                "Wren query planner is unavailable",
+                "SemaRail semantic planner is unavailable",
                 retryable=True,
             ) from exc
         if not isinstance(plan, Mapping):
             raise RpcFault(
                 WREN_UNAVAILABLE,
                 "query.dryPlan",
-                "Wren query planner is unavailable",
+                "SemaRail semantic planner is unavailable",
                 retryable=True,
             )
         native_sql = plan.get("nativeSql")
@@ -515,7 +515,7 @@ class WrenQueryService:
             raise RpcFault(
                 WREN_UNAVAILABLE,
                 "query.dryPlan",
-                "Wren query planner is unavailable",
+                "SemaRail semantic planner is unavailable",
                 retryable=True,
             )
         try:
@@ -542,7 +542,7 @@ class WrenQueryService:
                 "query denied by read-only SQL policy",
                 retryable=False,
             ) from exc
-        env_name = params.get("databaseDsnEnv", "WREN_DATABASE_URL")
+        env_name = params.get("databaseDsnEnv", "SEMARAIL_DATABASE_URL")
         if (
             not isinstance(env_name, str)
             or not re.fullmatch(r"[A-Z][A-Z0-9_]{0,127}", env_name)

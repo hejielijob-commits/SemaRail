@@ -1,0 +1,34 @@
+.mcp-page { max-width: 1180px; }
+.mcp-overview { display: grid; grid-template-columns: minmax(0, 2fr) 1fr 0.6fr; margin-bottom: 16px; overflow: hidden; }
+.mcp-overview > div { display: grid; gap: 6px; min-width: 0; padding: 16px 18px; }
+.mcp-overview > div + div { border-left: 1px solid var(--border); }
+.mcp-overview span, .mcp-meta dt { color: var(--muted-soft); font-size: 10px; font-weight: 750; letter-spacing: 0.07em; text-transform: uppercase; }
+.mcp-overview strong { overflow: hidden; font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.mcp-server-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 16px 0; }
+.mcp-server-card { min-width: 0; padding: 21px; }
+.mcp-card-heading { display: flex; align-items: flex-start; gap: 13px; }
+.mcp-card-icon { display: grid; width: 39px; height: 39px; flex: 0 0 39px; place-items: center; border-radius: 10px; }
+.mcp-card-icon.ready { background: var(--success-soft); color: var(--success); }
+.mcp-card-icon.pending { background: var(--warning-soft); color: var(--warning); }
+.mcp-card-heading > div { min-width: 0; flex: 1; }
+.mcp-title-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mcp-title-line h2 { font-size: 16px; }
+.mcp-card-heading p, .mcp-config-heading p, .mcp-callout p { margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.mcp-meta { display: grid; grid-template-columns: 0.7fr 1.3fr; gap: 12px; margin: 22px 0 16px; }
+.mcp-meta div { min-width: 0; }
+.mcp-meta dd { overflow: hidden; margin: 6px 0 0; color: var(--text-strong); font-size: 11px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.mcp-command { overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
+.mcp-command-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--border); padding: 5px 7px 5px 12px; }
+.mcp-command-label > span { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 10px; font-weight: 700; }
+.mcp-command > code { display: block; overflow-x: auto; padding: 13px; color: var(--text); font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; font-size: 10px; line-height: 1.6; white-space: nowrap; }
+.mcp-config { padding: 22px; }
+.mcp-config-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 15px; }
+.mcp-config-heading h2 { margin-top: 5px; font-size: 17px; }
+.mcp-config pre { max-height: 390px; overflow: auto; margin: 0; border: 1px solid var(--border); border-radius: 8px; background: #101827; padding: 17px; color: #dbeafe; font: 11px/1.65 "Cascadia Code", "SFMono-Regular", Consolas, monospace; }
+.mcp-callout { display: flex; align-items: flex-start; gap: 10px; margin-top: 15px; border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); border-radius: 8px; background: var(--accent-faint); padding: 13px 14px; color: var(--accent); }
+.mcp-callout.warning { border-color: color-mix(in srgb, var(--warning) 32%, var(--border)); background: var(--warning-soft); color: var(--warning); }
+.mcp-callout > div { min-width: 0; }
+.mcp-callout strong { font-size: 11px; }
+.mcp-loading { padding: 24px; }
+@media (max-width: 900px) { .mcp-server-grid { grid-template-columns: 1fr; } }
+@media (max-width: 680px) { .mcp-overview { grid-template-columns: 1fr; } .mcp-overview > div + div { border-top: 1px solid var(--border); border-left: 0; } .mcp-config-heading, .mcp-title-line { align-items: flex-start; flex-direction: column; } }

@@ -789,7 +789,7 @@ export function DataQuerySqlView({ meta, mode, copied, onModeChange, onCopy, sub
       ),
     ),
     element('div', { 'data-query-sql-submit-state': submissionState, role: 'status', 'aria-live': 'polite' },
-      submissionState === 'pending' ? 'Saved to the review queue. It is not active Wren memory until approved.'
+      submissionState === 'pending' ? 'Saved to the review queue. It is not active SemaRail memory until approved.'
         : submissionState === 'error' ? 'Could not reach the semantic console. Nothing was recorded.' : ''),
     element('section', { 'data-query-sql-history': true, 'aria-label': 'Confirmed SQL history used' },
       element('h4', null, 'Confirmed SQL references'),

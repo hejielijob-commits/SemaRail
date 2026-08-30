@@ -62,7 +62,7 @@ class DispatchTests(unittest.TestCase):
         self.assertEqual(response["error"], {
             "code": "WREN_UNAVAILABLE",
             "phase": "project.validate",
-            "message": "Wren project validator is unavailable",
+            "message": "SemaRail project validator is unavailable",
             "retryable": True,
         })
 

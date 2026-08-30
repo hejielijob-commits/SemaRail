@@ -1,7 +1,7 @@
 {
   "name": "@hejielijob/dsh-wren-data-agent-contract",
   "version": "0.1.0",
-  "description": "Versioned JSON-safe contracts shared by the Wren Data Agent Host, Client, and sidecar.",
+  "description": "Versioned JSON-safe contracts shared by the SemaRail Host, Client, and sidecar.",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

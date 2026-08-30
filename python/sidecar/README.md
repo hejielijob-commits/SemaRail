@@ -1,6 +1,6 @@
-# Wren data-agent sidecar
+# SemaRail sidecar
 
-This package is the first Python process boundary for the Wren data agent. It
+This package is the Python process boundary for SemaRail. It
 speaks a deliberately small RPC protocol so the Host can supervise it without
 importing Wren into the Harness process. `sqlglot` is the PostgreSQL AST policy
 boundary; the package remains independent of the Harness runtime.
@@ -54,7 +54,7 @@ The initial methods are:
   `databaseDsnEnv` are accepted. The sidecar dry-plans through Wren, then
   applies a second PostgreSQL AST check for one read-only statement, allowed
   functions, and MDL-derived physical tables. The default DSN environment
-  variable is `WREN_DATABASE_URL`; the DSN is resolved inside the sidecar and
+  variable is `SEMARAIL_DATABASE_URL`; the DSN is resolved inside the sidecar and
   is never sent in an RPC request. A hard 30-second timeout and hard two-query
   concurrency limit apply. Native SQL is wrapped in a server-side `LIMIT
   maxRows+1` before execution, and results are shaped as DataQueryPresentation
@@ -84,16 +84,20 @@ The optional MCP entry point reuses the same `WrenQueryService` and
 `EnvPsycopgExecutor` instead of reimplementing query policy:
 
 ```text
-dsh-data-agent-mcp --project C:\data\wren-project
+semarail-mcp --project C:\data\semantic-project
+semarail-query-mcp --project C:\data\semantic-project
 ```
 
-It exposes only `dsh_governed_query` over stdio. The project directory and DSN
+The governed-query server exposes only `semarail_governed_query` over stdio. The project directory and DSN
 environment-variable name are fixed at process startup and never appear as tool
 arguments. MCP request cancellation is forwarded to the executor's database
 cancellation hook. Install `.[wren,mcp]` to use this entry point.
 
-For governed Agent deployments, pair it with `wren serve mcp --no-connect`.
-Wren supplies semantic discovery and planning; DSH owns database execution.
+For Agent deployments, pair `semarail-mcp` (semantic context) with
+`semarail-query-mcp` (governed execution). The legacy `dsh-data-agent-mcp`
+entry point remains available as a compatibility alias.
+The upstream semantic runtime supplies discovery and planning; SemaRail owns
+the governed database-execution boundary.
 
 ## Local development
 

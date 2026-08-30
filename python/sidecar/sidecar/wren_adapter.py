@@ -126,7 +126,7 @@ class LazyWrenAdapter:
             raise RpcFault(
                 WREN_UNAVAILABLE,
                 "project.validate",
-                "Wren context validation APIs are unavailable",
+                "SemaRail context validation APIs are unavailable",
                 retryable=False,
             )
 
@@ -144,7 +144,7 @@ class LazyWrenAdapter:
             raise RpcFault(
                 PROJECT_VALIDATION_FAILED,
                 "project.validate",
-                "Wren project validation failed",
+                "SemaRail project validation failed",
                 retryable=False,
             ) from exc
 
@@ -246,7 +246,7 @@ class LazyWrenAdapter:
             raise RpcFault(
                 SEMANTIC_ERROR,
                 "query.dryPlan",
-                "Wren project data source is missing",
+                "SemaRail project data source is missing",
                 retryable=False,
             )
         try:
@@ -345,7 +345,7 @@ class LazyWrenAdapter:
                 raise RpcFault(
                     WREN_UNAVAILABLE,
                     "query.dryPlan",
-                    "Wren strict policy configuration is unavailable",
+                    "SemaRail strict policy configuration is unavailable",
                     retryable=False,
                 ) from exc
 
@@ -399,7 +399,7 @@ class LazyWrenAdapter:
             raise RpcFault(
                 WREN_UNAVAILABLE,
                 phase,
-                "Wren context build API is unavailable",
+                "SemaRail context build API is unavailable",
                 retryable=False,
             )
         try:
@@ -408,14 +408,14 @@ class LazyWrenAdapter:
             raise RpcFault(
                 SEMANTIC_ERROR,
                 phase,
-                "Wren project build failed",
+                "SemaRail project build failed",
                 retryable=False,
             ) from exc
         if not isinstance(manifest, dict):
             raise RpcFault(
                 SEMANTIC_ERROR,
                 phase,
-                "Wren project build failed",
+                "SemaRail project build failed",
                 retryable=False,
             )
         return manifest
@@ -582,14 +582,14 @@ class LazyWrenAdapter:
             raise RpcFault(
                 WREN_UNAVAILABLE,
                 "query.dryPlan",
-                "Wren query planner is unavailable",
+                "SemaRail semantic planner is unavailable",
                 retryable=True,
             ) from exc
         if not callable(factory):
             raise RpcFault(
                 WREN_UNAVAILABLE,
                 "query.dryPlan",
-                "Wren query planner is unavailable",
+                "SemaRail semantic planner is unavailable",
                 retryable=False,
             )
         return factory
@@ -603,7 +603,7 @@ class LazyWrenAdapter:
             raise RpcFault(
                 WREN_UNAVAILABLE,
                 phase,
-                "Wren runtime is unavailable",
+                "SemaRail semantic runtime is unavailable",
                 retryable=True,
             ) from exc
         except Exception as exc:
@@ -612,7 +612,7 @@ class LazyWrenAdapter:
             raise RpcFault(
                 WREN_UNAVAILABLE,
                 phase,
-                "Wren runtime is unavailable",
+                "SemaRail semantic runtime is unavailable",
                 retryable=True,
             ) from exc
         if not isinstance(context, ModuleType):
@@ -622,7 +622,7 @@ class LazyWrenAdapter:
                 raise RpcFault(
                     WREN_UNAVAILABLE,
                     phase,
-                    "Wren context module is unavailable",
+                    "SemaRail context module is unavailable",
                     retryable=False,
                 )
         self._context = context

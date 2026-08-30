@@ -1,4 +1,4 @@
-# Wren Semantic Console MVP server
+# SemaRail Semantic Console server
 
 This server is a local-only REST API for onboarding a datasource and editing a
 Wren 0.13.2 project. It uses the public Wren APIs `wren.context.validate_project`,
@@ -33,6 +33,7 @@ The primary routes are:
 | Route | Purpose |
 | --- | --- |
 | `GET /api/health` | Process/Wren readiness |
+| `GET /api/mcp-integration` | Secret-free stdio MCP readiness, commands, and generic client configuration |
 | `GET /api/project` | Project overview, draft count, revision, active datasource |
 | `GET /api/datasource-types` | Field metadata for configured, runtime-available drivers |
 | `GET/POST /api/datasources` | Redacted datasource list/create |

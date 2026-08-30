@@ -150,6 +150,39 @@ class SemanticConsoleServiceTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(error["code"], "INVALID_PATH")
 
+    def test_mcp_integration_exposes_safe_stdio_configuration(self):
+        service = SemanticConsoleService(self.make_project())
+        datasource = service.create_datasource(
+            {"name": "pg", "type": "postgres", "connection": {"host": "localhost", "password": "never-return"}}
+        )
+
+        status, integration = service.dispatch("GET", "/api/mcp-integration")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(integration["transport"], "stdio")
+        self.assertEqual(integration["semantic"]["status"], "ready")
+        self.assertEqual(integration["governedQuery"]["status"], "ready")
+        self.assertEqual(integration["governedQuery"]["datasourceType"], "postgres")
+        self.assertEqual(integration["semantic"]["command"], "semarail-mcp")
+        self.assertEqual(integration["governedQuery"]["command"], "semarail-query-mcp")
+        self.assertEqual(integration["governedQuery"]["databaseDsnEnv"], "SEMARAIL_DATABASE_URL")
+        self.assertIn(str(self.tmp_path / "project"), integration["semantic"]["args"])
+        self.assertEqual(integration["clientConfig"]["mcpServers"]["semarail-query"]["env"]["SEMARAIL_DATABASE_URL"], "<POSTGRESQL_DSN>")
+        serialized = json.dumps(integration)
+        self.assertNotIn("never-return", serialized)
+        self.assertNotIn(datasource.get("connection", {}).get("password", "never-return"), serialized)
+
+    def test_mcp_integration_marks_mysql_governed_execution_unsupported(self):
+        service = SemanticConsoleService(self.make_project())
+        with patch("server.drivers._module_available", return_value=True):
+            service.create_datasource({"name": "mysql", "type": "mysql", "connection": {"host": "localhost"}})
+
+        integration = service.mcp_integration()
+
+        self.assertEqual(integration["semantic"]["status"], "ready")
+        self.assertEqual(integration["governedQuery"]["status"], "setup_required")
+        self.assertEqual(integration["governedQuery"]["datasourceType"], "mysql")
+
     def test_business_model_projection_updates_wren_and_locales_as_drafts(self):
         store = self.make_project()
         model_dir = self.tmp_path / "project" / "models" / "orders"

@@ -1,7 +1,7 @@
 {
   "name": "@hejielijob/dsh-wren-data-agent-host",
   "version": "0.1.0",
-  "description": "DeepSeek Harness Host plugin for the Wren data_query boundary.",
+  "description": "DeepSeek Harness Host plugin for the SemaRail query boundary.",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

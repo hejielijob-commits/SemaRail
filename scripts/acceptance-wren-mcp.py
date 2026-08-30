@@ -190,6 +190,8 @@ async def _verify(root: Path) -> dict[str, Any]:
             "MCP client is unavailable; install python/sidecar with the mcp extra"
         ) from exc
 
+    repository = Path(__file__).resolve().parents[1]
+    sidecar_root = repository / "python" / "sidecar"
     wren = _wren_command()
     project, wren_home, profile = _prepare(root)
     env = dict(os.environ)
@@ -282,18 +284,18 @@ async def _verify(root: Path) -> dict[str, Any]:
                 "query": query,
             }
 
+    semantic_env = dict(env)
+    existing_pythonpath = semantic_env.get("PYTHONPATH", "")
+    semantic_env["PYTHONPATH"] = (
+        str(sidecar_root)
+        if not existing_pythonpath
+        else str(sidecar_root) + os.pathsep + existing_pythonpath
+    )
     semantic_only_params = StdioServerParameters(
-        command=str(wren),
-        args=[
-            "serve",
-            "mcp",
-            "--project",
-            str(project),
-            "--no-connect",
-            "--quiet",
-        ],
+        command=sys.executable,
+        args=["-m", "sidecar.semantic_mcp", "--project", str(project)],
         cwd=str(project),
-        env=env,
+        env=semantic_env,
     )
     async with stdio_client(semantic_only_params) as (reader, writer):
         async with ClientSession(reader, writer) as session:
@@ -321,9 +323,7 @@ async def _verify(root: Path) -> dict[str, Any]:
                 "executionToolsAbsent": sorted(forbidden_execution),
             }
 
-    repository = Path(__file__).resolve().parents[1]
     governed_env = dict(env)
-    sidecar_root = repository / "python" / "sidecar"
     existing_pythonpath = governed_env.get("PYTHONPATH", "")
     governed_env["PYTHONPATH"] = (
         str(sidecar_root)
@@ -343,17 +343,17 @@ async def _verify(root: Path) -> dict[str, Any]:
     async with stdio_client(governed_params) as (reader, writer):
         async with ClientSession(reader, writer) as session:
             initialized = await session.initialize()
-            if initialized.serverInfo.name != "dsh-governed-query":
+            if initialized.serverInfo.name != "semarail-query":
                 raise AcceptanceFailure("governed MCP returned an unexpected identity")
             tools = await session.list_tools()
-            if [tool.name for tool in tools.tools] != ["dsh_governed_query"]:
+            if [tool.name for tool in tools.tools] != ["semarail_governed_query"]:
                 raise AcceptanceFailure("governed MCP exposed an unexpected tool surface")
             properties = tools.tools[0].inputSchema.get("properties", {})
             if "project_dir" in properties or "database_dsn_env" in properties:
                 raise AcceptanceFailure("governed MCP exposed operator policy as tool input")
 
             governed_query = await session.call_tool(
-                "dsh_governed_query",
+                "semarail_governed_query",
                 {
                     "question": "List order identifiers",
                     "semantic_sql": "SELECT orders.id FROM orders ORDER BY orders.id",
@@ -376,7 +376,7 @@ async def _verify(root: Path) -> dict[str, Any]:
                 raise AcceptanceFailure("governed MCP did not preserve DSH bounds")
 
             denied = await session.call_tool(
-                "dsh_governed_query",
+                "semarail_governed_query",
                 {
                     "question": "policy probe",
                     "semantic_sql": "SELECT pg_sleep(1) AS waited",
@@ -390,8 +390,8 @@ async def _verify(root: Path) -> dict[str, Any]:
                 raise AcceptanceFailure("governed MCP did not enforce DSH SQL policy")
 
     native_result["governedGateway"] = {
-        "server": "dsh-governed-query",
-        "tools": ["dsh_governed_query"],
+        "server": "semarail-query",
+        "tools": ["semarail_governed_query"],
         "operatorPolicyPinned": True,
         "bounds": "passed",
         "policyDenial": "passed",

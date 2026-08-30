@@ -334,7 +334,7 @@ class Dispatcher:
             raise RpcFault(
                 WREN_UNAVAILABLE,
                 "project.validate",
-                "Wren project validator is unavailable",
+                "SemaRail project validator is unavailable",
                 retryable=True,
             )
         try:
@@ -367,7 +367,7 @@ class Dispatcher:
             raise RpcFault(
                 WREN_UNAVAILABLE,
                 "context.ask",
-                "Wren context provider is unavailable",
+                "SemaRail context provider is unavailable",
                 retryable=True,
             )
         try:
@@ -407,7 +407,7 @@ class Dispatcher:
             raise RpcFault(
                 WREN_UNAVAILABLE,
                 "query.dryPlan",
-                "Wren query planner is unavailable",
+                "SemaRail semantic planner is unavailable",
                 retryable=True,
             )
         try:
@@ -432,7 +432,7 @@ class Dispatcher:
             raise RpcFault(
                 WREN_UNAVAILABLE,
                 "query.run",
-                "Wren query runner is unavailable",
+                "SemaRail query runner is unavailable",
                 retryable=True,
             )
         try:
@@ -458,7 +458,7 @@ class Dispatcher:
             raise RpcFault(
                 WREN_UNAVAILABLE,
                 "query.cancel",
-                "Wren query runner is unavailable",
+                "SemaRail query runner is unavailable",
                 retryable=True,
             )
         try:
@@ -467,7 +467,7 @@ class Dispatcher:
                 raise RpcFault(
                     WREN_UNAVAILABLE,
                     "query.cancel",
-                    "Wren query cancellation is unavailable",
+                    "SemaRail query cancellation is unavailable",
                     retryable=True,
                 )
             return cancel(object_params)

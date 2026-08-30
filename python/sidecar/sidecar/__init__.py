@@ -1,4 +1,4 @@
-"""Public API for the Wren data-agent sidecar boundary."""
+"""Public API for the SemaRail sidecar boundary."""
 
 from .dispatch import (
     RPC_METHODS,

@@ -69,14 +69,14 @@ class GovernedMcpGatewayTests(unittest.TestCase):
             )
 
             tools = asyncio.run(server.list_tools())
-            self.assertEqual([tool.name for tool in tools], ["dsh_governed_query"])
+            self.assertEqual([tool.name for tool in tools], ["semarail_governed_query"])
             schema = tools[0].inputSchema
             self.assertNotIn("project_dir", schema.get("properties", {}))
             self.assertNotIn("database_dsn_env", schema.get("properties", {}))
 
             _content, result = asyncio.run(
                 server.call_tool(
-                    "dsh_governed_query",
+                    "semarail_governed_query",
                     {
                         "question": "How many orders?",
                         "semantic_sql": "SELECT COUNT(*) FROM orders",
@@ -99,7 +99,7 @@ class GovernedMcpGatewayTests(unittest.TestCase):
             self.assertEqual(params["maxRows"], 12)
             self.assertEqual(params["previewRows"], 7)
             self.assertEqual(params["maxPreviewBytes"], 4096)
-            self.assertRegex(params["queryId"], r"^dsh-mcp-[0-9a-f]{32}$")
+            self.assertRegex(params["queryId"], r"^semarail-mcp-[0-9a-f]{32}$")
 
     def test_rpc_fault_becomes_stable_mcp_tool_error_without_secret(self) -> None:
         class DeniedService(FakeQueryService):
@@ -120,7 +120,7 @@ class GovernedMcpGatewayTests(unittest.TestCase):
             with self.assertRaises(ToolError) as caught:
                 asyncio.run(
                     server.call_tool(
-                        "dsh_governed_query",
+                        "semarail_governed_query",
                         {"question": "secret", "semantic_sql": "DROP TABLE orders"},
                     )
                 )
@@ -146,7 +146,7 @@ class GovernedMcpGatewayTests(unittest.TestCase):
             with self.assertRaises(ToolError) as caught:
                 asyncio.run(
                     server.call_tool(
-                        "dsh_governed_query",
+                        "semarail_governed_query",
                         {"question": "q", "semantic_sql": "SELECT 1"},
                     )
                 )
@@ -166,7 +166,7 @@ class GovernedMcpGatewayTests(unittest.TestCase):
                 )
                 task = asyncio.create_task(
                     server.call_tool(
-                        "dsh_governed_query",
+                        "semarail_governed_query",
                         {"question": "slow", "semantic_sql": "SELECT 1"},
                     )
                 )

@@ -27,7 +27,7 @@ export class QueryGatewayError extends Error {
     code: DataAgentErrorCode = 'WREN_UNAVAILABLE',
     retryable = true,
   ) {
-    super('Wren query gateway is unavailable.')
+    super('SemaRail query gateway is unavailable.')
     this.name = 'QueryGatewayError'
     this.code = code
     this.retryable = retryable
@@ -43,10 +43,9 @@ export class SemanticContextGatewayError extends Error {
     code: DataAgentErrorCode = 'WREN_UNAVAILABLE',
     retryable = true,
   ) {
-    super('Wren semantic context is unavailable.')
+    super('SemaRail semantic context is unavailable.')
     this.name = 'SemanticContextGatewayError'
     this.code = code
     this.retryable = retryable
   }
 }
-

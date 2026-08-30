@@ -27,6 +27,7 @@ import {
   Moon,
   PencilSimple,
   Play,
+  Plug,
   Plus,
   RocketLaunch,
   Rows,
@@ -43,20 +44,21 @@ import {
 import { api } from "./api/client";
 import "./i18n";
 import { setConsoleLocale } from "./i18n";
-import type { ColumnRecord, ConsoleSection, CubeSnapshot, Datasource, DatasourceField, DatasourceType, KnowledgeRulesResponse, LocalizedText, ProjectDiff, ProjectFile, ProjectSummary, SchemaRecord, SemanticModel, SemanticProjectSnapshot, SemanticRelationship, SqlCandidatesResponse, TableRecord, Theme, ValidationIssue, VersionRecord, ViewDefinition, ViewPreviewResult, ViewSnapshot, ViewValidationResponse, ViewWritePayload } from "./types";
+import type { ColumnRecord, ConsoleSection, CubeSnapshot, Datasource, DatasourceField, DatasourceType, KnowledgeRulesResponse, LocalizedText, McpIntegrationResponse, ProjectDiff, ProjectFile, ProjectSummary, SchemaRecord, SemanticModel, SemanticProjectSnapshot, SemanticRelationship, SqlCandidatesResponse, TableRecord, Theme, ValidationIssue, VersionRecord, ViewDefinition, ViewPreviewResult, ViewSnapshot, ViewValidationResponse, ViewWritePayload } from "./types";
 import { Badge, Button, EmptyState, Field, InlineNotice, LoadingRows, Modal, SectionHeading, Select, TextArea, TextInput } from "./components/ui";
 import ModelEditor from "./components/ModelEditor";
 import { RelationshipGraph, type RelationshipGraphLocalizedText, type RelationshipGraphRelationship } from "./components/RelationshipGraph";
 import RuleWorkbench, { type KnowledgeRule, type RuleSaveAction } from "./components/RuleWorkbench";
 import SqlKnowledgeWorkbench, { type SqlKnowledgeCandidate, type SqlValidation } from "./components/SqlKnowledgeWorkbench";
 import CubeWorkbench, { type CubeDefinition } from "./components/CubeWorkbench";
+import McpIntegration from "./components/McpIntegration";
 
 const ViewWorkbench = lazy(() => import("./components/ViewWorkbench"));
 
 type Notice = { tone: "info" | "success" | "warning" | "error"; title: string; body?: string } | null;
 
 const navGroups: { labelKey: string; items: { id: ConsoleSection; labelKey: string; icon: typeof House; count?: string }[] }[] = [
-  { labelKey: "nav.workspace", items: [{ id: "overview", labelKey: "nav.overview", icon: House }, { id: "datasources", labelKey: "nav.datasources", icon: Database }, { id: "schema", labelKey: "nav.schema", icon: Table }] },
+  { labelKey: "nav.workspace", items: [{ id: "overview", labelKey: "nav.overview", icon: House }, { id: "datasources", labelKey: "nav.datasources", icon: Database }, { id: "schema", labelKey: "nav.schema", icon: Table }, { id: "mcp", labelKey: "nav.mcp", icon: Plug }] },
   { labelKey: "nav.semanticLayer", items: [{ id: "models", labelKey: "nav.models", icon: Cube }, { id: "relationships", labelKey: "nav.relationships", icon: ShareNetwork }, { id: "views", labelKey: "nav.views", icon: Eye }, { id: "cubes", labelKey: "nav.cubes", icon: Stack }, { id: "rules", labelKey: "nav.rules", icon: BookOpenText }, { id: "sqlKnowledge", labelKey: "nav.sqlKnowledge", icon: Code }, { id: "mdl", labelKey: "nav.mdl", icon: BracketsCurly }] },
 ];
 
@@ -176,6 +178,9 @@ function App() {
   const [viewSnapshot, setViewSnapshot] = useState<ViewSnapshot | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState<string | null>(null);
+  const [mcpIntegration, setMcpIntegration] = useState<McpIntegrationResponse | null>(null);
+  const [mcpLoading, setMcpLoading] = useState(false);
+  const [mcpError, setMcpError] = useState<string | null>(null);
   const fileRequestRef = useRef(0);
   const diffRequestRef = useRef(0);
 
@@ -255,6 +260,17 @@ function App() {
     });
     if (result) setViewSnapshot(result);
     setViewLoading(false);
+  }
+
+  async function loadMcpIntegration() {
+    setMcpLoading(true);
+    setMcpError(null);
+    const result = await api.getMcpIntegration().catch((error: unknown) => {
+      setMcpError(error instanceof Error ? error.message : "MCP integration could not be loaded.");
+      return null;
+    });
+    if (result) setMcpIntegration(result);
+    setMcpLoading(false);
   }
 
   async function loadProjectFile(path: string, fileList = files) {
@@ -545,6 +561,7 @@ function App() {
     if (next === "sqlKnowledge") void loadSqlCandidates();
     if (next === "cubes") void loadCubes();
     if (next === "views") void loadViews();
+    if (next === "mcp") void loadMcpIntegration();
     if (next === "schema" && activeDatasourceId) void handleLoadSchema();
     if (next === "instructions") {
       const instructionFile = files.find((file) => isInstructionFile(file.path));
@@ -662,6 +679,7 @@ function App() {
           {section === "cubes" ? <CubeWorkbench snapshot={cubeSnapshot} loading={cubeLoading} sourceContent={mdlSource} sourceLoading={fileLoading} diff={semanticDiff} diffLoading={semanticDiffLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onSave={saveCube} onCreate={createCubeDraft} onDelete={deleteCubeDraft} onRetry={() => void loadCubes()} onOpenSource={(path) => { setSelectedFilePath(path); void loadProjectFile(path); }} onLoadDiff={(path) => void loadSemanticDiff(path)} /> : null}
           {section === "rules" ? <RuleWorkbench rules={knowledgeRules(rulesSnapshot)} selectedRuleId={selectedRuleId} loading={rulesLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} source={selectedFilePath ? { path: selectedFilePath, content: mdlSource, diff: semanticDiff?.diff } : null} onRetry={() => void loadRules()} onSelectRule={(rule) => { setSelectedRuleId(rule.id); setSelectedFilePath(rule.sourcePath); void loadProjectFile(rule.sourcePath); void loadSemanticDiff(rule.sourcePath); }} onToggleRule={toggleRule} onSave={saveRule} onCreate={createRule} onDelete={deleteRule} /> : null}
           {section === "sqlKnowledge" ? <SqlKnowledgeWorkbench candidates={knowledgeCandidates(sqlCandidates)} loading={sqlLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onRetry={() => void loadSqlCandidates()} onValidate={validateCandidate} onApprove={approveCandidate} onReject={rejectCandidate} /> : null}
+          {section === "mcp" ? <McpIntegration integration={mcpIntegration} loading={mcpLoading} error={mcpError} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onRetry={() => void loadMcpIntegration()} /> : null}
           {section === "instructions" ? <InstructionsPage value={instructions} onChange={setInstructions} onSave={() => { const path = files.find((file) => isInstructionFile(file.path))?.path; if (path) void handleSaveFile(path, instructions); else setNotice({ tone: "error", title: "Draft save failed", body: "The project API did not return an instructions file." }); }} savedAt={draftSavedAt} loading={fileLoading} /> : null}
           {section === "mdl" ? <MdlPage value={mdlSource} onChange={setMdlSource} files={files} selectedFile={selectedFilePath} onSelectFile={(path: string) => void loadProjectFile(path)} onSave={(path?: string) => void handleSaveFile(path ?? selectedFilePath, mdlSource)} onImportProject={handleImportProject} savedAt={draftSavedAt} loading={fileLoading} /> : null}
         </>}
@@ -673,7 +691,7 @@ function App() {
   </div>;
 }
 
-function pageTitle(section: ConsoleSection, t: (key: string) => string) { return t(({ overview: "page.overview", datasources: "page.datasources", schema: "page.schema", models: "page.models", relationships: "page.relationships", views: "page.views", cubes: "page.cubes", rules: "page.rules", sqlKnowledge: "page.sqlKnowledge", instructions: "page.instructions", mdl: "page.mdl" })[section]); }
+function pageTitle(section: ConsoleSection, t: (key: string) => string) { return t(({ overview: "page.overview", datasources: "page.datasources", schema: "page.schema", models: "page.models", relationships: "page.relationships", views: "page.views", cubes: "page.cubes", rules: "page.rules", sqlKnowledge: "page.sqlKnowledge", mcp: "page.mcp", instructions: "page.instructions", mdl: "page.mdl" })[section]); }
 
 function Sidebar({ projectName, section, onNavigate, open, onClose }: { projectName: string; section: ConsoleSection; onNavigate: (section: ConsoleSection) => void; open: boolean; onClose: () => void }) {
   const { t } = useTranslation();

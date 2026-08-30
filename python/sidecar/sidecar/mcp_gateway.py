@@ -1,7 +1,7 @@
-"""Thin MCP adapter over the existing governed query service.
+"""Thin SemaRail MCP adapter over the existing governed query service.
 
 Wren's native MCP server remains the semantic discovery/planning interface.
-This server adds one DSH-specific execution tool that reuses the exact service
+This server adds one governed execution tool that reuses the exact service
 and PostgreSQL policy boundary used by the DeepSeek Harness sidecar.
 """
 
@@ -24,7 +24,7 @@ from mcp.types import ToolAnnotations
 from .errors import INTERNAL_ERROR, RpcError, RpcFault
 
 
-DEFAULT_DATABASE_DSN_ENV = "WREN_DATABASE_URL"
+DEFAULT_DATABASE_DSN_ENV = "SEMARAIL_DATABASE_URL"
 DEFAULT_CANCELLATION_GRACE_SECONDS = 2.0
 _ENV_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,127}\Z")
 
@@ -90,10 +90,10 @@ def create_governed_mcp_server(
     service = query_service or _default_query_service()
     logger = logging.getLogger("sidecar.mcp_gateway")
     server = FastMCP(
-        "dsh-governed-query",
+        "semarail-query",
         instructions=(
-            "Use Wren's native MCP tools for semantic context and planning, then "
-            "use dsh_governed_query when DSH PostgreSQL policy and execution limits "
+            "Use SemaRail's semantic MCP tools for context and planning, then "
+            "use semarail_governed_query when PostgreSQL policy and execution limits "
             "are required."
         ),
         log_level="WARNING",
@@ -101,14 +101,14 @@ def create_governed_mcp_server(
 
     @server.tool(
         annotations=ToolAnnotations(
-            title="Run a DSH governed semantic query",
+            title="Run a SemaRail governed semantic query",
             readOnlyHint=True,
             destructiveHint=False,
             idempotentHint=False,
             openWorldHint=True,
         )
     )
-    async def dsh_governed_query(
+    async def semarail_governed_query(
         question: str,
         semantic_sql: str,
         chart_intent: Literal["auto", "table", "line", "bar", "pie"] = "auto",
@@ -117,16 +117,16 @@ def create_governed_mcp_server(
         preview_rows: int = 200,
         max_preview_bytes: int = 1_048_576,
     ) -> dict[str, Any]:
-        """Execute one semantic SQL query through DSH's governed PostgreSQL path.
+        """Execute one semantic SQL query through SemaRail's governed PostgreSQL path.
 
         The project directory and datasource credential location are fixed by
         the server operator and cannot be selected by the agent. Semantic SQL
         is planned through Wren, checked against the MDL-derived physical
         allowlist, and executed read-only with hard time, row, byte, and
-        concurrency limits. The result uses DSH presentation schema version 1.
+        concurrency limits. The result uses SemaRail presentation schema version 1.
         """
 
-        query_id = f"dsh-mcp-{uuid.uuid4().hex}"
+        query_id = f"semarail-mcp-{uuid.uuid4().hex}"
         params = {
             "projectDir": str(project_path),
             "question": question,
@@ -178,9 +178,9 @@ def create_governed_mcp_server(
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Serve the DSH governed PostgreSQL query tool over MCP stdio"
+        description="Serve the SemaRail governed PostgreSQL query tool over MCP stdio"
     )
-    parser.add_argument("--project", required=True, help="fixed Wren project directory")
+    parser.add_argument("--project", required=True, help="fixed semantic project directory")
     parser.add_argument(
         "--database-dsn-env",
         default=DEFAULT_DATABASE_DSN_ENV,

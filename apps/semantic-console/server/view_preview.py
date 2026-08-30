@@ -144,7 +144,7 @@ class ViewPreviewService:
         if self.dispatcher is None:
             raise ViewPreviewError(
                 "WREN_UNAVAILABLE",
-                "safe Wren preview runtime is unavailable",
+                "safe SemaRail preview runtime is unavailable",
                 status=503,
                 details={"retryable": True, "phase": "preview"},
             )
@@ -161,7 +161,7 @@ class ViewPreviewService:
                     "method": "query.run",
                     "params": {
                         "projectDir": str(stage),
-                        "question": "Preview Wren View",
+                        "question": "Preview SemaRail View",
                         "semanticSql": semantic_sql,
                         "queryId": query_id,
                         "chartIntent": "table",
@@ -169,7 +169,7 @@ class ViewPreviewService:
                         "maxRows": limit,
                         "previewRows": limit,
                         "maxPreviewBytes": max_bytes,
-                        "databaseDsnEnv": "WREN_DATABASE_URL",
+                        "databaseDsnEnv": "SEMARAIL_DATABASE_URL",
                     },
                     "deadlineMs": timeout_ms + 1_000,
                 }

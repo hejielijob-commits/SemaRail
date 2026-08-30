@@ -107,7 +107,7 @@ def _secret_file_path(relative: str) -> bool:
 
 def _assert_safe_content(relative: str, content: str) -> None:
     if _secret_file_path(relative):
-        raise ProjectError("CREDENTIALS_NOT_ALLOWED", "credential files cannot be stored in a Wren project")
+        raise ProjectError("CREDENTIALS_NOT_ALLOWED", "credential files cannot be stored in a SemaRail project")
     if _DSN.search(content) or _SECRET_LINE.search(content):
         raise ProjectError("CREDENTIALS_NOT_ALLOWED", "credential values cannot be stored in project files")
 
@@ -317,7 +317,7 @@ class WrenProjectAdapter:
             }
         except BaseException as exc:
             if isinstance(exc, (KeyboardInterrupt, SystemExit)):
-                raise ProjectError("WREN_VALIDATION_FAILED", "Wren project validation failed") from exc
+                raise ProjectError("WREN_VALIDATION_FAILED", "SemaRail project validation failed") from exc
             return {
                 "valid": False,
                 "errors": [{"level": "error", "path": "project", "message": _redact_text(exc, project_dir)}],
@@ -333,12 +333,12 @@ class WrenProjectAdapter:
             context = self._load_context()
             manifest = context.build_json(project_dir)
             if not isinstance(manifest, dict):
-                raise ValueError("Wren build returned an invalid manifest")
+                raise ValueError("SemaRail build returned an invalid manifest")
             return manifest
         except BaseException as exc:
             if isinstance(exc, (KeyboardInterrupt, SystemExit)):
-                raise ProjectError("WREN_BUILD_FAILED", "Wren project build failed") from exc
-            raise ProjectError("WREN_BUILD_FAILED", "Wren project build failed") from exc
+                raise ProjectError("WREN_BUILD_FAILED", "SemaRail project build failed") from exc
+            raise ProjectError("WREN_BUILD_FAILED", "SemaRail project build failed") from exc
 
     def write_target(self, project_dir: Path, manifest: Mapping[str, Any]) -> None:
         try:
@@ -346,7 +346,7 @@ class WrenProjectAdapter:
             if callable(save_target):
                 save_target(dict(manifest), project_dir)
         except Exception as exc:
-            raise ProjectError("WREN_BUILD_FAILED", "Wren target build failed") from exc
+            raise ProjectError("WREN_BUILD_FAILED", "SemaRail target build failed") from exc
 
 
 def _normalize_issues(issues: Any, project_dir: Path) -> list[dict[str, str]]:
@@ -443,7 +443,7 @@ class ProjectStore:
         except ValueError:
             pass
         else:
-            raise ProjectError("INVALID_STATE_DIR", "state directory must be outside the Wren project")
+            raise ProjectError("INVALID_STATE_DIR", "state directory must be outside the SemaRail project")
         self.state_dir.mkdir(parents=True, exist_ok=True)
         try:
             os.chmod(self.state_dir, 0o700)
@@ -660,7 +660,7 @@ class ProjectStore:
                 if not source_path.is_dir() or source_path.is_symlink():
                     raise ProjectError("INVALID_PROJECT", "import source directory was not found")
                 if not (source_path / "wren_project.yml").is_file():
-                    raise ProjectError("INVALID_PROJECT", "import source is not a Wren project")
+                    raise ProjectError("INVALID_PROJECT", "import source is not a SemaRail project")
                 temp = Path(tempfile.mkdtemp(prefix="semantic-console-import-", dir=self.state_dir))
                 try:
                     _copy_tree(source_path, temp)

@@ -782,15 +782,15 @@ async def _run_governed_mcp_smoke_async(
     async with stdio_client(params) as (reader, writer):
         async with ClientSession(reader, writer) as session:
             initialized = await session.initialize()
-            if initialized.serverInfo.name != "dsh-governed-query":
+            if initialized.serverInfo.name != "semarail-query":
                 raise E2EFailure("governed MCP returned an unexpected server identity")
             tools = await session.list_tools()
             names = {tool.name for tool in tools.tools}
-            if names != {"dsh_governed_query"}:
+            if names != {"semarail_governed_query"}:
                 raise E2EFailure("governed MCP exposed an unexpected tool surface")
 
             successful = await session.call_tool(
-                "dsh_governed_query",
+                "semarail_governed_query",
                 {
                     "question": "List order identifiers",
                     "semantic_sql": "SELECT orders.id FROM orders ORDER BY orders.id",
@@ -812,7 +812,7 @@ async def _run_governed_mcp_smoke_async(
                 raise E2EFailure("governed MCP did not preserve DSH result bounds")
 
             denied = await session.call_tool(
-                "dsh_governed_query",
+                "semarail_governed_query",
                 {
                     "question": "policy probe",
                     "semantic_sql": "SELECT pg_sleep(1) AS waited",

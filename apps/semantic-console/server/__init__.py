@@ -1,4 +1,4 @@
-"""Wren Semantic Console MVP server package."""
+"""SemaRail Semantic Console server package."""
 
 from .app import (
     DEFAULT_HOST,

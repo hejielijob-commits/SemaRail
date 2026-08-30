@@ -1,21 +1,23 @@
-# DSH Data Agent — WrenAI Integration
+# SemaRail
 
-> Bring a governed Wren semantic layer to MCP-capable agents, with an enhanced DeepSeek Harness experience.
+> Governed semantic data infrastructure for MCP-capable agents.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-0f766e.svg)](LICENSE)
 ![Project status: Alpha](https://img.shields.io/badge/status-alpha-f59e0b)
-![DeepSeek Harness](https://img.shields.io/badge/DeepSeek_Harness-%3E%3D0.1.0--rc.10_%3C0.2.0-2563eb)
-[![WrenAI](https://img.shields.io/badge/WrenAI-0.13.2-7c3aed)](https://github.com/Canner/WrenAI)
 ![Node.js](https://img.shields.io/badge/Node.js-%5E22.19_%7C%7C_%3E%3D24-339933)
 ![Python](https://img.shields.io/badge/Python-%3E%3D3.11-3776ab)
 
-DSH Data Agent is an agent-facing semantic data layer built on [WrenAI](https://github.com/Canner/WrenAI). Any MCP-capable agent can use Wren's native context, planning, validation, knowledge, resource, and prompt tools together with DSH's governed PostgreSQL execution tool. DeepSeek Harness is an optional enhanced adapter that adds conversation-native Chart, Table, and SQL views over the same governed query service. A local visual console maintains the semantic project.
+SemaRail is an agent-facing semantic data layer for MCP-capable agents. It turns governed business semantics into reliable, inspectable answers through context-aware planning, validation, bounded read-only queries, and conversation-native Chart, Table, and SQL results. A local Semantic Console manages semantic projects, metadata, knowledge, and publication workflows.
+
+Connect SemaRail to any MCP-capable agent through its portable semantic tool surface. Optional conversation adapters provide the same durable result views and governed query boundary in supported hosts, while datasource credentials remain server-side and every result stays versioned and JSON-safe.
 
 > **Project status:** Alpha. The repository is open for evaluation and contribution, but its APIs, configuration, and storage formats may change before the first stable release. The current code is built and installed from source; npm and PyPI publication are intentionally out of scope.
 
-The standard agent interface uses Wren's native Model Context Protocol server and does not depend on DeepSeek Harness. The optional Harness integration uses only public Bundle, Cordis, tool, presentation-metadata, and Client slot APIs; it does not patch or fork DeepSeek Harness.
+## Attribution / Upstream foundation
 
-This repository depends on the WrenAI Python SDK/Core package `wrenai==0.13.2` and uses its public context, validation, build, field-registry, and project-format APIs. WrenAI is developed by [Canner](https://www.canner.io/). DSH Data Agent is an independent integration; it is not an official WrenAI distribution and is not endorsed by or affiliated with Canner. The product name and interface use the project's own DSH Data Agent branding; “WrenAI” is used only to identify the upstream technology.
+SemaRail is based on and adapted from the [WrenAI](https://github.com/Canner/WrenAI) codebase and Python SDK/Core. It currently uses `wrenai==0.13.2` and its public context, validation, build, field-registry, and project-format APIs. WrenAI is developed by [Canner](https://www.canner.io/), and the pinned upstream distribution identifies itself as Apache-2.0 licensed.
+
+SemaRail's own repository code is released under the [MIT License](LICENSE). SemaRail is an independent project, not an official WrenAI distribution or Canner product, and it is not endorsed by or affiliated with Canner. The SemaRail name and branding are independent of the upstream project.
 
 ![Semantic Console overview](docs/images/semantic-console-overview.png)
 
@@ -23,17 +25,17 @@ This repository depends on the WrenAI Python SDK/Core package `wrenai==0.13.2` a
 
 | Capability | What it provides |
 | --- | --- |
-| Agent-neutral MCP | Wren-native semantic tools plus an optional DSH governed-query MCP server for any MCP-capable agent. |
-| Semantic-aware agent tools | Retrieves Wren context before SQL generation and returns versioned, JSON-safe query results. |
+| Agent-neutral MCP | Portable semantic-context and governed-query MCP servers for any MCP-capable agent. |
+| Semantic-aware agent tools | Retrieves SemaRail context before SQL generation and returns versioned, JSON-safe query results. |
 | Governed query execution | PostgreSQL AST validation, object allowlists, read-only execution, row/byte/time limits, and cancellation. |
 | Conversation-native results | Reconstructable Chart, Table, and SQL views rendered from durable `tool/result.meta`. |
-| Semantic Console | A responsive local UI for data sources, schema import, models, relationships, views, cubes, rules, SQL knowledge, drafts, validation, publishing, and rollback. |
-| Bilingual editing | English and Simplified Chinese display metadata without changing Wren's technical identifiers. |
+| Semantic Console | A responsive local UI for data sources, schema import, models, relationships, views, cubes, rules, SQL knowledge, MCP integration, drafts, validation, publishing, and rollback. |
+| Bilingual editing | English and Simplified Chinese display metadata without changing stable technical identifiers. |
 | Verifiable delivery | Unit, package, isolated Harness, real PostgreSQL, replay, and golden-question acceptance gates. |
 
-## Enhanced DeepSeek Harness experience
+## Optional DeepSeek Harness experience
 
-DSH Data Agent renders query results directly in the conversation. The chart view below shows a successful six-row daily-revenue query using the durable result metadata returned by the tool.
+The SemaRail adapter renders query results directly in the conversation. The chart view below shows a successful six-row daily-revenue query using the durable result metadata returned by the tool.
 
 ![Daily revenue chart rendered inside DeepSeek Harness](docs/images/deepseek-harness-chart.png)
 
@@ -45,27 +47,27 @@ The SQL view keeps the generated Semantic SQL inspectable, lets users switch to 
 
 ```mermaid
 flowchart LR
-    A[Any MCP-capable agent] --> N[Wren native MCP --no-connect]
-    A --> G[DSH governed-query MCP]
-    N --> W[Wren semantic layer]
+    A[Any MCP-capable agent] --> N[SemaRail semantic MCP]
+    A --> G[SemaRail governed-query MCP]
+    N --> W[SemaRail semantic layer]
     G --> Q[Shared governed query service]
     Q --> W
     Q --> P[(PostgreSQL)]
 
     U[Harness conversation] --> C[Chart / Table / SQL views]
-    U --> H[Optional DSH Harness adapter]
+    U --> H[Optional SemaRail Harness adapter]
     H --> Q
     H --> M[Semantic Console]
-    M --> F[Wren project files]
+    M --> F[Semantic project files]
     M --> D[(PostgreSQL / MySQL metadata)]
     H -. durable result metadata .-> C
 ```
 
-Wren native MCP supplies the portable semantic tools. The DSH MCP adapter and
+SemaRail's semantic MCP supplies the portable semantic tools. Its query MCP and
 the optional Harness Host share the same governed query service:
 
 - The query service validates semantic context and untrusted SQL, executes bounded PostgreSQL queries, and produces table/chart presentation contracts.
-- The Semantic Console serves a local REST API and production SPA for managing Wren projects and datasource profiles.
+- The Semantic Console serves a local REST API and production SPA for managing semantic projects and datasource profiles.
 
 Datasource credentials stay server-side. They never enter Client payloads, tool output, session metadata, fixtures, or default logs.
 
@@ -79,7 +81,7 @@ The Console exposes only datasource types that are implemented and available in 
 
 ### Business model workbench
 
-Edit business names, descriptions, visibility, primary keys, and field dictionaries while keeping the generated Wren source and unified diff close at hand.
+Edit business names, descriptions, visibility, primary keys, and field dictionaries while keeping the generated semantic source and unified diff close at hand.
 
 ![Semantic model workbench](docs/images/semantic-model-workbench.png)
 
@@ -104,7 +106,7 @@ The Console also includes:
 - Node.js `^22.19.0 || >=24`
 - pnpm `11.x`
 - Python `>=3.11`
-- Wren Python CLI/Core `0.13.2`
+- SemaRail's pinned Python semantic runtime dependencies
 - PostgreSQL for the agent query path
 - DeepSeek Harness `>=0.1.0-rc.10 <0.2.0` only when using the Harness adapter
 
@@ -117,7 +119,7 @@ pnpm build
 
 ### Prepare the Python runtime
 
-The following creates a development environment with Wren's native MCP server,
+The following creates a development environment with SemaRail's semantic MCP server,
 the governed PostgreSQL query runtime, and both Console metadata drivers:
 
 ```powershell
@@ -130,7 +132,7 @@ py -3.11 -m venv .venv
 Use the included deterministic sales project for a local tour:
 
 ```powershell
-$stateDir = Join-Path $env:LOCALAPPDATA "wren-semantic-console\sales-demo"
+$stateDir = Join-Path $env:LOCALAPPDATA "semarail\semantic-console\sales-demo"
 & .\.venv\Scripts\python.exe -m server `
   --project-dir .\examples\wren-postgres `
   --state-dir $stateDir `
@@ -141,61 +143,58 @@ Open [http://127.0.0.1:48763](http://127.0.0.1:48763). The server binds to loopb
 
 ## Use with any MCP-capable agent
 
-Build the semantic project, then register two stdio MCP servers. Run Wren native
-MCP without a database connection for schema, context, knowledge, resources,
-prompts, and planning:
+Build the semantic project, then register two SemaRail stdio MCP servers. Run
+the semantic server without a database connection for schema, context,
+knowledge, resources, prompts, and planning:
 
 ```powershell
-wren context build --path C:\path\to\wren-project
-wren serve mcp --project C:\path\to\wren-project --no-connect
+semarail-mcp --project C:\path\to\semantic-project
 ```
 
-Start the DSH execution server against the same project. Provide the read-only
+Start the SemaRail execution server against the same project. Provide the read-only
 PostgreSQL DSN through the named operating-system environment variable or a
 secret manager; never put the DSN in an Agent prompt or MCP tool arguments.
 
 ```powershell
-# WREN_DATABASE_URL is inherited from the OS or your secret manager.
-dsh-data-agent-mcp `
-  --project C:\path\to\wren-project `
-  --database-dsn-env WREN_DATABASE_URL
+# SEMARAIL_DATABASE_URL is inherited from the OS or your secret manager.
+semarail-query-mcp `
+  --project C:\path\to\semantic-project `
+  --database-dsn-env SEMARAIL_DATABASE_URL
 ```
 
-The MCP client discovers Wren's semantic tools from the first server and the
-single `dsh_governed_query` execution tool from the second. The latter uses the
+The MCP client discovers SemaRail's semantic tools from the first server and the
+single `semarail_governed_query` execution tool from the second. The latter uses the
 same MDL-derived physical allowlist, dangerous-function policy, read-only
 transaction, 30-second ceiling, row/byte bounds, two-query concurrency cap,
 stable errors, and database cancellation path as the Harness adapter. Project
 and credential-source selection are fixed at server startup and are not exposed
 to the Agent. DeepSeek Harness is not required.
 
-Direct Wren native query tools remain useful for local evaluation and supported
-Wren datasources. To make the DSH controls non-bypassable, governed deployments
-should keep the native server on `--no-connect` and route execution only through
-`dsh_governed_query`.
+Governed deployments should keep semantic discovery separate from database
+execution and route execution only through `semarail_governed_query`.
 
 For a credential-free proof that exercises a real MCP client against both
-servers, including a native DuckDB query and the DSH policy boundary:
+servers, including a native DuckDB query and the SemaRail policy boundary:
 
 ```powershell
 pnpm acceptance:mcp
 ```
 
-Wren also supports Streamable HTTP, but WrenAI 0.13.2 does not add authentication
-to that transport. Keep it on loopback and prefer stdio for local clients.
+The pinned upstream runtime also supports Streamable HTTP, but does not add
+authentication to that transport. Keep it on loopback and prefer stdio for local clients.
 
 ## Harness configuration
 
 The workspace builds the bundle package as `@hejielijob/dsh-wren-data-agent`. It is not currently published to npm. Its Host package stages the query sidecar, Semantic Console server, and production SPA into the local package artifact, so the artifact can be installed into Harness after it is built from source.
 
-Configure the Host with an absolute Wren project directory and the Python interpreter that contains the packaged runtime dependencies:
+Configure the Host with an absolute semantic project directory and the Python interpreter that contains the packaged runtime dependencies. The package and Host IDs below are retained as compatibility identifiers for existing installs:
 
 ```yaml
 - id: wren-data-agent-host
   config:
     pythonExecutable: C:\Python311\python.exe
-    projectDir: D:\data\wren-project
-    databaseDsnEnv: WREN_DATABASE_URL
+    projectDir: D:\data\semantic-project
+    databaseDsnEnv: SEMARAIL_DATABASE_URL
     # semanticConsoleEnabled: false
     # workingDirectory: D:\managed\sidecar
 ```
@@ -226,13 +225,13 @@ All model-generated SQL is treated as untrusted input.
 - Query execution uses a read-only account and enforces server-side row, byte, timeout, and cancellation limits.
 - Protocol and presentation payloads are JSON-safe and versioned; unknown versions fail closed.
 - Sidecar stdout is protocol-only, while diagnostics go to stderr.
-- Console credentials are stored outside the Wren project below `~/.wren/semantic-console` and are redacted from API responses.
+- Console credentials are stored outside the semantic project in the runtime state directory and are redacted from API responses.
 - The Console is loopback-only and unauthenticated in this MVP. Team authentication, RBAC, approvals, and audit logging remain deployment work.
 
 These stricter controls are shared by the Harness sidecar and
-`dsh-data-agent-mcp`. Wren's own native query tools do not automatically
-inherit them; use native MCP with `--no-connect` when the DSH policy must be
-mandatory. The DSH MCP adapter is stdio-only, so it does not create an
+`semarail-query-mcp`. Keep semantic discovery disconnected from the database
+when the SemaRail execution policy must be mandatory. The query MCP adapter is
+stdio-only, so it does not create an
 unauthenticated network listener.
 
 ## Repository layout
@@ -243,7 +242,7 @@ unauthenticated network listener.
 | `packages/host` | Harness tools, process supervision, cancellation, and durable result projection. |
 | `packages/client` | Conversation Chart/Table/SQL views and Semantic Console entry points. |
 | `packages/bundle` | Installable `dsh.bundle` composition. |
-| `python/sidecar` | Shared Wren planning, PostgreSQL policy/execution, limits, framed RPC, and governed MCP adapter. |
+| `python/sidecar` | Shared semantic planning, PostgreSQL policy/execution, limits, framed RPC, and governed MCP adapter. |
 | `apps/semantic-console` | Local REST server and React management console. |
 | `examples/wren-postgres` | Deterministic sales project, seed data, and golden-question corpus. |
 | `scripts` | Packaging, acceptance, replay, and evaluation gates. |
@@ -266,10 +265,10 @@ Run the agent-neutral MCP gates:
 pnpm acceptance:mcp
 ```
 
-It creates a temporary DuckDB database, isolated Wren home and semantic project,
+It creates a temporary DuckDB database, isolated runtime home and semantic project,
 then drives both real stdio server adapters through the official Python MCP
 client. It verifies native tool discovery and the context/plan/query workflow,
-plus the DSH tool surface, fixed operator policy, result bounds, and policy
+plus the SemaRail tool surface, fixed operator policy, result bounds, and policy
 denial without reading local profiles or credentials.
 
 Run the isolated Harness packaging gate:
@@ -289,13 +288,13 @@ Run the real PostgreSQL boundary gate after configuring an existing administrato
 
 The default provision mode creates and later removes only a uniquely named
 temporary database and read-only role. It exercises both the framed Harness
-sidecar and the real stdio `dsh_governed_query` MCP path. For a managed database
+sidecar and the real stdio `semarail_governed_query` MCP path. For a managed database
 that must not be changed, use:
 
 ```powershell
 & .\.venv\Scripts\python.exe scripts\acceptance-postgres.py `
   --mode existing `
-  --database-dsn-env WREN_DATABASE_URL
+  --database-dsn-env SEMARAIL_DATABASE_URL
 ```
 
 Additional evidence gates:
@@ -310,12 +309,12 @@ The golden evaluator never calls an LLM or manufactures a quality result. A real
 
 ## Compatibility and current scope
 
-- Compiled and accepted against DSH Desktop runtime `0.1.1-rc.2` while keeping public peer compatibility with Harness `>=0.1.0-rc.10 <0.2.0`.
-- Wren Python CLI/Core is pinned to `0.13.2`.
-- Wren's native MCP interface can use datasources supported by the configured Wren profile.
-- DSH governed query execution through Harness or MCP is currently PostgreSQL-only.
+- Compiled and accepted against DeepSeek Harness Desktop runtime `0.1.1-rc.2` while keeping public peer compatibility with Harness `>=0.1.0-rc.10 <0.2.0`.
+- The upstream Python semantic runtime is pinned to `0.13.2`.
+- SemaRail's semantic MCP interface can use datasources supported by the configured semantic profile.
+- Governed query execution through Harness or MCP is currently PostgreSQL-only.
 - The Semantic Console supports PostgreSQL and MySQL connection metadata, testing, browsing, and model import.
-- Wren Python `0.13.2` does not support View-to-View references; nested View dependencies are rejected before execution.
+- The current Python semantic runtime does not support View-to-View references; nested View dependencies are rejected before execution.
 - Browser hard-refresh rendering remains a separate real-Client acceptance step beyond the API-only replay gate.
 
 ## License

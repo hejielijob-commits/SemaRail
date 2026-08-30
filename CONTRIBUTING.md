@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for helping improve DSH Data Agent. The project is currently alpha, so focused changes with clear tests are especially valuable.
+Thank you for helping improve SemaRail. The project is currently alpha, so focused changes with clear tests are especially valuable.
 
 ## Before you start
 

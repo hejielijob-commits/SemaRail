@@ -107,8 +107,8 @@ describe('Wren data_query Host boundary', () => {
     await withRealToolContext(async ctx => {
       apply(ctx)
       const assembly = await ctx.systemPrompt.assemble()
-      const section = assembly.sections.find(candidate => candidate.name === 'wren:data-agent')
-      expect(section?.text).toContain('wren_semantic_context')
+      const section = assembly.sections.find(candidate => candidate.name === 'semarail:data-agent')
+      expect(section?.text).toContain('semarail_semantic_context')
       expect(section?.text).toContain('authoritative allowlist')
       expect(section?.text).toContain('Do not guess or invent')
       expect(section?.text).toContain('at most one repair attempt')
@@ -186,7 +186,7 @@ describe('Wren data_query Host boundary', () => {
       status: 'error',
       error: {
         code: 'INTERNAL_ERROR',
-        message: 'The Wren query gateway returned an internal error.',
+        message: 'The SemaRail query gateway returned an internal error.',
       },
     })
     expect(JSON.stringify(result)).not.toContain('secret')

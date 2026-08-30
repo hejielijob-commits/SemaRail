@@ -212,7 +212,7 @@ class QueryTests(unittest.TestCase):
             params["chartIntent"] = intent
         with patch.dict(
             os.environ,
-            {"WREN_DATABASE_URL": "postgresql://user:secret@db.invalid/analytics"},
+            {"SEMARAIL_DATABASE_URL": "postgresql://user:secret@db.invalid/analytics"},
         ):
             return WrenQueryService(
                 FakePlanner(),
@@ -374,8 +374,8 @@ class QueryTests(unittest.TestCase):
             def cancel(self, _query_id: str) -> bool:
                 return False
 
-        old = os.environ.get("WREN_DATABASE_URL")
-        os.environ["WREN_DATABASE_URL"] = "postgresql://user:secret@db.invalid/analytics"
+        old = os.environ.get("SEMARAIL_DATABASE_URL")
+        os.environ["SEMARAIL_DATABASE_URL"] = "postgresql://user:secret@db.invalid/analytics"
         try:
             service = WrenQueryService(planner, Executor())
             dispatcher = Dispatcher(query_service=service)
@@ -392,9 +392,9 @@ class QueryTests(unittest.TestCase):
             )
         finally:
             if old is None:
-                os.environ.pop("WREN_DATABASE_URL", None)
+                os.environ.pop("SEMARAIL_DATABASE_URL", None)
             else:
-                os.environ["WREN_DATABASE_URL"] = old
+                os.environ["SEMARAIL_DATABASE_URL"] = old
         self.assertTrue(result["ok"])
         self.assertEqual(planner.calls, [{"projectDir": ".", "semanticSql": "SELECT COUNT(*) FROM orders"}])
         self.assertEqual(seen["connection_info"]["connectionUrl"], "postgresql://user:secret@db.invalid/analytics")

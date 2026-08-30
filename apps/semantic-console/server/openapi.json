@@ -1,13 +1,14 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Wren Semantic Console MVP",
+    "title": "SemaRail Semantic Console",
     "version": "1.0.0",
-    "description": "Local-only Semantic Console API. Success responses are the resource/list directly; errors are {code,message,details}. Datasource credentials are accepted only by write requests, held in the server's local secret state file, and never returned or written to a Wren project."
+    "description": "Local-only SemaRail Semantic Console API. Success responses are the resource/list directly; errors are {code,message,details}. Datasource credentials are accepted only by write requests, held in the server's local secret state file, and never returned or written to a semantic project."
   },
   "servers": [{"url": "http://127.0.0.1:48763"}],
   "paths": {
-    "/api/health": {"get": {"operationId": "health", "responses": {"200": {"description": "Process and Wren readiness", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Health"}}}}}}},
+    "/api/health": {"get": {"operationId": "health", "responses": {"200": {"description": "Process and semantic-runtime readiness", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Health"}}}}}}},
+    "/api/mcp-integration": {"get": {"operationId": "getMcpIntegration", "responses": {"200": {"description": "Secret-free stdio MCP readiness, launch commands, and generic client configuration"}}}},
     "/api/project": {"get": {"operationId": "getProject", "responses": {"200": {"description": "Project overview", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProjectOverview"}}}}}}},
     "/api/datasource-types": {"get": {"operationId": "listDatasourceTypes", "responses": {"200": {"description": "Datasource types", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/DatasourceType"}}}}}}}},
     "/api/datasources": {

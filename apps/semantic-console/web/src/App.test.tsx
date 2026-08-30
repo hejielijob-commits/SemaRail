@@ -35,7 +35,7 @@ describe("Semantic Console interactions", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     render(<App />);
 
-    expect(await screen.findByText("DSH Data Agent")).toBeInTheDocument();
+    expect(await screen.findByText("SemaRail")).toBeInTheDocument();
     expect(await screen.findByText("Semantic Console is offline")).toBeInTheDocument();
     expect(screen.getByText("API unavailable")).toBeInTheDocument();
     expect(screen.queryByText("Revenue intelligence")).not.toBeInTheDocument();

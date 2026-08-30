@@ -1,7 +1,7 @@
 {
   "name": "@hejielijob/dsh-wren-data-agent-client",
   "version": "0.1.0",
-  "description": "DeepSeek Harness Client plugin for the Wren data_query view and semantic-console sidebar action.",
+  "description": "DeepSeek Harness Client plugin for SemaRail query views and the Semantic Console action.",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",

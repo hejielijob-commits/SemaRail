@@ -1,4 +1,4 @@
-"""Local HTTP server for the Wren Semantic Console MVP.
+"""Local HTTP server for the SemaRail Semantic Console.
 
 The implementation intentionally uses the Python standard library.  It can be
 embedded by a host process (``create_app``/``SemanticConsoleApplication``) or
@@ -282,7 +282,7 @@ def serve(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Wren Semantic Console local server")
+    parser = argparse.ArgumentParser(description="SemaRail Semantic Console local server")
     parser.add_argument("--host", default=os.environ.get("SEMANTIC_CONSOLE_HOST", DEFAULT_HOST))
     parser.add_argument("--port", type=int, default=int(os.environ.get("SEMANTIC_CONSOLE_PORT", str(DEFAULT_PORT))))
     parser.add_argument("--project-dir", default=os.environ.get("WREN_PROJECT_HOME"))

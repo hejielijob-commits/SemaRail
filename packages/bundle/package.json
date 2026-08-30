@@ -1,7 +1,7 @@
 {
   "name": "@hejielijob/dsh-wren-data-agent",
   "version": "0.1.0",
-  "description": "Installable DeepSeek Harness Bundle for the Wren data agent.",
+  "description": "Installable DeepSeek Harness Bundle for SemaRail.",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

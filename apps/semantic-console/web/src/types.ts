@@ -10,8 +10,27 @@ export type ConsoleSection =
   | "cubes"
   | "rules"
   | "sqlKnowledge"
+  | "mcp"
   | "instructions"
   | "mdl";
+
+export interface McpServerProfile {
+  status: "ready" | "setup_required";
+  command: string;
+  args: string[];
+  toolMode?: string;
+  databaseDsnEnv?: string;
+  datasourceType?: string | null;
+}
+
+export interface McpIntegrationResponse {
+  schemaVersion: number;
+  transport: "stdio";
+  projectPath: string;
+  semantic: McpServerProfile;
+  governedQuery: McpServerProfile;
+  clientConfig: { mcpServers: Record<string, { command: string; args: string[]; env?: Record<string, string> }> };
+}
 
 export interface HealthResponse {
   status: string;

@@ -10,7 +10,7 @@ export class SidecarFrameError extends Error {
   constructor(
     code: Extract<DataAgentErrorCode, 'FRAME_TOO_LARGE' | 'TRUNCATED_FRAME' | 'PROTOCOL_ERROR'>,
   ) {
-    super('The Wren sidecar returned an invalid frame.')
+    super('The SemaRail sidecar returned an invalid frame.')
     this.name = 'SidecarFrameError'
     this.code = code
   }
