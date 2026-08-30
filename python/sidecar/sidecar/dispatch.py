@@ -533,6 +533,7 @@ def _query_run_params(params: Any) -> Mapping[str, Any]:
         "previewRows",
         "maxPreviewBytes",
         "databaseDsnEnv",
+        "authorizationPolicy",
     }
     if not isinstance(params, Mapping):
         raise RpcFault(INVALID_PARAMS, "validation", "params must be an object")
@@ -572,6 +573,8 @@ def _query_run_params(params: Any) -> Mapping[str, Any]:
         env_name = params["databaseDsnEnv"]
         if not isinstance(env_name, str) or not env_name or len(env_name) > 128:
             raise RpcFault(INVALID_PARAMS, "validation", "databaseDsnEnv is invalid")
+    if "authorizationPolicy" in params and not isinstance(params["authorizationPolicy"], Mapping):
+        raise RpcFault(INVALID_PARAMS, "validation", "authorizationPolicy is invalid")
     return cast(Mapping[str, Any], params)
 
 

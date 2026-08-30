@@ -400,6 +400,117 @@ class QueryTests(unittest.TestCase):
         self.assertEqual(seen["connection_info"]["connectionUrl"], "postgresql://user:secret@db.invalid/analytics")
         self.assertNotIn("secret", json.dumps(result))
 
+    def test_service_applies_row_policy_with_bound_parameters_before_execution(self) -> None:
+        original_sql = "SELECT sales.region_code, SUM(sales.amount) AS revenue FROM public.sales GROUP BY sales.region_code"
+        seen: dict[str, Any] = {}
+
+        class PolicyPlanner:
+            def dry_plan(self, _params: dict[str, Any]) -> dict[str, Any]:
+                return {
+                    "nativeSql": original_sql,
+                    "allowedPhysical": {
+                        "tables": [{"schema": "public", "table": "sales"}],
+                        "schemas": ["public"],
+                        "catalogs": [],
+                    },
+                }
+
+        class RecordingExecutor:
+            def execute(self, **kwargs: Any) -> dict[str, Any]:
+                seen.update(kwargs)
+                return {
+                    "schemaVersion": 1,
+                    "queryId": kwargs["query_id"],
+                    "status": "success",
+                    "semanticSql": kwargs["semantic_sql"],
+                    "nativeSql": kwargs["native_sql"],
+                    "columns": [],
+                    "previewRows": [],
+                    "stats": {"returnedRows": 0, "durationMs": 1, "truncated": False},
+                }
+
+            def cancel(self, _query_id: str) -> bool:
+                return False
+
+        policy = {
+            "schemaVersion": 1,
+            "defaultEffect": "deny",
+            "policyVersions": ["pol-sales:3"],
+            "tables": {
+                "public.sales": {
+                    "rowFilter": {
+                        "op": "or",
+                        "conditions": [{
+                            "op": "and",
+                            "conditions": [
+                                {"field": "organization_id", "operator": "eq", "values": ["org-sales"]},
+                                {"field": "region_code", "operator": "in", "values": ["CN-JIA"]},
+                            ],
+                        }],
+                    },
+                    "allowedColumns": ["region_code", "amount", "organization_id"],
+                    "deniedColumns": [],
+                }
+            },
+        }
+        service = WrenQueryService(
+            PolicyPlanner(),
+            RecordingExecutor(),
+            connection_resolver=lambda _project, _env: {"connectionUrl": "postgresql://local.invalid/db"},
+        )
+
+        result = service.run({
+            "projectDir": ".",
+            "question": "Revenue by region",
+            "semanticSql": original_sql,
+            "queryId": "q-row-policy",
+            "authorizationPolicy": policy,
+        })
+
+        self.assertIn("FROM (SELECT * FROM public.sales WHERE", seen["native_sql"])
+        self.assertNotIn("CN-JIA", seen["native_sql"])
+        self.assertEqual(set(seen["query_parameters"].values()), {"org-sales", "CN-JIA"})
+        self.assertEqual(result["nativeSql"], original_sql)
+        self.assertEqual(result["authorization"], {
+            "rowPolicyApplied": True,
+            "tableCount": 1,
+            "policyVersions": ["pol-sales:3"],
+        })
+        self.assertNotIn("CN-JIA", json.dumps(result))
+
+    def test_service_denies_a_physical_table_missing_from_data_policy(self) -> None:
+        class PayrollPlanner:
+            def dry_plan(self, _params: dict[str, Any]) -> dict[str, Any]:
+                return {
+                    "nativeSql": "SELECT employee_id FROM public.payroll",
+                    "allowedPhysical": {
+                        "tables": [{"schema": "public", "table": "payroll"}],
+                        "schemas": ["public"],
+                        "catalogs": [],
+                    },
+                }
+
+        service = WrenQueryService(
+            PayrollPlanner(),
+            PresentationExecutor([], []),
+            connection_resolver=lambda _project, _env: {"connectionUrl": "postgresql://local.invalid/db"},
+        )
+        with self.assertRaises(Exception) as caught:
+            service.run({
+                "projectDir": ".",
+                "question": "Payroll",
+                "semanticSql": "SELECT employee_id FROM public.payroll",
+                "queryId": "q-policy-deny",
+                "authorizationPolicy": {
+                    "schemaVersion": 1,
+                    "defaultEffect": "deny",
+                    "tables": {},
+                    "policyVersions": ["pol-sales:1"],
+                },
+            })
+        self.assertEqual(getattr(caught.exception, "error").code, POLICY_DENIED)
+        self.assertEqual(getattr(caught.exception, "error").phase, "authorization")
+
     def test_query_result_is_bounded_and_uses_exact_strings_for_numeric_precision(self) -> None:
         connection = FakeConnection([(1, "10.25"), (2, "20.50"), (3, "30.75")])
         executor = PostgresQueryExecutor(connection_factory=lambda _: connection)

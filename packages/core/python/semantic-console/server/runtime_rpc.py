@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import logging
 import os
-import secrets
 from collections.abc import Mapping
 from typing import Any, Protocol
 
 try:
+    from .access_control import AccessControlError, AccessControlStore, AuthContext, BOOTSTRAP_SUBJECT_ID
+    from .authorization import PolicyDecision, PolicyEngine
     from .project import ProjectStore
 except ImportError:  # pragma: no cover - direct module loading
+    from access_control import AccessControlError, AccessControlStore, AuthContext, BOOTSTRAP_SUBJECT_ID  # type: ignore[no-redef]
+    from authorization import PolicyDecision, PolicyEngine  # type: ignore[no-redef]
     from project import ProjectStore  # type: ignore[no-redef]
 
 
@@ -74,19 +77,25 @@ class RuntimeRpcGateway:
         dispatcher: RuntimeDispatcher | None = None,
         *,
         auth_token: str | None = None,
+        access_control: AccessControlStore | None = None,
+        policy_engine: PolicyEngine | None = None,
     ) -> None:
         self.project = project
         self.dispatcher = dispatcher if dispatcher is not None else _default_dispatcher(project)
         configured = auth_token if auth_token is not None else os.environ.get("SEMARAIL_API_TOKEN", "")
         self.auth_token = configured.strip()
+        self.access_control = access_control or AccessControlStore(
+            self.project.state_dir / "access-control.sqlite3",
+            bootstrap_token=self.auth_token,
+        )
+        self.policy_engine = policy_engine or PolicyEngine()
 
     def dispatch(self, body: Any, authorization: str | None = None) -> tuple[int, dict[str, Any]]:
         request_id = _request_id(body)
-        if len(self.auth_token) < 32:
-            return 503, _error(request_id, "WREN_UNAVAILABLE", "SemaRail Core authentication is not configured")
-        expected = f"Bearer {self.auth_token}"
-        if not isinstance(authorization, str) or not secrets.compare_digest(authorization, expected):
-            return 401, _error(request_id, "UNAUTHENTICATED", "authentication is required")
+        try:
+            auth = self.access_control.authenticate(authorization)
+        except AccessControlError as exc:
+            return exc.status, _error(request_id, exc.code, exc.safe_message)
         if not isinstance(body, Mapping):
             return 400, _error(request_id, "INVALID_REQUEST", "request must be a JSON object")
         if set(body) - _REQUEST_FIELDS:
@@ -101,9 +110,22 @@ class RuntimeRpcGateway:
         params = body.get("params")
         if not isinstance(params, Mapping):
             return 400, _error(request_id, "INVALID_PARAMS", "params must be an object")
-        normalized = self._normalize(method, params)
+        policies = [] if auth.subject.id == BOOTSTRAP_SUBJECT_ID else self.access_control.policies_for_subject(auth.subject.id)
+        project_id = str(self.project.overview().get("name") or "")
+        decision = self.policy_engine.authorize_method(auth.subject, str(method), policies, project_id=project_id)
+        if not decision.allowed:
+            self._audit(auth, str(method), "denied", request_id, decision)
+            return 403, _error(request_id, "FORBIDDEN", "permission is required")
+        normalized = self._normalize(method, params, decision)
         if isinstance(normalized, str):
+            self._audit(auth, str(method), "denied", request_id, decision)
             return 400, _error(request_id, "INVALID_PARAMS", normalized)
+        if method == "query.run" and auth.subject.id != BOOTSTRAP_SUBJECT_ID:
+            try:
+                normalized["authorizationPolicy"] = self.policy_engine.compile_data_policy(auth.subject, policies)
+            except Exception:
+                self._audit(auth, str(method), "denied", request_id, decision)
+                return 403, _error(request_id, "FORBIDDEN", "data access policy is invalid")
         if self.dispatcher is None:
             return 503, _error(request_id, "WREN_UNAVAILABLE", "SemaRail runtime is unavailable")
         internal = {
@@ -141,9 +163,15 @@ class RuntimeRpcGateway:
                     },
                 },
             }
+        self._audit(auth, str(method), "allowed" if response.get("ok") is True else "error", request_id, decision)
         return 200, response
 
-    def _normalize(self, method: Any, params: Mapping[str, Any]) -> dict[str, Any] | str:
+    def _normalize(
+        self,
+        method: Any,
+        params: Mapping[str, Any],
+        decision: PolicyDecision | None = None,
+    ) -> dict[str, Any] | str:
         project_dir = str(self.project.project_dir)
         if method == "health":
             return {} if not params else "health params must be empty"
@@ -166,18 +194,39 @@ class RuntimeRpcGateway:
         chart_intent = params.get("chartIntent")
         if chart_intent is not None and chart_intent not in {"auto", "table", "line", "bar", "pie"}:
             return "query.run chartIntent is invalid"
+        policy_limits = decision.limits if decision and decision.limits else {}
         return {
             "projectDir": project_dir,
             "question": params["question"],
             "semanticSql": params["semanticSql"],
             "queryId": params["queryId"],
-            "maxRows": MAX_QUERY_ROWS,
-            "previewRows": MAX_PREVIEW_ROWS,
-            "maxPreviewBytes": MAX_PREVIEW_BYTES,
-            "timeoutMs": MAX_TIMEOUT_MS,
+            "maxRows": min(MAX_QUERY_ROWS, policy_limits.get("maxRows", MAX_QUERY_ROWS)),
+            "previewRows": min(MAX_PREVIEW_ROWS, policy_limits.get("previewRows", MAX_PREVIEW_ROWS)),
+            "maxPreviewBytes": min(MAX_PREVIEW_BYTES, policy_limits.get("maxPreviewBytes", MAX_PREVIEW_BYTES)),
+            "timeoutMs": min(MAX_TIMEOUT_MS, policy_limits.get("timeoutMs", MAX_TIMEOUT_MS)),
             "databaseDsnEnv": "SEMARAIL_DATABASE_URL",
             **({"chartIntent": chart_intent} if chart_intent is not None else {}),
         }
+
+    def _audit(
+        self,
+        auth: AuthContext,
+        action: str,
+        result: str,
+        request_id: str,
+        decision: PolicyDecision,
+    ) -> None:
+        try:
+            self.access_control.record_audit(
+                action=action,
+                decision=result,
+                auth=auth,
+                resource=str(self.project.overview().get("name") or ""),
+                policy_version=decision.version_key or None,
+                details={"requestId": request_id},
+            )
+        except AccessControlError:
+            _LOGGER.error("runtime audit write failed")
 
 
 __all__ = ["CORE_API_VERSION", "CORE_PROTOCOL_VERSION", "RuntimeRpcGateway"]

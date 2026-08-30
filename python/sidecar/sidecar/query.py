@@ -53,6 +53,7 @@ from .sql_policy import (
     validate_read_only_sql,
     validate_semantic_sql,
 )
+from .row_policy import RowPolicyError, apply_row_policy
 
 
 # These values intentionally mirror packages/contract/src/json.ts.  The
@@ -85,6 +86,7 @@ class DatabaseExecutor(Protocol):
         project_dir: str,
         connection_info: Mapping[str, Any] | None,
         limits: "QueryLimits",
+        query_parameters: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Execute one already-planned native SQL query."""
 
@@ -452,6 +454,7 @@ class WrenQueryService:
             "previewRows",
             "maxPreviewBytes",
             "databaseDsnEnv",
+            "authorizationPolicy",
         }
         if set(params) - fields:
             raise RpcFault(INVALID_PARAMS, "validation", "query.run params are invalid")
@@ -542,6 +545,25 @@ class WrenQueryService:
                 "query denied by read-only SQL policy",
                 retryable=False,
             ) from exc
+        execution_sql = native_sql
+        query_parameters: Mapping[str, Any] | None = None
+        applied_tables: tuple[str, ...] = ()
+        authorization_policy = params.get("authorizationPolicy")
+        if authorization_policy is not None:
+            if not isinstance(authorization_policy, Mapping):
+                raise RpcFault(INVALID_PARAMS, "validation", "authorizationPolicy is invalid")
+            try:
+                authorized = apply_row_policy(native_sql, authorization_policy)
+                execution_sql = validate_native_sql(authorized.sql, allowed_physical=allowed_physical)
+                query_parameters = authorized.parameters
+                applied_tables = authorized.applied_tables
+            except (RowPolicyError, SqlPolicyError) as exc:
+                raise RpcFault(
+                    POLICY_DENIED,
+                    "authorization",
+                    "query denied by data access policy",
+                    retryable=False,
+                ) from exc
         env_name = params.get("databaseDsnEnv", "SEMARAIL_DATABASE_URL")
         if (
             not isinstance(env_name, str)
@@ -570,14 +592,27 @@ class WrenQueryService:
             )
         # This mapping is process-local and is never copied into an RPC
         # response. In particular, no credential can arrive from Client.
-        result = self.executor.execute(
-            query_id=query_id,
-            semantic_sql=semantic_sql,
-            native_sql=native_sql,
-            project_dir=project_dir,
-            connection_info=info,
-            limits=limits,
-        )
+        executor_args = {
+            "query_id": query_id,
+            "semantic_sql": semantic_sql,
+            "native_sql": execution_sql,
+            "project_dir": project_dir,
+            "connection_info": info,
+            "limits": limits,
+        }
+        if query_parameters is not None:
+            executor_args["query_parameters"] = query_parameters
+        result = self.executor.execute(**executor_args)
+        if authorization_policy is not None:
+            # Do not expose resolved subject values or the rewritten SQL. The
+            # ordinary Native SQL remains inspectable while enforcement stays
+            # server-side and parameterized.
+            result["nativeSql"] = native_sql
+            result["authorization"] = {
+                "rowPolicyApplied": bool(applied_tables),
+                "tableCount": len(applied_tables),
+                "policyVersions": list(authorization_policy.get("policyVersions", []))[:64],
+            }
         presentation = _apply_chart_spec(result, chart_intent)
         presentation["question"] = question
         if sql_history:
@@ -618,6 +653,7 @@ class PsycopgQueryExecutor:
         project_dir: str,
         connection_info: Mapping[str, Any] | None,
         limits: QueryLimits,
+        query_parameters: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         del project_dir  # Resolution happens before this boundary.
         _assert_executor_limits(limits)
@@ -693,7 +729,11 @@ class PsycopgQueryExecutor:
             self._configure_read_only(connection, limits.timeout_ms)
             cursor = connection.cursor()
             try:
-                cursor.execute(_bounded_select_sql(native_sql, limits.max_rows))
+                bounded_sql = _bounded_select_sql(native_sql, limits.max_rows)
+                if query_parameters is None:
+                    cursor.execute(bounded_sql)
+                else:
+                    cursor.execute(bounded_sql, dict(query_parameters))
                 return self._collect_result(
                     cursor,
                     query_id=query_id,

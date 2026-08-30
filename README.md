@@ -73,7 +73,7 @@ $env:SEMARAIL_API_TOKEN = semarail token create
 semarail start --project C:\path\to\semantic-project
 ```
 
-The Core process owns the semantic project, database credentials, execution limits, Semantic Console, and MCP servers. Open [http://127.0.0.1:48763](http://127.0.0.1:48763) after it starts. Keep `SEMARAIL_API_TOKEN` private and make it available only to trusted agent adapters.
+The Core process owns the semantic project, database credentials, execution limits, Semantic Console, and MCP servers. Open [http://127.0.0.1:48763](http://127.0.0.1:48763) after it starts. Keep `SEMARAIL_API_TOKEN` private: it is the local bootstrap-administrator credential used to create narrower, revocable service-account keys.
 
 ### Optional DeepSeek Harness plugin
 
@@ -168,6 +168,14 @@ Run the credential-free MCP acceptance test with:
 ```powershell
 pnpm acceptance:mcp
 ```
+
+### Service accounts and row permissions (alpha)
+
+SemaRail Core includes a local management API for service accounts, one-time API-key issuance, key rotation/revocation, versioned policy bindings, and audit events. Policies can restrict tool scopes, projects, physical tables, columns, query limits, and rows derived from trusted subject attributes. Mandatory row predicates are injected with bound database parameters before execution; missing or malformed permissions fail closed.
+
+For example, two agents can run the same sales query while account A is restricted to region `CN-JIA` and account B to `CN-YI`. Updating the account attributes or policy is effective on the next request. See [Access control (alpha)](docs/access-control.md) and [the architecture decision](docs/decisions/0005-enterprise-identity-and-data-authorization.md).
+
+This is currently a trusted local-administrator API. Remote HTTP MCP, employee/OIDC or DingTalk login, a visual policy editor, and PostgreSQL RLS are planned follow-up stages and are not claimed as completed here.
 
 ## DeepSeek Harness plugin
 

@@ -151,6 +151,75 @@ class RuntimeRpcTests(unittest.TestCase):
         self.assertEqual(response["error"]["code"], "UNAUTHENTICATED")
         self.assertEqual(self.dispatcher.requests, [])
 
+    def test_service_account_policy_controls_runtime_scope_and_limits(self) -> None:
+        account = self.gateway.access_control.create_service_account(
+            "Sales Agent", attributes={"regionCodes": ["CN-JIA"]}
+        )
+        policy = self.gateway.access_control.create_policy(
+            "Sales query",
+            {
+                "schemaVersion": 1,
+                "projects": ["runtime-test"],
+                "tools": ["query:execute"],
+                "tables": {},
+                "limits": {"maxRows": 25, "timeoutMs": 5000},
+            },
+        )
+        self.gateway.access_control.bind_policy(account.id, policy["id"])
+        issued = self.gateway.access_control.issue_api_key(account.id)
+
+        status, response = self.gateway.dispatch(
+            {
+                "protocolVersion": "1",
+                "id": "svc-query",
+                "method": "query.run",
+                "params": {"question": "Revenue", "semanticSql": "SELECT * FROM orders", "queryId": "svc-1"},
+            },
+            authorization=f"Bearer {issued['apiKey']}",
+        )
+
+        self.assertEqual(status, 200)
+        self.assertTrue(response["ok"])
+        internal = self.dispatcher.requests[-1]["params"]
+        self.assertEqual(internal["maxRows"], 25)
+        self.assertEqual(internal["timeoutMs"], 5000)
+        self.assertEqual(internal["authorizationPolicy"]["defaultEffect"], "deny")
+        event = self.gateway.access_control.list_audit()[0]
+        self.assertEqual(event["subjectId"], account.id)
+        self.assertEqual(event["policyVersion"], f"{policy['id']}:1")
+
+        self.gateway.access_control.update_policy(
+            policy["id"],
+            {
+                "schemaVersion": 1,
+                "projects": ["runtime-test"],
+                "tools": ["semantic:read"],
+                "tables": {},
+            },
+        )
+        denied_status, denied = self.gateway.dispatch(
+            {
+                "protocolVersion": "1",
+                "id": "svc-query-after-policy-change",
+                "method": "query.run",
+                "params": {"question": "Revenue", "semanticSql": "SELECT * FROM orders", "queryId": "svc-2"},
+            },
+            authorization=f"Bearer {issued['apiKey']}",
+        )
+        self.assertEqual(denied_status, 403)
+        self.assertEqual(denied["error"]["code"], "FORBIDDEN")
+        self.assertEqual(self.gateway.access_control.list_audit()[0]["policyVersion"], f"{policy['id']}:2")
+
+    def test_unbound_service_account_is_forbidden(self) -> None:
+        account = self.gateway.access_control.create_service_account("No policy")
+        issued = self.gateway.access_control.issue_api_key(account.id)
+        status, response = self.gateway.dispatch(
+            {"protocolVersion": "1", "id": "denied", "method": "health", "params": {}},
+            authorization=f"Bearer {issued['apiKey']}",
+        )
+        self.assertEqual(status, 403)
+        self.assertEqual(response["error"]["code"], "FORBIDDEN")
+
 
 if __name__ == "__main__":
     unittest.main()

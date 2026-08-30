@@ -18,10 +18,12 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 try:  # Package import when started with ``python -m server``.
+    from .access_api import AccessControlAdminApi
     from .service import SemanticConsoleService
     from .project import ProjectStore
     from .runtime_rpc import RuntimeRpcGateway
 except ImportError:  # Direct ``python app.py`` / test loading by file path.
+    from access_api import AccessControlAdminApi  # type: ignore[no-redef]
     from service import SemanticConsoleService  # type: ignore[no-redef]
     from project import ProjectStore  # type: ignore[no-redef]
     from runtime_rpc import RuntimeRpcGateway  # type: ignore[no-redef]
@@ -66,10 +68,15 @@ class SemanticConsoleApplication:
         *,
         static_dir: str | Path | None = None,
         runtime_rpc: RuntimeRpcGateway | None = None,
+        access_api: AccessControlAdminApi | None = None,
     ) -> None:
         self.service = service or SemanticConsoleService()
         self.static_dir = Path(static_dir).expanduser().resolve() if static_dir else None
         self.runtime_rpc = runtime_rpc or RuntimeRpcGateway(self.service.project)
+        self.access_api = access_api or AccessControlAdminApi(
+            self.runtime_rpc.access_control,
+            self.runtime_rpc.policy_engine,
+        )
 
     def request(
         self,
@@ -85,6 +92,9 @@ class SemanticConsoleApplication:
             query[key] = values[-1] if values else ""
         if method.upper() == "POST" and parsed.path == "/api/v1/runtime/rpc":
             return self.runtime_rpc.dispatch(body, authorization)
+        access_response = self.access_api.dispatch(method.upper(), parsed.path, body, authorization)
+        if access_response is not None:
+            return access_response
         status, result = self.service.dispatch(method.upper(), parsed.path, query, body)
         if "__error__" in result:
             return status, result["__error__"]
@@ -96,10 +106,16 @@ def create_app(
     *,
     static_dir: str | Path | None = None,
     runtime_rpc: RuntimeRpcGateway | None = None,
+    access_api: AccessControlAdminApi | None = None,
 ) -> SemanticConsoleApplication:
     """Create an embeddable Semantic Console application."""
 
-    return SemanticConsoleApplication(service, static_dir=static_dir, runtime_rpc=runtime_rpc)
+    return SemanticConsoleApplication(
+        service,
+        static_dir=static_dir,
+        runtime_rpc=runtime_rpc,
+        access_api=access_api,
+    )
 
 
 class _Handler(BaseHTTPRequestHandler):
