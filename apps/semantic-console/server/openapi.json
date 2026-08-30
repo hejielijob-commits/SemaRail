@@ -7,6 +7,7 @@
   },
   "servers": [{"url": "http://127.0.0.1:48763"}],
   "paths": {
+    "/api/v1/runtime/rpc": {"post": {"operationId": "runtimeRpc", "description": "Versioned agent runtime boundary. Core pins project, credential source, and query limits.", "security": [{"RuntimeBearer": []}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["protocolVersion", "id", "method", "params"], "additionalProperties": false, "properties": {"protocolVersion": {"type": "string", "enum": ["1"]}, "id": {"type": "string", "minLength": 1, "maxLength": 128}, "method": {"type": "string", "enum": ["health", "project.validate", "context.ask", "query.run", "query.cancel"]}, "params": {"type": "object"}, "deadlineMs": {"type": "integer"}}}}}}, "responses": {"200": {"description": "Versioned RPC response"}, "400": {"description": "Invalid or incompatible request"}, "401": {"description": "Missing or invalid bearer token"}, "503": {"description": "Core runtime unavailable"}}}},
     "/api/health": {"get": {"operationId": "health", "responses": {"200": {"description": "Process and semantic-runtime readiness", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Health"}}}}}}},
     "/api/mcp-integration": {"get": {"operationId": "getMcpIntegration", "responses": {"200": {"description": "Secret-free stdio MCP readiness, launch commands, and generic client configuration"}}}},
     "/api/project": {"get": {"operationId": "getProject", "responses": {"200": {"description": "Project overview", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProjectOverview"}}}}}}},
@@ -63,6 +64,7 @@
     "/api/versions/{id}/rollback": {"post": {"operationId": "rollbackVersion", "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}], "responses": {"200": {"description": "Restored version"}, "404": {"$ref": "#/components/responses/Error"}}}}
   },
   "components": {
+    "securitySchemes": {"RuntimeBearer": {"type": "http", "scheme": "bearer"}},
     "parameters": {
       "DatasourceId": {"name": "id", "in": "path", "required": true, "schema": {"type": "string"}},
       "RuleId": {"name": "id", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^rule_[A-Za-z0-9_-]{8,100}$"}},
@@ -79,7 +81,7 @@
       "ProjectOverview": {"type": "object", "additionalProperties": true, "properties": {"name": {"type": ["string", "null"]}, "schemaVersion": {"type": ["integer", "null"]}, "dataSource": {"type": ["string", "null"]}, "revision": {"type": "string"}, "draftCount": {"type": "integer"}, "activeDatasource": {"$ref": "#/components/schemas/Datasource"}}},
       "DatasourceType": {"type": "object", "required": ["type", "label", "available", "fields"], "properties": {"type": {"type": "string"}, "label": {"type": "string"}, "available": {"type": "boolean"}, "module": {"type": ["string", "null"]}, "supportsSchemaBrowse": {"type": "boolean"}, "supportsTest": {"type": "boolean"}, "fields": {"type": "array", "items": {"type": "object", "additionalProperties": true}}}},
       "Datasource": {"type": "object", "required": ["id", "name", "type", "connection", "hasPassword"], "properties": {"id": {"type": "string"}, "name": {"type": "string"}, "type": {"type": "string"}, "connection": {"type": "object", "description": "Redacted non-secret fields only"}, "hasPassword": {"type": "boolean"}, "createdAt": {"type": "string", "format": "date-time"}, "updatedAt": {"type": "string", "format": "date-time"}, "lastTest": {"type": ["object", "null"]}}},
-      "DatasourceInput": {"type": "object", "required": ["type"], "properties": {"name": {"type": "string"}, "type": {"type": "string", "enum": ["postgres", "mysql"]}, "connection": {"type": "object", "additionalProperties": true, "description": "Password accepted here only; never returned"}}},
+      "DatasourceInput": {"type": "object", "required": ["type"], "properties": {"name": {"type": "string"}, "type": {"type": "string", "enum": ["postgres", "mysql", "sqlite", "clickhouse", "duckdb"]}, "connection": {"type": "object", "additionalProperties": true, "description": "Password accepted here only; never returned"}}},
       "NameItem": {"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}}},
       "Table": {"allOf": [{"$ref": "#/components/schemas/NameItem"}, {"type": "object", "properties": {"type": {"type": "string"}}}]},
       "Column": {"type": "object", "required": ["name", "type", "nullable", "primaryKey"], "properties": {"name": {"type": "string"}, "type": {"type": "string"}, "dataType": {"type": "string"}, "nullable": {"type": "boolean"}, "ordinal": {"type": "integer"}, "primaryKey": {"type": "boolean"}}},

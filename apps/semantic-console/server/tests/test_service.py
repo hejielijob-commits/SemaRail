@@ -131,6 +131,8 @@ class SemanticConsoleServiceTests(unittest.TestCase):
             service.put_file("../credentials.yml", {"content": "password: bad"})
         with self.assertRaises(ApiServiceError):
             service.put_file("knowledge/rules/rule.md", {"content": "dsn: postgres://u:p@host/db"})
+        with self.assertRaises(ApiServiceError):
+            service.put_file("knowledge/rules/clickhouse.md", {"content": "clickhouse://u:p@host/analytics"})
 
     def test_postgres_schema_columns_and_model_generation(self):
         service = SemanticConsoleService(self.make_project(), connection_factory=lambda _values: FakeConnection())

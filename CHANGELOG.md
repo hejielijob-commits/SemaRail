@@ -4,6 +4,23 @@ All notable user-visible changes to this project are documented here. The format
 
 ## [Unreleased]
 
+### Added
+
+- Independently installable `@hejielijob/semarail-core` and thin
+  `@hejielijob/dsh-semarail-plugin` distributions.
+- An authenticated, versioned HTTP v1 boundary for Core handshake, semantic
+  context, governed query execution, and cancellation.
+- PostgreSQL, MySQL, SQLite, ClickHouse, and DuckDB Console adapters for
+  connection testing, schema browsing, and model import.
+
+### Changed
+
+- DeepSeek Harness now connects to an independently running SemaRail Core;
+  project selection, credentials, Python lifecycle, and policy limits no longer
+  live in the recommended Harness plugin.
+- The original `@hejielijob/dsh-wren-data-agent` package remains available as a
+  legacy all-in-one compatibility artifact during migration.
+
 ## [0.1.0-alpha.1] - 2026-08-30
 
 ### Added

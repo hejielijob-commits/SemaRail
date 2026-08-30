@@ -68,6 +68,8 @@ export {
   SemanticConsoleProcess,
 } from './semantic-console.js'
 export type { SemanticConsoleConfig } from './semantic-console.js'
+export { CoreHttpGateway, DEFAULT_SEMARAIL_ENDPOINT, createCoreHttpGateway } from './core-http.js'
+export type { CoreHttpGatewayConfig } from './core-http.js'
 
 export const TOOL_NAME = 'data_query' as const
 /** Stable wire name of the semantic-context Tool. */
@@ -105,6 +107,7 @@ function safeErrorMessage(code: DataAgentErrorCode): string {
     case 'UNSUPPORTED_PROTOCOL': return 'The SemaRail sidecar protocol is unsupported.'
     case 'UNSUPPORTED_VERSION': return 'The SemaRail data contract version is unsupported.'
     case 'INTERNAL_ERROR': return 'The SemaRail query gateway returned an internal error.'
+    case 'UNAUTHENTICATED': return 'SemaRail Core authentication failed.'
     case 'WREN_UNAVAILABLE': return 'The SemaRail semantic runtime is unavailable.'
   }
   return 'The SemaRail query gateway returned an internal error.'

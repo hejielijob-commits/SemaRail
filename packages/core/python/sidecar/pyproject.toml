@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dsh-wren-data-agent-sidecar"
+version = "0.1.0"
+description = "Framed JSON-RPC sidecar boundary for SemaRail"
+requires-python = ">=3.11"
+# sqlglot is the actual PostgreSQL AST boundary for both semantic preflight
+# and native post-plan policy.  It is intentionally not replaced by a lexical
+# scanner; comments/dollar quotes/CTE nesting must be parsed structurally.
+dependencies = ["sqlglot>=29"]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "mcp[cli]==1.28.1"]
+# The MVP query path is PostgreSQL-only; include Wren's pinned psycopg extra
+# when the optional runtime is installed.  The default sidecar remains
+# dependency-free and reports DATABASE_ERROR until a driver is available.
+wren = ["wrenai[postgres]==0.13.2"]
+# Agent-neutral MCP runtime and official Python client. Wren 0.13.2 still uses
+# the v1 FastMCP API, so keep the SDK at its upstream lockfile version.
+mcp = ["wrenai[mcp]==0.13.2", "mcp[cli]==1.28.1"]
+
+[project.scripts]
+dsh-wren-sidecar = "sidecar.main:main"
+dsh-data-agent-mcp = "sidecar.mcp_gateway:main"
+semarail-mcp = "sidecar.semantic_mcp:main"
+semarail-query-mcp = "sidecar.mcp_gateway:main"
+
+[tool.setuptools]
+packages = ["sidecar"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

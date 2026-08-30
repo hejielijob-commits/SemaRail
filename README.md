@@ -9,9 +9,9 @@
 
 SemaRail turns database schemas, business definitions, relationships, rules, and reviewed SQL into a semantic context that AI agents can use consistently. It provides a visual Semantic Console for managing that context, a stable MCP interface for agent integration, and a governed query boundary for read-only data access.
 
-SemaRail is agent-neutral. Any MCP-capable client can use its semantic tools. A dedicated DeepSeek Harness plugin is also included for a richer conversation experience with native Chart, Table, and SQL views.
+SemaRail is agent-neutral. Any MCP-capable client can use its semantic tools. It also provides a dedicated, independently installable DeepSeek Harness plugin that connects Harness to SemaRail Core, turning it into a governed Data Agent with native Chart, Table, and SQL views.
 
-> **Status:** Alpha. APIs, configuration, and storage formats may change before the first stable release. The project is currently installed from source; npm and PyPI packages are not published yet.
+> **Status:** Alpha. APIs, configuration, and storage formats may change before the first stable release. Core and Harness plugin tarballs can be built from source; npm and PyPI packages are not published yet.
 
 ![SemaRail Semantic Console overview](docs/images/semantic-console-overview.png)
 
@@ -20,16 +20,16 @@ SemaRail is agent-neutral. Any MCP-capable client can use its semantic tools. A 
 - **Visual semantic modeling** — import database schemas and manage models, fields, relationships, views, cubes, business rules, and reviewed SQL knowledge.
 - **Agent-neutral MCP tools** — expose semantic context and governed query planning to Codex and other MCP-capable agents through stdio.
 - **Governed data access** — parse generated PostgreSQL with `sqlglot`, enforce physical-object allowlists, reject unsafe statements, and apply read-only, timeout, row, byte, and concurrency limits.
-- **PostgreSQL and MySQL metadata** — test connections, browse schemas, and import models from the datasource types available in the installed runtime.
+- **Common database metadata** — test connections, browse schemas, and import models from PostgreSQL, MySQL, SQLite, ClickHouse, and DuckDB.
 - **Versioned semantic projects** — validate drafts, inspect generated source and diffs, publish revisions, and roll back changes.
 - **Bilingual metadata** — maintain English and Simplified Chinese display names without changing stable technical identifiers.
-- **DeepSeek Harness integration** — install an optional Host/Client bundle that renders durable Chart, Table, and SQL results directly in conversations.
+- **DeepSeek Harness Data Agent** — install the optional thin Host/Client plugin to give Harness SemaRail semantic context, governed querying, cancellation, and durable Chart, Table, and SQL results.
 
 ### Datasource management
 
-Datasource credentials stay on the server and are redacted from API responses. The standard Console installation includes PostgreSQL and MySQL drivers for connection testing, schema browsing, and model import.
+Datasource credentials stay on the server and are redacted from API responses. The standard Console installation includes PostgreSQL, MySQL, SQLite, ClickHouse, and DuckDB drivers for connection testing, schema browsing, and model import. Local SQLite and DuckDB files are opened read-only.
 
-![PostgreSQL and MySQL datasource management](docs/images/datasources.png)
+![Datasource management](docs/images/datasources.png)
 
 ### Semantic model workbench
 
@@ -49,28 +49,42 @@ Explore and maintain field-level model relationships in an interactive graph.
 - TypeScript and Node.js
 - React 18 and Vite
 - Model Context Protocol (MCP) Python SDK
-- WrenAI Python SDK/Core 0.13.2
 - `sqlglot` for structural SQL validation
 - PostgreSQL for governed query execution
-- PostgreSQL and MySQL drivers for Console metadata workflows
+- PostgreSQL, MySQL, SQLite, ClickHouse, and DuckDB drivers for Console metadata workflows
 - Apache ECharts for conversation-native charts
 
 ## Quick start
 
-### Install the DeepSeek Harness plugin
+### Install SemaRail Core
 
 Requirements:
 
-- DeepSeek Harness `>=0.1.0-rc.10 <0.2.0`
-- Python `>=3.11` available as `python` or configured with `pythonExecutable`
+- Node.js `^22.19.0 || >=24`
+- Python `>=3.11`
 
-Install the current SemaRail alpha directly from GitHub Releases:
+Until the split packages are published, build both local tarballs from the repository:
 
 ```powershell
-dsh plugin --profile web add https://github.com/hejielijob-commits/SemaRail/releases/download/v0.1.0-alpha.1/hejielijob-dsh-wren-data-agent-0.1.0-alpha.1.tgz
+pnpm install
+pnpm package:split
+npm install --global .\dist\hejielijob-semarail-core-0.1.0-alpha.2.tgz
+$env:SEMARAIL_API_TOKEN = semarail token create
+semarail start --project C:\path\to\semantic-project
 ```
 
-The first start creates SemaRail's private Python environment automatically. npm and PyPI publication are not required for this installation method.
+The Core process owns the semantic project, database credentials, execution limits, Semantic Console, and MCP servers. Open [http://127.0.0.1:48763](http://127.0.0.1:48763) after it starts. Keep `SEMARAIL_API_TOKEN` private and make it available only to trusted agent adapters.
+
+### Optional DeepSeek Harness plugin
+
+In another terminal, provide the same token to Harness and install the small adapter package:
+
+```powershell
+$env:SEMARAIL_API_TOKEN = "<the same Core token>"
+dsh plugin --profile web add .\dist\hejielijob-dsh-semarail-plugin-0.1.0-alpha.2.tgz
+```
+
+The plugin connects to `http://127.0.0.1:48763` by default. It no longer embeds or starts Python, the Semantic Console, or the semantic runtime.
 
 ### Run from source
 
@@ -89,7 +103,7 @@ pnpm install
 pnpm build
 ```
 
-Create the Python environment and install the semantic runtime, MCP servers, Console, PostgreSQL query driver, and MySQL metadata driver:
+Create the Python environment and install the semantic runtime, MCP servers, Console, governed PostgreSQL query driver, and Console metadata drivers:
 
 ```powershell
 py -3.11 -m venv .venv
@@ -159,7 +173,7 @@ SemaRail includes a dedicated DeepSeek Harness bundle for users who want the sem
 
 The plugin provides:
 
-- A Host plugin that manages semantic context, governed PostgreSQL execution, process lifecycle, and cancellation.
+- A Host plugin that connects to SemaRail Core for semantic context, governed PostgreSQL execution, and cancellation.
 - A Client plugin that renders durable Chart, Table, and SQL views from `tool/result.meta`.
 - A shortcut from Harness to the local Semantic Console.
 - Compatibility with DeepSeek Harness `>=0.1.0-rc.10 <0.2.0`.
@@ -174,51 +188,47 @@ The plugin provides:
 
 ### Install the Harness plugin from source
 
-The distribution bundle is named `@hejielijob/dsh-wren-data-agent`. It is now a single self-contained Harness package: the Host, Client, shared contract, Python sources, and production Console assets are all included in one tarball. Because it is not published to npm yet, build that tarball locally:
+The recommended integration is the thin `@hejielijob/dsh-semarail-plugin` package. It depends on a separately running SemaRail Core through the authenticated, versioned HTTP v1 boundary. Build both unpublished packages locally:
 
 ```powershell
 pnpm install
-pnpm package:plugin
+pnpm package:split
 ```
 
 Install the generated package with the same one-command Harness flow used by registry plugins:
 
 ```powershell
-dsh plugin --profile web add .\dist\hejielijob-dsh-wren-data-agent-0.1.0-alpha.1.tgz
+dsh plugin --profile web add .\dist\hejielijob-dsh-semarail-plugin-0.1.0-alpha.2.tgz
 ```
 
 You can also download the `.tgz` from a future GitHub Release and pass its local path or HTTPS URL to the same command. Once the package is published to npm, installation will reduce to:
 
 ```powershell
-dsh plugin --profile web add @hejielijob/dsh-wren-data-agent
+dsh plugin --profile web add @hejielijob/dsh-semarail-plugin
 ```
 
-Verify the complete single-tarball installation in a temporary Harness profile with:
+The former `@hejielijob/dsh-wren-data-agent` all-in-one package remains as a legacy compatibility artifact for now. Do not enable both packages in the same Harness profile. See [the migration guide](docs/deepseek-harness-plugin.md).
+
+Verify both package boundaries with:
 
 ```powershell
-pnpm acceptance
+pnpm --filter @hejielijob/semarail-core test
+pnpm --filter @hejielijob/dsh-semarail-plugin test
 ```
 
 ### Configure the Harness Host
 
-Use an absolute semantic project directory and a system Python 3.11 or newer:
+The plugin accepts only connection settings; project paths, credentials, and execution limits stay in Core:
 
 ```yaml
-- id: wren-data-agent-host
+- id: semarail-harness-host
   config:
-    pythonExecutable: C:\Python311\python.exe
-    projectDir: D:\data\semantic-project
-    databaseDsnEnv: SEMARAIL_DATABASE_URL
-    # semanticConsoleEnabled: false
-    # workingDirectory: D:\managed\sidecar
-    # pythonBootstrapEnabled: false # only for a self-managed Python environment
+    semarailEndpoint: http://127.0.0.1:48763
+    authTokenEnv: SEMARAIL_API_TOKEN
+    timeoutMs: 30000
 ```
 
-On first startup, SemaRail uses that interpreter to create a private, versioned virtual environment and install its fixed direct Python dependencies. Sidecar and Console startup share an installation lock, and later starts reuse the completed environment. The first initialization requires network access and may take several minutes; subsequent startup is normally immediate. Set `SEMARAIL_RUNTIME_HOME` only if the private runtime must live outside the operating-system cache directory.
-
-Set `pythonBootstrapEnabled: false` only when `pythonExecutable` already points to an environment where the packaged Sidecar and Console dependencies have been installed manually.
-
-Set `SEMARAIL_DATABASE_URL` in the Host process environment to a read-only PostgreSQL account. Do not put the DSN itself in bundle configuration.
+Set `SEMARAIL_DATABASE_URL` only in the Core process environment when governed PostgreSQL execution is required. The Harness plugin never receives the DSN.
 
 The Client opens the Semantic Console at `http://127.0.0.1:48763` by default. An embedding can pass `semanticConsoleUrl` to the exported view/link props or set `localStorage['dsh-wren-data-agent.semantic-console-url']`; only credential-free absolute HTTP(S) URLs are accepted.
 
@@ -232,7 +242,7 @@ All model-generated SQL is treated as untrusted input.
 - Protocol and presentation payloads are JSON-safe and versioned; unknown versions fail closed.
 - Sidecar stdout is protocol-only; diagnostics go to stderr.
 - Datasource credentials remain server-side and are redacted from Console API responses.
-- The Console is loopback-only and unauthenticated in this alpha release. Team authentication, RBAC, approvals, and audit logging remain deployment work.
+- The Console remains loopback-only in this alpha release. The agent runtime endpoint requires a bearer token; team RBAC, approvals, and audit logging remain deployment work.
 
 ## Repository layout
 
@@ -243,7 +253,9 @@ All model-generated SQL is treated as untrusted input.
 | `packages/contract` | Shared Host, Client, and Sidecar contracts. |
 | `packages/host` | DeepSeek Harness Host plugin and packaged Python runtimes. |
 | `packages/client` | DeepSeek Harness Chart, Table, SQL, and Console views. |
-| `packages/bundle` | Installable DeepSeek Harness `dsh.bundle` composition. |
+| `packages/core` | Independently installable SemaRail Core CLI/runtime distribution. |
+| `packages/dsh-plugin` | Thin DeepSeek Harness Host/Client adapter. |
+| `packages/bundle` | Legacy all-in-one DeepSeek Harness compatibility bundle. |
 | `examples/wren-postgres` | Deterministic sales project and golden-question corpus. |
 | `scripts` | Packaging, acceptance, replay, and evaluation gates. |
 
@@ -253,6 +265,7 @@ All model-generated SQL is treated as untrusted input.
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm acceptance:split
 pnpm acceptance:mcp
 ```
 
@@ -271,7 +284,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Report sec
 
 - SemaRail's semantic MCP interface can use datasources supported by the configured semantic profile.
 - Governed query execution through MCP or DeepSeek Harness is currently PostgreSQL-only.
-- The Semantic Console supports PostgreSQL and MySQL connection testing, schema browsing, and model import.
+- The Semantic Console supports PostgreSQL, MySQL, SQLite, ClickHouse, and DuckDB connection testing, schema browsing, and model import.
 - The current semantic runtime does not support View-to-View references; nested View dependencies are rejected before execution.
 - Browser hard-refresh rendering remains a separate real-Client acceptance step beyond the API-only replay gate.
 

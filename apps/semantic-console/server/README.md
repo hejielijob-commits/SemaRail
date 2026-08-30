@@ -3,10 +3,11 @@
 This server is a local-only REST API for onboarding a datasource and editing a
 Wren 0.13.2 project. It uses the public Wren APIs `wren.context.validate_project`,
 `wren.context.build_json`, and `wren.context.save_target` when the runtime is
-installed. The standard Console install includes PostgreSQL (`psycopg`) and
-MySQL (`mysql.connector`) drivers. The datasource type API and UI expose only
-these configured types, and omit either one if its driver cannot be imported
-by the running Python environment.
+installed. The standard Console install includes PostgreSQL (`psycopg`), MySQL
+(`mysql.connector`), SQLite (Python standard library), ClickHouse
+(`clickhouse-connect`), and DuckDB (`duckdb`) metadata drivers. The datasource
+type API and UI expose only configured types whose drivers can be imported by
+the running Python environment. SQLite and DuckDB open existing files read-only.
 
 Start it from the repository root with:
 
@@ -33,6 +34,7 @@ The primary routes are:
 | Route | Purpose |
 | --- | --- |
 | `GET /api/health` | Process/Wren readiness |
+| `POST /api/v1/runtime/rpc` | Authenticated, versioned agent runtime handshake/context/query/cancel boundary |
 | `GET /api/mcp-integration` | Secret-free stdio MCP readiness, commands, and generic client configuration |
 | `GET /api/project` | Project overview, draft count, revision, active datasource |
 | `GET /api/datasource-types` | Field metadata for configured, runtime-available drivers |
@@ -64,6 +66,8 @@ The primary routes are:
 | `POST /api/project/publish` | Validate/build then transactionally publish |
 | `GET /api/versions` | Published snapshot list |
 | `POST /api/versions/{id}/rollback` | Validate and restore a snapshot |
+
+`POST /api/v1/runtime/rpc` requires `Authorization: Bearer <token>`. Set a token of at least 32 characters in `SEMARAIL_API_TOKEN` before starting Core. The public request cannot select a project, send database credentials, or override query limits; those values are pinned by Core. The currently supported v1 methods are `health`, `project.validate`, `context.ask`, `query.run`, and `query.cancel`.
 
 Edits never mutate the project until publish. Publishing validates/builds a
 temporary tree, writes a generated MDL target, snapshots that **new** tree, and

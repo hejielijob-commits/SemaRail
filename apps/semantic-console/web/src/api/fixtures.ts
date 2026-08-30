@@ -54,6 +54,37 @@ export const fixtureDatasourceTypes: DatasourceType[] = [
       { name: "ssl_mode", label: "SSL mode", inputType: "select", examples: ["required", "preferred", "disabled"] },
     ],
   },
+  {
+    type: "sqlite",
+    label: "SQLite",
+    available: true,
+    supportsSchemaBrowse: true,
+    supportsTest: true,
+    fields: [{ name: "path", label: "Database file", inputType: "text", placeholder: "C:\\data\\analytics.sqlite", required: true }],
+  },
+  {
+    type: "clickhouse",
+    label: "ClickHouse",
+    available: true,
+    supportsSchemaBrowse: true,
+    supportsTest: true,
+    fields: [
+      { name: "host", label: "Host", inputType: "text", placeholder: "localhost", required: true },
+      { name: "port", label: "HTTP port", inputType: "number", placeholder: "8123", required: true },
+      { name: "database", label: "Database", inputType: "text", placeholder: "default", required: true },
+      { name: "user", label: "User", inputType: "text", placeholder: "default", required: true },
+      { name: "password", label: "Password", inputType: "password", sensitive: true },
+      { name: "secure", label: "TLS", inputType: "select", examples: ["true", "false"] },
+    ],
+  },
+  {
+    type: "duckdb",
+    label: "DuckDB",
+    available: true,
+    supportsSchemaBrowse: true,
+    supportsTest: true,
+    fields: [{ name: "path", label: "Database file", inputType: "text", placeholder: "C:\\data\\analytics.duckdb", required: true }],
+  },
 ];
 
 export const fixtureDatasources: Datasource[] = [

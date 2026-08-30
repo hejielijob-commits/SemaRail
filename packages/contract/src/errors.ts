@@ -20,6 +20,7 @@ export const ERROR_CODES = [
   'PROTOCOL_ERROR',
   'UNSUPPORTED_VERSION',
   'INTERNAL_ERROR',
+  'UNAUTHENTICATED',
 ] as const
 
 /** Stable error code emitted by Host, sidecar, or presentation validation. */

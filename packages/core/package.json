@@ -1,0 +1,32 @@
+{
+  "name": "@hejielijob/semarail-core",
+  "version": "0.1.0-alpha.2",
+  "description": "Standalone SemaRail Core runtime, Semantic Console, MCP servers, and database adapters.",
+  "type": "module",
+  "bin": {
+    "semarail": "./bin/semarail.mjs"
+  },
+  "files": [
+    "bin/semarail.mjs",
+    "runtime/bootstrap.py",
+    "runtime/constraints.txt",
+    "python/sidecar/pyproject.toml",
+    "python/sidecar/README.md",
+    "python/sidecar/sidecar/**/*.py",
+    "python/semantic-console/pyproject.toml",
+    "python/semantic-console/server/**/*.py",
+    "semantic-console-web/**/*",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepack": "pnpm run build",
+    "test": "node --test tests/cli.test.mjs && pnpm run build && pnpm run verify-pack",
+    "verify-pack": "node scripts/verify-pack.mjs"
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "license": "MIT"
+}

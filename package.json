@@ -16,10 +16,14 @@
     "lint": "pnpm -r --if-present lint",
     "acceptance": "pwsh -NoLogo -NoProfile -File scripts/acceptance.ps1",
     "acceptance:mcp": "node scripts/run-wren-mcp-acceptance.mjs",
+    "acceptance:split": "pnpm --filter @hejielijob/semarail-core build && node scripts/acceptance-split.mjs",
     "acceptance:postgres": "pwsh -NoLogo -NoProfile -File scripts/acceptance-postgres.ps1",
     "acceptance:replay": "node scripts/acceptance-replay.mjs",
     "evaluate:golden": "pwsh -NoLogo -NoProfile -File scripts/evaluate-golden.ps1",
     "probe:sidecar": "node scripts/probe-sidecar.mjs",
-    "package:plugin": "node scripts/package-plugin.mjs"
+    "package:plugin": "node scripts/package-plugin.mjs",
+    "package:core": "node scripts/package-distribution.mjs core",
+    "package:harness-plugin": "node scripts/package-distribution.mjs dsh-plugin",
+    "package:split": "pnpm run package:core && pnpm run package:harness-plugin"
   }
 }
