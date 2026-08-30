@@ -16,6 +16,7 @@ function usage() {
     '',
     'Usage:',
     '  semarail start --project <directory> [--port 48763] [--state-dir <directory>]',
+    '  semarail mcp serve --project <directory> [--port 48764] [--state-dir <directory>]',
     '  semarail status [--endpoint http://127.0.0.1:48763]',
     '  semarail token create',
     '  semarail --version',
@@ -112,6 +113,53 @@ async function status(args) {
   process.stdout.write(`SemaRail Core ${body.result.apiVersion} is ready at ${endpoint.origin}\n`)
 }
 
+async function serveMcp(args) {
+  const options = parseOptions(args)
+  const project = options.get('project')
+  if (!project) throw new Error('--project is required')
+  const projectDir = resolve(project)
+  if (!existsSync(projectDir)) throw new Error('project directory does not exist')
+  const host = options.get('host') ?? '127.0.0.1'
+  const allowedHost = options.get('allowed-host')
+  if (!['127.0.0.1', 'localhost', '::1'].includes(host) && !allowedHost) {
+    throw new Error('non-loopback MCP requires --allowed-host')
+  }
+  const port = Number(options.get('port') ?? '48764')
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('--port is invalid')
+  const authTokenEnv = options.get('auth-token-env') ?? 'SEMARAIL_API_TOKEN'
+  const token = requiredToken(authTokenEnv)
+  const python = options.get('python') ?? process.env.SEMARAIL_PYTHON?.trim() ?? (process.platform === 'win32' ? 'python.exe' : 'python3')
+  const bootstrap = resolve(packageRoot, 'runtime', 'bootstrap.py')
+  const consoleRoot = resolve(packageRoot, 'python', 'semantic-console')
+  const sidecarRoot = resolve(packageRoot, 'python', 'sidecar')
+  const childArgs = [
+    bootstrap, '--', '-m', 'server.remote_mcp', '--host', host, '--port', String(port), '--project', projectDir,
+  ]
+  const stateDir = options.get('state-dir')
+  if (stateDir) childArgs.push('--state-dir', resolve(stateDir))
+  if (allowedHost) childArgs.push('--allowed-host', allowedHost)
+  const child = spawn(python, childArgs, {
+    cwd: consoleRoot,
+    stdio: 'inherit',
+    windowsHide: true,
+    env: {
+      ...process.env,
+      SEMARAIL_API_TOKEN: token,
+      PYTHONPATH: sidecarRoot,
+      PYTHONDONTWRITEBYTECODE: '1',
+    },
+  })
+  const forward = signal => {
+    try { child.kill(signal) } catch {}
+  }
+  process.once('SIGINT', forward)
+  process.once('SIGTERM', forward)
+  process.exitCode = await new Promise((resolveExit, reject) => {
+    child.once('error', reject)
+    child.once('exit', code => resolveExit(code ?? 1))
+  })
+}
+
 async function main(argv = process.argv.slice(2)) {
   const [command, ...args] = argv
   if (command === '--version' || command === '-v') {
@@ -127,6 +175,7 @@ async function main(argv = process.argv.slice(2)) {
     return
   }
   if (command === 'start') return start(args)
+  if (command === 'mcp' && args[0] === 'serve') return serveMcp(args.slice(1))
   if (command === 'status') return status(args)
   throw new Error(`unknown command: ${command}`)
 }

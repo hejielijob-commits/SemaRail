@@ -10,6 +10,7 @@ test('CLI exposes branded help and version', () => {
   assert.equal(help.status, 0)
   assert.match(help.stdout, /SemaRail Core/)
   assert.match(help.stdout, /semarail start --project/)
+  assert.match(help.stdout, /semarail mcp serve --project/)
   const version = spawnSync(process.execPath, [cli, '--version'], { encoding: 'utf8' })
   assert.equal(version.stdout.trim(), '0.1.0-alpha.2')
 })
@@ -27,4 +28,13 @@ test('start fails closed without authentication configuration', () => {
   })
   assert.equal(result.status, 1)
   assert.doesNotMatch(result.stderr, /token-that|Bearer|[a-f0-9]{64}/)
+})
+
+test('remote MCP fails closed without authentication configuration', () => {
+  const result = spawnSync(process.execPath, [cli, 'mcp', 'serve', '--project', resolve(import.meta.dirname, '..')], {
+    encoding: 'utf8',
+    env: { ...process.env, SEMARAIL_API_TOKEN: '' },
+  })
+  assert.equal(result.status, 1)
+  assert.doesNotMatch(result.stderr, /Bearer|[a-f0-9]{64}/)
 })

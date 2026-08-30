@@ -67,6 +67,8 @@ class PolicyEngineTests(unittest.TestCase):
 
     def test_tool_scope_defaults_to_deny_and_explicit_deny_wins(self) -> None:
         self.assertTrue(self.engine.authorize_method(self.user_a, "context.ask", [policy("pol-sales")]).allowed)
+        self.assertTrue(self.engine.authorize_method(self.user_a, "project.describe", [policy("pol-sales")]).allowed)
+        self.assertFalse(self.engine.authorize_method(self.user_a, "query.dryPlan", [policy("pol-sales")]).allowed)
         self.assertFalse(self.engine.authorize_method(self.user_a, "project.validate", [policy("pol-sales")]).allowed)
         denied = policy("pol-denied")
         denied["document"]["denyTools"] = ["query:execute"]

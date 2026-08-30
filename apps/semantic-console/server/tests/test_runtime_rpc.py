@@ -141,6 +141,20 @@ class RuntimeRpcTests(unittest.TestCase):
         self.assertTrue(response["ok"])
         self.assertEqual(self.dispatcher.requests[-1]["params"], {"projectDir": str(self.project.project_dir)})
 
+    def test_runtime_pins_describe_and_dry_plan_project_paths(self) -> None:
+        for method, params in (
+            ("project.describe", {}),
+            ("query.dryPlan", {"semanticSql": "SELECT * FROM orders"}),
+        ):
+            with self.subTest(method=method):
+                status, response = self.gateway.dispatch(
+                    {"protocolVersion": "1", "id": method, "method": method, "params": params},
+                    authorization=self.authorization,
+                )
+                self.assertEqual(status, 200)
+                self.assertTrue(response["ok"])
+                self.assertEqual(self.dispatcher.requests[-1]["params"]["projectDir"], str(self.project.project_dir))
+
     def test_runtime_rpc_requires_a_bearer_token(self) -> None:
         status, response = self.gateway.dispatch(
             {"protocolVersion": "1", "id": "health-2", "method": "health", "params": {}},

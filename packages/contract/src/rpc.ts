@@ -18,7 +18,7 @@ import { ERROR_JSON_SCHEMA, _parseError, type DataAgentError } from './errors.js
 import { _schema, type ContractSchema } from './schema.js'
 
 /** Supported sidecar RPC methods. */
-export const RPC_METHODS = ['health', 'project.validate', 'context.ask', 'query.dryPlan', 'query.run', 'query.cancel'] as const
+export const RPC_METHODS = ['health', 'project.validate', 'project.describe', 'context.ask', 'query.dryPlan', 'query.run', 'query.cancel'] as const
 
 /** Supported sidecar RPC method. */
 export type RpcMethod = typeof RPC_METHODS[number]

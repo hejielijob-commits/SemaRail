@@ -25,7 +25,7 @@ stored on that account.
 {
   "schemaVersion": 1,
   "projects": ["sales-project"],
-  "tools": ["semantic:read", "query:execute", "query:cancel"],
+  "tools": ["project:validate", "semantic:read", "query:plan", "query:execute", "query:cancel"],
   "limits": {"maxRows": 200, "timeoutMs": 10000},
   "tables": {
     "public.sales": {
@@ -71,8 +71,12 @@ key are effective immediately.
 
 ## Current boundary
 
-This alpha API is intended for a trusted local administrator. A visual policy
-editor, remote HTTP MCP, employee/OIDC login, DingTalk identity mapping, and
-PostgreSQL RLS are not yet implemented. Do not expose the loopback control API as
-an internet-facing service without the planned production transport and session
-hardening.
+The alpha distribution includes an authenticated, stateless Streamable HTTP MCP
+endpoint at `/mcp`, started with `semarail mcp serve`. It verifies the same API
+keys and routes every tool through the same current Runtime/PolicyEngine as Core.
+
+The management API remains intended for a trusted local administrator. A visual
+policy editor, employee/OIDC login, DingTalk identity mapping, and PostgreSQL RLS
+are not yet implemented. Non-loopback MCP requires an explicit allowed Host and
+must be placed behind TLS; do not expose the loopback control API as an
+internet-facing service.

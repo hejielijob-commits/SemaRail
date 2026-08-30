@@ -25,6 +25,19 @@ class FakeValidator:
         return {"valid": True, "warningCount": 0}
 
 
+class FakeContextProvider:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def describe(self, params: object) -> dict[str, object]:
+        assert isinstance(params, dict)
+        self.calls.append(params)
+        return {"schemaVersion": 1, "models": [{"name": "orders"}], "relationships": []}
+
+    def ask(self, _params: object) -> dict[str, object]:
+        return {"schemaVersion": 1, "models": [], "relationships": []}
+
+
 class DispatchTests(unittest.TestCase):
     def test_health_does_not_need_wren(self) -> None:
         response = Dispatcher().dispatch(request("health"))
@@ -55,6 +68,14 @@ class DispatchTests(unittest.TestCase):
         response = dispatcher.dispatch(request("project.validate", {"projectDir": "x"}))
         self.assertEqual(response["result"], {"valid": True})
         self.assertEqual(seen, [{"projectDir": "x"}])
+
+    def test_project_describe_uses_context_provider_without_a_question(self) -> None:
+        provider = FakeContextProvider()
+        dispatcher = Dispatcher(SidecarDependencies(context_provider=provider))
+        response = dispatcher.dispatch(request("project.describe", {"projectDir": "project"}))
+        self.assertTrue(response["ok"])
+        self.assertEqual(response["result"]["models"][0]["name"], "orders")
+        self.assertEqual(provider.calls, [{"projectDir": "project"}])
 
     def test_missing_wren_dependency_is_stable(self) -> None:
         response = dispatch_request(request("project.validate", {"projectDir": "x"}))

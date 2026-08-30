@@ -28,7 +28,9 @@ MAX_QUERY_ROWS = 500
 MAX_PREVIEW_ROWS = 200
 MAX_PREVIEW_BYTES = 1_048_576
 MAX_TIMEOUT_MS = 30_000
-_PUBLIC_METHODS = frozenset({"health", "project.validate", "context.ask", "query.run", "query.cancel"})
+_PUBLIC_METHODS = frozenset(
+    {"health", "project.validate", "project.describe", "context.ask", "query.dryPlan", "query.run", "query.cancel"}
+)
 _REQUEST_FIELDS = frozenset({"protocolVersion", "id", "method", "params", "deadlineMs"})
 _LOGGER = logging.getLogger("semarail-core.runtime")
 
@@ -177,6 +179,8 @@ class RuntimeRpcGateway:
             return {} if not params else "health params must be empty"
         if method == "project.validate":
             return {"projectDir": project_dir} if not params else "project.validate params must be empty"
+        if method == "project.describe":
+            return {"projectDir": project_dir} if not params else "project.describe params must be empty"
         if method == "context.ask":
             if set(params) != {"question"} or not isinstance(params.get("question"), str):
                 return "context.ask requires only question"
@@ -185,6 +189,10 @@ class RuntimeRpcGateway:
             if set(params) != {"queryId"} or not isinstance(params.get("queryId"), str):
                 return "query.cancel requires only queryId"
             return {"queryId": params["queryId"]}
+        if method == "query.dryPlan":
+            if set(params) != {"semanticSql"} or not isinstance(params.get("semanticSql"), str):
+                return "query.dryPlan requires only semanticSql"
+            return {"projectDir": project_dir, "semanticSql": params["semanticSql"]}
         allowed = {"question", "semanticSql", "chartIntent", "queryId"}
         if set(params) - allowed:
             return "query.run contains unsupported fields"

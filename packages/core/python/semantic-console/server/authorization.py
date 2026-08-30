@@ -34,7 +34,9 @@ class PolicyDecision:
 _METHOD_SCOPE = {
     "health": "runtime:health",
     "project.validate": "project:validate",
+    "project.describe": "semantic:read",
     "context.ask": "semantic:read",
+    "query.dryPlan": "query:plan",
     "query.run": "query:execute",
     "query.cancel": "query:cancel",
 }

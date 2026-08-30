@@ -175,7 +175,22 @@ SemaRail Core includes a local management API for service accounts, one-time API
 
 For example, two agents can run the same sales query while account A is restricted to region `CN-JIA` and account B to `CN-YI`. Updating the account attributes or policy is effective on the next request. See [Access control (alpha)](docs/access-control.md) and [the architecture decision](docs/decisions/0005-enterprise-identity-and-data-authorization.md).
 
-This is currently a trusted local-administrator API. Remote HTTP MCP, employee/OIDC or DingTalk login, a visual policy editor, and PostgreSQL RLS are planned follow-up stages and are not claimed as completed here.
+This is currently a trusted local-administrator API. Employee/OIDC or DingTalk login, a visual policy editor, and PostgreSQL RLS are planned follow-up stages and are not claimed as completed here.
+
+### Authenticated Streamable HTTP MCP (alpha)
+
+Start the authenticated MCP endpoint against the same project and state directory as Core:
+
+```powershell
+$env:SEMARAIL_API_TOKEN = "<bootstrap token>"
+semarail mcp serve `
+  --project C:\path\to\semantic-project `
+  --state-dir C:\path\to\semarail-state
+```
+
+The endpoint is `http://127.0.0.1:48764/mcp`. Configure the MCP client with a managed service-account key in the `Authorization: Bearer <key>` header. It exposes the four stable semantic tools plus `semarail_governed_query`; every call reuses the current Subject, project/tool policy, query limits, and table/column/row policy enforced by Core.
+
+Loopback is the safe default. A non-loopback bind requires an explicit `--allowed-host` and should be placed behind a TLS reverse proxy; the current alpha command does not terminate TLS itself. Employee OAuth/DingTalk authorization is still a subsequent stage.
 
 ## DeepSeek Harness plugin
 

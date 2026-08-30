@@ -31,6 +31,7 @@ RPC_METHODS = frozenset(
     {
         "health",
         "project.validate",
+        "project.describe",
         "context.ask",
         "query.dryPlan",
         "query.run",
@@ -50,7 +51,10 @@ class ProjectValidator(Protocol):
 
 
 class ContextProvider(Protocol):
-    """Wren-facing dependency used by ``context.ask``."""
+    """Wren-facing dependency used by semantic context methods."""
+
+    def describe(self, params: Mapping[str, Any]) -> Any:
+        """Return structured models and relationships for a project."""
 
     def ask(self, params: Mapping[str, Any]) -> Any:
         """Return structured semantic context for a question."""
@@ -266,6 +270,8 @@ class Dispatcher:
                 result = self._health(parsed.params)
             elif parsed.method == "project.validate":
                 result = self._project_validate(parsed.params)
+            elif parsed.method == "project.describe":
+                result = self._project_describe(parsed.params)
             elif parsed.method == "context.ask":
                 result = self._context_ask(parsed.params)
             elif parsed.method == "query.dryPlan":
@@ -382,6 +388,35 @@ class Dispatcher:
                 SEMANTIC_ERROR,
                 "context.ask",
                 "semantic context lookup failed",
+                retryable=False,
+            ) from exc
+
+    def _project_describe(self, params: Any) -> Any:
+        object_params = _method_params(
+            params,
+            method="project.describe",
+            fields={"projectDir"},
+        )
+        _required_string(object_params, "projectDir", maximum=32_768)
+        provider = self.dependencies.context_provider
+        describe = getattr(provider, "describe", None) if provider is not None else None
+        if not callable(describe):
+            raise RpcFault(
+                WREN_UNAVAILABLE,
+                "project.describe",
+                "SemaRail project description is unavailable",
+                retryable=True,
+            )
+        try:
+            return describe(object_params)
+        except RpcFault:
+            raise
+        except Exception as exc:
+            self.logger.error("semantic project description failed")
+            raise RpcFault(
+                SEMANTIC_ERROR,
+                "project.describe",
+                "semantic project description failed",
                 retryable=False,
             ) from exc
 

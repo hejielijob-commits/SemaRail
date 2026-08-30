@@ -16,6 +16,7 @@ const required = [
   'python/sidecar/sidecar/query.py', 'python/sidecar/sidecar/row_policy.py', 'python/sidecar/sidecar/semantic_mcp.py',
   'python/semantic-console/server/app.py', 'python/semantic-console/server/runtime_rpc.py',
   'python/semantic-console/server/access_control.py', 'python/semantic-console/server/authorization.py',
+  'python/semantic-console/server/remote_mcp.py',
   'semantic-console-web/index.html', 'README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md',
 ]
 for (const file of required) if (!files.includes(file)) throw new Error(`Core package omitted ${file}`)

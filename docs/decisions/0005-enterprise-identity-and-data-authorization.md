@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted. The local service-account foundation is implemented; remote MCP,
-interactive employee sign-in, and database-native defense in depth are staged
-follow-up work.
+Accepted. The service-account foundation and authenticated Streamable HTTP MCP
+are implemented; interactive employee sign-in and database-native defense in
+depth are staged follow-up work.
 
 ## Context
 
@@ -69,10 +69,13 @@ than the local SQLite file, are the compatibility boundary.
 ### Transport rollout
 
 The existing stdio MCP servers remain suitable for one trusted local user. The
-multi-user path will add remote HTTP MCP backed by the same authenticated Core
-runtime. An optional local stdio bridge may connect clients that cannot speak
-remote MCP. DingTalk authorization will create a short-lived user session and
-then enter the same Subject/PolicyEngine path as an API key.
+multi-user path adds stateless Streamable HTTP MCP backed by the same
+authenticated Core runtime. API keys are verified at the HTTP boundary and every
+tool is authorized again by current Core policy. Non-loopback deployment requires
+an explicit Host allowlist and external TLS termination. An optional local stdio
+bridge may later connect clients that cannot speak remote MCP. DingTalk
+authorization will create a short-lived user session and then enter the same
+Subject/PolicyEngine path as an API key.
 
 ## Security invariants
 
