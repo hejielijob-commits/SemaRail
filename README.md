@@ -67,7 +67,7 @@ Requirements:
 Download the SemaRail `.tgz` from GitHub Releases, then install it into the Web profile:
 
 ```powershell
-dsh plugin --profile web add C:\Downloads\hejielijob-dsh-wren-data-agent-0.1.0.tgz
+dsh plugin --profile web add C:\Downloads\hejielijob-dsh-wren-data-agent-0.1.0-alpha.1.tgz
 ```
 
 The first start creates SemaRail's private Python environment automatically. npm and PyPI publication are not required for this installation method.
@@ -184,7 +184,7 @@ pnpm package:plugin
 Install the generated package with the same one-command Harness flow used by registry plugins:
 
 ```powershell
-dsh plugin --profile web add .\dist\hejielijob-dsh-wren-data-agent-0.1.0.tgz
+dsh plugin --profile web add .\dist\hejielijob-dsh-wren-data-agent-0.1.0-alpha.1.tgz
 ```
 
 You can also download the `.tgz` from a future GitHub Release and pass its local path or HTTPS URL to the same command. Once the package is published to npm, installation will reduce to:

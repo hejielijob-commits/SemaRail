@@ -4,6 +4,8 @@ All notable user-visible changes to this project are documented here. The format
 
 ## [Unreleased]
 
+## [0.1.0-alpha.1] - 2026-08-30
+
 ### Added
 
 - Initial DeepSeek Harness Host, Client, Contract, and Bundle packages.
