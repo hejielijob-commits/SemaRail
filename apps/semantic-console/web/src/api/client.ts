@@ -33,6 +33,11 @@ import type {
   ViewValidationResponse,
   ViewPreviewResult,
   McpIntegrationResponse,
+  AccessCredential,
+  ServiceAccount,
+  AccessPolicy,
+  AccessAuditEvent,
+  IssuedApiKey,
 } from "../types";
 
 export class ApiClientError extends Error {
@@ -90,6 +95,76 @@ export class ApiClient {
   /** Load secret-free stdio MCP commands and readiness for the active project. */
   getMcpIntegration(): Promise<McpIntegrationResponse> {
     return this.request<McpIntegrationResponse>("/api/mcp-integration");
+  }
+
+  private adminHeaders(token: string): HeadersInit {
+    return { Authorization: `Bearer ${token}` };
+  }
+
+  getServiceAccounts(token: string): Promise<{ items: ServiceAccount[] }> {
+    return this.request("/api/v1/access/service-accounts", { headers: this.adminHeaders(token) });
+  }
+
+  createServiceAccount(token: string, payload: { name: string; attributes?: Record<string, unknown> }): Promise<ServiceAccount> {
+    return this.request("/api/v1/access/service-accounts", {
+      method: "POST", headers: this.adminHeaders(token), body: JSON.stringify(payload),
+    });
+  }
+
+  updateServiceAccount(token: string, id: string, payload: { name?: string; attributes?: Record<string, unknown> }): Promise<ServiceAccount> {
+    return this.request(`/api/v1/access/service-accounts/${encodeURIComponent(id)}`, {
+      method: "PUT", headers: this.adminHeaders(token), body: JSON.stringify(payload),
+    });
+  }
+
+  setServiceAccountStatus(token: string, id: string, status: "active" | "disabled"): Promise<ServiceAccount> {
+    return this.request(`/api/v1/access/service-accounts/${encodeURIComponent(id)}/status`, {
+      method: "PUT", headers: this.adminHeaders(token), body: JSON.stringify({ status }),
+    });
+  }
+
+  issueServiceAccountKey(token: string, id: string, label: string): Promise<IssuedApiKey> {
+    return this.request(`/api/v1/access/service-accounts/${encodeURIComponent(id)}/keys`, {
+      method: "POST", headers: this.adminHeaders(token), body: JSON.stringify({ label }),
+    });
+  }
+
+  rotateCredential(token: string, id: string): Promise<IssuedApiKey> {
+    return this.request(`/api/v1/access/credentials/${encodeURIComponent(id)}/rotate`, {
+      method: "POST", headers: this.adminHeaders(token), body: "{}",
+    });
+  }
+
+  revokeCredential(token: string, id: string): Promise<AccessCredential> {
+    return this.request(`/api/v1/access/credentials/${encodeURIComponent(id)}/revoke`, {
+      method: "POST", headers: this.adminHeaders(token), body: "{}",
+    });
+  }
+
+  getAccessPolicies(token: string): Promise<{ items: AccessPolicy[] }> {
+    return this.request("/api/v1/access/policies", { headers: this.adminHeaders(token) });
+  }
+
+  createAccessPolicy(token: string, payload: { name: string; document: Record<string, unknown> }): Promise<AccessPolicy> {
+    return this.request("/api/v1/access/policies", {
+      method: "POST", headers: this.adminHeaders(token), body: JSON.stringify(payload),
+    });
+  }
+
+  updateAccessPolicy(token: string, id: string, document: Record<string, unknown>): Promise<AccessPolicy> {
+    return this.request(`/api/v1/access/policies/${encodeURIComponent(id)}`, {
+      method: "PUT", headers: this.adminHeaders(token), body: JSON.stringify({ document }),
+    });
+  }
+
+  bindAccessPolicy(token: string, subjectId: string, policyId: string): Promise<{ subjectId: string; policyId: string }> {
+    return this.request("/api/v1/access/policy-bindings", {
+      method: "POST", headers: this.adminHeaders(token), body: JSON.stringify({ subjectId, policyId }),
+    });
+  }
+
+  getAccessAudit(token: string): Promise<{ items: AccessAuditEvent[] }> {
+    return this.request("/api/v1/access/audit", { headers: this.adminHeaders(token) });
   }
 
   /** Load the structured business-model projection used by the visual editor. */

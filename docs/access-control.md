@@ -15,6 +15,12 @@ semarail start --project C:\path\to\semantic-project
 Use that token only to bootstrap managed service accounts. A created API key is
 shown once and its plaintext is not stored.
 
+Open **Access control** in the Semantic Console to manage service accounts,
+trusted subject attributes, API keys, policy documents, bindings, and audit
+events. The administrator token is held only in the mounted page's React state:
+it is sent in the `Authorization` header, is not written to browser storage, and
+is cleared when the page is reloaded or unmounted.
+
 ## Policy example
 
 The following rule lets a service account execute queries against one explicit
@@ -75,8 +81,8 @@ The alpha distribution includes an authenticated, stateless Streamable HTTP MCP
 endpoint at `/mcp`, started with `semarail mcp serve`. It verifies the same API
 keys and routes every tool through the same current Runtime/PolicyEngine as Core.
 
-The management API remains intended for a trusted local administrator. A visual
-policy editor, employee/OIDC login, DingTalk identity mapping, and PostgreSQL RLS
-are not yet implemented. Non-loopback MCP requires an explicit allowed Host and
-must be placed behind TLS; do not expose the loopback control API as an
-internet-facing service.
+The management API and its current Console UI remain intended for a trusted
+local administrator. Employee/OIDC login, DingTalk identity mapping, and
+PostgreSQL RLS are not yet implemented. Non-loopback MCP requires an explicit
+allowed Host and must be placed behind TLS; do not expose the loopback control
+API as an internet-facing service.

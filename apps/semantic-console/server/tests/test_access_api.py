@@ -81,6 +81,7 @@ class AccessControlAdminApiTests(unittest.TestCase):
         )
         self.assertEqual(status, 200)
         self.assertEqual(accounts["items"][0]["attributes"]["regionCodes"], ["CN-JIA"])
+        self.assertEqual(accounts["items"][0]["policyIds"], [policy["id"]])
         self.assertNotIn("apiKey", accounts["items"][0]["credentials"][0])
 
         status, updated = self.app.request(

@@ -11,6 +11,7 @@ export type ConsoleSection =
   | "rules"
   | "sqlKnowledge"
   | "mcp"
+  | "access"
   | "instructions"
   | "mdl";
 
@@ -30,6 +31,54 @@ export interface McpIntegrationResponse {
   semantic: McpServerProfile;
   governedQuery: McpServerProfile;
   clientConfig: { mcpServers: Record<string, { command: string; args: string[]; env?: Record<string, string> }> };
+}
+
+export interface AccessCredential {
+  id: string;
+  subjectId: string;
+  label: string;
+  createdAt: string;
+  expiresAt?: string | null;
+  revokedAt?: string | null;
+  lastUsedAt?: string | null;
+}
+
+export interface ServiceAccount {
+  id: string;
+  organizationId: string;
+  type: "service_account";
+  name: string;
+  attributes: Record<string, unknown>;
+  status: "active" | "disabled";
+  credentials: AccessCredential[];
+  policyIds: string[];
+}
+
+export interface AccessPolicy {
+  id: string;
+  organizationId: string;
+  name: string;
+  version: number;
+  document: Record<string, unknown>;
+}
+
+export interface AccessAuditEvent {
+  id: string;
+  occurredAt: string;
+  organizationId?: string | null;
+  subjectId?: string | null;
+  credentialId?: string | null;
+  action: string;
+  decision: "allowed" | "denied" | "error";
+  resource?: string | null;
+  policyVersion?: string | null;
+  details: Record<string, unknown>;
+}
+
+export interface IssuedApiKey {
+  apiKey: string;
+  credential: AccessCredential;
+  replacedCredentialId?: string;
 }
 
 export interface HealthResponse {

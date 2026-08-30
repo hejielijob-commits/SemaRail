@@ -18,6 +18,24 @@ describe("ApiClient", () => {
     await expect(new ApiClient().testDatasource("warehouse")).rejects.toMatchObject({ status: 400, code: "INVALID_CONNECTION", message: "database connection failed" } satisfies Partial<ApiClientError>);
   });
 
+  it("sends administrator credentials only in the authorization header", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ items: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const token = "bootstrap-admin-secret";
+
+    await new ApiClient("http://console.test").getServiceAccounts(token);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://console.test/api/v1/access/service-accounts",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: `Bearer ${token}` }),
+      }),
+    );
+    const [, options] = fetchMock.mock.calls[0] ?? [];
+    expect(options?.body).toBeUndefined();
+    expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain(token);
+  });
+
   it("activates a datasource through the explicit current-connection endpoint", async () => {
     const response = { activeDatasource: { id: "billing", name: "Billing", type: "mysql" }, project: { activeDatasource: { id: "billing", name: "Billing", type: "mysql" } } };
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }));

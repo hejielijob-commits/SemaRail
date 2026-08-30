@@ -1,0 +1,52 @@
+.access-page { max-width: 1500px; }
+.access-lock { display: grid; max-width: 720px; grid-template-columns: auto 1fr; gap: 22px; padding: 28px; }
+.access-lock > span { display: grid; width: 54px; height: 54px; place-items: center; border-radius: 14px; background: var(--accent-faint); color: var(--accent); }
+.access-lock h2, .access-key-once h2 { margin: 0 0 6px; font-size: 17px; }
+.access-lock p, .access-key-once p { margin: 0 0 18px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.access-lock form { display: flex; align-items: end; gap: 10px; }
+.access-lock .field { flex: 1; }
+.access-lock .notice { margin-top: 14px; }
+.access-tabs { display: flex; gap: 20px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+.access-tabs button { border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); padding: 10px 1px; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.access-tabs button.active { border-color: var(--accent); color: var(--accent); }
+.access-account-layout { display: grid; grid-template-columns: minmax(260px, .72fr) minmax(0, 1.5fr); gap: 14px; }
+.access-list, .access-detail, .access-policy-list, .access-policy-editor, .access-audit { padding: 18px; }
+.access-create { display: grid; gap: 10px; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
+.access-list-items { display: grid; gap: 6px; margin-top: 14px; }
+.access-list-items > button, .access-policy-list > button:not(.button) { display: grid; gap: 5px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text); padding: 10px; text-align: left; cursor: pointer; }
+.access-list-items > button:hover, .access-list-items > button.active, .access-policy-list > button:not(.button):hover, .access-policy-list > button.active { border-color: var(--accent-border); background: var(--accent-faint); }
+.access-list-items button > span { display: flex; align-items: center; gap: 7px; }
+.access-list-items button > .badge { justify-self: start; }
+.access-list-items small, .access-policy-list span, .access-muted { color: var(--muted); font-size: 10px; }
+.access-detail > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
+.access-detail h2 { margin: 2px 0 4px; font-size: 20px; }
+.access-detail code, .access-credentials code, .access-audit code { color: var(--muted); font-size: 9px; }
+.access-bind { display: grid; grid-template-columns: minmax(0, 1fr) 190px auto; align-items: end; gap: 10px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.access-bind > div { display: grid; gap: 5px; }
+.access-bind strong, .access-credential-heading h3 { font-size: 11px; }
+.access-bind span { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.access-credential-heading { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 8px; }
+.access-credential-heading h3 { margin: 0; }
+.access-credentials { display: grid; gap: 7px; }
+.access-credentials article { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.access-credentials article.revoked { opacity: .55; }
+.access-credentials article > div { display: grid; gap: 2px; }
+.access-credentials article > span { display: flex; gap: 5px; }
+.access-credentials small { color: var(--muted); font-size: 9px; }
+.access-key-once { display: grid; grid-template-columns: auto 1fr; gap: 12px; margin-bottom: 14px; border-color: color-mix(in srgb, var(--success) 45%, var(--border)); padding: 16px; }
+.access-key-once > svg { color: var(--success); }
+.access-key-once code { display: block; overflow: auto; margin: 8px 0 10px; border-radius: 7px; background: var(--code-bg, #101723); color: #d8e0ef; padding: 10px; font-size: 10px; }
+.access-key-once > div > div { display: flex; gap: 6px; }
+.access-policy-layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 14px; }
+.access-policy-list { display: flex; flex-direction: column; gap: 7px; }
+.access-policy-list > .button { align-self: flex-start; margin-bottom: 6px; }
+.access-policy-editor .textarea { min-height: 470px; resize: vertical; font-family: var(--mono); font-size: 10px; line-height: 1.6; }
+.access-policy-title { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.access-policy-title h2 { margin: 0; font-size: 18px; }
+.access-audit-table { min-width: 760px; overflow-x: auto; }
+.access-audit-table > div { display: grid; grid-template-columns: 1.2fr 1.3fr .6fr 1fr; align-items: center; gap: 12px; min-height: 48px; border-bottom: 1px solid var(--border); font-size: 10px; }
+.access-audit-table > div > span:first-child { display: grid; gap: 2px; }
+.access-audit-table small { color: var(--muted); font-size: 9px; }
+.access-audit-table .head { min-height: 34px; color: var(--muted); font-size: 9px; font-weight: 700; text-transform: uppercase; }
+@media (max-width: 900px) { .access-account-layout, .access-policy-layout { grid-template-columns: 1fr; } .access-bind { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .access-lock { grid-template-columns: 1fr; } .access-lock form { align-items: stretch; flex-direction: column; } .access-detail > header { flex-direction: column; } }

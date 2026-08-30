@@ -19,12 +19,12 @@ const resources = {
       nav: {
         workspace: "Workspace", overview: "Overview", datasources: "Data sources", schema: "Schema browser",
         semanticLayer: "Semantic layer", models: "Models", relationships: "Relationships", views: "Views",
-        cubes: "Cubes", rules: "Business rules", sqlKnowledge: "SQL knowledge", mcp: "MCP integration", instructions: "Instructions", mdl: "MDL source", settings: "Settings", helpTitle: "Need a hand?",
+        cubes: "Cubes", rules: "Business rules", sqlKnowledge: "SQL knowledge", mcp: "MCP integration", access: "Access control", instructions: "Instructions", mdl: "MDL source", settings: "Settings", helpTitle: "Need a hand?",
         helpBody: "Read the semantic layer guide", project: "PROJECT", close: "Close navigation", open: "Open navigation",
       },
       page: {
         overview: "Overview", datasources: "Data sources", schema: "Schema browser", models: "Models",
-        relationships: "Relationships", views: "Views", cubes: "Cubes", rules: "Business rules", sqlKnowledge: "SQL knowledge", mcp: "MCP integration", instructions: "Instructions", mdl: "MDL source",
+        relationships: "Relationships", views: "Views", cubes: "Cubes", rules: "Business rules", sqlKnowledge: "SQL knowledge", mcp: "MCP integration", access: "Access control", instructions: "Instructions", mdl: "MDL source",
       },
       model: {
         eyebrow: "Semantic layer", title: "Business models", pageDescription: "Shape the business language around your source tables, then publish it as one reliable semantic layer.",
@@ -82,12 +82,12 @@ const resources = {
       nav: {
         workspace: "工作区", overview: "概览", datasources: "数据源", schema: "Schema 浏览器",
         semanticLayer: "语义层", models: "业务模型", relationships: "关系", views: "视图",
-        cubes: "指标立方体", rules: "业务规则", sqlKnowledge: "SQL 知识", mcp: "MCP 集成", instructions: "指令", mdl: "MDL 源文件", settings: "设置", helpTitle: "需要帮助？",
+        cubes: "指标立方体", rules: "业务规则", sqlKnowledge: "SQL 知识", mcp: "MCP 集成", access: "访问控制", instructions: "指令", mdl: "MDL 源文件", settings: "设置", helpTitle: "需要帮助？",
         helpBody: "阅读语义层指南", project: "项目", close: "关闭导航", open: "打开导航",
       },
       page: {
         overview: "概览", datasources: "数据源", schema: "Schema 浏览器", models: "业务模型",
-        relationships: "关系", views: "视图", cubes: "指标立方体", rules: "业务规则", sqlKnowledge: "SQL 知识", mcp: "MCP 集成", instructions: "指令", mdl: "MDL 源文件",
+        relationships: "关系", views: "视图", cubes: "指标立方体", rules: "业务规则", sqlKnowledge: "SQL 知识", mcp: "MCP 集成", access: "访问控制", instructions: "指令", mdl: "MDL 源文件",
       },
       model: {
         eyebrow: "语义层", title: "业务模型", pageDescription: "围绕源表定义业务语言，并将其发布为可靠的统一语义层。",

@@ -247,10 +247,23 @@ class AccessControlStore:
             credentials = connection.execute(
                 "SELECT id,subject_id,label,created_at,expires_at,revoked_at,last_used_at FROM credentials ORDER BY created_at,id"
             ).fetchall()
+            bindings = connection.execute(
+                "SELECT subject_id,policy_id FROM policy_bindings ORDER BY created_at,policy_id"
+            ).fetchall()
         by_subject: dict[str, list[dict[str, Any]]] = {}
         for row in credentials:
             by_subject.setdefault(str(row["subject_id"]), []).append(self._credential_public(row))
-        return [{**self._subject_from_row(row).as_dict(), "credentials": by_subject.get(str(row["id"]), [])} for row in rows]
+        policies_by_subject: dict[str, list[str]] = {}
+        for row in bindings:
+            policies_by_subject.setdefault(str(row["subject_id"]), []).append(str(row["policy_id"]))
+        return [
+            {
+                **self._subject_from_row(row).as_dict(),
+                "credentials": by_subject.get(str(row["id"]), []),
+                "policyIds": policies_by_subject.get(str(row["id"]), []),
+            }
+            for row in rows
+        ]
 
     def set_subject_status(self, subject_id: str, status: str) -> Subject:
         if status not in {"active", "disabled"}:
