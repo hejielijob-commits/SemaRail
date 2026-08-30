@@ -64,10 +64,10 @@ Requirements:
 - DeepSeek Harness `>=0.1.0-rc.10 <0.2.0`
 - Python `>=3.11` available as `python` or configured with `pythonExecutable`
 
-Download the SemaRail `.tgz` from GitHub Releases, then install it into the Web profile:
+Install the current SemaRail alpha directly from GitHub Releases:
 
 ```powershell
-dsh plugin --profile web add C:\Downloads\hejielijob-dsh-wren-data-agent-0.1.0-alpha.1.tgz
+dsh plugin --profile web add https://github.com/hejielijob-commits/SemaRail/releases/download/v0.1.0-alpha.1/hejielijob-dsh-wren-data-agent-0.1.0-alpha.1.tgz
 ```
 
 The first start creates SemaRail's private Python environment automatically. npm and PyPI publication are not required for this installation method.
