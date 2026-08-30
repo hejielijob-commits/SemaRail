@@ -280,7 +280,10 @@ try {
     Invoke-Checked -Executable $PnpmPath -Arguments @($registryArg, 'build') -WorkingDirectory $repoDir -Label 'Build plugin packages'
   }
 
-  $packageOrder = @('contract', 'host', 'client', 'bundle')
+  # The public distribution is one dual-face Bundle tarball. Contract code,
+  # Host runtime, Client artifact, Sidecar, and Console assets are all staged
+  # into this package; unpublished workspace packages must not be installed.
+  $packageOrder = @('bundle')
   $tarballs = [ordered] @{}
   foreach ($packageName in $packageOrder) {
     $packageDir = Join-Path $repoDir "packages\$packageName"
@@ -296,79 +299,37 @@ try {
   }
 
   $profileDir = Join-Path $env:DSH_HOME 'profiles\web'
-  New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
   $bundleName = '@hejielijob/dsh-wren-data-agent'
-  $hostName = '@hejielijob/dsh-wren-data-agent-host'
-  $clientName = '@hejielijob/dsh-wren-data-agent-client'
-  $contractName = '@hejielijob/dsh-wren-data-agent-contract'
-  $subprocessPeerName = '@deepseek-ai/dsh-subprocess'
-  $cordisPeerName = '@deepseek-ai/cordis'
-  $invariantsPeerName = '@deepseek-ai/dsh-invariants'
-  $bundleSpec = 'file:' + ($tarballs[$bundleName] -replace '\\', '/')
-  $hostSpec = 'file:' + ($tarballs[$hostName] -replace '\\', '/')
-  $clientSpec = 'file:' + ($tarballs[$clientName] -replace '\\', '/')
-  $contractSpec = 'file:' + ($tarballs[$contractName] -replace '\\', '/')
-
-  $profileManifest = [ordered]@{
-    name = 'dsh-profile-web'
-    private = $true
-    dependencies = [ordered]@{
-      $bundleName = $bundleSpec
-      $hostName = $hostSpec
-      $clientName = $clientSpec
-      $contractName = $contractSpec
-      # The Harness loader normally supplies Host peers. The direct installed-
-      # artifact probe below imports Host outside that loader, so its temporary
-      # profile explicitly supplies the same rc.7 peer.
-      $subprocessPeerName = '0.1.0-rc.7'
-      $cordisPeerName = '^4.0.1'
-      $invariantsPeerName = '0.1.0-rc.7'
-    }
-    dsh = [ordered]@{
-      profile = [ordered]@{
-        bundles = @('@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', $bundleName)
-      }
-    }
-  }
-  Write-JsonFile -Path (Join-Path $profileDir 'package.json') -Value $profileManifest
-  Write-Utf8NoBom -Path (Join-Path $profileDir 'cordis.patch.yml') -Content "# Isolated acceptance profile; no Harness source is modified.`n[]`n"
-
-  $workspaceYaml = @(
-    'packages:',
-    '  - .',
-    '',
-    'nodeLinker: hoisted',
-    'autoInstallPeers: false',
-    '',
-    'overrides:',
-    "  $((Quote-YamlScalar $contractName)): $((Quote-YamlScalar $contractSpec))",
-    "  $((Quote-YamlScalar $hostName)): $((Quote-YamlScalar $hostSpec))",
-    "  $((Quote-YamlScalar $clientName)): $((Quote-YamlScalar $clientSpec))"
-  ) -join [Environment]::NewLine
-  Write-Utf8NoBom -Path (Join-Path $profileDir 'pnpm-workspace.yaml') -Content ($workspaceYaml + [Environment]::NewLine)
-
-  Invoke-Checked -Executable $PnpmPath -Arguments @($registryArg, 'install', '--ignore-scripts') -WorkingDirectory $profileDir -Label 'Install packed plugin into isolated Harness profile'
-  foreach ($packageName in @($bundleName, $hostName, $clientName, $contractName)) {
-    $installedManifest = Join-Path $profileDir "node_modules\$($packageName.Replace('/', '\'))\package.json"
-    if (-not (Test-Path -LiteralPath $installedManifest -PathType Leaf)) {
-      throw "Installed package is missing from the isolated profile: $packageName"
-    }
-  }
-
-  # Exercise the installed Host artifact against the Sidecar staged inside its
-  # npm package. This proves the runtime does not fall back to this checkout's
-  # Host build or python/sidecar source tree.
-  $installedHostDir = Join-Path $profileDir "node_modules\$($hostName.Replace('/', '\'))"
-  $packagedSidecarDir = Join-Path $installedHostDir 'python\sidecar'
-  $installedHostModule = Join-Path $installedHostDir 'lib\sidecar.js'
-  $exampleProject = Join-Path $repoDir 'examples\wren-postgres'
+  $bundleTarball = $tarballs[$bundleName]
   Invoke-Checked -Executable $NodePath -Arguments @(
-    (Join-Path $repoDir 'scripts\probe-sidecar.mjs'),
-    $PythonPath,
-    $exampleProject,
-    $packagedSidecarDir,
-    $installedHostModule
-  ) -WorkingDirectory $profileDir -Label 'Probe installed Host and packaged Python sidecar'
+    $harnessCli,
+    'plugin',
+    '--profile',
+    'web',
+    'add',
+    $bundleTarball
+  ) -WorkingDirectory $HarnessDir -Label 'Install the single SemaRail tarball through dsh plugin'
+
+  $installedManifest = Join-Path $profileDir "node_modules\$($bundleName.Replace('/', '\'))\package.json"
+  if (-not (Test-Path -LiteralPath $installedManifest -PathType Leaf)) {
+    throw "Installed package is missing from the isolated profile: $bundleName"
+  }
+  $installedProfile = Get-Content -LiteralPath (Join-Path $profileDir 'package.json') -Raw | ConvertFrom-Json
+  $profileDependencies = @($installedProfile.dependencies.PSObject.Properties.Name)
+  if ($profileDependencies.Count -ne 1 -or $profileDependencies[0] -ne $bundleName) {
+    throw "Single-tarball install added unexpected profile dependencies: $($profileDependencies -join ', ')"
+  }
+  $installedBundles = @($installedProfile.dsh.profile.bundles)
+  if (@($installedBundles | Where-Object { $_ -eq $bundleName }).Count -ne 1) {
+    throw 'dsh plugin did not activate exactly one SemaRail Bundle layer'
+  }
+
+  # Resolve the installed artifact paths now; the probe runs after dump-config,
+  # because profile loading first heals Harness-owned peer fallbacks.
+  $installedHostDir = Join-Path $profileDir "node_modules\$($bundleName.Replace('/', '\'))"
+  $packagedSidecarDir = Join-Path $installedHostDir 'python\sidecar'
+  $installedHostModule = Join-Path $installedHostDir 'lib\index.js'
+  $exampleProject = Join-Path $repoDir 'examples\wren-postgres'
 
   $dumpPath = Join-Path $script:RunDir 'dump-config.txt'
   $dumpErrorPath = Join-Path $script:RunDir 'dump-config.stderr.log'
@@ -378,9 +339,19 @@ try {
   if ($dump.ExitCode -ne 0) {
     throw "Harness dump-config failed with exit code $($dump.ExitCode); see $dumpErrorPath"
   }
-  Assert-Contains -Text $dump.Stdout -Needle $hostName -EvidenceLabel 'dump-config'
-  Assert-Contains -Text $dump.Stdout -Needle $clientName -EvidenceLabel 'dump-config'
-  Write-Host "[acceptance] dump-config contains Host and Client bundle rows"
+  Assert-Contains -Text $dump.Stdout -Needle $bundleName -EvidenceLabel 'dump-config'
+  Write-Host "[acceptance] dump-config contains the dual-face Bundle row"
+
+  # Exercise the installed Host artifact against the Sidecar staged inside its
+  # npm package. This proves the runtime does not fall back to this checkout's
+  # Host build or Python source tree.
+  Invoke-Checked -Executable $NodePath -Arguments @(
+    (Join-Path $repoDir 'scripts\probe-sidecar.mjs'),
+    $PythonPath,
+    $exampleProject,
+    $packagedSidecarDir,
+    $installedHostModule
+  ) -WorkingDirectory $profileDir -Label 'Probe installed Host and packaged Python sidecar'
 
   if ($Port -eq 0) {
     $Port = Get-FreeLoopbackPort
@@ -439,17 +410,17 @@ try {
   }
 
   $indexBody = [string] $indexResponse.Content
-  Assert-Contains -Text $indexBody -Needle $clientName -EvidenceLabel 'web index boot manifest'
+  Assert-Contains -Text $indexBody -Needle $bundleName -EvidenceLabel 'web index boot manifest'
   Write-Host "[acceptance] web index returned HTTP 200 and advertises Client plugin"
 
-  $clientUri = "$baseUri`plugins/$clientName/client.js"
+  $clientUri = "$baseUri`plugins/$bundleName/client.js"
   $clientResponse = Invoke-HttpGet -Uri $clientUri -TimeoutSeconds 5
   if ([int] $clientResponse.StatusCode -ne 200) {
     throw "Client bundle did not return HTTP 200: $clientUri"
   }
   $clientBody = [string] $clientResponse.Content
   Assert-Contains -Text $clientBody -Needle 'window.__ModuleLoader__.load' -EvidenceLabel 'client.js response'
-  Assert-Contains -Text $clientBody -Needle $clientName -EvidenceLabel 'client.js response'
+  Assert-Contains -Text $clientBody -Needle $bundleName -EvidenceLabel 'client.js response'
   Write-Host "[acceptance] $clientUri returned HTTP 200 with the generated Client artifact"
 
   $result = [ordered]@{
@@ -458,7 +429,7 @@ try {
     harnessDir = $HarnessDir
     profile = $profileDir
     port = $Port
-    bundles = @($bundleName, $hostName, $clientName, $contractName)
+    bundles = @($bundleName)
     dumpConfig = $dumpPath
     clientUrl = $clientUri
   }
@@ -467,7 +438,7 @@ try {
   Write-Host 'ACCEPTANCE_PASS'
   Write-Host "  Harness: $HarnessDir (0.1.0-rc.7)"
   Write-Host "  Profile: $profileDir"
-  Write-Host "  dump-config: Host + Client rows detected"
+  Write-Host "  dump-config: one dual-face Bundle row detected"
   Write-Host "  HTTP: GET $baseUri -> 200"
   Write-Host "  HTTP: GET $clientUri -> 200"
   $script:Succeeded = $true

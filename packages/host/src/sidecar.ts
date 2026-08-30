@@ -33,6 +33,9 @@ import type { SemanticConsoleConfig } from './semantic-console.js'
 
 const DEFAULT_TIMEOUT_MS = 30_000
 const DEFAULT_STARTUP_TIMEOUT_MS = 10_000
+// A cold Windows install of Wren plus database drivers can take several
+// minutes on a slow package mirror; subsequent starts reuse the marker.
+const DEFAULT_BOOTSTRAP_STARTUP_TIMEOUT_MS = 900_000
 const DEFAULT_CANCEL_GRACE_MS = 500
 const DEFAULT_MAX_STDERR_BYTES = 32 * 1024
 const DEFAULT_DSN_ENV = 'SEMARAIL_DATABASE_URL'
@@ -46,6 +49,11 @@ const DEFAULT_DSN_ENV = 'SEMARAIL_DATABASE_URL'
  */
 export function packagedSidecarDirectory(): string {
   return fileURLToPath(new URL('../python/sidecar/', import.meta.url))
+}
+
+/** Bootstrap bundled beside both packaged Python applications. */
+export function packagedPythonBootstrap(): string {
+  return fileURLToPath(new URL('../runtime/bootstrap.py', import.meta.url))
 }
 
 type StableTransportCode = Extract<
@@ -176,6 +184,8 @@ export function createSubprocessSidecarSpawn(
 export interface SidecarGatewayConfig extends SemanticConsoleConfig {
   /** Python executable, defaulting to `python`. */
   readonly pythonExecutable?: string
+  /** Set false only when the configured Python already owns all dependencies. */
+  readonly pythonBootstrapEnabled?: boolean
   /** Python module passed to `python -m`, defaulting to `sidecar`. */
   readonly sidecarModule?: string
   /** Working directory used for the child process. */
@@ -250,6 +260,7 @@ function queryIdFromParams(params: JsonValue): string | undefined {
 /** Supervised concurrent framed-RPC client for one sidecar process. */
 export class SidecarRpcClient {
   private readonly pythonExecutable: string
+  private readonly pythonBootstrapEnabled: boolean
   private readonly sidecarModule: string
   private readonly workingDirectory: string | undefined
   private readonly timeoutMs: number
@@ -269,6 +280,7 @@ export class SidecarRpcClient {
 
   constructor(options: SidecarGatewayConfig = {}) {
     this.pythonExecutable = optionalString(options.pythonExecutable, 'python', 'pythonExecutable')
+    this.pythonBootstrapEnabled = options.pythonBootstrapEnabled !== false
     this.sidecarModule = optionalString(options.sidecarModule, 'sidecar', 'sidecarModule')
     this.workingDirectory = options.workingDirectory === undefined
       ? packagedSidecarDirectory()
@@ -332,7 +344,10 @@ export class SidecarRpcClient {
     spawnOptions.cwd = this.workingDirectory
     let child: SidecarChildProcess
     try {
-      child = this.spawn(this.pythonExecutable, ['-m', this.sidecarModule], spawnOptions)
+      const args = this.pythonBootstrapEnabled
+        ? [packagedPythonBootstrap(), '--', '-m', this.sidecarModule]
+        : ['-m', this.sidecarModule]
+      child = this.spawn(this.pythonExecutable, args, spawnOptions)
     } catch {
       throw new SidecarProcessError('SIDECAR_UNAVAILABLE', true)
     }
@@ -620,7 +635,11 @@ export class SidecarQueryGateway implements QueryGateway, SemanticContextGateway
   ) {
     this.projectDir = typeof options.projectDir === 'string' ? options.projectDir.trim() || undefined : undefined
     this.timeoutMs = numberOption(options.timeoutMs, DEFAULT_TIMEOUT_MS, 'timeoutMs')
-    this.startupTimeoutMs = numberOption(options.startupTimeoutMs, DEFAULT_STARTUP_TIMEOUT_MS, 'startupTimeoutMs')
+    this.startupTimeoutMs = numberOption(
+      options.startupTimeoutMs,
+      options.pythonBootstrapEnabled === false ? DEFAULT_STARTUP_TIMEOUT_MS : DEFAULT_BOOTSTRAP_STARTUP_TIMEOUT_MS,
+      'startupTimeoutMs',
+    )
     this.databaseDsnEnv = optionalString(options.databaseDsnEnv, DEFAULT_DSN_ENV, 'databaseDsnEnv')
     this.client = new SidecarRpcClient(spawnOverride === undefined ? options : { ...options, spawn: spawnOverride })
   }

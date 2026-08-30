@@ -3,7 +3,4 @@
 
 - insert:
     - id: wren-data-agent-host
-      name: '@hejielijob/dsh-wren-data-agent-host'
-
-    - id: wren-data-agent-client
-      name: '@hejielijob/dsh-wren-data-agent-client'
+      name: '@hejielijob/dsh-wren-data-agent'

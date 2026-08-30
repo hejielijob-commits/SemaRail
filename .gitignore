@@ -17,5 +17,11 @@ __pycache__/
 .pytest_cache/
 *.py[cod]
 *.egg-info/
+*.tgz
 packages/host/python/
 packages/host/semantic-console-web/
+packages/bundle/python/
+packages/bundle/runtime/
+packages/bundle/semantic-console-web/
+packages/bundle/LICENSE
+packages/bundle/THIRD_PARTY_NOTICES.md

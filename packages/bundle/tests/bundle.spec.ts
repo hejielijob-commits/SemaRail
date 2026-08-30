@@ -6,26 +6,25 @@ import { fileURLToPath } from 'node:url'
 const packageDir = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 describe('Wren Data Agent Bundle', () => {
-  it('ships the two public Loader rows', () => {
+  it('ships one dual-face Loader row so Host apply runs only once', () => {
     const patch = readFileSync(join(packageDir, 'cordis.patch.yml'), 'utf8')
     expect(patch).toContain("id: wren-data-agent-host")
-    expect(patch).toContain("name: '@hejielijob/dsh-wren-data-agent-host'")
-    expect(patch).toContain("id: wren-data-agent-client")
-    expect(patch).toContain("name: '@hejielijob/dsh-wren-data-agent-client'")
+    expect(patch).toContain("name: '@hejielijob/dsh-wren-data-agent'")
+    expect(patch).not.toContain('id: wren-data-agent-client')
+    expect(patch.match(/name: '@hejielijob\/dsh-wren-data-agent'/g)).toHaveLength(1)
   })
 
-  it('declares the Host/Client dependency closure and bundle manifest', () => {
+  it('is a dual-face bundle without unpublished runtime dependencies', () => {
     const manifest = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8')) as {
-      dsh?: { bundle?: { patch?: string } }
+      dsh?: { bundle?: { patch?: string }, client?: { platform?: string } }
       dependencies?: Record<string, string>
+      exports?: Record<string, unknown>
     }
     expect(manifest.dsh?.bundle?.patch).toBe('./cordis.patch.yml')
-    expect(manifest.dependencies?.['@hejielijob/dsh-wren-data-agent-host']).toBe('0.1.0')
-    expect(manifest.dependencies?.['@hejielijob/dsh-wren-data-agent-client']).toBe('0.1.0')
-
-    const hostManifest = JSON.parse(readFileSync(join(packageDir, '..', 'host', 'package.json'), 'utf8')) as {
-      dependencies?: Record<string, string>
-    }
-    expect(hostManifest.dependencies?.['@hejielijob/dsh-wren-data-agent-contract']).toBe('workspace:*')
+    expect(manifest.dsh?.client?.platform).toBe('web')
+    expect(manifest.exports?.['./client']).toBeDefined()
+    expect(manifest.dependencies?.['@hejielijob/dsh-wren-data-agent-host']).toBeUndefined()
+    expect(manifest.dependencies?.['@hejielijob/dsh-wren-data-agent-client']).toBeUndefined()
+    expect(manifest.dependencies?.['@hejielijob/dsh-wren-data-agent-contract']).toBeUndefined()
   })
 })

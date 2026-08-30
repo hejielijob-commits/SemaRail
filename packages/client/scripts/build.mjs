@@ -5,16 +5,19 @@ import { fileURLToPath } from 'node:url'
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const tsc = resolve(packageDir, 'node_modules/typescript/bin/tsc')
+const artifactOnly = process.env.DSH_CLIENT_ARTIFACT_ONLY === '1'
 
-rmSync(resolve(packageDir, 'lib'), { recursive: true, force: true })
-rmSync(resolve(packageDir, '.build'), { recursive: true, force: true })
+if (!artifactOnly) {
+  rmSync(resolve(packageDir, 'lib'), { recursive: true, force: true })
+  rmSync(resolve(packageDir, '.build'), { recursive: true, force: true })
 
-execFileSync(process.execPath, [tsc, '-p', 'tsconfig.json'], { cwd: packageDir, stdio: 'inherit' })
-execFileSync(process.execPath, [tsc, '-p', 'tsconfig.client.json'], { cwd: packageDir, stdio: 'inherit' })
-// The package is ESM, while this intermediate tree is intentionally CJS for
-// the rc.10-compatible lazy factory. Mark only the temporary tree as CommonJS so esbuild
-// does not reinterpret TypeScript's `exports` assignments as ESM globals.
-writeFileSync(resolve(packageDir, '.build/client-cjs/package.json'), '{"type":"commonjs"}\n')
+  execFileSync(process.execPath, [tsc, '-p', 'tsconfig.json'], { cwd: packageDir, stdio: 'inherit' })
+  execFileSync(process.execPath, [tsc, '-p', 'tsconfig.client.json'], { cwd: packageDir, stdio: 'inherit' })
+  // The package is ESM, while this intermediate tree is intentionally CJS for
+  // the rc.10-compatible lazy factory. Mark only the temporary tree as CommonJS so esbuild
+  // does not reinterpret TypeScript's `exports` assignments as ESM globals.
+  writeFileSync(resolve(packageDir, '.build/client-cjs/package.json'), '{"type":"commonjs"}\n')
+}
 
 const { build } = await import('esbuild')
 const bundled = await build({
@@ -33,7 +36,10 @@ const bundled = await build({
 })
 const body = bundled.outputFiles[0]?.text
 if (body === undefined) throw new Error('esbuild did not emit a Client artifact')
-const pluginId = '@hejielijob/dsh-wren-data-agent-client'
+// The standalone Client package keeps its historical id.  The installable
+// Bundle overrides it so the same generated artifact registers under the one
+// package name that Harness actually installs from the tarball.
+const pluginId = process.env.DSH_CLIENT_PLUGIN_ID ?? '@hejielijob/dsh-wren-data-agent-client'
 const artifact = [
   '// Generated lazy-CJS Client artifact for DeepSeek Harness rc.10-compatible API (verified with 0.1.1-rc.2).',
   '// The loader supplies the platform module table through the factory require.',
@@ -49,5 +55,6 @@ const artifact = [
   '',
 ].join('\n')
 
-mkdirSync(resolve(packageDir, 'lib'), { recursive: true })
-writeFileSync(resolve(packageDir, 'lib/client.js'), artifact)
+const outputPath = resolve(process.env.DSH_CLIENT_OUTPUT_PATH ?? resolve(packageDir, 'lib/client.js'))
+mkdirSync(dirname(outputPath), { recursive: true })
+writeFileSync(outputPath, artifact)

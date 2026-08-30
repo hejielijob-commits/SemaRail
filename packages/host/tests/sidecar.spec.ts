@@ -10,10 +10,12 @@ import {
   createSidecarQueryGateway,
   createSubprocessSidecarSpawn,
   packagedSidecarDirectory,
+  packagedPythonBootstrap,
   type SidecarChildProcess,
   type SidecarGatewayConfig,
   type SidecarSpawn,
   SidecarQueryGateway,
+  SidecarRpcClient,
 } from '../src/sidecar.ts'
 import type { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 
@@ -73,7 +75,7 @@ describe('sidecar framing', () => {
 
 describe('supervised sidecar gateway', () => {
   it('defaults the managed subprocess cwd to the packaged Python runtime', () => {
-    const specs: unknown[] = []
+    const specs: Array<{ argv?: string[] }> = []
     const runtime = {
       spawn(spec: unknown) {
         specs.push(spec)
@@ -96,7 +98,44 @@ describe('supervised sidecar gateway', () => {
       stdio: ['pipe', 'pipe', 'pipe'],
     })
     expect(specs[0]).toMatchObject({ cwd: packagedSidecarDirectory() })
+    expect(specs[0]?.argv).toEqual(['python', '-m', 'sidecar'])
     child.kill()
+  })
+
+  it('starts the sidecar through the private-runtime bootstrap by default', () => {
+    const calls: Array<{ executable: string, args: readonly string[] }> = []
+    const spawn: SidecarSpawn = (executable, args) => {
+      calls.push({ executable, args })
+      const stdin = new PassThrough()
+      const stdout = new PassThrough()
+      return {
+        stdin, stdout, stderr: new PassThrough(), exitCode: null, killed: false,
+        on() { return this }, once() { return this }, kill() { return true },
+      }
+    }
+    const client = new SidecarRpcClient({ spawn })
+    return client.start().then(() => {
+      expect(calls[0]).toEqual({ executable: 'python', args: [packagedPythonBootstrap(), '--', '-m', 'sidecar'] })
+      client.dispose()
+    })
+  })
+
+  it('allows an explicitly managed Python runtime to bypass bootstrap', () => {
+    const calls: Array<{ executable: string, args: readonly string[] }> = []
+    const spawn: SidecarSpawn = (executable, args) => {
+      calls.push({ executable, args })
+      const stdin = new PassThrough()
+      const stdout = new PassThrough()
+      return {
+        stdin, stdout, stderr: new PassThrough(), exitCode: null, killed: false,
+        on() { return this }, once() { return this }, kill() { return true },
+      }
+    }
+    const client = new SidecarRpcClient({ pythonBootstrapEnabled: false, spawn })
+    return client.start().then(() => {
+      expect(calls[0]?.args).toEqual(['-m', 'sidecar'])
+      client.dispose()
+    })
   })
 
   it('adapts production startup to the rc.7 managed subprocess spec', () => {

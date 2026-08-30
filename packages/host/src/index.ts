@@ -50,6 +50,7 @@ export {
   SidecarRpcClient,
   SidecarRpcError,
   SidecarProcessError,
+  packagedPythonBootstrap,
 } from './sidecar.js'
 export type {
   SidecarChildProcess,
@@ -363,6 +364,7 @@ export function apply(ctx: Context, config?: SidecarGatewayConfig): void {
       const consoleProcess = new SemanticConsoleProcess(runtime, {
         pythonExecutable: config.pythonExecutable ?? 'python',
         projectDir,
+        ...(config.pythonBootstrapEnabled === undefined ? {} : { pythonBootstrapEnabled: config.pythonBootstrapEnabled }),
       })
       ctx.effect(() => {
         consoleProcess.start()

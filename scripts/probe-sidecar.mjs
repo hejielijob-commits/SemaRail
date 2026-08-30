@@ -23,6 +23,11 @@ for (const [label, path] of [
 const { SidecarRpcClient } = await import(pathToFileURL(hostModule).href)
 const client = new SidecarRpcClient({
   pythonExecutable,
+  // This probe supplies the repository's already-provisioned test Python and
+  // isolates packaged Sidecar behavior. Runtime bootstrap has its own focused
+  // acceptance; repeating installation here would make the 10 s RPC health
+  // bound include network/package-manager latency.
+  pythonBootstrapEnabled: false,
   sidecarModule: 'sidecar',
   workingDirectory: sidecarDir,
   timeoutMs: 30_000,

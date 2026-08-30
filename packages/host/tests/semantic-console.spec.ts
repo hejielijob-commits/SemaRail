@@ -11,6 +11,7 @@ import {
   packagedSemanticConsoleWebDirectory,
   packagedSidecarPythonDirectory,
 } from '../src/semantic-console.ts'
+import { packagedPythonBootstrap } from '../src/sidecar.ts'
 
 function fakeHandle(): SubprocessHandle & {
   terminate: ReturnType<typeof vi.fn>
@@ -62,6 +63,7 @@ describe('Semantic Console managed process', () => {
     })
     expect(specs[0]?.argv).toEqual([
       'C:\\Python311\\python.exe',
+      packagedPythonBootstrap(), '--',
       '-m', 'server',
       '--host', '127.0.0.1',
       '--port', String(SEMANTIC_CONSOLE_PORT),

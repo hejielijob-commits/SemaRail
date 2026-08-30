@@ -19,6 +19,10 @@ All notable user-visible changes to this project are documented here. The format
   stdio commands, a secret-free client configuration, and explicit MySQL scope.
 - A stable, read-only SemaRail semantic MCP contract for project validation,
   model discovery, context retrieval, and dry query planning.
+- A single-tarball DeepSeek Harness distribution and `pnpm package:plugin`
+  command for local or GitHub Release installation.
+- Automatic, versioned private Python runtime initialization for the Harness
+  Sidecar and Semantic Console, with concurrent-start locking and safe errors.
 
 ### Changed
 
@@ -29,3 +33,5 @@ All notable user-visible changes to this project are documented here. The format
 - Replaced the `semarail-mcp` upstream-proxy behavior with a thin SemaRail-owned
   `SemanticService`; it continues to use WrenAI project structures directly and
   does not introduce an intermediate semantic format.
+- Collapsed the Harness distribution boundary from four separately installed
+  workspace packages to one dual-face Host and Client Bundle.

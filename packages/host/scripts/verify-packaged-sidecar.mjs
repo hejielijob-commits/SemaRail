@@ -30,6 +30,8 @@ const files = Array.isArray(report) && Array.isArray(report[0]?.files)
   ? report[0].files.map(file => file?.path).filter(path => typeof path === 'string')
   : []
 const required = [
+  'runtime/bootstrap.py',
+  'runtime/constraints.txt',
   'python/sidecar/pyproject.toml',
   'python/sidecar/sidecar/__main__.py',
   'python/sidecar/sidecar/semantic_mcp.py',

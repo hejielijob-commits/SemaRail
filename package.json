@@ -19,6 +19,7 @@
     "acceptance:postgres": "pwsh -NoLogo -NoProfile -File scripts/acceptance-postgres.ps1",
     "acceptance:replay": "node scripts/acceptance-replay.mjs",
     "evaluate:golden": "pwsh -NoLogo -NoProfile -File scripts/evaluate-golden.ps1",
-    "probe:sidecar": "node scripts/probe-sidecar.mjs"
+    "probe:sidecar": "node scripts/probe-sidecar.mjs",
+    "package:plugin": "node scripts/package-plugin.mjs"
   }
 }

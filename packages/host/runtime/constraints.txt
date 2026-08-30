@@ -1,0 +1,7 @@
+# SemaRail Python runtime compatibility boundary. Direct dependencies are fixed.
+sqlglot==30.17.0
+wrenai==0.13.2
+mcp==1.28.1
+PyYAML==6.0.3
+psycopg==3.3.4
+mysql-connector-python==26.7.0

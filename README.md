@@ -57,15 +57,30 @@ Explore and maintain field-level model relationships in an interactive graph.
 
 ## Quick start
 
-### Requirements
+### Install the DeepSeek Harness plugin
+
+Requirements:
+
+- DeepSeek Harness `>=0.1.0-rc.10 <0.2.0`
+- Python `>=3.11` available as `python` or configured with `pythonExecutable`
+
+Download the SemaRail `.tgz` from GitHub Releases, then install it into the Web profile:
+
+```powershell
+dsh plugin --profile web add C:\Downloads\hejielijob-dsh-wren-data-agent-0.1.0.tgz
+```
+
+The first start creates SemaRail's private Python environment automatically. npm and PyPI publication are not required for this installation method.
+
+### Run from source
+
+Requirements:
 
 - Git
 - Node.js `^22.19.0 || >=24`
 - pnpm `11.x`
 - Python `>=3.11`
 - PostgreSQL only if you want to execute governed queries
-
-### Install
 
 ```powershell
 git clone https://github.com/hejielijob-commits/SemaRail.git
@@ -159,37 +174,34 @@ The plugin provides:
 
 ### Install the Harness plugin from source
 
-The bundle is named `@hejielijob/dsh-wren-data-agent`. The legacy package and Host IDs are retained as compatibility identifiers for existing installations. Because the packages are not published to npm yet, build and pack them locally:
+The distribution bundle is named `@hejielijob/dsh-wren-data-agent`. It is now a single self-contained Harness package: the Host, Client, shared contract, Python sources, and production Console assets are all included in one tarball. Because it is not published to npm yet, build that tarball locally:
 
 ```powershell
 pnpm install
-pnpm build
-
-$packDir = Join-Path $PWD "packs"
-New-Item -ItemType Directory -Path $packDir -Force | Out-Null
-pnpm --dir .\packages\contract pack --pack-destination $packDir
-pnpm --dir .\packages\host pack --pack-destination $packDir
-pnpm --dir .\packages\client pack --pack-destination $packDir
-pnpm --dir .\packages\bundle pack --pack-destination $packDir
+pnpm package:plugin
 ```
 
-DeepSeek Harness installs out-of-tree bundles into a profile. Until the four SemaRail packages are published, their local tarballs must be installed together so the bundle's Host, Client, and Contract dependencies resolve locally. The repository's acceptance script performs this isolated installation automatically and verifies that Harness loads both sides of the plugin:
+Install the generated package with the same one-command Harness flow used by registry plugins:
 
 ```powershell
-pnpm acceptance
+dsh plugin --profile web add .\dist\hejielijob-dsh-wren-data-agent-0.1.0.tgz
 ```
 
-For a persistent Harness profile, install the four generated tarballs into that profile's package environment, add `@hejielijob/dsh-wren-data-agent` to `dsh.profile.bundles`, and keep the package-manager overrides pointed at the matching local Host, Client, and Contract tarballs. Once the packages are published, installation will reduce to:
+You can also download the `.tgz` from a future GitHub Release and pass its local path or HTTPS URL to the same command. Once the package is published to npm, installation will reduce to:
 
 ```powershell
 dsh plugin --profile web add @hejielijob/dsh-wren-data-agent
 ```
 
-> The one-command installation above is the intended published-package flow and is not available yet.
+Verify the complete single-tarball installation in a temporary Harness profile with:
+
+```powershell
+pnpm acceptance
+```
 
 ### Configure the Harness Host
 
-Use an absolute semantic project directory and a Python interpreter containing the packaged runtime dependencies:
+Use an absolute semantic project directory and a system Python 3.11 or newer:
 
 ```yaml
 - id: wren-data-agent-host
@@ -199,20 +211,12 @@ Use an absolute semantic project directory and a Python interpreter containing t
     databaseDsnEnv: SEMARAIL_DATABASE_URL
     # semanticConsoleEnabled: false
     # workingDirectory: D:\managed\sidecar
+    # pythonBootstrapEnabled: false # only for a self-managed Python environment
 ```
 
-Install the packaged Python runtimes into the Host's selected environment:
+On first startup, SemaRail uses that interpreter to create a private, versioned virtual environment and install its fixed direct Python dependencies. Sidecar and Console startup share an installation lock, and later starts reuse the completed environment. The first initialization requires network access and may take several minutes; subsequent startup is normally immediate. Set `SEMARAIL_RUNTIME_HOME` only if the private runtime must live outside the operating-system cache directory.
 
-```powershell
-$sidecarDir = "C:\path\to\node_modules\@hejielijob\dsh-wren-data-agent-host\python\sidecar"
-$consoleDir = "C:\path\to\node_modules\@hejielijob\dsh-wren-data-agent-host\python\semantic-console"
-$python = "C:\Python311\python.exe"
-
-Push-Location $sidecarDir
-& $python -m pip install ".[wren]"
-Pop-Location
-& $python -m pip install $consoleDir
-```
+Set `pythonBootstrapEnabled: false` only when `pythonExecutable` already points to an environment where the packaged Sidecar and Console dependencies have been installed manually.
 
 Set `SEMARAIL_DATABASE_URL` in the Host process environment to a read-only PostgreSQL account. Do not put the DSN itself in bundle configuration.
 

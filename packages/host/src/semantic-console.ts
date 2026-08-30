@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import type { SubprocessHandle, SubprocessRuntime, SubprocessSpawnSpec } from '@deepseek-ai/dsh-subprocess'
+import { packagedPythonBootstrap } from './sidecar.js'
 
 /** Loopback address shared with the Client plugin's global console link. */
 export const SEMANTIC_CONSOLE_HOST = '127.0.0.1' as const
@@ -51,6 +52,7 @@ export class SemanticConsoleProcess {
     private readonly options: {
       readonly pythonExecutable: string
       readonly projectDir: string
+      readonly pythonBootstrapEnabled?: boolean
     },
   ) {}
 
@@ -60,6 +62,7 @@ export class SemanticConsoleProcess {
     const port = SEMANTIC_CONSOLE_PORT
     const argv = [
       requiredString(this.options.pythonExecutable, 'pythonExecutable'),
+      ...(this.options.pythonBootstrapEnabled === false ? [] : [packagedPythonBootstrap(), '--']),
       '-m',
       'server',
       '--host',
