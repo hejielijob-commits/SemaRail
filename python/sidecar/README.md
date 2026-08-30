@@ -93,11 +93,15 @@ environment-variable name are fixed at process startup and never appear as tool
 arguments. MCP request cancellation is forwarded to the executor's database
 cancellation hook. Install `.[wren,mcp]` to use this entry point.
 
-For Agent deployments, pair `semarail-mcp` (semantic context) with
+For Agent deployments, pair `semarail-mcp` (the stable read-only tools
+`semarail_validate_project`, `semarail_list_models`, `semarail_get_context`, and
+`semarail_plan_query`) with
 `semarail-query-mcp` (governed execution). The legacy `dsh-data-agent-mcp`
 entry point remains available as a compatibility alias.
-The upstream semantic runtime supplies discovery and planning; SemaRail owns
-the governed database-execution boundary.
+The thin `SemanticService` calls the pinned WrenAI runtime with the existing
+project structures directly. It does not maintain an intermediate semantic
+format. SemaRail owns both the stable MCP contract and the governed
+database-execution boundary.
 
 ## Local development
 

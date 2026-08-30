@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted.
+Superseded in part by [0004](0004-stable-semarail-semantic-mcp.md). The governed
+query boundary remains accepted.
 
 ## Context
 

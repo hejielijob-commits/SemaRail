@@ -32,6 +32,10 @@ const files = Array.isArray(report) && Array.isArray(report[0]?.files)
 const required = [
   'python/sidecar/pyproject.toml',
   'python/sidecar/sidecar/__main__.py',
+  'python/sidecar/sidecar/semantic_mcp.py',
+  'python/sidecar/sidecar/semantic_service.py',
+  'python/sidecar/sidecar/mcp_gateway.py',
+  'python/sidecar/sidecar/wren_adapter.py',
   'python/sidecar/sidecar/protocol.py',
   'python/sidecar/sidecar/query.py',
   'python/semantic-console/server/app.py',

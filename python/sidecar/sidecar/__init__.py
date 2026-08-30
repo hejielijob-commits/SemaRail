@@ -40,6 +40,14 @@ from .query import (
     validate_semantic_sql,
 )
 from .sql_policy import DANGEROUS_FUNCTIONS, PhysicalAllowlist, PhysicalTable
+from .semantic_service import (
+    MAX_QUESTION_CHARS,
+    MAX_SEMANTIC_SQL_CHARS,
+    MAX_SEMANTIC_RESULT_BYTES,
+    SEMANTIC_SCHEMA_VERSION,
+    SemanticRuntime,
+    SemanticService,
+)
 from .wren_adapter import (
     WREN_PACKAGE_NAME,
     WREN_SUPPORTED_VERSION,
@@ -92,4 +100,10 @@ __all__ = [
     "DANGEROUS_FUNCTIONS",
     "PhysicalAllowlist",
     "PhysicalTable",
+    "MAX_QUESTION_CHARS",
+    "MAX_SEMANTIC_SQL_CHARS",
+    "MAX_SEMANTIC_RESULT_BYTES",
+    "SEMANTIC_SCHEMA_VERSION",
+    "SemanticRuntime",
+    "SemanticService",
 ]

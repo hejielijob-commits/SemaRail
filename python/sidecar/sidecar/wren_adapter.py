@@ -3,6 +3,9 @@
 The sidecar deliberately imports Wren only when a request needs it.  The
 process can therefore start, answer health probes, and expose a stable
 ``WREN_UNAVAILABLE`` error even when the optional Wren runtime is not present.
+This module is SemaRail-owned integration code around the separately
+distributed WrenAI 0.13.2 package (Apache License 2.0); it does not vendor
+upstream WrenAI implementation files.
 """
 
 from __future__ import annotations
@@ -110,6 +113,17 @@ class LazyWrenAdapter:
             "wrenVersion": version,
         }
 
+    def prepare(self) -> None:
+        """Load the semantic module before a stdio transport takes ownership.
+
+        On Windows, importing the native-backed Wren module for the first time
+        while an MCP server is actively reading redirected stdin can block.
+        Product entry points call this bounded, database-free warm-up before
+        entering the stdio loop; request methods remain lazy for other hosts.
+        """
+
+        self._load_context()
+
     def validate(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Validate/build a Wren project and return safe aggregate counts.
 
@@ -215,6 +229,31 @@ class LazyWrenAdapter:
                 "semantic context lookup failed",
                 retryable=False,
             ) from exc
+
+    def describe(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Return the project schema through SemaRail's stable read contract.
+
+        The returned model, relationship, and view records are the same
+        bounded projections used by :meth:`ask`.  They are produced directly
+        from WrenAI's public ``build_json`` result; SemaRail does not maintain
+        or round-trip a second semantic project format.
+        """
+
+        project_path = self._project_path(params, phase="project.describe")
+        manifest = self._build_manifest(project_path, phase="project.describe")
+        result: dict[str, Any] = {
+            "schemaVersion": 1,
+            "projectRevision": _project_revision(
+                project_path,
+                phase="project.describe",
+            ),
+            "models": _semantic_models(manifest, project_path),
+            "relationships": _semantic_relationships(manifest, project_path),
+        }
+        views = _semantic_views(manifest, project_path)
+        if views:
+            result["views"] = views
+        return result
 
     def dry_plan(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Transform semantic SQL through Wren without opening a database."""

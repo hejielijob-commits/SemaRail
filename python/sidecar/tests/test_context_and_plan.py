@@ -78,6 +78,31 @@ class FakeEngine:
 
 
 class ContextAndDryPlanTests(unittest.TestCase):
+    def test_describe_uses_the_existing_manifest_without_context_lookup(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            project = Path(temp)
+            (project / "wren_project.yml").write_text("name: demo\n", encoding="utf-8")
+            built = manifest(project.resolve())
+            context_called = False
+
+            def retrieve(*_: Any) -> None:
+                nonlocal context_called
+                context_called = True
+
+            adapter = LazyWrenAdapter(
+                module_loader=lambda _: SimpleNamespace(build_json=lambda path: built),
+                context_retriever=retrieve,
+            )
+
+            result = adapter.describe({"projectDir": str(project)})
+
+            self.assertEqual(result["schemaVersion"], 1)
+            self.assertEqual(result["models"][0]["name"], "orders")
+            self.assertEqual(result["relationships"][0]["name"], "orders_customer")
+            self.assertEqual(result["views"][0]["name"], "order_totals")
+            self.assertFalse(context_called)
+            self.assertNotIn(str(project.resolve()), json.dumps(result))
+
     def test_context_ask_recalls_confirmed_sql_with_stable_safe_reference(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             project = Path(temp)

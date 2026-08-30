@@ -22,6 +22,7 @@ describe("McpIntegration", () => {
 
     expect(screen.getByRole("heading", { name: "Semantic context" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Governed query" })).toBeInTheDocument();
+    expect(screen.getByText("validate · models · context · plan")).toBeInTheDocument();
     expect(screen.getByText("semarail_governed_query")).toBeInTheDocument();
     expect(screen.getAllByText(/semarail-mcp/).length).toBeGreaterThan(0);
 

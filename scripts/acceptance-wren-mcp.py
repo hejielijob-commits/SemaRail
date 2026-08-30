@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Credential-free end-to-end acceptance for WrenAI's native MCP server.
+"""Credential-free upstream-compatibility and SemaRail MCP acceptance.
 
-The gate creates an isolated Wren project, WREN_HOME, and DuckDB database in a
-temporary directory.  It then drives ``wren serve mcp`` through the official
-Python MCP stdio client and verifies the real context -> plan -> validate ->
-query workflow.  No user profile, database, or project file is read or changed.
+The gate creates an isolated Wren project, WREN_HOME, and DuckDB profile in a
+temporary directory, verifies the pinned upstream build, then drives SemaRail's
+semantic and governed stdio servers through the official Python MCP client. No
+user profile, database, or project file is read or changed.
 """
 
 from __future__ import annotations
@@ -45,6 +45,16 @@ def _wren_command() -> Path:
     )
 
 
+def _python_command() -> Path:
+    """Return the interpreter belonging to the active environment on Windows."""
+
+    scripts = Path(sysconfig.get_path("scripts"))
+    candidate = scripts / ("python.exe" if os.name == "nt" else "python")
+    # Do not resolve the Windows venv launcher: resolving its target bypasses
+    # the virtual environment and loses the installed MCP/Wren packages.
+    return candidate.absolute() if candidate.is_file() else Path(sys.executable).absolute()
+
+
 def _run(command: list[str], *, cwd: Path, env: dict[str, str]) -> None:
     completed = subprocess.run(
         command,
@@ -77,6 +87,22 @@ def _tool_payload(result: Any) -> Any:
             except json.JSONDecodeError:
                 return text
     raise AcceptanceFailure("MCP tool returned no readable content")
+
+
+async def _call_tool(session: Any, name: str, arguments: dict[str, Any]) -> Any:
+    """Call one MCP tool with a bounded wait and an actionable failure name."""
+
+    try:
+        result = await asyncio.wait_for(
+            session.call_tool(name, arguments),
+            timeout=60,
+        )
+        if getattr(result, "isError", False):
+            detail = _tool_payload(result)
+            raise AcceptanceFailure(f"MCP tool failed: {name}: {detail}")
+        return result
+    except TimeoutError as exc:
+        raise AcceptanceFailure(f"MCP tool timed out: {name}") from exc
 
 
 def _prepare(root: Path) -> tuple[Path, Path, Path]:
@@ -210,79 +236,14 @@ async def _verify(root: Path) -> dict[str, Any]:
         env=env,
     )
 
-    params = StdioServerParameters(
-        command=str(wren),
-        args=[
-            "serve",
-            "mcp",
-            "--project",
-            str(project),
-            "--profile",
-            "dsh-mcp-e2e",
-            "--quiet",
-        ],
-        cwd=str(project),
-        env=env,
-    )
-
-    async with stdio_client(params) as (reader, writer):
-        async with ClientSession(reader, writer) as session:
-            initialized = await session.initialize()
-            tools = await session.list_tools()
-            tool_names = {tool.name for tool in tools.tools}
-            required = {"get_context", "list_models", "dry_plan", "dry_run", "run_sql"}
-            missing = required - tool_names
-            if missing:
-                raise AcceptanceFailure(f"native MCP tools missing: {sorted(missing)}")
-            if "store_query" in tool_names:
-                raise AcceptanceFailure("write tool was enabled without --allow-write")
-
-            context = _tool_payload(
-                await session.call_tool(
-                    "get_context", {"question": "What is daily order revenue?"}
-                )
-            )
-            if "orders" not in json.dumps(context).lower():
-                raise AcceptanceFailure("semantic context did not include orders")
-
-            sql = (
-                "SELECT DATE_TRUNC('day', ordered_at) AS order_day, "
-                'SUM(amount) AS revenue FROM "orders" GROUP BY 1 ORDER BY 1'
-            )
-            planned = _tool_payload(await session.call_tool("dry_plan", {"sql": sql}))
-            if "orders" not in json.dumps(planned).lower():
-                raise AcceptanceFailure("dry plan did not resolve the orders model")
-            if _tool_payload(await session.call_tool("dry_run", {"sql": sql})) != {"ok": True}:
-                raise AcceptanceFailure("native MCP dry run did not pass")
-
-            query = _tool_payload(
-                await session.call_tool("run_sql", {"sql": sql, "limit": 10})
-            )
-            if query.get("columns") != ["order_day", "revenue"]:
-                raise AcceptanceFailure("native MCP returned unexpected columns")
-            if query.get("row_count") != 3 or query.get("truncated") is not False:
-                raise AcceptanceFailure("native MCP returned unexpected row metadata")
-            revenues = [round(float(row["revenue"]), 2) for row in query.get("rows", [])]
-            if revenues != [1280.50, 3960.25, 725.75]:
-                raise AcceptanceFailure(f"native MCP returned unexpected revenues: {revenues}")
-
-            resources = await session.list_resources()
-            templates = await session.list_resource_templates()
-            prompts = await session.list_prompts()
-            prompt_names = [prompt.name for prompt in prompts.prompts]
-            if "wren_workflow" not in prompt_names:
-                raise AcceptanceFailure("native MCP workflow prompt is unavailable")
-
-            native_result = {
-                "status": "passed",
-                "server": initialized.serverInfo.name,
-                "toolCount": len(tool_names),
-                "requiredTools": sorted(required),
-                "resourceCount": len(resources.resources),
-                "resourceTemplateCount": len(templates.resourceTemplates),
-                "promptNames": prompt_names,
-                "query": query,
-            }
+    # Building through the pinned Wren CLI above is the upstream compatibility
+    # gate. Do not start Wren's separate MCP server here: SemaRail owns the
+    # public MCP contract, and composing two semantic MCP processes against the
+    # same temporary WREN_HOME caused platform-specific native-runtime locking.
+    result = {
+        "status": "passed",
+        "upstreamBuild": "passed",
+    }
 
     semantic_env = dict(env)
     existing_pythonpath = semantic_env.get("PYTHONPATH", "")
@@ -292,33 +253,68 @@ async def _verify(root: Path) -> dict[str, Any]:
         else str(sidecar_root) + os.pathsep + existing_pythonpath
     )
     semantic_only_params = StdioServerParameters(
-        command=sys.executable,
+        command=str(_python_command()),
         args=["-m", "sidecar.semantic_mcp", "--project", str(project)],
         cwd=str(project),
         env=semantic_env,
     )
     async with stdio_client(semantic_only_params) as (reader, writer):
         async with ClientSession(reader, writer) as session:
-            await session.initialize()
+            initialized = await session.initialize()
+            if initialized.serverInfo.name != "semarail-semantic":
+                raise AcceptanceFailure("SemaRail semantic MCP returned an unexpected identity")
             tools = await session.list_tools()
             semantic_tool_names = {tool.name for tool in tools.tools}
-            required_semantic = {"get_context", "list_models", "dry_plan"}
+            required_semantic = {
+                "semarail_validate_project",
+                "semarail_list_models",
+                "semarail_get_context",
+                "semarail_plan_query",
+            }
             forbidden_execution = {"run_sql", "dry_run", "query_cube", "store_query"}
-            if not required_semantic.issubset(semantic_tool_names):
-                raise AcceptanceFailure("native --no-connect omitted semantic tools")
+            if semantic_tool_names != required_semantic:
+                raise AcceptanceFailure(
+                    f"SemaRail semantic MCP exposed unexpected tools: {sorted(semantic_tool_names)}"
+                )
             exposed = forbidden_execution & semantic_tool_names
             if exposed:
                 raise AcceptanceFailure(
-                    f"native --no-connect exposed execution tools: {sorted(exposed)}"
+                    f"SemaRail semantic MCP exposed execution tools: {sorted(exposed)}"
                 )
+            validated = _tool_payload(
+                await _call_tool(session, "semarail_validate_project", {})
+            )
+            if validated.get("schemaVersion") != 1 or validated.get("valid") is not True:
+                raise AcceptanceFailure("SemaRail semantic MCP did not validate the project")
+            described = _tool_payload(
+                await _call_tool(session, "semarail_list_models", {})
+            )
+            if "orders" not in json.dumps(described).lower():
+                raise AcceptanceFailure("SemaRail model listing omitted orders")
             semantic_context = _tool_payload(
-                await session.call_tool(
-                    "get_context", {"question": "What is daily order revenue?"}
+                await _call_tool(
+                    session,
+                    "semarail_get_context",
+                    {"question": "What is daily order revenue?"},
                 )
             )
             if "orders" not in json.dumps(semantic_context).lower():
-                raise AcceptanceFailure("native --no-connect context omitted orders")
-            native_result["semanticOnly"] = {
+                raise AcceptanceFailure("SemaRail semantic context omitted orders")
+            semantic_sql = (
+                "SELECT DATE_TRUNC('day', ordered_at) AS order_day, "
+                'SUM(amount) AS revenue FROM "orders" GROUP BY 1 ORDER BY 1'
+            )
+            planned = _tool_payload(
+                await _call_tool(
+                    session,
+                    "semarail_plan_query",
+                    {"semantic_sql": semantic_sql},
+                )
+            )
+            if "orders" not in json.dumps(planned).lower():
+                raise AcceptanceFailure("SemaRail query planning omitted orders")
+            result["semantic"] = {
+                "server": initialized.serverInfo.name,
                 "requiredTools": sorted(required_semantic),
                 "executionToolsAbsent": sorted(forbidden_execution),
             }
@@ -331,7 +327,7 @@ async def _verify(root: Path) -> dict[str, Any]:
         else str(sidecar_root) + os.pathsep + existing_pythonpath
     )
     governed_params = StdioServerParameters(
-        command=sys.executable,
+        command=str(_python_command()),
         args=[
             str(repository / "scripts" / "fixtures" / "governed-mcp-server.py"),
             "--project",
@@ -389,19 +385,19 @@ async def _verify(root: Path) -> dict[str, Any]:
             if not getattr(denied, "isError", False) or "POLICY_DENIED" not in diagnostic:
                 raise AcceptanceFailure("governed MCP did not enforce DSH SQL policy")
 
-    native_result["governedGateway"] = {
+    result["governedGateway"] = {
         "server": "semarail-query",
         "tools": ["semarail_governed_query"],
         "operatorPolicyPinned": True,
         "bounds": "passed",
         "policyDenial": "passed",
     }
-    return native_result
+    return result
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Run credential-free native and governed MCP acceptance"
+        description="Run credential-free SemaRail semantic and governed MCP acceptance"
     )
     parser.add_argument(
         "--keep-temp",
@@ -417,8 +413,16 @@ def main() -> int:
             result["tempDirectory"] = str(root)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
+    except BaseExceptionGroup as exc:
+        failures = [
+            str(item)
+            for item in exc.subgroup(AcceptanceFailure).exceptions
+        ] if exc.subgroup(AcceptanceFailure) is not None else []
+        detail = "; ".join(failures) or "MCP transport task failed"
+        print(f"SEMARAIL_MCP_E2E_FAIL: {detail}", file=sys.stderr)
+        return 1
     except (AcceptanceFailure, OSError, subprocess.SubprocessError) as exc:
-        print(f"WREN_MCP_E2E_FAIL: {exc}", file=sys.stderr)
+        print(f"SEMARAIL_MCP_E2E_FAIL: {exc}", file=sys.stderr)
         return 1
     finally:
         if not args.keep_temp:

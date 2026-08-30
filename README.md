@@ -143,9 +143,16 @@ Open [http://127.0.0.1:48763](http://127.0.0.1:48763). The server binds to loopb
 
 ## Use with any MCP-capable agent
 
-Build the semantic project, then register two SemaRail stdio MCP servers. Run
-the semantic server without a database connection for schema, context,
-knowledge, resources, prompts, and planning:
+Build the semantic project, then register two SemaRail stdio MCP servers. The
+semantic server exposes SemaRail's stable, database-disconnected tool contract:
+
+- `semarail_validate_project`
+- `semarail_list_models`
+- `semarail_get_context`
+- `semarail_plan_query`
+
+These tools use the pinned WrenAI runtime and its project structures directly;
+SemaRail does not convert the project into a second semantic model.
 
 ```powershell
 semarail-mcp --project C:\path\to\semantic-project
@@ -162,7 +169,7 @@ semarail-query-mcp `
   --database-dsn-env SEMARAIL_DATABASE_URL
 ```
 
-The MCP client discovers SemaRail's semantic tools from the first server and the
+The MCP client discovers the four semantic tools from the first server and the
 single `semarail_governed_query` execution tool from the second. The latter uses the
 same MDL-derived physical allowlist, dangerous-function policy, read-only
 transaction, 30-second ceiling, row/byte bounds, two-query concurrency cap,
@@ -173,15 +180,16 @@ to the Agent. DeepSeek Harness is not required.
 Governed deployments should keep semantic discovery separate from database
 execution and route execution only through `semarail_governed_query`.
 
-For a credential-free proof that exercises a real MCP client against both
-servers, including a native DuckDB query and the SemaRail policy boundary:
+For a credential-free proof that builds a real Wren project and exercises an
+official MCP client against both SemaRail servers and the policy boundary:
 
 ```powershell
 pnpm acceptance:mcp
 ```
 
-The pinned upstream runtime also supports Streamable HTTP, but does not add
-authentication to that transport. Keep it on loopback and prefer stdio for local clients.
+SemaRail's stable semantic endpoint currently supports stdio. Keep the optional
+upstream-native MCP endpoint separate if you use it for experimentation; its
+larger tool surface is not part of SemaRail's compatibility contract.
 
 ## Harness configuration
 
@@ -327,3 +335,5 @@ Third-party components keep their own licenses:
 - The Client bundles Apache ECharts `5.6.0`; its Apache-2.0 `LICENSE` and `NOTICE` are shipped in `packages/client/licenses/echarts`.
 
 The MIT license for this repository does not replace or relicense those third-party components.
+See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the dependency and
+artifact attribution inventory.

@@ -1,4 +1,4 @@
-/** Run the native Wren MCP gate with the configured or project Python. */
+/** Run the upstream-compatibility and stable SemaRail MCP acceptance gate. */
 
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'

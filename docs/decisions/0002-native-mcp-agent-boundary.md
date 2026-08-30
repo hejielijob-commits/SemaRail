@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Superseded by [0004](0004-stable-semarail-semantic-mcp.md).
 
 ## Context
 

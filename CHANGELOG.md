@@ -17,6 +17,8 @@ All notable user-visible changes to this project are documented here. The format
   limits, error contract, and database cancellation path.
 - An MCP Integration page in the Semantic Console with readiness, copyable
   stdio commands, a secret-free client configuration, and explicit MySQL scope.
+- A stable, read-only SemaRail semantic MCP contract for project validation,
+  model discovery, context retrieval, and dry query planning.
 
 ### Changed
 
@@ -24,3 +26,6 @@ All notable user-visible changes to this project are documented here. The format
 - Renamed the product and management interface to SemaRail, with WrenAI attribution isolated to the README's upstream-foundation and license sections.
 - Datasource selection now shows only drivers configured in the running Python environment.
 - Positioned DeepSeek Harness as an optional adapter while using SemaRail MCP servers as the standard integration for other agents.
+- Replaced the `semarail-mcp` upstream-proxy behavior with a thin SemaRail-owned
+  `SemanticService`; it continues to use WrenAI project structures directly and
+  does not introduce an intermediate semantic format.
