@@ -24,6 +24,7 @@ describe("McpIntegration", () => {
     expect(screen.getByRole("heading", { name: "Governed query" })).toBeInTheDocument();
     expect(screen.getByText("validate · models · context · plan")).toBeInTheDocument();
     expect(screen.getByText("semarail_governed_query")).toBeInTheDocument();
+    expect(screen.getByText(/SemaRail Core query limits/)).toBeInTheDocument();
     expect(screen.getAllByText(/semarail-mcp/).length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Copy configuration" }));
@@ -35,6 +36,7 @@ describe("McpIntegration", () => {
     render(<McpIntegration integration={{ ...integration, governedQuery: { ...integration.governedQuery, status: "setup_required", datasourceType: "mysql" } }} loading={false} error={null} locale="zh-CN" onRetry={vi.fn()} />);
 
     expect(screen.getByText("受控执行目前仅支持 PostgreSQL")).toBeInTheDocument();
+    expect(screen.getByText(/SemaRail Core 受控查询服务/)).toBeInTheDocument();
     expect(screen.getAllByText("需要配置").length).toBeGreaterThan(0);
   });
 });

@@ -39,7 +39,9 @@ export type DataQueryClientContext = Pick<ClientContext, 'slots'>
 export const DEFAULT_SEMANTIC_CONSOLE_URL = 'http://127.0.0.1:48763' as const
 
 /** Browser-only override key; the value is validated before it is used as a URL. */
-export const SEMANTIC_CONSOLE_URL_STORAGE_KEY = 'dsh-wren-data-agent.semantic-console-url' as const
+export const SEMANTIC_CONSOLE_URL_STORAGE_KEY = 'semarail.semantic-console-url' as const
+/** Previous key retained for one-way browser-setting compatibility. */
+export const LEGACY_SEMANTIC_CONSOLE_URL_STORAGE_KEY = 'dsh-wren-data-agent.semantic-console-url' as const
 
 const MAX_SEMANTIC_CONSOLE_URL = 2_048
 
@@ -69,7 +71,9 @@ export function parseSemanticConsoleUrl(value: unknown): string | undefined {
 function readSemanticConsoleStorage(): string | undefined {
   if (typeof globalThis === 'undefined' || !('localStorage' in globalThis)) return undefined
   try {
-    return parseSemanticConsoleUrl(globalThis.localStorage.getItem(SEMANTIC_CONSOLE_URL_STORAGE_KEY))
+    const current = globalThis.localStorage.getItem(SEMANTIC_CONSOLE_URL_STORAGE_KEY)
+    if (current !== null) return parseSemanticConsoleUrl(current)
+    return parseSemanticConsoleUrl(globalThis.localStorage.getItem(LEGACY_SEMANTIC_CONSOLE_URL_STORAGE_KEY))
   } catch {
     // Storage can throw in privacy mode or for an opaque origin. Keep the
     // loopback fallback deterministic and do not make rendering fail.

@@ -1,4 +1,4 @@
-"""Wren project drafts, validation, publishing, and version snapshots.
+"""SemaRail semantic project drafts, validation, publishing, and snapshots.
 
 The project directory is treated as a source tree, not as a database.  Edits
 arrive in an in-memory draft overlay, validation runs against a temporary copy,

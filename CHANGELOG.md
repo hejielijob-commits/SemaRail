@@ -20,6 +20,11 @@ All notable user-visible changes to this project are documented here. The format
   live in the recommended Harness plugin.
 - The original `@hejielijob/dsh-wren-data-agent` package remains available as a
   legacy all-in-one compatibility artifact during migration.
+- User-facing Console, documentation, API, and GitHub template copy now uses
+  SemaRail naming consistently; obsolete Harness screenshots were removed.
+- The Semantic Console browser override now uses
+  `semarail.semantic-console-url` while reading the previous key as a migration
+  fallback.
 
 ## [0.1.0-alpha.1] - 2026-08-30
 
@@ -32,7 +37,7 @@ All notable user-visible changes to this project are documented here. The format
 - English project screenshots and a public-project README.
 - Security policy, contribution guide, GitHub issue forms, pull-request template, and continuous integration checks.
 - Agent-neutral SemaRail MCP setup documentation and a credential-free native MCP end-to-end CI gate.
-- A stdio `semarail_governed_query` MCP tool that reuses the Harness query policy,
+- A stdio `semarail_governed_query` MCP tool that reuses the SemaRail governed-query policy,
   limits, error contract, and database cancellation path.
 - An MCP Integration page in the Semantic Console with readiness, copyable
   stdio commands, a secret-free client configuration, and explicit MySQL scope.
@@ -45,7 +50,7 @@ All notable user-visible changes to this project are documented here. The format
 
 ### Changed
 
-- Renamed the GitHub repository to `dsh-data-agent` to match the independent project branding.
+- Renamed the GitHub repository to `SemaRail` to match the independent project branding.
 - Renamed the product and management interface to SemaRail, with WrenAI attribution isolated to the README's upstream-foundation and license sections.
 - Datasource selection now shows only drivers configured in the running Python environment.
 - Positioned DeepSeek Harness as an optional adapter while using SemaRail MCP servers as the standard integration for other agents.

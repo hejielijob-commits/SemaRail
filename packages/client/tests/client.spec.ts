@@ -15,6 +15,7 @@ import {
   SemanticConsoleSidebarAction,
   submitSqlCandidate,
   SEMANTIC_CONSOLE_URL_STORAGE_KEY,
+  LEGACY_SEMANTIC_CONSOLE_URL_STORAGE_KEY,
   parseDataQueryMeta,
   tokenizeSql,
   type DataQueryResultBlock,
@@ -149,6 +150,9 @@ describe('data_query Client adapter', () => {
     storage.setItem(SEMANTIC_CONSOLE_URL_STORAGE_KEY, 'javascript:alert(1)')
     expect(resolveSemanticConsoleUrl()).toBe(DEFAULT_SEMANTIC_CONSOLE_URL)
     storage.removeItem(SEMANTIC_CONSOLE_URL_STORAGE_KEY)
+    storage.setItem(LEGACY_SEMANTIC_CONSOLE_URL_STORAGE_KEY, 'https://legacy-console.example.test/project')
+    expect(resolveSemanticConsoleUrl()).toBe('https://legacy-console.example.test/project')
+    storage.removeItem(LEGACY_SEMANTIC_CONSOLE_URL_STORAGE_KEY)
   })
 
   it('renders an external link with opener isolation and collapsed tooltip', () => {

@@ -8,22 +8,22 @@ type Locale = "en-US" | "zh-CN";
 
 const copy = {
   "en-US": {
-    eyebrow: "Agent access", title: "MCP integration", description: "Expose this semantic project to any MCP-capable agent without coupling it to DeepSeek Harness.",
+    eyebrow: "Agent access", title: "MCP integration", description: "Expose this semantic project to any MCP-capable agent. DeepSeek Harness remains an optional plugin.",
     stdio: "stdio · client managed", semantic: "Semantic context", semanticBody: "Four stable SemaRail tools for project validation, model discovery, context and planning. Database execution is disabled.",
-    governed: "Governed query", governedBody: "PostgreSQL execution through SemaRail limits, policy checks and cancellation.", ready: "Ready to configure", setup: "Setup required",
+    governed: "Governed query", governedBody: "Safely execute PostgreSQL queries through SemaRail Core query limits, policy checks, and cancellation.", ready: "Ready to configure", setup: "Setup required",
     command: "Launch command", copyCommand: "Copy command", copied: "Copied", config: "MCP client configuration", configBody: "Paste this JSON into an MCP client and adapt only the client-specific wrapper if needed.", copyConfig: "Copy configuration",
     secretTitle: "Credentials stay explicit", secretBody: "The Console never copies saved datasource passwords into this configuration. Replace <POSTGRESQL_DSN> in the agent's private environment.",
-    mysqlTitle: "Governed execution is PostgreSQL-only", mysqlBody: "The semantic server is ready, but the SemaRail governed query server cannot execute against the active MySQL datasource yet.",
+    mysqlTitle: "Governed execution is PostgreSQL-only", mysqlBody: "The semantic server is ready, but the SemaRail Core governed query service cannot execute against the active MySQL datasource yet.",
     missingTitle: "Integration information unavailable", retry: "Retry", project: "Project", transport: "Transport", tools: "Agent receives",
     semanticTools: "validate · models · context · plan", governedTools: "semarail_governed_query",
   },
   "zh-CN": {
-    eyebrow: "Agent 接入", title: "MCP 集成", description: "将当前语义项目提供给任何支持 MCP 的 Agent，不再与 DeepSeek Harness 强绑定。",
+    eyebrow: "Agent 接入", title: "MCP 集成", description: "将当前语义项目提供给任何支持 MCP 的 Agent；DeepSeek Harness 仅作为可选插件。",
     stdio: "stdio · 由客户端管理", semantic: "语义上下文", semanticBody: "通过四个稳定的 SemaRail 工具提供项目校验、模型发现、上下文和规划；不连接数据库。",
-    governed: "受控查询", governedBody: "通过 SemaRail 的限制、策略校验和取消机制执行 PostgreSQL 查询。", ready: "可以配置", setup: "需要配置",
+    governed: "受控查询", governedBody: "通过 SemaRail Core 的查询限制、策略校验和取消机制，安全执行 PostgreSQL 查询。", ready: "可以配置", setup: "需要配置",
     command: "启动命令", copyCommand: "复制命令", copied: "已复制", config: "MCP 客户端配置", configBody: "将此 JSON 粘贴到 MCP 客户端；如客户端格式不同，只需调整最外层结构。", copyConfig: "复制配置",
     secretTitle: "凭据保持显式隔离", secretBody: "控制台不会把已保存的数据源密码复制进配置。请在 Agent 的私有环境中替换 <POSTGRESQL_DSN>。",
-    mysqlTitle: "受控执行目前仅支持 PostgreSQL", mysqlBody: "语义服务可以使用，但 SemaRail 受控查询服务暂不能对当前 MySQL 数据源执行查询。",
+    mysqlTitle: "受控执行目前仅支持 PostgreSQL", mysqlBody: "语义服务可以使用，但 SemaRail Core 受控查询服务暂不能对当前 MySQL 数据源执行查询。",
     missingTitle: "无法加载集成信息", retry: "重试", project: "项目", transport: "传输方式", tools: "Agent 获得",
     semanticTools: "项目校验 · 模型 · 上下文 · 规划", governedTools: "semarail_governed_query",
   },

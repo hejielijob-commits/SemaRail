@@ -130,6 +130,8 @@ Open [http://127.0.0.1:48763](http://127.0.0.1:48763). The server binds to loopb
 
 SemaRail provides two separate stdio servers so deployments can expose semantic discovery without automatically granting database access.
 
+![SemaRail MCP integration](docs/images/mcp-integration.png)
+
 ### Semantic MCP server
 
 The semantic server reads the project but does not connect to the database. It exposes:
@@ -169,7 +171,7 @@ pnpm acceptance:mcp
 
 ## DeepSeek Harness plugin
 
-SemaRail includes a dedicated DeepSeek Harness bundle for users who want the semantic layer embedded in the Harness conversation UI. This integration is optional; the Semantic Console and MCP servers do not require DeepSeek Harness.
+SemaRail includes an optional thin DeepSeek Harness plugin for users who want the semantic layer in the Harness conversation UI. The plugin connects to an independently running SemaRail Core; the Semantic Console and MCP servers do not require DeepSeek Harness.
 
 The plugin provides:
 
@@ -177,14 +179,6 @@ The plugin provides:
 - A Client plugin that renders durable Chart, Table, and SQL views from `tool/result.meta`.
 - A shortcut from Harness to the local Semantic Console.
 - Compatibility with DeepSeek Harness `>=0.1.0-rc.10 <0.2.0`.
-
-### Conversation chart
-
-![Daily revenue chart rendered inside DeepSeek Harness](docs/images/deepseek-harness-chart.png)
-
-### Inspectable SQL
-
-![Semantic SQL inspection inside DeepSeek Harness](docs/images/deepseek-harness-semantic-sql.png)
 
 ### Install the Harness plugin from source
 
@@ -230,7 +224,7 @@ The plugin accepts only connection settings; project paths, credentials, and exe
 
 Set `SEMARAIL_DATABASE_URL` only in the Core process environment when governed PostgreSQL execution is required. The Harness plugin never receives the DSN.
 
-The Client opens the Semantic Console at `http://127.0.0.1:48763` by default. An embedding can pass `semanticConsoleUrl` to the exported view/link props or set `localStorage['dsh-wren-data-agent.semantic-console-url']`; only credential-free absolute HTTP(S) URLs are accepted.
+The Client opens the Semantic Console at `http://127.0.0.1:48763` by default. An embedding can pass `semanticConsoleUrl` to the exported view/link props or set `localStorage['semarail.semantic-console-url']`; only credential-free absolute HTTP(S) URLs are accepted. The former `dsh-wren-data-agent.semantic-console-url` key is read only as a migration fallback.
 
 ## Security model
 
@@ -251,7 +245,7 @@ All model-generated SQL is treated as untrusted input.
 | `apps/semantic-console` | Local Python server and React Semantic Console. |
 | `python/sidecar` | Semantic planning, SQL policy/execution, framed RPC, and MCP servers. |
 | `packages/contract` | Shared Host, Client, and Sidecar contracts. |
-| `packages/host` | DeepSeek Harness Host plugin and packaged Python runtimes. |
+| `packages/host` | Shared Harness Host adapters, tool registration, and legacy bundle support. |
 | `packages/client` | DeepSeek Harness Chart, Table, SQL, and Console views. |
 | `packages/core` | Independently installable SemaRail Core CLI/runtime distribution. |
 | `packages/dsh-plugin` | Thin DeepSeek Harness Host/Client adapter. |

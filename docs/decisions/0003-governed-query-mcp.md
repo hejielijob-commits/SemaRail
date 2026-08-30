@@ -5,6 +5,11 @@
 Superseded in part by [0004](0004-stable-semarail-semantic-mcp.md). The governed
 query boundary remains accepted.
 
+> Historical interface note: the accepted boundary is now exposed by
+> `semarail-query-mcp` with the `semarail_governed_query` tool. The DSH-prefixed
+> names below describe the superseded implementation; only the CLI alias remains
+> temporarily available for compatibility.
+
 ## Context
 
 Wren's native MCP server provides the broad semantic tool surface, while the

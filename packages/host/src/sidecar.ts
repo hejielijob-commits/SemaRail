@@ -190,7 +190,7 @@ export interface SidecarGatewayConfig extends SemanticConsoleConfig {
   readonly sidecarModule?: string
   /** Working directory used for the child process. */
   readonly workingDirectory?: string
-  /** Wren project directory sent only to the sidecar. */
+  /** SemaRail semantic project directory sent only to the sidecar. */
   readonly projectDir?: string
   /** Per-request query/context timeout. */
   readonly timeoutMs?: number

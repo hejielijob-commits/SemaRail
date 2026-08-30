@@ -1,9 +1,9 @@
 # SemaRail Semantic Console server
 
 This server is a local-only REST API for onboarding a datasource and editing a
-Wren 0.13.2 project. It uses the public Wren APIs `wren.context.validate_project`,
-`wren.context.build_json`, and `wren.context.save_target` when the runtime is
-installed. The standard Console install includes PostgreSQL (`psycopg`), MySQL
+SemaRail semantic project. The current implementation uses pinned public
+upstream runtime APIs for validation, build, and target generation. The
+standard Console install includes PostgreSQL (`psycopg`), MySQL
 (`mysql.connector`), SQLite (Python standard library), ClickHouse
 (`clickhouse-connect`), and DuckDB (`duckdb`) metadata drivers. The datasource
 type API and UI expose only configured types whose drivers can be imported by
@@ -12,7 +12,7 @@ the running Python environment. SQLite and DuckDB open existing files read-only.
 Start it from the repository root with:
 
 ```text
-python -m server --project-dir ./my-wren-project --state-dir ~/.wren/semantic-console/my-project
+python -m server --project-dir ./semantic-project --state-dir ~/.semarail/semantic-console/my-project
 ```
 
 (`PYTHONPATH=apps/semantic-console` is needed when running from a checkout.)
@@ -33,7 +33,7 @@ The primary routes are:
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/health` | Process/Wren readiness |
+| `GET /api/health` | Core process and semantic-runtime readiness |
 | `POST /api/v1/runtime/rpc` | Authenticated, versioned agent runtime handshake/context/query/cancel boundary |
 | `GET /api/mcp-integration` | Secret-free stdio MCP readiness, commands, and generic client configuration |
 | `GET /api/project` | Project overview, draft count, revision, active datasource |
@@ -54,7 +54,7 @@ The primary routes are:
 | `PUT /api/semantic-relationships` | Replace validated model relationships and their semantic metadata |
 | `GET/POST /api/knowledge/rules` | List or create one-rule records |
 | `GET/PUT/DELETE /api/knowledge/rules/{id}` | Read/edit/delete one rule |
-| `POST /api/knowledge/rules/{id}/enable` | Enable a rule in the effective Wren knowledge directory |
+| `POST /api/knowledge/rules/{id}/enable` | Enable a rule in the effective semantic-project knowledge directory |
 | `POST /api/knowledge/rules/{id}/disable` | Disable a rule and move its content out of the effective directory |
 | `GET/POST /api/knowledge/sql-candidates` | List or submit SQL candidates for review |
 | `GET/PUT /api/knowledge/sql-candidates/{id}` | Read or edit a pending SQL candidate |
@@ -134,7 +134,7 @@ archived document in its original order. The index at
 forward compatibility. Rule changes are project drafts and become effective
 after the normal validate/publish operation.
 
-SQL candidates are deliberately kept outside the Wren project in the
+SQL candidates are deliberately kept outside the semantic project in the
 sidecar's private state directory (`sql-candidates.json`). `POST
 /api/knowledge/sql-candidates` accepts `question`, `sql`, optional `queryId`,
 `sessionId`, `dialect`, `stats`, and `sqlHistory` (an array of JSON-safe

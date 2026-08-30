@@ -4,6 +4,10 @@
 
 Superseded by [0004](0004-stable-semarail-semantic-mcp.md).
 
+> Historical interface note: new integrations use `semarail-mcp` and
+> `semarail-query-mcp`. Command names in the decision record below describe the
+> superseded implementation and must not be copied into new client settings.
+
 ## Context
 
 The first SemaRail experience was packaged for DeepSeek Harness. WrenAI

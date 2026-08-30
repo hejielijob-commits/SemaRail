@@ -6,8 +6,9 @@ Accepted.
 
 ## Decision
 
-The Data Agent ships as an independently installable DeepSeek Harness Bundle.
-The Bundle mounts Host and Client plugins through `cordis.patch.yml`. No source
+The optional DeepSeek Harness integration ships as an independently installable
+thin plugin. It mounts Host and Client adapters through `cordis.patch.yml` and
+connects to an independently running, authenticated SemaRail Core. No source
 file in DeepSeek Harness is changed or overlaid.
 
 The supported Harness baseline is `>=0.1.0-rc.10 <0.2.0`. Compatibility is
@@ -24,4 +25,5 @@ integration boundary is defined separately in
 - Installation and removal use the official `dsh plugin --profile` lifecycle.
 - Host and Client loadability must be tested from built package artifacts.
 - The plugin cannot rely on undocumented imports from Harness applications.
-- Wren and Python runtime provisioning remain explicit deployment concerns.
+- Semantic runtime and Python provisioning belong to SemaRail Core, not the
+  recommended Harness plugin.

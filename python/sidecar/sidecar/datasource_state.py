@@ -28,7 +28,7 @@ def semantic_console_state_file(
     *,
     home: str | Path | None = None,
 ) -> Path:
-    """Return the Console state file for one canonical Wren project."""
+    """Return the Console state file for one canonical semantic project."""
 
     project = Path(project_dir).expanduser().resolve()
     digest = hashlib.sha256(str(project).encode("utf-8")).hexdigest()[:16]

@@ -1,9 +1,10 @@
 # SemaRail sidecar
 
-This package is the Python process boundary for SemaRail. It
-speaks a deliberately small RPC protocol so the Host can supervise it without
-importing Wren into the Harness process. `sqlglot` is the PostgreSQL AST policy
-boundary; the package remains independent of the Harness runtime.
+This package is the Python process boundary used by SemaRail Core. It speaks a
+deliberately small RPC protocol so Core and optional agent adapters do not need
+to import the semantic runtime into their own processes. `sqlglot` is the
+PostgreSQL AST policy boundary; the package remains independent of any agent
+client runtime.
 
 ## Wire protocol
 

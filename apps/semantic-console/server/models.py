@@ -98,7 +98,7 @@ class DatasourceRecord:
 
 @dataclass(frozen=True)
 class VersionRecord:
-    """A published project snapshot kept outside the Wren project directory."""
+    """A published project snapshot kept outside the semantic project directory."""
 
     id: str
     revision: str

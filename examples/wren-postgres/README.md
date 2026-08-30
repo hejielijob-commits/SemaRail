@@ -57,7 +57,7 @@ If the administrator connection is held in a secret-manager-backed environment
 variable, use its name (the value itself is never put on the command line):
 
 ```text
-.venv\\Scripts\\python.exe scripts\\acceptance-postgres.py --admin-dsn-env WREN_POSTGRES_ADMIN_URL
+.venv\\Scripts\\python.exe scripts\\acceptance-postgres.py --admin-dsn-env SEMARAIL_POSTGRES_ADMIN_URL
 ```
 
 When the administrator DSN is assembled from explicit host/user options and a
@@ -69,7 +69,7 @@ For a managed database that must not be provisioned or changed, use
 read-only role's DSN. Existing mode performs the query/policy/timeout/cancel
 checks and does not create or drop database objects.
 
-The gate covers Wren project validation, the four smoke queries and chart/
+The gate covers semantic project validation, the four smoke queries and chart/
 column/row metadata, server-side row bounds, DML/multi-statement/dangerous
 function/unauthorized-object rejection, a direct read-only-account write
 probe, and timeout plus framed `query.cancel` behavior. PostgreSQL and the

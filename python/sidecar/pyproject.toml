@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dsh-wren-data-agent-sidecar"
+name = "semarail-sidecar"
 version = "0.1.0"
 description = "Framed JSON-RPC sidecar boundary for SemaRail"
 requires-python = ">=3.11"
@@ -23,6 +23,9 @@ wren = ["wrenai[postgres]==0.13.2"]
 mcp = ["wrenai[mcp]==0.13.2", "mcp[cli]==1.28.1"]
 
 [project.scripts]
+# SemaRail-owned commands. The DSH-prefixed entries remain compatibility
+# aliases for the legacy all-in-one Harness package.
+semarail-sidecar = "sidecar.main:main"
 dsh-wren-sidecar = "sidecar.main:main"
 dsh-data-agent-mcp = "sidecar.mcp_gateway:main"
 semarail-mcp = "sidecar.semantic_mcp:main"
