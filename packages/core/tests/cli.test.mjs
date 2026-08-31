@@ -11,8 +11,19 @@ test('CLI exposes branded help and version', () => {
   assert.match(help.stdout, /SemaRail Core/)
   assert.match(help.stdout, /semarail start --project/)
   assert.match(help.stdout, /semarail mcp serve --project/)
+  assert.match(help.stdout, /semarail auth login --provider/)
   const version = spawnSync(process.execPath, [cli, '--version'], { encoding: 'utf8' })
-  assert.equal(version.stdout.trim(), '0.1.0-alpha.2')
+  assert.equal(version.stdout.trim(), '0.1.0-alpha.3')
+})
+
+test('employee auth commands fail closed without configuration or session data', () => {
+  const missingProvider = spawnSync(process.execPath, [cli, 'auth', 'login'], { encoding: 'utf8' })
+  assert.equal(missingProvider.status, 1)
+  assert.doesNotMatch(missingProvider.stderr, /Bearer|sr_session_/)
+
+  const missingSession = spawnSync(process.execPath, [cli, 'auth', 'status', '--session-file', resolve(import.meta.dirname, 'missing-session.json')], { encoding: 'utf8' })
+  assert.equal(missingSession.status, 1)
+  assert.doesNotMatch(missingSession.stderr, /Bearer|sr_session_/)
 })
 
 test('CLI generates a strong token without decorating its value', () => {

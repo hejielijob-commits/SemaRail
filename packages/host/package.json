@@ -27,6 +27,8 @@
     "python/sidecar/sidecar/**/*.py",
     "python/semantic-console/pyproject.toml",
     "python/semantic-console/server/**/*.py",
+    "python/semantic-console/server/README.md",
+    "python/semantic-console/server/openapi.json",
     "semantic-console-web/**/*"
   ],
   "scripts": {

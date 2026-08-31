@@ -2,9 +2,10 @@
 
 ## Status
 
-Accepted. The service-account foundation and authenticated Streamable HTTP MCP
-are implemented; interactive employee sign-in and database-native defense in
-depth are staged follow-up work.
+Accepted and partially implemented. Service accounts, authenticated Streamable
+HTTP MCP, external employee sign-in, unified Subject mapping, and portable data
+policy enforcement are implemented. Database-native defense in depth remains a
+staged follow-up.
 
 ## Context
 
@@ -26,14 +27,14 @@ accepted from an MCP tool argument.
 Every authenticated actor becomes a versioned SemaRail `Subject`:
 
 - `service_account` subjects authenticate with hashed, revocable API keys;
-- `user` subjects will authenticate through an external OIDC/OAuth identity and
+- `user` subjects authenticate through an external OIDC/OAuth identity and
   retain the provider employee identifier as a trusted external identity;
 - both carry server-managed attributes, such as organization and region codes;
 - policies bind to subjects and are evaluated on every request.
 
 The existing `SEMARAIL_API_TOKEN` remains a local bootstrap-administrator
 credential during migration. It is not embedded in policy documents and is not
-the future employee-login mechanism.
+used as the employee-login mechanism.
 
 ### Policy and enforcement
 
@@ -73,9 +74,13 @@ multi-user path adds stateless Streamable HTTP MCP backed by the same
 authenticated Core runtime. API keys are verified at the HTTP boundary and every
 tool is authorized again by current Core policy. Non-loopback deployment requires
 an explicit Host allowlist and external TLS termination. An optional local stdio
-bridge may later connect clients that cannot speak remote MCP. DingTalk
-authorization will create a short-lived user session and then enter the same
-Subject/PolicyEngine path as an API key.
+bridge may later connect clients that cannot speak remote MCP. DingTalk and OIDC
+authorization create a short-lived user session through a one-time
+device/browser flow and then enter the same Subject/PolicyEngine path as an API
+key. Provider access tokens never leave the server. Each provider instance maps
+exactly one verified external organization to one internal organization, and an
+immutable provider fingerprint prevents a reconfigured issuer with an equal
+external subject from inheriting old policy.
 
 ## Security invariants
 

@@ -63,6 +63,11 @@ if (!client.includes('id: "@hejielijob/dsh-wren-data-agent"')) {
   throw new Error('Client artifact does not register under the installed Bundle package name')
 }
 
+const host = readFileSync(resolve(packageDir, 'lib', 'index.js'), 'utf8')
+if (!host.includes('SEMARAIL_HARNESS_TOKEN')) {
+  throw new Error('Legacy Bundle Host does not default to the dedicated Harness token variable')
+}
+
 const unpublishedPattern = /@hejielijob\/dsh-wren-data-agent-(?:host|client|contract)/u
 for (const file of files.filter(path => /\.(?:js|d\.ts)$/u.test(path))) {
   const body = readFileSync(resolve(packageDir, file), 'utf8')

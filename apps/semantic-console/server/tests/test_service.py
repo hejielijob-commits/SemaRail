@@ -10,6 +10,7 @@ import yaml
 
 from server.app import create_app
 from server.project import ProjectStore
+from server.runtime_rpc import RuntimeRpcGateway
 from server.service import ApiServiceError, SemanticConsoleService
 
 
@@ -144,11 +145,18 @@ class SemanticConsoleServiceTests(unittest.TestCase):
         self.assertEqual(generated["model"]["columns"][0]["type"], "INTEGER")
 
     def test_embedded_app_returns_direct_shapes_and_safe_errors(self):
-        app = create_app(SemanticConsoleService(self.make_project()))
+        project = self.make_project()
+        token = "admin-token-that-is-at-least-thirty-two-characters"
+        app = create_app(
+            SemanticConsoleService(project),
+            runtime_rpc=RuntimeRpcGateway(project, dispatcher=None, auth_token=token),
+        )
         status, health = app.request("GET", "/api/health")
         self.assertEqual(status, 200)
         self.assertEqual(health["service"], "semantic-console")
-        status, error = app.request("GET", "/api/project/file?path=../secret")
+        status, error = app.request(
+            "GET", "/api/project/file?path=../secret", authorization=f"Bearer {token}"
+        )
         self.assertEqual(status, 400)
         self.assertEqual(error["code"], "INVALID_PATH")
 

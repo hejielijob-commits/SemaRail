@@ -39,6 +39,19 @@ async function waitForConsole(endpoint, child) {
   throw new Error('packaged Core server did not become ready')
 }
 
+async function adminJson(endpoint, path, init = {}) {
+  const response = await fetch(new URL(path, endpoint), {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...init.headers,
+    },
+  })
+  if (!response.ok) throw new Error(`bootstrap request failed: ${path} (${response.status})`)
+  return await response.json()
+}
+
 let child
 try {
   const port = await freePort()
@@ -61,6 +74,34 @@ try {
   })
   await waitForConsole(endpoint, child)
 
+  const account = await adminJson(endpoint, '/api/v1/access/service-accounts', {
+    method: 'POST',
+    body: JSON.stringify({ name: 'Split acceptance Harness' }),
+  })
+  const policy = await adminJson(endpoint, '/api/v1/access/policies', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'Split acceptance semantic read',
+      document: {
+        schemaVersion: 1,
+        projects: ['semarail_sales'],
+        tools: ['runtime:health', 'project:validate', 'semantic:read'],
+        tables: {},
+      },
+    }),
+  })
+  await adminJson(endpoint, '/api/v1/access/policy-bindings', {
+    method: 'POST',
+    body: JSON.stringify({ subjectId: account.id, policyId: policy.id }),
+  })
+  const issued = await adminJson(endpoint, `/api/v1/access/service-accounts/${account.id}/keys`, {
+    method: 'POST',
+    body: JSON.stringify({ label: 'acceptance' }),
+  })
+  if (typeof issued.apiKey !== 'string' || !issued.apiKey.startsWith('sr_live_')) {
+    throw new Error('bootstrap did not issue a scoped service-account key')
+  }
+
   const clientRequire = createRequire(resolve(repository, 'packages', 'client', 'package.json'))
   const { build } = clientRequire('esbuild')
   const built = await build({
@@ -72,7 +113,7 @@ try {
     write: false,
   })
   const moduleUrl = `data:text/javascript;base64,${Buffer.from(built.outputFiles[0].contents).toString('base64')}`
-  process.env.SEMARAIL_API_TOKEN = token
+  process.env.SEMARAIL_HARNESS_TOKEN = issued.apiKey
   const { createCoreHttpGateway } = await import(moduleUrl)
   const gateway = createCoreHttpGateway({ semarailEndpoint: endpoint })
   await gateway.start()
@@ -83,6 +124,7 @@ try {
   gateway.dispose()
   process.stdout.write(`Split acceptance passed: thin gateway reached packaged Core and resolved ${context.models.length} model(s).\n`)
 } finally {
+  delete process.env.SEMARAIL_HARNESS_TOKEN
   if (child !== undefined && child.exitCode === null) {
     child.kill('SIGTERM')
     await new Promise(resolveExit => child.once('exit', resolveExit))

@@ -12,6 +12,10 @@ All notable user-visible changes to this project are documented here. The format
   context, governed query execution, and cancellation.
 - PostgreSQL, MySQL, SQLite, ClickHouse, and DuckDB Console adapters for
   connection testing, schema browsing, and model import.
+- DingTalk and generic OIDC employee sign-in with one-time browser/device
+  authorization, short-lived revocable SemaRail sessions, immutable provider
+  identities, external-organization allowlisting, employee administration, and
+  the same table/column/row policies used by service accounts.
 
 ### Changed
 
@@ -25,6 +29,15 @@ All notable user-visible changes to this project are documented here. The format
 - The Semantic Console browser override now uses
   `semarail.semantic-console-url` while reading the previous key as a migration
   fallback.
+- DeepSeek Harness now reads a dedicated, scoped service-account key from
+  `SEMARAIL_HARNESS_TOKEN`; the Core bootstrap administrator token is no longer
+  the adapter default.
+- Console project administration and access-control administration use
+  independent capabilities, and policy unbinding or employee disablement takes
+  effect on the next request without reviving old sessions.
+- Physical table row/column enforcement now resolves aliases by SQL lexical
+  scope and keeps other-project policies out of the current project's compiled
+  data policy.
 
 ## [0.1.0-alpha.1] - 2026-08-30
 

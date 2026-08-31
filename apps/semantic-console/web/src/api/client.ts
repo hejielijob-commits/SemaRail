@@ -35,6 +35,7 @@ import type {
   McpIntegrationResponse,
   AccessCredential,
   ServiceAccount,
+  UserAccount,
   AccessPolicy,
   AccessAuditEvent,
   IssuedApiKey,
@@ -57,9 +58,15 @@ export class ApiClientError extends Error {
 /** Typed REST boundary for the semantic console. Secrets are accepted only in request bodies. */
 export class ApiClient {
   private readonly baseUrl: string;
+  private bearerToken = "";
 
   constructor(baseUrl = "") {
     this.baseUrl = baseUrl.replace(/\/$/, "");
+  }
+
+  /** Keep the Console administrator credential in memory only. */
+  setBearerToken(token: string): void {
+    this.bearerToken = token.trim();
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -68,6 +75,7 @@ export class ApiClient {
       headers: {
         Accept: "application/json",
         ...(init.body ? { "Content-Type": "application/json" } : {}),
+        ...(this.bearerToken ? { Authorization: `Bearer ${this.bearerToken}` } : {}),
         ...init.headers,
       },
     });
@@ -101,8 +109,28 @@ export class ApiClient {
     return { Authorization: `Bearer ${token}` };
   }
 
+  getCapabilities(token: string): Promise<{ subject: { id: string; name: string }; projectId: string; capabilities: { "console:admin": boolean; "access:admin": boolean } }> {
+    return this.request("/api/v1/auth/capabilities", { headers: this.adminHeaders(token) });
+  }
+
   getServiceAccounts(token: string): Promise<{ items: ServiceAccount[] }> {
     return this.request("/api/v1/access/service-accounts", { headers: this.adminHeaders(token) });
+  }
+
+  getUsers(token: string): Promise<{ items: UserAccount[] }> {
+    return this.request("/api/v1/access/users", { headers: this.adminHeaders(token) });
+  }
+
+  updateUser(token: string, id: string, payload: { name?: string; attributes?: Record<string, unknown> }): Promise<UserAccount> {
+    return this.request(`/api/v1/access/users/${encodeURIComponent(id)}`, {
+      method: "PUT", headers: this.adminHeaders(token), body: JSON.stringify(payload),
+    });
+  }
+
+  setUserStatus(token: string, id: string, status: "active" | "disabled"): Promise<UserAccount> {
+    return this.request(`/api/v1/access/users/${encodeURIComponent(id)}/status`, {
+      method: "PUT", headers: this.adminHeaders(token), body: JSON.stringify({ status }),
+    });
   }
 
   createServiceAccount(token: string, payload: { name: string; attributes?: Record<string, unknown> }): Promise<ServiceAccount> {
@@ -160,6 +188,12 @@ export class ApiClient {
   bindAccessPolicy(token: string, subjectId: string, policyId: string): Promise<{ subjectId: string; policyId: string }> {
     return this.request("/api/v1/access/policy-bindings", {
       method: "POST", headers: this.adminHeaders(token), body: JSON.stringify({ subjectId, policyId }),
+    });
+  }
+
+  unbindAccessPolicy(token: string, subjectId: string, policyId: string): Promise<{ subjectId: string; policyId: string; status: "unbound" }> {
+    return this.request(`/api/v1/access/policy-bindings/${encodeURIComponent(subjectId)}/${encodeURIComponent(policyId)}`, {
+      method: "DELETE", headers: this.adminHeaders(token),
     });
   }
 

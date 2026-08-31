@@ -16,7 +16,7 @@ import threading
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Iterator, Mapping
 
@@ -24,6 +24,9 @@ from typing import Any, Callable, Iterator, Mapping
 DEFAULT_ORGANIZATION_ID = "default"
 BOOTSTRAP_SUBJECT_ID = "bootstrap-admin"
 _KEY_PATTERN = re.compile(r"sr_live_([a-f0-9]{24})_([A-Za-z0-9_-]{32,128})\Z")
+_SESSION_PATTERN = re.compile(r"sr_session_([a-f0-9]{24})_([A-Za-z0-9_-]{32,128})\Z")
+_DEVICE_PATTERN = re.compile(r"sr_device_([a-f0-9]{24})_([A-Za-z0-9_-]{32,128})\Z")
+_STATE_PATTERN = re.compile(r"sr_state_([a-f0-9]{24})_([A-Za-z0-9_-]{32,128})\Z")
 _PBKDF2_ITERATIONS = 210_000
 
 
@@ -174,6 +177,39 @@ class AccessControlStore:
                     revoked_at TEXT,
                     last_used_at TEXT
                 );
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id TEXT PRIMARY KEY,
+                    subject_id TEXT NOT NULL REFERENCES subjects(id),
+                    salt BLOB NOT NULL,
+                    secret_hash BLOB NOT NULL,
+                    created_at TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    revoked_at TEXT,
+                    last_used_at TEXT
+                );
+                CREATE TABLE IF NOT EXISTS external_identities (
+                    provider_key TEXT NOT NULL,
+                    provider TEXT NOT NULL,
+                    external_subject TEXT NOT NULL,
+                    subject_id TEXT NOT NULL REFERENCES subjects(id),
+                    organization_external_id TEXT,
+                    profile_json TEXT NOT NULL,
+                    last_login_at TEXT NOT NULL,
+                    PRIMARY KEY(provider_key,external_subject),
+                    UNIQUE(provider_key,subject_id)
+                );
+                CREATE TABLE IF NOT EXISTS identity_transactions (
+                    id TEXT PRIMARY KEY,
+                    provider TEXT NOT NULL,
+                    state_hash BLOB NOT NULL,
+                    device_hash BLOB NOT NULL,
+                    status TEXT NOT NULL CHECK(status IN ('pending','completed','consumed')),
+                    subject_id TEXT REFERENCES subjects(id),
+                    created_at TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    completed_at TEXT,
+                    consumed_at TEXT
+                );
                 CREATE TABLE IF NOT EXISTS policies (
                     id TEXT PRIMARY KEY,
                     organization_id TEXT NOT NULL REFERENCES organizations(id),
@@ -202,9 +238,45 @@ class AccessControlStore:
                     details_json TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS credentials_subject_idx ON credentials(subject_id);
+                CREATE INDEX IF NOT EXISTS sessions_subject_idx ON sessions(subject_id);
+                CREATE INDEX IF NOT EXISTS identity_subject_idx ON external_identities(subject_id);
+                CREATE INDEX IF NOT EXISTS identity_transaction_expiry_idx ON identity_transactions(expires_at);
                 CREATE INDEX IF NOT EXISTS audit_occurred_idx ON audit_events(occurred_at);
                 """
             )
+            external_identity_columns = {
+                str(row["name"])
+                for row in connection.execute("PRAGMA table_info(external_identities)").fetchall()
+            }
+            if "provider_key" not in external_identity_columns:
+                # Pre-release databases used the mutable provider display id as
+                # the identity namespace. Preserve those rows under that same
+                # key while moving new logins to immutable provider fingerprints.
+                connection.executescript(
+                    """
+                    ALTER TABLE external_identities RENAME TO external_identities_legacy;
+                    CREATE TABLE external_identities (
+                        provider_key TEXT NOT NULL,
+                        provider TEXT NOT NULL,
+                        external_subject TEXT NOT NULL,
+                        subject_id TEXT NOT NULL REFERENCES subjects(id),
+                        organization_external_id TEXT,
+                        profile_json TEXT NOT NULL,
+                        last_login_at TEXT NOT NULL,
+                        PRIMARY KEY(provider_key,external_subject),
+                        UNIQUE(provider_key,subject_id)
+                    );
+                    INSERT INTO external_identities(
+                        provider_key,provider,external_subject,subject_id,
+                        organization_external_id,profile_json,last_login_at
+                    )
+                    SELECT provider,provider,external_subject,subject_id,
+                           organization_external_id,profile_json,last_login_at
+                    FROM external_identities_legacy;
+                    DROP TABLE external_identities_legacy;
+                    CREATE INDEX identity_subject_idx ON external_identities(subject_id);
+                    """
+                )
             connection.execute(
                 "INSERT OR IGNORE INTO organizations(id,name,created_at) VALUES(?,?,?)",
                 (DEFAULT_ORGANIZATION_ID, "Default organization", _timestamp(self.clock())),
@@ -265,14 +337,146 @@ class AccessControlStore:
             for row in rows
         ]
 
+    def list_users(self) -> list[dict[str, Any]]:
+        """Return human subjects with external identity metadata and bindings."""
+
+        with self._connect() as connection:
+            rows = connection.execute("SELECT * FROM subjects WHERE kind='user' ORDER BY created_at,id").fetchall()
+            identities = connection.execute(
+                "SELECT provider,external_subject,subject_id,organization_external_id,profile_json,last_login_at "
+                "FROM external_identities ORDER BY provider,external_subject"
+            ).fetchall()
+            bindings = connection.execute(
+                "SELECT subject_id,policy_id FROM policy_bindings ORDER BY created_at,policy_id"
+            ).fetchall()
+        identities_by_subject: dict[str, list[dict[str, Any]]] = {}
+        for row in identities:
+            identities_by_subject.setdefault(str(row["subject_id"]), []).append(
+                {
+                    "provider": row["provider"],
+                    "externalSubject": row["external_subject"],
+                    "organizationExternalId": row["organization_external_id"],
+                    "profile": json.loads(str(row["profile_json"])),
+                    "lastLoginAt": row["last_login_at"],
+                }
+            )
+        policies_by_subject: dict[str, list[str]] = {}
+        for row in bindings:
+            policies_by_subject.setdefault(str(row["subject_id"]), []).append(str(row["policy_id"]))
+        return [
+            {
+                **self._subject_from_row(row).as_dict(),
+                "identities": identities_by_subject.get(str(row["id"]), []),
+                "policyIds": policies_by_subject.get(str(row["id"]), []),
+            }
+            for row in rows
+        ]
+
+    def update_user(
+        self,
+        subject_id: str,
+        *,
+        name: str | None = None,
+        attributes: Mapping[str, Any] | None = None,
+    ) -> Subject:
+        """Update administrator-controlled attributes used by policy resolution."""
+
+        current = self.subject(subject_id)
+        if current.kind != "user":
+            raise AccessControlError("SUBJECT_NOT_FOUND", "user was not found", status=404)
+        user_name = current.name if name is None else _validate_name(name)
+        safe_attributes = dict(current.attributes) if attributes is None else _json_object(attributes, field="attributes")
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                "UPDATE subjects SET name=?,attributes_json=?,updated_at=? WHERE id=?",
+                (user_name, json.dumps(safe_attributes, separators=(",", ":")), _timestamp(self.clock()), subject_id),
+            )
+        return self.subject(subject_id)
+
+    def upsert_external_user(
+        self,
+        *,
+        provider: str,
+        provider_key: str | None = None,
+        external_subject: str,
+        name: str,
+        organization_external_id: str | None = None,
+        profile: Mapping[str, Any] | None = None,
+        organization_id: str = DEFAULT_ORGANIZATION_ID,
+    ) -> Subject:
+        """Resolve one verified external identity without trusting it for data policy."""
+
+        provider_id = _validate_name(provider, field="provider")
+        immutable_provider_key = _validate_name(provider_key or provider_id, field="providerKey")
+        external_id = _validate_name(external_subject, field="externalSubject")
+        display_name = _validate_name(name)
+        safe_profile = _json_object(profile, field="profile")
+        now = _timestamp(self.clock())
+        with self._lock, self._connect() as connection:
+            row = connection.execute(
+                "SELECT e.subject_id,e.organization_external_id,s.organization_id "
+                "FROM external_identities e JOIN subjects s ON s.id=e.subject_id "
+                "WHERE e.provider_key=? AND e.external_subject=?",
+                (immutable_provider_key, external_id),
+            ).fetchone()
+            if row is None:
+                subject_id = f"usr_{uuid.uuid4().hex}"
+                organization = connection.execute(
+                    "SELECT 1 FROM organizations WHERE id=?", (organization_id,)
+                ).fetchone()
+                if organization is None:
+                    raise AccessControlError("ORGANIZATION_NOT_FOUND", "organization was not found", status=404)
+                connection.execute(
+                    "INSERT INTO subjects(id,organization_id,kind,name,status,attributes_json,created_at,updated_at) "
+                    "VALUES(?,?,?,?,?,?,?,?)",
+                    (subject_id, organization_id, "user", display_name, "active", "{}", now, now),
+                )
+                connection.execute(
+                    "INSERT INTO external_identities(provider_key,provider,external_subject,subject_id,organization_external_id,profile_json,last_login_at) "
+                    "VALUES(?,?,?,?,?,?,?)",
+                    (immutable_provider_key, provider_id, external_id, subject_id, organization_external_id, json.dumps(safe_profile, separators=(",", ":")), now),
+                )
+            else:
+                subject_id = str(row["subject_id"])
+                if row["organization_id"] != organization_id:
+                    raise AccessControlError(
+                        "ORGANIZATION_MISMATCH", "external identity belongs to a different organization", status=409
+                    )
+                previous_external_organization = row["organization_external_id"]
+                if (
+                    previous_external_organization is not None
+                    and organization_external_id != previous_external_organization
+                ):
+                    raise AccessControlError(
+                        "ORGANIZATION_MISMATCH", "external identity organization changed", status=409
+                    )
+                connection.execute(
+                    "UPDATE subjects SET name=?,updated_at=? WHERE id=?",
+                    (display_name, now, subject_id),
+                )
+                connection.execute(
+                    "UPDATE external_identities SET organization_external_id=?,profile_json=?,last_login_at=? "
+                    "WHERE provider_key=? AND external_subject=?",
+                    (organization_external_id, json.dumps(safe_profile, separators=(",", ":")), now, immutable_provider_key, external_id),
+                )
+        return self.subject(subject_id)
+
     def set_subject_status(self, subject_id: str, status: str) -> Subject:
         if status not in {"active", "disabled"}:
             raise AccessControlError("INVALID_REQUEST", "subject status is invalid")
         with self._lock, self._connect() as connection:
+            now = _timestamp(self.clock())
             changed = connection.execute(
                 "UPDATE subjects SET status=?,updated_at=? WHERE id=?",
-                (status, _timestamp(self.clock()), subject_id),
+                (status, now, subject_id),
             ).rowcount
+            if changed and status == "disabled":
+                # Re-enabling a human account must never revive a session
+                # captured before the administrator disabled it.
+                connection.execute(
+                    "UPDATE sessions SET revoked_at=COALESCE(revoked_at,?) WHERE subject_id=?",
+                    (now, subject_id),
+                )
         if not changed:
             raise AccessControlError("SUBJECT_NOT_FOUND", "subject was not found", status=404)
         return self.subject(subject_id)
@@ -393,6 +597,145 @@ class AccessControlStore:
             "replacedCredentialId": credential_id,
         }
 
+    def issue_session(self, subject_id: str, *, ttl_seconds: int = 28_800) -> dict[str, Any]:
+        """Issue a bounded employee session; plaintext is returned once."""
+
+        if type(ttl_seconds) is not int or not 300 <= ttl_seconds <= 86_400:
+            raise AccessControlError("INVALID_EXPIRY", "session lifetime is invalid")
+        subject = self.subject(subject_id)
+        if subject.kind != "user" or subject.status != "active":
+            raise AccessControlError("SUBJECT_DISABLED", "user is unavailable", status=409)
+        session_id = secrets.token_hex(12)
+        secret = secrets.token_urlsafe(32)
+        salt = secrets.token_bytes(16)
+        now_value = self.clock().astimezone(UTC)
+        created_at = _timestamp(now_value)
+        expires_at = _timestamp(now_value + timedelta(seconds=ttl_seconds))
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                "INSERT INTO sessions(id,subject_id,salt,secret_hash,created_at,expires_at) VALUES(?,?,?,?,?,?)",
+                (session_id, subject_id, salt, self._derive(secret, salt), created_at, expires_at),
+            )
+        return {
+            "accessToken": f"sr_session_{session_id}_{secret}",
+            "tokenType": "Bearer",
+            "expiresAt": expires_at,
+            "subject": subject.as_dict(),
+        }
+
+    def revoke_session(self, session_id: str) -> None:
+        with self._lock, self._connect() as connection:
+            changed = connection.execute(
+                "UPDATE sessions SET revoked_at=COALESCE(revoked_at,?) WHERE id=?",
+                (_timestamp(self.clock()), session_id),
+            ).rowcount
+        if not changed:
+            raise AccessControlError("SESSION_NOT_FOUND", "session was not found", status=404)
+
+    def begin_identity_login(self, provider: str, *, ttl_seconds: int = 600) -> dict[str, Any]:
+        """Create a one-time state and device code without storing either plaintext."""
+
+        provider_id = _validate_name(provider, field="provider")
+        if type(ttl_seconds) is not int or not 60 <= ttl_seconds <= 900:
+            raise AccessControlError("INVALID_EXPIRY", "login lifetime is invalid")
+        transaction_id = secrets.token_hex(12)
+        state_secret = secrets.token_urlsafe(32)
+        device_secret = secrets.token_urlsafe(32)
+        now_value = self.clock().astimezone(UTC)
+        now = _timestamp(now_value)
+        expires_at = _timestamp(now_value + timedelta(seconds=ttl_seconds))
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                "DELETE FROM identity_transactions WHERE expires_at<=? OR status='consumed'",
+                (now,),
+            )
+            outstanding = connection.execute(
+                "SELECT COUNT(*) AS count FROM identity_transactions WHERE provider=? AND status IN ('pending','completed')",
+                (provider_id,),
+            ).fetchone()
+            if outstanding is not None and int(outstanding["count"]) >= 1000:
+                raise AccessControlError("LOGIN_RATE_LIMITED", "too many login requests", status=429)
+            connection.execute(
+                "INSERT INTO identity_transactions(id,provider,state_hash,device_hash,status,created_at,expires_at) "
+                "VALUES(?,?,?,?,?,?,?)",
+                (
+                    transaction_id,
+                    provider_id,
+                    hashlib.sha256(state_secret.encode()).digest(),
+                    hashlib.sha256(device_secret.encode()).digest(),
+                    "pending",
+                    now,
+                    expires_at,
+                ),
+            )
+        return {
+            "transactionId": transaction_id,
+            "state": f"sr_state_{transaction_id}_{state_secret}",
+            "deviceCode": f"sr_device_{transaction_id}_{device_secret}",
+            "expiresAt": expires_at,
+        }
+
+    def verify_identity_state(self, provider: str, state: str) -> str:
+        match = _STATE_PATTERN.fullmatch(state if isinstance(state, str) else "")
+        if match is None:
+            raise AccessControlError("INVALID_LOGIN", "login state is invalid", status=400)
+        transaction_id, secret = match.groups()
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM identity_transactions WHERE id=?", (transaction_id,)).fetchone()
+        if (
+            row is None
+            or row["provider"] != provider
+            or row["status"] != "pending"
+            or not secrets.compare_digest(bytes(row["state_hash"]), hashlib.sha256(secret.encode()).digest())
+        ):
+            raise AccessControlError("INVALID_LOGIN", "login state is invalid", status=400)
+        expiry = _parse_timestamp(str(row["expires_at"]))
+        if expiry is None or expiry <= self.clock().astimezone(UTC):
+            raise AccessControlError("LOGIN_EXPIRED", "login request expired", status=410)
+        return transaction_id
+
+    def complete_identity_login(self, transaction_id: str, subject_id: str) -> None:
+        subject = self.subject(subject_id)
+        if subject.kind != "user" or subject.status != "active":
+            raise AccessControlError("SUBJECT_DISABLED", "user is unavailable", status=403)
+        with self._lock, self._connect() as connection:
+            changed = connection.execute(
+                "UPDATE identity_transactions SET status='completed',subject_id=?,completed_at=? "
+                "WHERE id=? AND status='pending'",
+                (subject_id, _timestamp(self.clock()), transaction_id),
+            ).rowcount
+        if not changed:
+            raise AccessControlError("INVALID_LOGIN", "login request is no longer available", status=409)
+
+    def consume_identity_device_code(self, device_code: str) -> Subject | None:
+        """Return ``None`` while pending, otherwise consume exactly once."""
+
+        match = _DEVICE_PATTERN.fullmatch(device_code if isinstance(device_code, str) else "")
+        if match is None:
+            raise AccessControlError("INVALID_LOGIN", "device code is invalid", status=400)
+        transaction_id, secret = match.groups()
+        with self._lock, self._connect() as connection:
+            row = connection.execute("SELECT * FROM identity_transactions WHERE id=?", (transaction_id,)).fetchone()
+            if row is None or not secrets.compare_digest(
+                bytes(row["device_hash"]), hashlib.sha256(secret.encode()).digest()
+            ):
+                raise AccessControlError("INVALID_LOGIN", "device code is invalid", status=400)
+            expiry = _parse_timestamp(str(row["expires_at"]))
+            if expiry is None or expiry <= self.clock().astimezone(UTC):
+                raise AccessControlError("LOGIN_EXPIRED", "login request expired", status=410)
+            if row["status"] == "pending":
+                return None
+            if row["status"] != "completed" or row["subject_id"] is None:
+                raise AccessControlError("INVALID_LOGIN", "device code was already consumed", status=409)
+            changed = connection.execute(
+                "UPDATE identity_transactions SET status='consumed',consumed_at=? WHERE id=? AND status='completed'",
+                (_timestamp(self.clock()), transaction_id),
+            ).rowcount
+            if not changed:
+                raise AccessControlError("INVALID_LOGIN", "device code was already consumed", status=409)
+            subject_id = str(row["subject_id"])
+        return self.subject(subject_id)
+
     def authenticate(self, authorization: str | None) -> AuthContext:
         if not isinstance(authorization, str) or not authorization.startswith("Bearer "):
             raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
@@ -402,6 +745,28 @@ class AccessControlStore:
                 Subject(BOOTSTRAP_SUBJECT_ID, DEFAULT_ORGANIZATION_ID, "user", "Bootstrap administrator", {"roles": ["admin"]}),
                 "bootstrap_token",
             )
+        session_match = _SESSION_PATTERN.fullmatch(token)
+        if session_match is not None:
+            session_id, secret = session_match.groups()
+            with self._lock, self._connect() as connection:
+                row = connection.execute(
+                    "SELECT x.*,s.organization_id,s.kind,s.name,s.status,s.attributes_json FROM sessions x "
+                    "JOIN subjects s ON s.id=x.subject_id WHERE x.id=?",
+                    (session_id,),
+                ).fetchone()
+                if row is None or row["revoked_at"] is not None or row["status"] != "active":
+                    raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
+                expiry = _parse_timestamp(str(row["expires_at"]))
+                if expiry is None or expiry <= self.clock().astimezone(UTC):
+                    raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
+                if not secrets.compare_digest(self._derive(secret, bytes(row["salt"])), bytes(row["secret_hash"])):
+                    raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
+                connection.execute("UPDATE sessions SET last_used_at=? WHERE id=?", (_timestamp(self.clock()), session_id))
+            subject = Subject(
+                str(row["subject_id"]), str(row["organization_id"]), str(row["kind"]),
+                str(row["name"]), json.loads(str(row["attributes_json"])), str(row["status"]),
+            )
+            return AuthContext(subject, "oauth_session", session_id)
         match = _KEY_PATTERN.fullmatch(token)
         if match is None:
             raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
@@ -488,6 +853,27 @@ class AccessControlStore:
                 "INSERT OR IGNORE INTO policy_bindings(subject_id,policy_id,created_at) VALUES(?,?,?)",
                 (subject_id, policy_id, _timestamp(self.clock())),
             )
+
+    def unbind_policy(self, subject_id: str, policy_id: str) -> None:
+        """Remove one current grant so the next request is re-evaluated without it."""
+
+        subject = self.subject(subject_id)
+        with self._lock, self._connect() as connection:
+            policy = connection.execute(
+                "SELECT organization_id FROM policies WHERE id=?", (policy_id,)
+            ).fetchone()
+            if policy is None:
+                raise AccessControlError("POLICY_NOT_FOUND", "policy was not found", status=404)
+            if policy["organization_id"] != subject.organization_id:
+                raise AccessControlError(
+                    "ORGANIZATION_MISMATCH", "policy and subject organizations differ", status=409
+                )
+            changed = connection.execute(
+                "DELETE FROM policy_bindings WHERE subject_id=? AND policy_id=?",
+                (subject_id, policy_id),
+            ).rowcount
+        if not changed:
+            raise AccessControlError("BINDING_NOT_FOUND", "policy binding was not found", status=404)
 
     def policies_for_subject(self, subject_id: str) -> list[dict[str, Any]]:
         with self._connect() as connection:

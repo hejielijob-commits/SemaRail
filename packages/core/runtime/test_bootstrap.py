@@ -24,7 +24,20 @@ class BootstrapTests(unittest.TestCase):
             path = root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(relative, encoding="utf-8")
+        for relative in ("python/sidecar/sidecar/__init__.py", "python/semantic-console/server/__init__.py"):
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(relative, encoding="utf-8")
         return root
+
+    def test_python_source_change_invalidates_runtime_fingerprint(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            package_root = self._package_root(Path(temporary) / "package")
+            before = bootstrap._fingerprint(package_root)
+            source = package_root / "python" / "semantic-console" / "server" / "__init__.py"
+            source.write_text("changed runtime source", encoding="utf-8")
+
+            self.assertNotEqual(before, bootstrap._fingerprint(package_root))
 
     def test_concurrent_initializers_share_one_install_and_reuse_marker(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

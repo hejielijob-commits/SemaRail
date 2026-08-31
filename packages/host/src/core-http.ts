@@ -108,7 +108,7 @@ export class CoreHttpGateway implements QueryGateway, SemanticContextGateway {
     this.endpoint = endpointUrl(config.semarailEndpoint)
     this.timeoutMs = timeout(config.timeoutMs)
     this.request = config.request ?? fetch
-    const tokenEnv = config.authTokenEnv?.trim() || 'SEMARAIL_API_TOKEN'
+    const tokenEnv = config.authTokenEnv?.trim() || 'SEMARAIL_HARNESS_TOKEN'
     if (!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(tokenEnv)) throw new RangeError('authTokenEnv is invalid')
     this.authToken = process.env[tokenEnv]?.trim() || ''
   }

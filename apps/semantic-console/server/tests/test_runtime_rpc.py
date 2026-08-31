@@ -234,6 +234,96 @@ class RuntimeRpcTests(unittest.TestCase):
         self.assertEqual(status, 403)
         self.assertEqual(response["error"]["code"], "FORBIDDEN")
 
+    def test_employee_session_uses_the_same_current_row_policy_as_service_accounts(self) -> None:
+        user = self.gateway.access_control.upsert_external_user(
+            provider="dingtalk", external_subject="employee-a", name="Employee A"
+        )
+        self.gateway.access_control.update_user(user.id, attributes={"regionCodes": ["CN-JIA"]})
+        policy = self.gateway.access_control.create_policy(
+            "Employee sales region",
+            {
+                "schemaVersion": 1,
+                "projects": ["runtime-test"],
+                "tools": ["query:execute"],
+                "tables": {
+                    "public.sales": {
+                        "effect": "allow",
+                        "rows": [
+                            {
+                                "field": "region_code",
+                                "operator": "in",
+                                "valueFrom": "subject.attributes.regionCodes",
+                            }
+                        ],
+                        "columns": {"allow": ["order_id", "region_code", "amount"], "deny": []},
+                    }
+                },
+            },
+        )
+        self.gateway.access_control.bind_policy(user.id, policy["id"])
+        session = self.gateway.access_control.issue_session(user.id)
+
+        status, response = self.gateway.dispatch(
+            {
+                "protocolVersion": "1",
+                "id": "employee-query",
+                "method": "query.run",
+                "params": {"question": "Revenue", "semanticSql": "SELECT * FROM sales", "queryId": "employee-1"},
+            },
+            authorization=f"Bearer {session['accessToken']}",
+        )
+
+        self.assertEqual(status, 200)
+        self.assertTrue(response["ok"])
+        compiled = self.dispatcher.requests[-1]["params"]["authorizationPolicy"]
+        row_filter = compiled["tables"]["public.sales"]["rowFilter"]
+        self.assertEqual(row_filter["conditions"][0]["conditions"][0]["values"], ["CN-JIA"])
+        self.assertEqual(self.gateway.access_control.list_audit()[0]["subjectId"], user.id)
+
+    def test_unbinding_policy_immediately_revokes_existing_service_account_credential(self) -> None:
+        account = self.gateway.access_control.create_service_account("Sales Agent")
+        policy = self.gateway.access_control.create_policy(
+            "Sales query",
+            {
+                "schemaVersion": 1,
+                "projects": ["runtime-test"],
+                "tools": ["query:execute"],
+                "tables": {},
+            },
+        )
+        self.gateway.access_control.bind_policy(account.id, policy["id"])
+        issued = self.gateway.access_control.issue_api_key(account.id)
+        credential_authorization = f"Bearer {issued['apiKey']}"
+        request = {
+            "protocolVersion": "1",
+            "id": "svc-query-before-unbind",
+            "method": "query.run",
+            "params": {"question": "Revenue", "semanticSql": "SELECT * FROM orders", "queryId": "svc-1"},
+        }
+
+        status, response = self.gateway.dispatch(request, authorization=credential_authorization)
+
+        self.assertEqual(status, 200)
+        self.assertTrue(response["ok"])
+        dispatch_count = len(self.dispatcher.requests)
+
+        app = create_app(SemanticConsoleService(self.project), runtime_rpc=self.gateway)
+        unbind_status, unbound = app.request(
+            "DELETE",
+            f"/api/v1/access/policy-bindings/{account.id}/{policy['id']}",
+            authorization=self.authorization,
+        )
+
+        self.assertEqual((unbind_status, unbound["status"]), (200, "unbound"))
+        denied_status, denied = self.gateway.dispatch(
+            {**request, "id": "svc-query-after-unbind", "params": {**request["params"], "queryId": "svc-2"}},
+            authorization=credential_authorization,
+        )
+
+        self.assertEqual(denied_status, 403)
+        self.assertEqual(denied["error"]["code"], "FORBIDDEN")
+        self.assertEqual(len(self.dispatcher.requests), dispatch_count)
+
 
 if __name__ == "__main__":
     unittest.main()

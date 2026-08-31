@@ -13,6 +13,7 @@
 .access-list, .access-detail, .access-policy-list, .access-policy-editor, .access-audit { padding: 18px; }
 .access-create { display: grid; gap: 10px; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
 .access-list-items { display: grid; gap: 6px; margin-top: 14px; }
+.access-list-items-flush { margin-top: 0; }
 .access-list-items > button, .access-policy-list > button:not(.button) { display: grid; gap: 5px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text); padding: 10px; text-align: left; cursor: pointer; }
 .access-list-items > button:hover, .access-list-items > button.active, .access-policy-list > button:not(.button):hover, .access-policy-list > button.active { border-color: var(--accent-border); background: var(--accent-faint); }
 .access-list-items button > span { display: flex; align-items: center; gap: 7px; }
@@ -25,8 +26,16 @@
 .access-bind > div { display: grid; gap: 5px; }
 .access-bind strong, .access-credential-heading h3 { font-size: 11px; }
 .access-bind span { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.access-bound-list { display: flex !important; flex-wrap: wrap; gap: 6px !important; margin-top: 2px; }
+.access-bound-list > span { align-items: center; background: var(--accent-faint); border-radius: 999px; color: var(--accent); display: inline-flex; gap: 6px; padding: 3px 4px 3px 9px; }
+.access-bound-list button { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; font-weight: 700; padding: 2px 5px; }
 .access-credential-heading { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 8px; }
 .access-credential-heading h3 { margin: 0; }
+.access-employee-identity { display: grid; gap: 8px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.access-employee-identity > strong { font-size: 11px; }
+.access-employee-identity > span { display: flex; align-items: center; gap: 8px; }
+.access-employee-identity small { color: var(--muted); font-size: 9px; }
+.access-employee-policy { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; padding: 16px 0; border-bottom: 1px solid var(--border); }
 .access-credentials { display: grid; gap: 7px; }
 .access-credentials article { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
 .access-credentials article.revoked { opacity: .55; }

@@ -124,7 +124,9 @@ class RuntimeRpcGateway:
             return 400, _error(request_id, "INVALID_PARAMS", normalized)
         if method == "query.run" and auth.subject.id != BOOTSTRAP_SUBJECT_ID:
             try:
-                normalized["authorizationPolicy"] = self.policy_engine.compile_data_policy(auth.subject, policies)
+                normalized["authorizationPolicy"] = self.policy_engine.compile_data_policy(
+                    auth.subject, policies, project_id=project_id
+                )
             except Exception:
                 self._audit(auth, str(method), "denied", request_id, decision)
                 return 403, _error(request_id, "FORBIDDEN", "data access policy is invalid")

@@ -68,7 +68,7 @@ Until the split packages are published, build both local tarballs from the repos
 ```powershell
 pnpm install
 pnpm package:split
-npm install --global .\dist\hejielijob-semarail-core-0.1.0-alpha.2.tgz
+npm install --global .\dist\hejielijob-semarail-core-0.1.0-alpha.3.tgz
 $env:SEMARAIL_API_TOKEN = semarail token create
 semarail start --project C:\path\to\semantic-project
 ```
@@ -77,11 +77,11 @@ The Core process owns the semantic project, database credentials, execution limi
 
 ### Optional DeepSeek Harness plugin
 
-In another terminal, provide the same token to Harness and install the small adapter package:
+In Access Control, create a dedicated Harness service account, bind only the required project/table/row policy, and issue a one-time `sr_live_...` key. Provide that scoped key—not the bootstrap token—to Harness:
 
 ```powershell
-$env:SEMARAIL_API_TOKEN = "<the same Core token>"
-dsh plugin --profile web add .\dist\hejielijob-dsh-semarail-plugin-0.1.0-alpha.2.tgz
+$env:SEMARAIL_HARNESS_TOKEN = "<scoped sr_live_... key>"
+dsh plugin --profile web add .\dist\hejielijob-dsh-semarail-plugin-0.1.0-alpha.3.tgz
 ```
 
 The plugin connects to `http://127.0.0.1:48763` by default. It no longer embeds or starts Python, the Semantic Console, or the semantic runtime.
@@ -169,13 +169,13 @@ Run the credential-free MCP acceptance test with:
 pnpm acceptance:mcp
 ```
 
-### Service accounts and row permissions (alpha)
+### Service accounts, employees, and row permissions (alpha)
 
-SemaRail Core includes a local management API for service accounts, one-time API-key issuance, key rotation/revocation, versioned policy bindings, and audit events. Policies can restrict tool scopes, projects, physical tables, columns, query limits, and rows derived from trusted subject attributes. Mandatory row predicates are injected with bound database parameters before execution; missing or malformed permissions fail closed.
+SemaRail Core includes a local management API for service accounts and externally authenticated employees, one-time API-key issuance, key rotation/revocation, short-lived employee sessions, versioned policy bindings, and audit events. Policies can restrict tool scopes, projects, physical tables, columns, query limits, and rows derived from trusted subject attributes. Mandatory row predicates are injected with bound database parameters before execution; missing or malformed permissions fail closed.
 
 For example, two agents can run the same sales query while account A is restricted to region `CN-JIA` and account B to `CN-YI`. Updating the account attributes or policy is effective on the next request. See [Access control (alpha)](docs/access-control.md) and [the architecture decision](docs/decisions/0005-enterprise-identity-and-data-authorization.md).
 
-This is currently a trusted local-administrator API. Employee/OIDC or DingTalk login, a visual policy editor, and PostgreSQL RLS are planned follow-up stages and are not claimed as completed here.
+Employees can sign in through a configured DingTalk or generic OIDC provider with `semarail auth login --provider <id>`. The browser callback never receives a SemaRail bearer token; the initiating CLI exchanges a one-time device code for a bounded session and then enters the same Subject/PolicyEngine path as an API key. New employees have no data policy until an administrator assigns trusted attributes and a policy in **Access control**. See [Access control (alpha)](docs/access-control.md) for provider configuration and security boundaries.
 
 ### Authenticated Streamable HTTP MCP (alpha)
 
@@ -190,7 +190,7 @@ semarail mcp serve `
 
 The endpoint is `http://127.0.0.1:48764/mcp`. Configure the MCP client with a managed service-account key in the `Authorization: Bearer <key>` header. It exposes the four stable semantic tools plus `semarail_governed_query`; every call reuses the current Subject, project/tool policy, query limits, and table/column/row policy enforced by Core.
 
-Loopback is the safe default. A non-loopback bind requires an explicit `--allowed-host` and should be placed behind a TLS reverse proxy; the current alpha command does not terminate TLS itself. Employee OAuth/DingTalk authorization is still a subsequent stage.
+Loopback is the safe default. A non-loopback bind requires an explicit `--allowed-host` and should be placed behind a TLS reverse proxy; the current alpha command does not terminate TLS itself. Employee sign-in and short-lived sessions are implemented, but a centrally exposed employee gateway still requires a trusted TLS reverse proxy and deployment hardening before production use.
 
 ## DeepSeek Harness plugin
 
@@ -215,7 +215,7 @@ pnpm package:split
 Install the generated package with the same one-command Harness flow used by registry plugins:
 
 ```powershell
-dsh plugin --profile web add .\dist\hejielijob-dsh-semarail-plugin-0.1.0-alpha.2.tgz
+dsh plugin --profile web add .\dist\hejielijob-dsh-semarail-plugin-0.1.0-alpha.3.tgz
 ```
 
 You can also download the `.tgz` from a future GitHub Release and pass its local path or HTTPS URL to the same command. Once the package is published to npm, installation will reduce to:
@@ -241,11 +241,11 @@ The plugin accepts only connection settings; project paths, credentials, and exe
 - id: semarail-harness-host
   config:
     semarailEndpoint: http://127.0.0.1:48763
-    authTokenEnv: SEMARAIL_API_TOKEN
+    authTokenEnv: SEMARAIL_HARNESS_TOKEN
     timeoutMs: 30000
 ```
 
-Set `SEMARAIL_DATABASE_URL` only in the Core process environment when governed PostgreSQL execution is required. The Harness plugin never receives the DSN.
+Set `SEMARAIL_DATABASE_URL` only in the Core process environment when governed PostgreSQL execution is required. The Harness plugin never receives the DSN. Never expose the Core bootstrap `SEMARAIL_API_TOKEN` to Harness or another Agent: it intentionally bypasses ordinary project and data policy so an administrator can recover the local control plane.
 
 The Client opens the Semantic Console at `http://127.0.0.1:48763` by default. An embedding can pass `semanticConsoleUrl` to the exported view/link props or set `localStorage['semarail.semantic-console-url']`; only credential-free absolute HTTP(S) URLs are accepted. The former `dsh-wren-data-agent.semantic-console-url` key is read only as a migration fallback.
 
@@ -259,7 +259,7 @@ All model-generated SQL is treated as untrusted input.
 - Protocol and presentation payloads are JSON-safe and versioned; unknown versions fail closed.
 - Sidecar stdout is protocol-only; diagnostics go to stderr.
 - Datasource credentials remain server-side and are redacted from Console API responses.
-- The Console remains loopback-only in this alpha release. The agent runtime endpoint requires a bearer token; team RBAC, approvals, and audit logging remain deployment work.
+- The Console remains loopback-only in this alpha release. Subject policies, table/column/row authorization and audit events are implemented; production multi-tenant administration, approval workflows, a hardened remote identity gateway, and database-native RLS remain deployment work.
 
 ## Repository layout
 

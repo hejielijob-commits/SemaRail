@@ -62,6 +62,9 @@ function main() {
     if (!entry.isFile() || !entry.name.endsWith('.py')) continue
     copyFile(resolve(sourceServer, entry.name), resolve(packagedServer, 'server', entry.name))
   }
+  for (const name of ['README.md', 'openapi.json']) {
+    copyFile(resolve(sourceServer, name), resolve(packagedServer, 'server', name))
+  }
   copyTree(sourceWeb, packagedWeb, () => true)
   const licenses = [
     ['react', resolve(dirname(reactPackage), 'LICENSE')],

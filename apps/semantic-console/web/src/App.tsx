@@ -183,6 +183,15 @@ function App() {
   const [mcpIntegration, setMcpIntegration] = useState<McpIntegrationResponse | null>(null);
   const [mcpLoading, setMcpLoading] = useState(false);
   const [mcpError, setMcpError] = useState<string | null>(null);
+  const [showConsoleUnlock, setShowConsoleUnlock] = useState(false);
+  const [consoleTokenInput, setConsoleTokenInput] = useState("");
+  const [consoleAuthError, setConsoleAuthError] = useState("");
+  const [consoleSession, setConsoleSession] = useState<{
+    token: string;
+    subjectName: string;
+    consoleAdmin: boolean;
+    accessAdmin: boolean;
+  } | null>(null);
   const fileRequestRef = useRef(0);
   const diffRequestRef = useRef(0);
 
@@ -332,6 +341,25 @@ function App() {
     setLoading(false); setRefreshing(false);
     return failures.length === 0;
   };
+
+  async function unlockConsole() {
+    const token = consoleTokenInput.trim();
+    setConsoleAuthError("");
+    try {
+      const result = await api.getCapabilities(token);
+      const consoleAdmin = result.capabilities["console:admin"];
+      const accessAdmin = result.capabilities["access:admin"];
+      if (!consoleAdmin && !accessAdmin) throw new Error("This identity has no Console capability for the current project.");
+      api.setBearerToken(token);
+      setConsoleSession({ token, subjectName: result.subject.name, consoleAdmin, accessAdmin });
+      setConsoleTokenInput("");
+      setShowConsoleUnlock(false);
+      if (consoleAdmin) await refreshWorkspace();
+      else setSection("access");
+    } catch (error) {
+      setConsoleAuthError(error instanceof Error ? error.message : "Authentication failed.");
+    }
+  }
   useEffect(() => { void refreshWorkspace(); }, []);
 
   const selectedDatasource = datasources.find((item) => item.id === selectedDatasourceId);
@@ -668,8 +696,9 @@ function App() {
   return <div className="app-shell">
     <Sidebar projectName={project.name || project.projectName || "Semantic project"} section={section} onNavigate={navigate} open={showMobileNav} onClose={() => setShowMobileNav(false)} />
     <div className="app-main">
-      <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" onClick={() => setShowMobileNav(true)} aria-label={t("nav.open")}><SidebarSimple size={19} /></button><div className="breadcrumbs"><span>{t("nav.workspace")}</span><CaretRight size={13} /><strong>{pageTitle(section, t)}</strong></div></div><div className="topbar-actions"><span className={`connection-state ${apiOnline ? "online" : "offline"}`}><span className="connection-dot" />{apiOnline ? t("common.connected") : t("common.unavailable")}</span><label className="locale-switcher"><span className="sr-only">{t("language.label")}</span><select aria-label={t("language.switchTo")} value={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onChange={(event) => setConsoleLocale(event.target.value as "zh-CN" | "en-US")}><option value="en-US">EN</option><option value="zh-CN">中</option></select></label><button className="icon-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={t(theme === "light" ? "common.switchToDark" : "common.switchToLight")}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="icon-button" onClick={() => setShowHistory(true)} aria-label={t("common.openHistory")}><ClockCounterClockwise size={18} /></button><div className="avatar" aria-label={t("common.signedIn")}>WS</div></div></header>
+      <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" onClick={() => setShowMobileNav(true)} aria-label={t("nav.open")}><SidebarSimple size={19} /></button><div className="breadcrumbs"><span>{t("nav.workspace")}</span><CaretRight size={13} /><strong>{pageTitle(section, t)}</strong></div></div><div className="topbar-actions"><span className={`connection-state ${apiOnline ? "online" : "offline"}`}><span className="connection-dot" />{apiOnline ? t("common.connected") : t("common.unavailable")}</span><Button size="sm" variant="secondary" icon={ShieldCheck} onClick={() => setShowConsoleUnlock(true)}>{consoleSession?.subjectName ?? "Unlock Console"}</Button><label className="locale-switcher"><span className="sr-only">{t("language.label")}</span><select aria-label={t("language.switchTo")} value={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onChange={(event) => setConsoleLocale(event.target.value as "zh-CN" | "en-US")}><option value="en-US">EN</option><option value="zh-CN">中</option></select></label><button className="icon-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={t(theme === "light" ? "common.switchToDark" : "common.switchToLight")}>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</button><button className="icon-button" onClick={() => setShowHistory(true)} aria-label={t("common.openHistory")}><ClockCounterClockwise size={18} /></button><div className="avatar" aria-label={t("common.signedIn")}>WS</div></div></header>
       <main className="content">
+        {!consoleSession ? <InlineNotice tone="warning" title="Console locked">Unlock with a project-scoped Console or Access administrator credential. The credential remains only in this tab's memory.</InlineNotice> : null}
         {notice ? <InlineNotice tone={notice.tone} title={notice.title} onDismiss={() => { setNotice(null); setLoadError(null); }}>{notice.body}</InlineNotice> : null}
         {loading ? <LoadingWorkspace /> : <>
           {section === "overview" ? <Overview project={project} datasources={datasources} versions={versions} files={files} onNavigate={navigate} onHistory={() => setShowHistory(true)} /> : null}
@@ -682,7 +711,7 @@ function App() {
           {section === "rules" ? <RuleWorkbench rules={knowledgeRules(rulesSnapshot)} selectedRuleId={selectedRuleId} loading={rulesLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} source={selectedFilePath ? { path: selectedFilePath, content: mdlSource, diff: semanticDiff?.diff } : null} onRetry={() => void loadRules()} onSelectRule={(rule) => { setSelectedRuleId(rule.id); setSelectedFilePath(rule.sourcePath); void loadProjectFile(rule.sourcePath); void loadSemanticDiff(rule.sourcePath); }} onToggleRule={toggleRule} onSave={saveRule} onCreate={createRule} onDelete={deleteRule} /> : null}
           {section === "sqlKnowledge" ? <SqlKnowledgeWorkbench candidates={knowledgeCandidates(sqlCandidates)} loading={sqlLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onRetry={() => void loadSqlCandidates()} onValidate={validateCandidate} onApprove={approveCandidate} onReject={rejectCandidate} /> : null}
           {section === "mcp" ? <McpIntegration integration={mcpIntegration} loading={mcpLoading} error={mcpError} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onRetry={() => void loadMcpIntegration()} /> : null}
-          {section === "access" ? <AccessControl locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} /> : null}
+          {section === "access" ? <AccessControl locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} adminToken={consoleSession?.accessAdmin ? consoleSession.token : ""} /> : null}
           {section === "instructions" ? <InstructionsPage value={instructions} onChange={setInstructions} onSave={() => { const path = files.find((file) => isInstructionFile(file.path))?.path; if (path) void handleSaveFile(path, instructions); else setNotice({ tone: "error", title: "Draft save failed", body: "The project API did not return an instructions file." }); }} savedAt={draftSavedAt} loading={fileLoading} /> : null}
           {section === "mdl" ? <MdlPage value={mdlSource} onChange={setMdlSource} files={files} selectedFile={selectedFilePath} onSelectFile={(path: string) => void loadProjectFile(path)} onSave={(path?: string) => void handleSaveFile(path ?? selectedFilePath, mdlSource)} onImportProject={handleImportProject} savedAt={draftSavedAt} loading={fileLoading} /> : null}
         </>}
@@ -691,6 +720,7 @@ function App() {
     </div>
     <Modal open={showHistory} title="Version history" description="Restore a previous project snapshot as a draft." onClose={() => setShowHistory(false)} footer={<Button variant="ghost" onClick={() => setShowHistory(false)}>Close</Button>}><VersionHistory versions={versions} onRollback={rollback} busyAction={busyAction} /></Modal>
     <Modal open={showImportModal} title={`Import ${selectedTable}`} description={`${selectedSchema}.${selectedTable} will become a semantic model draft.`} onClose={() => setShowImportModal(false)} footer={<><Button variant="ghost" onClick={() => setShowImportModal(false)}>Cancel</Button><Button variant="primary" icon={DownloadSimple} onClick={importSelectedTable}>Import table</Button></>}><div className="import-preview"><div className="import-preview-row"><span>Source</span><strong>{sourceLabel(selectedDatasource)}</strong></div><div className="import-preview-row"><span>Columns</span><strong>{columns.length} detected</strong></div><div className="import-preview-row"><span>Primary key</span><strong>{columns.find((column) => column.primaryKey)?.name ?? "Not detected"}</strong></div><InlineNotice tone="info" title="Review after import">The generated model uses source column names and keeps measures empty until you define them.</InlineNotice></div></Modal>
+    <Modal open={showConsoleUnlock} title="Unlock Console" description="Use a scoped administrator credential for this project. It is never written to browser storage." onClose={() => { setShowConsoleUnlock(false); setConsoleAuthError(""); }} footer={<><Button variant="ghost" onClick={() => setShowConsoleUnlock(false)}>Cancel</Button><Button variant="primary" icon={ShieldCheck} disabled={consoleTokenInput.trim().length < 32} onClick={() => void unlockConsole()}>Unlock</Button></>}><Field label="Administrator credential" htmlFor="console-admin-token"><TextInput id="console-admin-token" type="password" autoComplete="off" value={consoleTokenInput} onChange={(event) => setConsoleTokenInput(event.target.value)} /></Field>{consoleAuthError ? <InlineNotice tone="error" title="Authentication failed">{consoleAuthError}</InlineNotice> : null}</Modal>
   </div>;
 }
 

@@ -16,7 +16,7 @@ import subprocess
 import sys
 import time
 
-BOOTSTRAP_VERSION = "1"
+BOOTSTRAP_VERSION = "2"
 LOCK_WAIT_SECONDS = 900
 LOCK_STALE_SECONDS = 3600
 LOCK_POLL_SECONDS = 0.2
@@ -41,8 +41,20 @@ def _fingerprint(package_root: Path) -> str:
     digest = hashlib.sha256()
     digest.update(BOOTSTRAP_VERSION.encode())
     digest.update(sys.implementation.cache_tag.encode())
-    for relative in ("runtime/constraints.txt", "python/sidecar/pyproject.toml", "python/semantic-console/pyproject.toml"):
-        digest.update((package_root / relative).read_bytes())
+    inputs = [
+        package_root / "runtime" / "constraints.txt",
+        package_root / "python" / "sidecar" / "pyproject.toml",
+        package_root / "python" / "semantic-console" / "pyproject.toml",
+        *sorted((package_root / "python" / "sidecar").rglob("*.py")),
+        *sorted((package_root / "python" / "semantic-console").rglob("*.py")),
+    ]
+    for path in inputs:
+        relative = path.relative_to(package_root).as_posix().encode("utf-8")
+        digest.update(len(relative).to_bytes(4, "big"))
+        digest.update(relative)
+        content = path.read_bytes()
+        digest.update(len(content).to_bytes(8, "big"))
+        digest.update(content)
     return digest.hexdigest()[:16]
 
 

@@ -54,6 +54,25 @@ export interface ServiceAccount {
   policyIds: string[];
 }
 
+export interface ExternalIdentity {
+  provider: string;
+  externalSubject: string;
+  organizationExternalId?: string | null;
+  profile: Record<string, unknown>;
+  lastLoginAt: string;
+}
+
+export interface UserAccount {
+  id: string;
+  organizationId: string;
+  type: "user";
+  name: string;
+  attributes: Record<string, unknown>;
+  status: "active" | "disabled";
+  identities: ExternalIdentity[];
+  policyIds: string[];
+}
+
 export interface AccessPolicy {
   id: string;
   organizationId: string;

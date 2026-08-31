@@ -5,10 +5,16 @@ import { api } from "../api/client";
 
 vi.mock("../api/client", () => ({
   api: {
+    setBearerToken: vi.fn(),
     getServiceAccounts: vi.fn(),
+    getUsers: vi.fn(),
     getAccessPolicies: vi.fn(),
     getAccessAudit: vi.fn(),
     issueServiceAccountKey: vi.fn(),
+    updateUser: vi.fn(),
+    setUserStatus: vi.fn(),
+    bindAccessPolicy: vi.fn(),
+    unbindAccessPolicy: vi.fn(),
   },
 }));
 
@@ -30,17 +36,32 @@ const policy = {
   version: 1,
   document: { schemaVersion: 1 },
 };
+const employee = {
+  id: "user-a",
+  organizationId: "org-default",
+  type: "user" as const,
+  name: "Employee A",
+  attributes: { regionCodes: ["CN-JIA"] },
+  status: "active" as const,
+  identities: [{ provider: "dingtalk", externalSubject: "union-a", profile: { employeeNumber: "A001" }, lastLoginAt: "2026-08-30T00:00:00Z" }],
+  policyIds: [],
+};
 
 describe("AccessControl", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.getServiceAccounts).mockResolvedValue({ items: [account] });
+    vi.mocked(api.getUsers).mockResolvedValue({ items: [employee] });
     vi.mocked(api.getAccessPolicies).mockResolvedValue({ items: [policy] });
     vi.mocked(api.getAccessAudit).mockResolvedValue({ items: [] });
     vi.mocked(api.issueServiceAccountKey).mockResolvedValue({
       apiKey: "sr_live_plaintext_shown_once",
       credential: { id: "credential-1", subjectId: account.id, label: "console", createdAt: "2026-08-30T00:00:00Z" },
     });
+    vi.mocked(api.updateUser).mockResolvedValue(employee);
+    vi.mocked(api.setUserStatus).mockResolvedValue({ ...employee, status: "disabled" });
+    vi.mocked(api.bindAccessPolicy).mockResolvedValue({ subjectId: employee.id, policyId: policy.id });
+    vi.mocked(api.unbindAccessPolicy).mockResolvedValue({ subjectId: account.id, policyId: policy.id, status: "unbound" });
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn().mockResolvedValue(undefined) } });
   });
 
@@ -57,10 +78,31 @@ describe("AccessControl", () => {
 
     expect((await screen.findAllByText("Sales agent A")).length).toBeGreaterThan(0);
     expect(api.getServiceAccounts).toHaveBeenCalledWith(adminToken);
+    expect(api.setBearerToken).toHaveBeenCalledWith(adminToken);
+    expect(api.getUsers).toHaveBeenCalledWith(adminToken);
     expect(api.getAccessPolicies).toHaveBeenCalledWith(adminToken);
     expect(api.getAccessAudit).toHaveBeenCalledWith(adminToken);
     expect(screen.queryByDisplayValue(adminToken)).not.toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(adminToken);
+  });
+
+  it("shows employees from external identity login and saves administrator-controlled regions", async () => {
+    render(<AccessControl locale="en-US" />);
+    fireEvent.change(screen.getByLabelText("Administrator token"), { target: { value: adminToken } });
+    fireEvent.click(screen.getByRole("button", { name: "Open access control" }));
+    await screen.findAllByText("Sales agent A");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Employees" }));
+    expect((await screen.findAllByText("Employee A")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/dingtalk/).length).toBeGreaterThan(0);
+    const regions = screen.getByLabelText("Region codes");
+    expect(regions).toHaveValue("CN-JIA");
+    fireEvent.change(regions, { target: { value: "CN-YI,CN-BEI" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save access attributes" }));
+
+    await waitFor(() => expect(api.updateUser).toHaveBeenCalledWith(adminToken, employee.id, {
+      attributes: { regionCodes: ["CN-YI", "CN-BEI"] },
+    }));
   });
 
   it("shows an issued API key once and never mixes it into the account record", async () => {
@@ -77,5 +119,31 @@ describe("AccessControl", () => {
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith("sr_live_plaintext_shown_once"));
     fireEvent.click(screen.getByRole("button", { name: "I saved the key" }));
     expect(screen.queryByText("sr_live_plaintext_shown_once")).not.toBeInTheDocument();
+  });
+
+  it("disables an employee immediately and binds a data policy", async () => {
+    render(<AccessControl locale="en-US" />);
+    fireEvent.change(screen.getByLabelText("Administrator token"), { target: { value: adminToken } });
+    fireEvent.click(screen.getByRole("button", { name: "Open access control" }));
+    await screen.findAllByText("Sales agent A");
+    fireEvent.click(screen.getByRole("tab", { name: "Employees" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Disable" }));
+    await waitFor(() => expect(api.setUserStatus).toHaveBeenCalledWith(adminToken, employee.id, "disabled"));
+
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: policy.id } });
+    fireEvent.click(screen.getByRole("button", { name: "Bind policy" }));
+    await waitFor(() => expect(api.bindAccessPolicy).toHaveBeenCalledWith(adminToken, employee.id, policy.id));
+  });
+
+  it("removes a bound policy without disabling the whole service account", async () => {
+    render(<AccessControl locale="en-US" />);
+    fireEvent.change(screen.getByLabelText("Administrator token"), { target: { value: adminToken } });
+    fireEvent.click(screen.getByRole("button", { name: "Open access control" }));
+    await screen.findAllByText("Sales agent A");
+
+    fireEvent.click(screen.getByRole("button", { name: "Unbind Sales region policy" }));
+
+    await waitFor(() => expect(api.unbindAccessPolicy).toHaveBeenCalledWith(adminToken, account.id, policy.id));
   });
 });

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { api } from "./api/client";
 
 vi.mock("@uiw/react-codemirror", () => ({
   default: ({ value, onChange, "aria-label": label }: { value: string; onChange: (value: string) => void; "aria-label"?: string }) => (
@@ -28,6 +29,7 @@ function emptyWorkspaceFetch() {
 describe("Semantic Console interactions", () => {
   beforeEach(() => {
     localStorage.clear();
+    api.setBearerToken("");
     vi.restoreAllMocks();
   });
 
@@ -242,5 +244,66 @@ describe("Semantic Console interactions", () => {
     expect(await screen.findByRole("table")).toHaveTextContent("7");
     const previewCall = fetchMock.mock.calls.find(([input]) => String(input).endsWith("/api/views/daily_orders/preview"));
     expect(previewCall?.[1]).toMatchObject({ method: "POST", body: JSON.stringify({ limit: 100, maxBytes: 524288 }) });
+  });
+
+  it("unlocks the ordinary workbench for a console-only token without granting Access Control", async () => {
+    const token = "console-only-token-123456789012345678";
+    const fetchMock = emptyWorkspaceFetch();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/auth/capabilities")) return Promise.resolve(jsonResponse({
+        subject: { id: "subject-console", name: "Console administrator" },
+        projectId: "project-1",
+        capabilities: { "console:admin": true, "access:admin": false },
+      }));
+      if (url.endsWith("/api/project") && init?.method !== "POST") return Promise.resolve(jsonResponse({ name: new Headers(init?.headers).get("Authorization") === `Bearer ${token}` ? "Authorized workspace" : "", projectExists: true, activeDatasource: null }));
+      return emptyWorkspaceFetch()(input, init);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    await screen.findByRole("heading", { name: "Semantic project" });
+    fireEvent.click(screen.getByRole("button", { name: "Unlock Console" }));
+    fireEvent.change(await screen.findByLabelText("Administrator credential"), { target: { value: token } });
+    fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+    expect(await screen.findByRole("button", { name: "Console administrator" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Authorized workspace" })).toBeInTheDocument();
+    const authenticatedProjectCall = fetchMock.mock.calls.find(([input, init]) => String(input).endsWith("/api/project") && new Headers(init?.headers).get("Authorization") === `Bearer ${token}`);
+    expect(authenticatedProjectCall).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Access control" }));
+    expect(await screen.findByRole("heading", { name: "Administrator authentication required" })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/api/v1/access/"))).toBe(false);
+  });
+
+  it("opens Access Control for an access-only token without refreshing ordinary Console APIs", async () => {
+    const token = "access-only-token-123456789012345678";
+    const fetchMock = emptyWorkspaceFetch();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/auth/capabilities")) return Promise.resolve(jsonResponse({
+        subject: { id: "subject-access", name: "Access administrator" },
+        projectId: "project-1",
+        capabilities: { "console:admin": false, "access:admin": true },
+      }));
+      if (url.endsWith("/api/v1/access/service-accounts") || url.endsWith("/api/v1/access/users") || url.endsWith("/api/v1/access/policies") || url.endsWith("/api/v1/access/audit")) return Promise.resolve(jsonResponse({ items: [] }));
+      return emptyWorkspaceFetch()(input, init);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    await screen.findByRole("heading", { name: "Semantic project" });
+    const ordinaryCallsBeforeUnlock = fetchMock.mock.calls.filter(([input]) => String(input).startsWith("/api/") && !String(input).includes("/api/v1/auth/capabilities")).length;
+    fireEvent.click(screen.getByRole("button", { name: "Unlock Console" }));
+    fireEvent.change(await screen.findByLabelText("Administrator credential"), { target: { value: token } });
+    fireEvent.click(screen.getByRole("button", { name: "Unlock" }));
+
+    expect(await screen.findByRole("heading", { name: "Access control" })).toBeInTheDocument();
+    expect(await screen.findByText("No service accounts")).toBeInTheDocument();
+    const ordinaryCallsAfterUnlock = fetchMock.mock.calls.filter(([input]) => String(input).startsWith("/api/") && !String(input).includes("/api/v1/auth/capabilities") && !String(input).includes("/api/v1/access/")).length;
+    expect(ordinaryCallsAfterUnlock).toBe(ordinaryCallsBeforeUnlock);
+    expect(fetchMock.mock.calls.some(([input, init]) => String(input).endsWith("/api/v1/auth/capabilities") && new Headers(init?.headers).get("Authorization") === `Bearer ${token}`)).toBe(true);
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/api/v1/access/")).every(([, init]) => new Headers(init?.headers).get("Authorization") === `Bearer ${token}`)).toBe(true);
   });
 });

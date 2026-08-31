@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 from sqlglot import exp, parse_one
 from sqlglot.errors import ParseError, SqlglotError
+from sqlglot.optimizer.scope import traverse_scope
 
 
 class RowPolicyError(ValueError):
@@ -108,34 +109,59 @@ def _condition(
     return column.isin(*placeholders)
 
 
-def _validate_columns(statement: exp.Expression, aliases: Mapping[str, Mapping[str, Any]]) -> None:
-    restricted = [rule for rule in aliases.values() if rule.get("allowedColumns") is not None or rule.get("deniedColumns")]
-    if not restricted:
-        return
-    for star in statement.find_all(exp.Star):
-        if not isinstance(star.parent, exp.Count):
-            raise RowPolicyError("wildcard columns are not allowed by column policy")
-    for column in statement.find_all(exp.Column):
-        name = column.name
-        if not name or name == "*":
+def _is_restricted(rule: Mapping[str, Any]) -> bool:
+    return rule.get("allowedColumns") is not None or bool(rule.get("deniedColumns"))
+
+
+def _validate_column(name: str, rules: list[Mapping[str, Any]]) -> None:
+    for rule in rules:
+        denied = rule.get("deniedColumns", [])
+        allowed = rule.get("allowedColumns")
+        if not isinstance(denied, list) or any(not isinstance(item, str) for item in denied):
+            raise RowPolicyError("denied column policy is invalid")
+        if allowed is not None and (not isinstance(allowed, list) or any(not isinstance(item, str) for item in allowed)):
+            raise RowPolicyError("allowed column policy is invalid")
+        if name in denied or (allowed is not None and name not in allowed):
+            raise RowPolicyError("column is not allowed")
+
+
+def _validate_columns(statement: exp.Expression, table_rules: Mapping[int, Mapping[str, Any]]) -> None:
+    """Validate columns against sources in each SELECT's lexical scope.
+
+    A global alias map is unsafe because a nested query may shadow an outer
+    alias. ``traverse_scope`` resolves each local source independently; an
+    external correlated column is left for its owning outer scope.
+    """
+
+    for scope in traverse_scope(statement):
+        local_rules = {
+            alias.lower(): table_rules[id(source)]
+            for alias, source in scope.sources.items()
+            if isinstance(source, exp.Table) and id(source) in table_rules
+        }
+        restricted = {alias: rule for alias, rule in local_rules.items() if _is_restricted(rule)}
+        if not restricted:
             continue
-        if column.table:
-            candidates = [aliases.get(column.table.lower())]
-        elif len(aliases) == 1:
-            candidates = list(aliases.values())
-        else:
-            # An unqualified column in a multi-table query is safe only when
-            # every possible protected source allows it.
-            candidates = list(aliases.values())
-        for rule in (item for item in candidates if item is not None):
-            denied = rule.get("deniedColumns", [])
-            allowed = rule.get("allowedColumns")
-            if not isinstance(denied, list) or any(not isinstance(item, str) for item in denied):
-                raise RowPolicyError("denied column policy is invalid")
-            if allowed is not None and (not isinstance(allowed, list) or any(not isinstance(item, str) for item in allowed)):
-                raise RowPolicyError("allowed column policy is invalid")
-            if name in denied or (allowed is not None and name not in allowed):
-                raise RowPolicyError("column is not allowed")
+        if any(isinstance(selection, exp.Star) for selection in getattr(scope.expression, "selects", ())):
+            raise RowPolicyError("wildcard columns are not allowed by column policy")
+        for star in scope.stars:
+            alias = star.table.lower() if star.table else ""
+            if (alias and alias in restricted) or (not alias and restricted):
+                raise RowPolicyError("wildcard columns are not allowed by column policy")
+        for column in scope.columns:
+            name = column.name
+            if not name or name == "*":
+                continue
+            if column.table:
+                rule = restricted.get(column.table.lower())
+                candidates = [rule] if rule is not None else []
+            else:
+                # Without catalog metadata an unqualified reference in a
+                # multi-source SELECT could resolve to any protected source.
+                # Requiring every local protected source to allow it is the
+                # only fail-closed choice.
+                candidates = list(restricted.values())
+            _validate_column(name, candidates)
 
 
 def apply_row_policy(sql: str, policy: Mapping[str, Any]) -> AuthorizedQuery:
@@ -154,7 +180,7 @@ def apply_row_policy(sql: str, policy: Mapping[str, Any]) -> AuthorizedQuery:
         raise RowPolicyError("native SQL could not be parsed") from exc
     cte_names = {cte.alias_or_name.lower() for cte in statement.find_all(exp.CTE) if cte.alias_or_name}
     physical_tables = [table for table in statement.find_all(exp.Table) if not _is_cte_reference(table, cte_names)]
-    aliases: dict[str, Mapping[str, Any]] = {}
+    table_rules: dict[int, Mapping[str, Any]] = {}
     resolved: list[tuple[exp.Table, str, Mapping[str, Any]]] = []
     for table in physical_tables:
         matched = _rule_for(table, rules)
@@ -163,10 +189,9 @@ def apply_row_policy(sql: str, policy: Mapping[str, Any]) -> AuthorizedQuery:
                 raise RowPolicyError("table is not allowed")
             continue
         key, rule = matched
-        alias = (table.alias_or_name or table.name).lower()
-        aliases[alias] = rule
+        table_rules[id(table)] = rule
         resolved.append((table, key, rule))
-    _validate_columns(statement, aliases)
+    _validate_columns(statement, table_rules)
 
     parameters: dict[str, Any] = {}
     applied: list[str] = []

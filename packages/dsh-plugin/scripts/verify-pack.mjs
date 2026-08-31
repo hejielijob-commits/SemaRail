@@ -25,4 +25,7 @@ const host = readFileSync(resolve(packageDir, 'lib', 'index.js'), 'utf8')
 if (/(?:bootstrap\.py|semantic-console-web|sidecar\/server\.py|dsh-subprocess)/u.test(host)) {
   throw new Error('Thin Host bundle still embeds Core bootstrap, server, or subprocess code')
 }
+if (!host.includes('SEMARAIL_HARNESS_TOKEN')) {
+  throw new Error('Thin Host bundle does not default to the dedicated Harness token variable')
+}
 console.log(`Thin DeepSeek Harness plugin verification passed (${files.length} files).`)

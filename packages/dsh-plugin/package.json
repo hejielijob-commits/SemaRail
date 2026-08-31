@@ -1,6 +1,6 @@
 {
   "name": "@hejielijob/dsh-semarail-plugin",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Thin DeepSeek Harness integration for an independently running SemaRail Core.",
   "type": "module",
   "main": "lib/index.js",

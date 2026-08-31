@@ -221,11 +221,22 @@ class PolicyEngine:
         except PolicyError:
             return PolicyDecision(False, "policy evaluation failed closed")
 
-    def authorize_table(self, subject: Subject, table: str, policies: Sequence[Mapping[str, Any]]) -> PolicyDecision:
+    def authorize_table(
+        self,
+        subject: Subject,
+        table: str,
+        policies: Sequence[Mapping[str, Any]],
+        *,
+        project_id: str | None = None,
+    ) -> PolicyDecision:
         if subject.id == BOOTSTRAP_SUBJECT_ID:
             return PolicyDecision(True, "bootstrap administrator")
         try:
             documents = self._documents(subject, policies)
+            if project_id is not None:
+                documents = [item for item in documents if _matches(item[0].get("projects", []), project_id)]
+                if not documents:
+                    return PolicyDecision(False, "project is not allowed")
             matching: list[tuple[Mapping[str, Any], Mapping[str, Any], str]] = []
             for document, version in documents:
                 rule = _table_rule(document, table)
@@ -237,6 +248,7 @@ class PolicyEngine:
                 return PolicyDecision(False, "table is explicitly denied", tuple(item[2] for item in matching))
 
             row_scopes: list[dict[str, Any]] = []
+            unrestricted_rows = False
             allow_sets: list[set[str]] = []
             denied: set[str] = set()
             for _, rule, _ in matching:
@@ -250,7 +262,10 @@ class PolicyEngine:
                 if not isinstance(rows, list):
                     raise PolicyError("rows must be an array")
                 required.extend(_normalize_condition(item, subject) for item in rows)
-                row_scopes.append({"op": "and", "conditions": required})
+                if required:
+                    row_scopes.append({"op": "and", "conditions": required})
+                else:
+                    unrestricted_rows = True
                 columns = rule.get("columns", {})
                 if not isinstance(columns, Mapping):
                     raise PolicyError("columns must be an object")
@@ -264,7 +279,9 @@ class PolicyEngine:
                     raise PolicyError("column deny list is invalid")
                 denied.update(deny)
             allowed_columns = tuple(sorted(set().union(*allow_sets) - denied)) if allow_sets else None
-            row_filter: Mapping[str, Any] | None = {"op": "or", "conditions": row_scopes} if row_scopes else None
+            row_filter: Mapping[str, Any] | None = (
+                None if unrestricted_rows or not row_scopes else {"op": "or", "conditions": row_scopes}
+            )
             return PolicyDecision(
                 True,
                 "table is allowed",
@@ -302,13 +319,23 @@ class PolicyEngine:
                 values.extend(raw)
         return tuple(dict.fromkeys(values))
 
-    def compile_data_policy(self, subject: Subject, policies: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    def compile_data_policy(
+        self,
+        subject: Subject,
+        policies: Sequence[Mapping[str, Any]],
+        *,
+        project_id: str | None = None,
+    ) -> dict[str, Any]:
         """Resolve bound table rules into a secret-free execution policy."""
 
         if subject.id == BOOTSTRAP_SUBJECT_ID:
             return {"schemaVersion": 1, "defaultEffect": "allow", "tables": {}, "policyVersions": []}
         try:
             documents = self._documents(subject, policies)
+            if project_id is not None:
+                documents = [item for item in documents if _matches(item[0].get("projects", []), project_id)]
+                if not documents:
+                    raise PolicyError("project is not allowed")
             table_names: set[str] = set()
             for document, _ in documents:
                 tables = document.get("tables", {})
@@ -317,7 +344,7 @@ class PolicyEngine:
                 table_names.update(str(name) for name in tables if name != "*")
             compiled: dict[str, Any] = {}
             for table in sorted(table_names):
-                decision = self.authorize_table(subject, table, policies)
+                decision = self.authorize_table(subject, table, policies, project_id=project_id)
                 if not decision.allowed:
                     continue
                 compiled[table] = {
@@ -329,7 +356,15 @@ class PolicyEngine:
                 "schemaVersion": 1,
                 "defaultEffect": "deny",
                 "tables": compiled,
-                "policyVersions": sorted({version for decision_table in table_names for version in self.authorize_table(subject, decision_table, policies).policy_versions}),
+                "policyVersions": sorted(
+                    {
+                        version
+                        for decision_table in table_names
+                        for version in self.authorize_table(
+                            subject, decision_table, policies, project_id=project_id
+                        ).policy_versions
+                    }
+                ),
             }
         except (PolicyError, TypeError, ValueError) as exc:
             raise PolicyError("data policy compilation failed") from exc

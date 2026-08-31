@@ -77,6 +77,46 @@ class RowPolicyTests(unittest.TestCase):
         self.assertEqual(query.applied_tables, ("public.sales",))
         self.assertEqual(set(query.parameters.values()), {"org-sales", "CN-JIA"})
 
+    def test_nested_alias_shadow_cannot_replace_outer_column_policy(self) -> None:
+        policy = region_policy("CN-JIA")
+        policy["tables"]["public.targets"] = {
+            "rowFilter": None,
+            "allowedColumns": ["customer_phone"],
+            "deniedColumns": [],
+        }
+        with self.assertRaises(RowPolicyError):
+            apply_row_policy(
+                "SELECT s.customer_phone FROM public.sales s "
+                "WHERE EXISTS (SELECT 1 FROM public.targets s)",
+                policy,
+            )
+
+    def test_self_join_and_correlated_subquery_keep_each_lexical_source_policy(self) -> None:
+        policy = region_policy("CN-JIA")
+        query = apply_row_policy(
+            "SELECT current.order_id FROM public.sales current "
+            "JOIN public.sales previous ON current.order_id = previous.order_id "
+            "WHERE EXISTS (SELECT 1 FROM public.sales nested "
+            "WHERE nested.region_code = current.region_code)",
+            policy,
+        )
+        self.assertEqual(query.sql.count("SELECT * FROM public.sales WHERE"), 3)
+        self.assertEqual(query.applied_tables, ("public.sales",))
+
+    def test_unqualified_column_in_multi_source_scope_must_be_allowed_by_every_protected_source(self) -> None:
+        policy = region_policy("CN-JIA")
+        policy["tables"]["public.targets"] = {
+            "rowFilter": None,
+            "allowedColumns": ["target"],
+            "deniedColumns": [],
+        }
+        with self.assertRaises(RowPolicyError):
+            apply_row_policy(
+                "SELECT amount FROM public.sales s JOIN public.targets t "
+                "ON s.region_code = t.target",
+                policy,
+            )
+
     def test_unlisted_table_denied_column_wildcard_and_missing_attribute_fail_closed(self) -> None:
         with self.assertRaises(RowPolicyError):
             apply_row_policy("SELECT amount FROM public.payroll", region_policy("CN-JIA"))

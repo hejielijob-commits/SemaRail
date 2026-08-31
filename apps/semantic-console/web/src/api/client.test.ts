@@ -36,6 +36,24 @@ describe("ApiClient", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain(token);
   });
 
+  it("keeps an unlocked Console credential in memory and applies it to ordinary REST calls", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+    const token = "bootstrap-admin-secret";
+    const client = new ApiClient("http://console.test");
+
+    client.setBearerToken(token);
+    await client.getDatasources();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://console.test/api/datasources",
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: `Bearer ${token}` }) }),
+    );
+    const [url, options] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).not.toContain(token);
+    expect(options?.body).toBeUndefined();
+  });
+
   it("activates a datasource through the explicit current-connection endpoint", async () => {
     const response = { activeDatasource: { id: "billing", name: "Billing", type: "mysql" }, project: { activeDatasource: { id: "billing", name: "Billing", type: "mysql" } } };
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }));

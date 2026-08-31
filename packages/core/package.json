@@ -1,6 +1,6 @@
 {
   "name": "@hejielijob/semarail-core",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Standalone SemaRail Core runtime, Semantic Console, MCP servers, and database adapters.",
   "type": "module",
   "bin": {
@@ -15,6 +15,8 @@
     "python/sidecar/sidecar/**/*.py",
     "python/semantic-console/pyproject.toml",
     "python/semantic-console/server/**/*.py",
+    "python/semantic-console/server/README.md",
+    "python/semantic-console/server/openapi.json",
     "semantic-console-web/**/*",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md"

@@ -18,12 +18,16 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 try:  # Package import when started with ``python -m server``.
+    from .access_control import AccessControlError, AuthContext, BOOTSTRAP_SUBJECT_ID
     from .access_api import AccessControlAdminApi
+    from .identity_api import IdentityApi
     from .service import SemanticConsoleService
     from .project import ProjectStore
     from .runtime_rpc import RuntimeRpcGateway
 except ImportError:  # Direct ``python app.py`` / test loading by file path.
+    from access_control import AccessControlError, AuthContext, BOOTSTRAP_SUBJECT_ID  # type: ignore[no-redef]
     from access_api import AccessControlAdminApi  # type: ignore[no-redef]
+    from identity_api import IdentityApi  # type: ignore[no-redef]
     from service import SemanticConsoleService  # type: ignore[no-redef]
     from project import ProjectStore  # type: ignore[no-redef]
     from runtime_rpc import RuntimeRpcGateway  # type: ignore[no-redef]
@@ -32,6 +36,12 @@ except ImportError:  # Direct ``python app.py`` / test loading by file path.
 MAX_REQUEST_BYTES = 4 * 1024 * 1024
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 48763
+_PUBLIC_CONSOLE_ROUTES = frozenset(
+    {
+        ("GET", "/api/health"),
+        ("GET", "/api/datasource-types"),
+    }
+)
 
 
 def _allowed_browser_origin(origin: str | None) -> bool:
@@ -69,14 +79,18 @@ class SemanticConsoleApplication:
         static_dir: str | Path | None = None,
         runtime_rpc: RuntimeRpcGateway | None = None,
         access_api: AccessControlAdminApi | None = None,
+        identity_api: IdentityApi | None = None,
     ) -> None:
         self.service = service or SemanticConsoleService()
         self.static_dir = Path(static_dir).expanduser().resolve() if static_dir else None
         self.runtime_rpc = runtime_rpc or RuntimeRpcGateway(self.service.project)
+        project_id = str(self.runtime_rpc.project.overview().get("name") or "")
         self.access_api = access_api or AccessControlAdminApi(
             self.runtime_rpc.access_control,
             self.runtime_rpc.policy_engine,
+            project_id=project_id,
         )
+        self.identity_api = identity_api or IdentityApi(self.runtime_rpc.access_control)
 
     def request(
         self,
@@ -92,10 +106,66 @@ class SemanticConsoleApplication:
             query[key] = values[-1] if values else ""
         if method.upper() == "POST" and parsed.path == "/api/v1/runtime/rpc":
             return self.runtime_rpc.dispatch(body, authorization)
+        if method.upper() == "GET" and parsed.path == "/api/v1/auth/capabilities":
+            try:
+                auth = self.runtime_rpc.access_control.authenticate(authorization)
+                policies = (
+                    []
+                    if auth.subject.id == BOOTSTRAP_SUBJECT_ID
+                    else self.runtime_rpc.access_control.policies_for_subject(auth.subject.id)
+                )
+                project_id = str(self.runtime_rpc.project.overview().get("name") or "")
+                capabilities = {
+                    scope: self.runtime_rpc.policy_engine.authorize_scope(
+                        auth.subject, scope, policies, project_id=project_id
+                    ).allowed
+                    for scope in ("console:admin", "access:admin")
+                }
+                return 200, {
+                    "subject": auth.subject.as_dict(),
+                    "projectId": project_id,
+                    "capabilities": capabilities,
+                }
+            except AccessControlError as exc:
+                return exc.status, {"code": exc.code, "message": exc.safe_message}
+        identity_response = self.identity_api.dispatch(method.upper(), parsed.path, query, body, authorization)
+        if identity_response is not None:
+            return identity_response
         access_response = self.access_api.dispatch(method.upper(), parsed.path, body, authorization)
         if access_response is not None:
             return access_response
+        auth: AuthContext | None = None
+        normalized_method = method.upper()
+        if parsed.path.startswith("/api/") and (normalized_method, parsed.path) not in _PUBLIC_CONSOLE_ROUTES:
+            try:
+                auth = self.runtime_rpc.access_control.authenticate(authorization)
+                policies = (
+                    []
+                    if auth.subject.id == BOOTSTRAP_SUBJECT_ID
+                    else self.runtime_rpc.access_control.policies_for_subject(auth.subject.id)
+                )
+                project_id = str(self.runtime_rpc.project.overview().get("name") or "")
+                decision = self.runtime_rpc.policy_engine.authorize_scope(
+                    auth.subject, "console:admin", policies, project_id=project_id
+                )
+                if not decision.allowed:
+                    self.runtime_rpc.access_control.record_audit(
+                        action="console.access", decision="denied", auth=auth, resource=parsed.path
+                    )
+                    return 403, {"code": "FORBIDDEN", "message": "console administrator permission is required"}
+            except AccessControlError as exc:
+                return exc.status, {"code": exc.code, "message": exc.safe_message}
         status, result = self.service.dispatch(method.upper(), parsed.path, query, body)
+        if auth is not None:
+            try:
+                self.runtime_rpc.access_control.record_audit(
+                    action=f"console.{normalized_method.lower()}",
+                    decision="allowed" if status < 400 else "error",
+                    auth=auth,
+                    resource=parsed.path,
+                )
+            except AccessControlError:
+                _LOGGER.error("console audit write failed")
         if "__error__" in result:
             return status, result["__error__"]
         return status, result
@@ -107,6 +177,7 @@ def create_app(
     static_dir: str | Path | None = None,
     runtime_rpc: RuntimeRpcGateway | None = None,
     access_api: AccessControlAdminApi | None = None,
+    identity_api: IdentityApi | None = None,
 ) -> SemanticConsoleApplication:
     """Create an embeddable Semantic Console application."""
 
@@ -115,6 +186,7 @@ def create_app(
         static_dir=static_dir,
         runtime_rpc=runtime_rpc,
         access_api=access_api,
+        identity_api=identity_api,
     )
 
 

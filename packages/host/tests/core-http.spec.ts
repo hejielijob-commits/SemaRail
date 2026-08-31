@@ -30,6 +30,24 @@ describe('standalone SemaRail Core HTTP gateway', () => {
 
   afterEach(() => {
     delete process.env.SEMARAIL_TEST_TOKEN
+    delete process.env.SEMARAIL_HARNESS_TOKEN
+  })
+
+  it('uses the dedicated Harness token variable by default', async () => {
+    process.env.SEMARAIL_HARNESS_TOKEN = TOKEN
+    const authorizations: Array<string | null> = []
+    const request = async (_input: string | URL, init?: RequestInit): Promise<Response> => {
+      const body = JSON.parse(String(init?.body)) as { id: string; method: string }
+      authorizations.push(new Headers(init?.headers).get('Authorization'))
+      if (body.method === 'health') {
+        return rpcResponse(body.id, { service: 'semarail-core', apiVersion: '1', protocolVersion: '1' })
+      }
+      return rpcResponse(body.id, { valid: true, projectRevision: 'sha256:test' })
+    }
+
+    await new CoreHttpGateway({ request }).start()
+
+    expect(authorizations).toEqual([`Bearer ${TOKEN}`, `Bearer ${TOKEN}`])
   })
 
   it('handshakes, authenticates, and queries without sending project or credentials', async () => {
