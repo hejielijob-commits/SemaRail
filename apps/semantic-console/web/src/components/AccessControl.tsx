@@ -31,8 +31,9 @@ const copy = {
   },
 } as const;
 
-const policyTemplate = JSON.stringify({
+const policyTemplate = (datasourceId = "") => JSON.stringify({
   schemaVersion: 1,
+  ...(datasourceId ? { datasourceId } : {}),
   projects: ["sales-project"],
   tools: ["project:validate", "semantic:read", "query:plan", "query:execute", "query:cancel"],
   limits: { maxRows: 200, timeoutMs: 10000 },
@@ -59,7 +60,7 @@ function BoundPolicies({ ids, policies, unbindLabel, onUnbind }: { ids: string[]
   })}</div>;
 }
 
-export default function AccessControl({ locale, onAuthenticated, adminToken = "" }: { locale: Locale; onAuthenticated?: () => void; adminToken?: string }) {
+export default function AccessControl({ locale, onAuthenticated, adminToken = "", activeDatasourceId = "" }: { locale: Locale; onAuthenticated?: () => void; adminToken?: string; activeDatasourceId?: string }) {
   const c = copy[locale];
   const [tokenInput, setTokenInput] = useState("");
   const [token, setToken] = useState(adminToken);
@@ -81,7 +82,7 @@ export default function AccessControl({ locale, onAuthenticated, adminToken = ""
   const [copied, setCopied] = useState(false);
   const [policyName, setPolicyName] = useState("");
   const [policyId, setPolicyId] = useState("");
-  const [policyJson, setPolicyJson] = useState(policyTemplate);
+  const [policyJson, setPolicyJson] = useState(() => policyTemplate(activeDatasourceId));
 
   const selected = accounts.find((item) => item.id === selectedId) ?? accounts[0];
   const selectedUser = users.find((item) => item.id === selectedUserId) ?? users[0];
@@ -98,6 +99,10 @@ export default function AccessControl({ locale, onAuthenticated, adminToken = ""
   useEffect(() => {
     if (adminToken) void loadAll(adminToken);
   }, [adminToken]);
+
+  useEffect(() => {
+    if (!policyId) setPolicyJson(policyTemplate(activeDatasourceId));
+  }, [activeDatasourceId, policyId]);
 
   async function loadAll(adminToken = token) {
     if (!adminToken) return;
@@ -178,7 +183,7 @@ export default function AccessControl({ locale, onAuthenticated, adminToken = ""
       <section className="panel access-list"><div className="access-list-items access-list-items-flush">{users.map((user) => { const identity = user.identities[0]; return <button key={user.id} className={selectedUser?.id === user.id ? "active" : ""} onClick={() => setSelectedUserId(user.id)}><span><UsersThree size={17} /><strong>{user.name}</strong></span><Badge tone={user.status === "active" ? "green" : "amber"} dot>{user.status === "active" ? c.active : c.disabled}</Badge><small>{identity ? `${identity.provider} · ${String(identity.profile.employeeNumber ?? identity.externalSubject)}` : "—"}</small></button>; })}</div>{!users.length ? <EmptyState icon={UsersThree} title={c.noEmployees} body={c.noEmployeesBody} /> : null}</section>
       {selectedUser ? <section className="panel access-detail"><header><div><p className="panel-kicker">{selectedUser.type}</p><h2>{selectedUser.name}</h2><code>{selectedUser.id}</code></div><Button size="sm" variant={selectedUser.status === "active" ? "danger" : "secondary"} onClick={() => void act(() => api.setUserStatus(token, selectedUser.id, selectedUser.status === "active" ? "disabled" : "active"))}>{selectedUser.status === "active" ? c.disable : c.enable}</Button></header><div className="access-employee-identity"><strong>{c.identity}</strong>{selectedUser.identities.map((identity) => <span key={`${identity.provider}:${identity.externalSubject}`}><Badge tone="blue">{identity.provider}</Badge><code>{String(identity.profile.employeeNumber ?? identity.externalSubject)}</code><small>{formatDate(identity.lastLoginAt, locale)}</small></span>)}</div><div className="access-employee-policy"><Field label={c.regions} hint={c.regionsHint} htmlFor="employee-region-codes"><TextInput id="employee-region-codes" value={employeeRegions} onChange={(event) => setEmployeeRegions(event.target.value)} /></Field><Button size="sm" variant="primary" onClick={() => void act(() => api.updateUser(token, selectedUser.id, { attributes: { ...selectedUser.attributes, regionCodes: employeeRegions.split(",").map((item) => item.trim()).filter(Boolean) } }))}>{c.saveAccess}</Button></div><div className="access-bind"><div><strong>{c.bound}</strong><BoundPolicies ids={selectedUser.policyIds} policies={policies} unbindLabel={c.unbind} onUnbind={(id) => void act(() => api.unbindAccessPolicy(token, selectedUser.id, id))} /></div><Select value={employeePolicyId} onChange={(event) => setEmployeePolicyId(event.target.value)}><option value="">{c.choosePolicy}</option>{availableEmployeePolicies.map((policy) => <option key={policy.id} value={policy.id}>{policy.name}</option>)}</Select><Button size="sm" disabled={!employeePolicyId} onClick={() => void act(async () => { await api.bindAccessPolicy(token, selectedUser.id, employeePolicyId); setEmployeePolicyId(""); })}>{c.bind}</Button></div></section> : null}
     </div> : null}
-    {tab === "policies" ? <div className="access-policy-layout"><section className="panel access-policy-list"><Button size="sm" icon={Plus} onClick={() => { setPolicyId(""); setPolicyJson(policyTemplate); }}>{c.createPolicy}</Button>{policies.map((policy) => <button key={policy.id} className={policyId === policy.id ? "active" : ""} onClick={() => editPolicy(policy.id)}><strong>{policy.name}</strong><span>{c.version} {policy.version}</span></button>)}{!policies.length ? <EmptyState icon={ShieldCheck} title={c.noPolicies} body={c.noPoliciesBody} /> : null}</section><form className="panel access-policy-editor" onSubmit={(event) => void savePolicy(event)}>{!selectedPolicy ? <Field label={c.policyName}><TextInput required value={policyName} onChange={(event) => setPolicyName(event.target.value)} /></Field> : <div className="access-policy-title"><h2>{selectedPolicy.name}</h2><Badge tone="blue">v{selectedPolicy.version}</Badge></div>}<Field label={c.policyDocument}><TextArea spellCheck={false} value={policyJson} onChange={(event) => setPolicyJson(event.target.value)} /></Field><Button type="submit" variant="primary" loading={busy} disabled={!selectedPolicy && !policyName.trim()}>{selectedPolicy ? c.savePolicy : c.createPolicy}</Button></form></div> : null}
+    {tab === "policies" ? <div className="access-policy-layout"><section className="panel access-policy-list"><Button size="sm" icon={Plus} onClick={() => { setPolicyId(""); setPolicyJson(policyTemplate(activeDatasourceId)); }}>{c.createPolicy}</Button>{policies.map((policy) => <button key={policy.id} className={policyId === policy.id ? "active" : ""} onClick={() => editPolicy(policy.id)}><strong>{policy.name}</strong><span>{c.version} {policy.version}</span></button>)}{!policies.length ? <EmptyState icon={ShieldCheck} title={c.noPolicies} body={c.noPoliciesBody} /> : null}</section><form className="panel access-policy-editor" onSubmit={(event) => void savePolicy(event)}>{!selectedPolicy ? <Field label={c.policyName} htmlFor="access-policy-name"><TextInput id="access-policy-name" required value={policyName} onChange={(event) => setPolicyName(event.target.value)} /></Field> : <div className="access-policy-title"><h2>{selectedPolicy.name}</h2><Badge tone="blue">v{selectedPolicy.version}</Badge></div>}<Field label={c.policyDocument} htmlFor="access-policy-document"><TextArea id="access-policy-document" spellCheck={false} value={policyJson} onChange={(event) => setPolicyJson(event.target.value)} /></Field><Button type="submit" variant="primary" loading={busy} disabled={!selectedPolicy && !policyName.trim()}>{selectedPolicy ? c.savePolicy : c.createPolicy}</Button></form></div> : null}
     {tab === "audit" ? <section className="panel access-audit">{audit.length ? <div className="access-audit-table"><div className="head"><span>{c.event}</span><span>{c.actor}</span><span>{c.decision}</span><span>{c.resource}</span></div>{audit.map((event) => <div key={event.id}><span><strong>{event.action}</strong><small>{formatDate(event.occurredAt, locale)}</small></span><code>{event.subjectId ?? "—"}</code><Badge tone={event.decision === "allowed" ? "green" : event.decision === "denied" ? "red" : "amber"}>{event.decision}</Badge><span>{event.resource ?? "—"}</span></div>)}</div> : <EmptyState icon={WarningCircle} title={c.noAudit} body={c.noAuditBody} />}</section> : null}
   </div>;
 }

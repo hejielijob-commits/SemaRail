@@ -39,6 +39,134 @@ class FakeContextProvider:
 
 
 class DispatchTests(unittest.TestCase):
+    def test_restricted_semantic_output_hides_denied_tables_columns_and_sql_plan(self) -> None:
+        class Provider:
+            def describe(self, _params: object) -> dict[str, object]:
+                return {
+                    "schemaVersion": 1,
+                    "projectRevision": "sha256:test",
+                    "models": [
+                        {"name": "orders", "table": "public.orders", "columns": [
+                            {"name": "order_id", "type": "INTEGER"},
+                            {"name": "secret", "type": "TEXT"},
+                        ]},
+                        {"name": "payroll", "table": "audit.payroll", "columns": [
+                            {"name": "salary", "type": "DECIMAL"},
+                        ]},
+                        {"name": "customers", "table": "public.customers", "columns": [
+                            {"name": "customer_id", "type": "INTEGER"},
+                            {"name": "private_note", "type": "TEXT"},
+                        ]},
+                    ],
+                    "relationships": [
+                        {"name": "orders_payroll", "models": ["orders", "payroll"], "joinType": "ONE_TO_ONE", "condition": "orders.secret = payroll.salary"},
+                        {"name": "orders_customers", "models": ["orders", "customers"], "joinType": "MANY_TO_ONE", "condition": "orders.order_id = customers.customer_id"},
+                        {"name": "private_customers", "models": ["orders", "customers"], "joinType": "MANY_TO_ONE", "condition": "orders.order_id = customers.private_note"},
+                    ],
+                    "views": [{"name": "all_data", "statement": "SELECT * FROM audit.payroll"}],
+                    "summary": "audit.payroll secret",
+                }
+
+            def ask(self, params: object) -> dict[str, object]:
+                return self.describe(params)
+
+        class Planner:
+            def dry_plan(self, _params: object) -> dict[str, object]:
+                return {
+                    "semanticSql": "SELECT order_id FROM orders",
+                    "nativeSql": "SELECT order_id FROM public.orders",
+                    "projectRevision": "sha256:test",
+                    "allowedPhysical": {
+                        "catalogs": [], "schemas": ["public", "audit"],
+                        "tables": [{"schema": "public", "table": "orders"}, {"schema": "audit", "table": "payroll"}],
+                    },
+                }
+
+        policy = {
+            "schemaVersion": 1,
+            "defaultEffect": "deny",
+            "tables": {
+                "public.orders": {"rowFilter": None, "allowedColumns": ["order_id"], "deniedColumns": ["secret"]},
+                "public.customers": {"rowFilter": None, "allowedColumns": ["customer_id"], "deniedColumns": ["private_note"]},
+            },
+            "policyVersions": ["policy:1"],
+        }
+        dispatcher = Dispatcher(SidecarDependencies(context_provider=Provider(), query_planner=Planner()))
+
+        for method, params in (
+            ("project.describe", {"projectDir": "project", "authorizationPolicy": policy}),
+            ("context.ask", {"projectDir": "project", "question": "show orders", "authorizationPolicy": policy}),
+        ):
+            with self.subTest(method=method):
+                response = dispatcher.dispatch(request(method, params))
+                self.assertTrue(response["ok"])
+                result = response["result"]
+                self.assertEqual(result["models"], [
+                    {"name": "orders", "table": "public.orders", "columns": [{"name": "order_id", "type": "INTEGER"}]},
+                    {"name": "customers", "table": "public.customers", "columns": [{"name": "customer_id", "type": "INTEGER"}]},
+                ])
+                self.assertEqual(result["relationships"], [{
+                    "name": "orders_customers",
+                    "models": ["orders", "customers"],
+                    "joinType": "MANY_TO_ONE",
+                    "condition": "orders.order_id = customers.customer_id",
+                }])
+                self.assertNotIn("views", result)
+                self.assertNotIn("summary", result)
+
+        plan = dispatcher.dispatch(request("query.dryPlan", {"projectDir": "project", "semanticSql": "SELECT order_id FROM orders", "authorizationPolicy": policy}))
+        self.assertTrue(plan["ok"])
+        self.assertEqual(plan["result"]["allowedPhysical"]["tables"], [{"schema": "public", "table": "orders"}])
+
+    def test_restricted_dry_plan_and_missing_policy_fail_closed(self) -> None:
+        policy = {"schemaVersion": 1, "defaultEffect": "deny", "tables": {}, "policyVersions": []}
+        denied = Dispatcher(query_planner=lambda _: {
+            "semanticSql": "SELECT * FROM payroll",
+            "nativeSql": "SELECT salary FROM audit.payroll",
+            "projectRevision": "sha256:test",
+            "allowedPhysical": {"catalogs": [], "schemas": ["audit"], "tables": [{"schema": "audit", "table": "payroll"}]},
+        }).dispatch(request("query.dryPlan", {"projectDir": "project", "semanticSql": "SELECT * FROM payroll", "authorizationPolicy": policy}))
+        self.assertFalse(denied["ok"])
+        self.assertEqual(denied["error"]["code"], "POLICY_DENIED")
+
+        missing = Dispatcher(context_provider=FakeContextProvider()).dispatch(request("project.describe", {
+            "projectDir": "project", "authorizationPolicy": {"schemaVersion": 1, "defaultEffect": "deny"},
+        }))
+        self.assertFalse(missing["ok"])
+        self.assertEqual(missing["error"]["code"], "POLICY_DENIED")
+
+    def test_restricted_model_without_physical_table_uses_unique_policy_suffix(self) -> None:
+        class Provider:
+            @staticmethod
+            def describe(_: object) -> dict[str, object]:
+                return {
+                    "schemaVersion": 1,
+                    "projectRevision": "sha256:test",
+                    "models": [{"name": "orders", "columns": [{"name": "ORDER_ID", "type": "INTEGER"}]}],
+                    "relationships": [],
+                }
+
+        response = Dispatcher(context_provider=Provider()).dispatch(request("project.describe", {
+            "projectDir": "project",
+            "authorizationPolicy": {
+                "schemaVersion": 1,
+                "defaultEffect": "deny",
+                "tables": {"public.orders": {"rowFilter": None, "allowedColumns": ["order_id"], "deniedColumns": []}},
+                "policyVersions": ["policy:1"],
+            },
+        }))
+        self.assertTrue(response["ok"])
+        self.assertEqual(response["result"]["models"][0]["columns"][0]["name"], "ORDER_ID")
+
+    def test_explicit_bootstrap_allow_policy_leaves_semantic_response_unchanged(self) -> None:
+        provider = FakeContextProvider()
+        response = Dispatcher(context_provider=provider).dispatch(request("project.describe", {
+            "projectDir": "project",
+            "authorizationPolicy": {"schemaVersion": 1, "defaultEffect": "allow", "tables": {}, "policyVersions": []},
+        }))
+        self.assertTrue(response["ok"])
+        self.assertEqual(response["result"]["models"], [{"name": "orders"}])
+
     def test_health_does_not_need_wren(self) -> None:
         response = Dispatcher().dispatch(request("health"))
         self.assertEqual(response, {

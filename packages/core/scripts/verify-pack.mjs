@@ -19,6 +19,7 @@ const files = report[0]?.files?.map(file => file.path) ?? []
 const required = [
   'bin/semarail.mjs', 'runtime/bootstrap.py', 'runtime/constraints.txt',
   'python/sidecar/sidecar/query.py', 'python/sidecar/sidecar/row_policy.py', 'python/sidecar/sidecar/semantic_mcp.py',
+  'python/sidecar/sidecar/semantic_policy.py',
   'python/semantic-console/server/app.py', 'python/semantic-console/server/runtime_rpc.py',
   'python/semantic-console/server/access_control.py', 'python/semantic-console/server/authorization.py',
   'python/semantic-console/server/identity.py', 'python/semantic-console/server/identity_api.py',
@@ -33,7 +34,11 @@ for (const [file, marker] of [
   ['python/semantic-console/server/access_api.py', 'unbind_policy'],
   ['python/semantic-console/server/app.py', '/api/v1/auth/capabilities'],
   ['python/semantic-console/server/runtime_rpc.py', 'project_id=project_id'],
+  ['python/semantic-console/server/authorization.py', 'datasource binding is required'],
+  ['python/semantic-console/server/access_control.py', 'confirmation_hash'],
   ['python/sidecar/sidecar/row_policy.py', 'traverse_scope'],
+  ['python/sidecar/sidecar/semantic_policy.py', '_safe_relationship_condition'],
+  ['bin/semarail.mjs', 'Enter the confirmation code shown in your browser'],
 ]) {
   if (!readFileSync(resolve(packageDir, file), 'utf8').includes(marker)) {
     throw new Error(`Core package has stale generated content: ${file}`)

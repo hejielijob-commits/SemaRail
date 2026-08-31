@@ -129,6 +129,15 @@ class RowPolicyTests(unittest.TestCase):
         with self.assertRaises(RowPolicyError):
             apply_row_policy("SELECT amount FROM public.sales", malformed)
 
+    def test_unquoted_identifier_case_cannot_bypass_column_policy(self) -> None:
+        with self.assertRaises(RowPolicyError):
+            apply_row_policy("SELECT CUSTOMER_PHONE FROM public.sales", region_policy("CN-JIA"))
+        allowed = apply_row_policy(
+            "SELECT ORDER_ID FROM public.sales",
+            region_policy("CN-JIA"),
+        )
+        self.assertEqual(allowed.applied_tables, ("public.sales",))
+
 
 if __name__ == "__main__":
     unittest.main()

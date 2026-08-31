@@ -146,4 +146,17 @@ describe("AccessControl", () => {
 
     await waitFor(() => expect(api.unbindAccessPolicy).toHaveBeenCalledWith(adminToken, account.id, policy.id));
   });
+
+  it("binds a new policy template to the active server datasource", async () => {
+    render(<AccessControl locale="en-US" adminToken={adminToken} activeDatasourceId="datasource-sales" />);
+    await screen.findAllByText("Sales agent A");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Policies" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Create policy" })[0]);
+
+    expect(JSON.parse((screen.getByLabelText("Policy document (JSON)") as HTMLTextAreaElement).value)).toMatchObject({
+      schemaVersion: 1,
+      datasourceId: "datasource-sales",
+    });
+  });
 });

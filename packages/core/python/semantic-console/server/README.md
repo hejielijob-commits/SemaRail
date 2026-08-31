@@ -37,8 +37,8 @@ The primary routes are:
 | `POST /api/v1/runtime/rpc` | Authenticated, versioned agent runtime handshake/context/query/cancel boundary |
 | `GET /api/v1/auth/providers` | Public list of configured identity provider ids and labels |
 | `POST /api/v1/auth/device/start` | Create a bounded one-time browser/device login transaction |
-| `GET /api/v1/auth/callback/{provider}` | Verify OAuth/OIDC state and complete external identity mapping |
-| `POST /api/v1/auth/device/token` | Poll; returns 202 while pending and a one-time SemaRail session after verification |
+| `GET /api/v1/auth/callback/{provider}` | Verify OAuth/OIDC state and show a browser-only one-time confirmation code |
+| `POST /api/v1/auth/device/token` | Poll, submit the browser confirmation code, and consume the transaction for one SemaRail session |
 | `GET /api/v1/auth/capabilities` | Resolve independent current-project Console and Access administrator capabilities |
 | `GET /api/v1/auth/me` | Resolve the current employee session |
 | `POST /api/v1/auth/logout` | Revoke the current employee session |

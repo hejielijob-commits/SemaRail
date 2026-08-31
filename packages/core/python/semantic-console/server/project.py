@@ -465,6 +465,18 @@ class ProjectStore:
 
         return self._datasource_secret_file
 
+    def active_datasource_identifier(self) -> str | None:
+        """Return the current datasource's server-known stable ID, if any.
+
+        Callers must not trust an ID supplied by a runtime request.  Resolving
+        it through the stored active record also handles stale active IDs after
+        datasource deletion or state-file edits.
+        """
+
+        with self._lock:
+            active = self._datasources.get(self.active_datasource_id) if self.active_datasource_id else None
+            return active.id if active is not None and active.id == self.active_datasource_id else None
+
     # ---- project read/draft operations ---------------------------------
 
     def overview(self) -> dict[str, Any]:

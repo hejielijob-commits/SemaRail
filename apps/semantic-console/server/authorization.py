@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
@@ -42,8 +43,8 @@ _METHOD_SCOPE = {
 }
 _ALLOWED_OPERATORS = {"eq", "in"}
 _LIMIT_FIELDS = {"maxRows", "previewRows", "maxPreviewBytes", "timeoutMs"}
-_DOCUMENT_FIELDS = {"schemaVersion", "projects", "tools", "denyTools", "limits", "tables"}
-_TABLE_RULE_FIELDS = {"effect", "tenantField", "rows", "columns"}
+_DOCUMENT_FIELDS = {"schemaVersion", "projects", "tools", "denyTools", "limits", "tables", "datasourceId"}
+_TABLE_RULE_FIELDS = {"effect", "tenantField", "rows", "columns", "datasourceId"}
 
 
 def _identifier(value: Any, *, wildcard: bool = False) -> bool:
@@ -54,6 +55,19 @@ def _identifier(value: Any, *, wildcard: bool = False) -> bool:
     )
 
 
+def _datasource_identifier(value: Any) -> bool:
+    """Validate the opaque, server-issued datasource identifier.
+
+    Datasource IDs are intentionally not SQL identifiers: the project store
+    issues random URL-safe tokens, and policy evaluation only compares them to
+    the active server-side record.
+    """
+
+    return isinstance(value, str) and 1 <= len(value) <= 128 and all(
+        character.isalnum() or character in {"-", "_"} for character in value
+    )
+
+
 def validate_policy_document(document: Any) -> Mapping[str, Any]:
     """Statically validate a version-one policy before it is persisted."""
 
@@ -61,6 +75,9 @@ def validate_policy_document(document: Any) -> Mapping[str, Any]:
         raise PolicyError("policy document has unknown fields")
     if document.get("schemaVersion") != 1:
         raise PolicyError("policy schema version is unsupported")
+    datasource_id = document.get("datasourceId")
+    if datasource_id is not None and not _datasource_identifier(datasource_id):
+        raise PolicyError("datasourceId is invalid")
     for field in ("projects", "tools", "denyTools"):
         values = document.get(field, [])
         if not isinstance(values, list) or any(not isinstance(item, str) or not item for item in values):
@@ -79,6 +96,9 @@ def validate_policy_document(document: Any) -> Mapping[str, Any]:
             raise PolicyError("table rule is invalid")
         if rule.get("effect", "allow") not in {"allow", "deny"}:
             raise PolicyError("table effect is invalid")
+        rule_datasource_id = rule.get("datasourceId")
+        if rule_datasource_id is not None and not _datasource_identifier(rule_datasource_id):
+            raise PolicyError("table datasourceId is invalid")
         tenant_field = rule.get("tenantField")
         if tenant_field is not None and not _identifier(tenant_field):
             raise PolicyError("tenant field is invalid")
@@ -146,14 +166,20 @@ def _normalize_condition(condition: Any, subject: Subject) -> dict[str, Any]:
         raise PolicyError("row operator is unsupported")
     value = _resolve_subject_value(subject, condition.get("valueFrom"))
     values = list(value) if isinstance(value, (list, tuple)) else [value]
-    if not values or any(not isinstance(item, (str, int, float, bool)) for item in values):
+    if not values or any(
+        not isinstance(item, (str, int, float, bool))
+        or (isinstance(item, float) and not math.isfinite(item))
+        for item in values
+    ):
         raise PolicyError("row condition resolved to an invalid value")
     if operator == "eq" and len(values) != 1:
         raise PolicyError("eq row condition requires one value")
     return {"field": field, "operator": operator, "values": values}
 
 
-def _table_rule(document: Mapping[str, Any], table: str) -> Mapping[str, Any] | None:
+def _table_rule(
+    document: Mapping[str, Any], table: str, *, datasource_id: str | None = None
+) -> Mapping[str, Any] | None:
     tables = document.get("tables", {})
     if not isinstance(tables, Mapping):
         raise PolicyError("tables must be an object")
@@ -162,7 +188,26 @@ def _table_rule(document: Mapping[str, Any], table: str) -> Mapping[str, Any] | 
         return None
     if not isinstance(rule, Mapping):
         raise PolicyError("table rule must be an object")
+    if datasource_id is not None:
+        binding = rule.get("datasourceId", document.get("datasourceId"))
+        if binding != datasource_id:
+            return None
     return rule
+
+
+def _document_matches_datasource(document: Mapping[str, Any], datasource_id: str) -> bool:
+    """Whether a document contains a rule explicitly bound to this source."""
+
+    if document.get("datasourceId") == datasource_id:
+        return True
+    tables = document.get("tables", {})
+    if not isinstance(tables, Mapping):
+        raise PolicyError("tables must be an object")
+    return any(
+        isinstance(rule, Mapping)
+        and rule.get("datasourceId", document.get("datasourceId")) == datasource_id
+        for rule in tables.values()
+    )
 
 
 def _limits(documents: Sequence[Mapping[str, Any]]) -> dict[str, int]:
@@ -188,9 +233,12 @@ class PolicyEngine:
         policies: Sequence[Mapping[str, Any]],
         *,
         project_id: str | None = None,
+        datasource_id: str | None = None,
     ) -> PolicyDecision:
         try:
-            return self.authorize_scope(subject, scope_for_method(method), policies, project_id=project_id)
+            return self.authorize_scope(
+                subject, scope_for_method(method), policies, project_id=project_id, datasource_id=datasource_id
+            )
         except PolicyError:
             return PolicyDecision(False, "policy evaluation failed closed")
 
@@ -201,13 +249,16 @@ class PolicyEngine:
         policies: Sequence[Mapping[str, Any]],
         *,
         project_id: str | None = None,
+        datasource_id: str | None = None,
     ) -> PolicyDecision:
         """Authorize one stable SemaRail scope."""
 
         if subject.id == BOOTSTRAP_SUBJECT_ID:
             return PolicyDecision(True, "bootstrap administrator")
         try:
-            documents = self._documents(subject, policies)
+            documents = self._documents(subject, policies, datasource_id=datasource_id)
+            if datasource_id is not None and not documents:
+                return PolicyDecision(False, "datasource is not allowed")
             if project_id is not None:
                 documents = [item for item in documents if _matches(item[0].get("projects", []), project_id)]
                 if not documents:
@@ -228,18 +279,23 @@ class PolicyEngine:
         policies: Sequence[Mapping[str, Any]],
         *,
         project_id: str | None = None,
+        datasource_id: str | None = None,
     ) -> PolicyDecision:
         if subject.id == BOOTSTRAP_SUBJECT_ID:
             return PolicyDecision(True, "bootstrap administrator")
         try:
-            documents = self._documents(subject, policies)
+            if not _datasource_identifier(datasource_id):
+                return PolicyDecision(False, "datasource binding is required")
+            documents = self._documents(subject, policies, datasource_id=datasource_id)
+            if not documents:
+                return PolicyDecision(False, "datasource is not allowed")
             if project_id is not None:
                 documents = [item for item in documents if _matches(item[0].get("projects", []), project_id)]
                 if not documents:
                     return PolicyDecision(False, "project is not allowed")
             matching: list[tuple[Mapping[str, Any], Mapping[str, Any], str]] = []
             for document, version in documents:
-                rule = _table_rule(document, table)
+                rule = _table_rule(document, table, datasource_id=datasource_id)
                 if rule is not None:
                     matching.append((document, rule, version))
             if not matching:
@@ -250,6 +306,7 @@ class PolicyEngine:
             row_scopes: list[dict[str, Any]] = []
             unrestricted_rows = False
             allow_sets: list[set[str]] = []
+            unrestricted_columns = False
             denied: set[str] = set()
             for _, rule, _ in matching:
                 if rule.get("effect", "allow") != "allow":
@@ -275,10 +332,16 @@ class PolicyEngine:
                     if not isinstance(allow, list) or any(not isinstance(item, str) for item in allow):
                         raise PolicyError("column allow list is invalid")
                     allow_sets.append(set(allow))
+                else:
+                    unrestricted_columns = True
                 if not isinstance(deny, list) or any(not isinstance(item, str) for item in deny):
                     raise PolicyError("column deny list is invalid")
                 denied.update(deny)
-            allowed_columns = tuple(sorted(set().union(*allow_sets) - denied)) if allow_sets else None
+            allowed_columns = (
+                None
+                if unrestricted_columns or not allow_sets
+                else tuple(sorted(set().union(*allow_sets) - denied))
+            )
             row_filter: Mapping[str, Any] | None = (
                 None if unrestricted_rows or not row_scopes else {"op": "or", "conditions": row_scopes}
             )
@@ -325,13 +388,18 @@ class PolicyEngine:
         policies: Sequence[Mapping[str, Any]],
         *,
         project_id: str | None = None,
+        datasource_id: str | None = None,
     ) -> dict[str, Any]:
         """Resolve bound table rules into a secret-free execution policy."""
 
         if subject.id == BOOTSTRAP_SUBJECT_ID:
             return {"schemaVersion": 1, "defaultEffect": "allow", "tables": {}, "policyVersions": []}
         try:
-            documents = self._documents(subject, policies)
+            if not _datasource_identifier(datasource_id):
+                raise PolicyError("datasource binding is required")
+            documents = self._documents(subject, policies, datasource_id=datasource_id)
+            if not documents:
+                raise PolicyError("datasource is not allowed")
             if project_id is not None:
                 documents = [item for item in documents if _matches(item[0].get("projects", []), project_id)]
                 if not documents:
@@ -341,10 +409,16 @@ class PolicyEngine:
                 tables = document.get("tables", {})
                 if not isinstance(tables, Mapping):
                     raise PolicyError("tables must be an object")
-                table_names.update(str(name) for name in tables if name != "*")
+                table_names.update(
+                    str(name)
+                    for name in tables
+                    if name != "*" and _table_rule(document, str(name), datasource_id=datasource_id) is not None
+                )
             compiled: dict[str, Any] = {}
             for table in sorted(table_names):
-                decision = self.authorize_table(subject, table, policies, project_id=project_id)
+                decision = self.authorize_table(
+                    subject, table, policies, project_id=project_id, datasource_id=datasource_id
+                )
                 if not decision.allowed:
                     continue
                 compiled[table] = {
@@ -361,7 +435,7 @@ class PolicyEngine:
                         version
                         for decision_table in table_names
                         for version in self.authorize_table(
-                            subject, decision_table, policies, project_id=project_id
+                            subject, decision_table, policies, project_id=project_id, datasource_id=datasource_id
                         ).policy_versions
                     }
                 ),
@@ -370,7 +444,9 @@ class PolicyEngine:
             raise PolicyError("data policy compilation failed") from exc
 
     @staticmethod
-    def _documents(subject: Subject, policies: Sequence[Mapping[str, Any]]) -> list[tuple[Mapping[str, Any], str]]:
+    def _documents(
+        subject: Subject, policies: Sequence[Mapping[str, Any]], *, datasource_id: str | None = None
+    ) -> list[tuple[Mapping[str, Any], str]]:
         normalized: list[tuple[Mapping[str, Any], str]] = []
         for policy in policies:
             if policy.get("organizationId") != subject.organization_id or not isinstance(policy.get("document"), Mapping):
@@ -379,7 +455,8 @@ class PolicyEngine:
             validate_policy_document(document)
             # JSON round-trip rejects non-serializable policy extensions.
             json.dumps(document, ensure_ascii=False)
-            normalized.append((document, f"{policy.get('id')}:{policy.get('version')}"))
+            if datasource_id is None or _document_matches_datasource(document, datasource_id):
+                normalized.append((document, f"{policy.get('id')}:{policy.get('version')}"))
         return normalized
 
     @staticmethod

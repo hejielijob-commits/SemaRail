@@ -27,6 +27,9 @@ _KEY_PATTERN = re.compile(r"sr_live_([a-f0-9]{24})_([A-Za-z0-9_-]{32,128})\Z")
 _SESSION_PATTERN = re.compile(r"sr_session_([a-f0-9]{24})_([A-Za-z0-9_-]{32,128})\Z")
 _DEVICE_PATTERN = re.compile(r"sr_device_([a-f0-9]{24})_([A-Za-z0-9_-]{32,128})\Z")
 _STATE_PATTERN = re.compile(r"sr_state_([a-f0-9]{24})_([A-Za-z0-9_-]{32,128})\Z")
+_CONFIRMATION_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+_CONFIRMATION_PATTERN = re.compile(r"[A-HJ-NP-Z2-9]{4}-?[A-HJ-NP-Z2-9]{4}\Z", re.IGNORECASE)
+_MAX_CONFIRMATION_ATTEMPTS = 5
 _PBKDF2_ITERATIONS = 210_000
 
 
@@ -208,7 +211,9 @@ class AccessControlStore:
                     created_at TEXT NOT NULL,
                     expires_at TEXT NOT NULL,
                     completed_at TEXT,
-                    consumed_at TEXT
+                    consumed_at TEXT,
+                    confirmation_hash BLOB,
+                    confirmation_attempts INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE TABLE IF NOT EXISTS policies (
                     id TEXT PRIMARY KEY,
@@ -276,6 +281,16 @@ class AccessControlStore:
                     DROP TABLE external_identities_legacy;
                     CREATE INDEX identity_subject_idx ON external_identities(subject_id);
                     """
+                )
+            identity_transaction_columns = {
+                str(row["name"])
+                for row in connection.execute("PRAGMA table_info(identity_transactions)").fetchall()
+            }
+            if "confirmation_hash" not in identity_transaction_columns:
+                connection.execute("ALTER TABLE identity_transactions ADD COLUMN confirmation_hash BLOB")
+            if "confirmation_attempts" not in identity_transaction_columns:
+                connection.execute(
+                    "ALTER TABLE identity_transactions ADD COLUMN confirmation_attempts INTEGER NOT NULL DEFAULT 0"
                 )
             connection.execute(
                 "INSERT OR IGNORE INTO organizations(id,name,created_at) VALUES(?,?,?)",
@@ -694,26 +709,41 @@ class AccessControlStore:
             raise AccessControlError("LOGIN_EXPIRED", "login request expired", status=410)
         return transaction_id
 
-    def complete_identity_login(self, transaction_id: str, subject_id: str) -> None:
+    def complete_identity_login(self, transaction_id: str, subject_id: str) -> str:
+        """Stage a verified identity and return a browser-only confirmation code.
+
+        The code is generated only after the provider callback succeeds. Its
+        digest is persisted so possession of the original device code or full
+        authorization URL is insufficient to issue a session.
+        """
+
         subject = self.subject(subject_id)
         if subject.kind != "user" or subject.status != "active":
             raise AccessControlError("SUBJECT_DISABLED", "user is unavailable", status=403)
+        compact_code = "".join(secrets.choice(_CONFIRMATION_ALPHABET) for _ in range(8))
+        confirmation_code = f"{compact_code[:4]}-{compact_code[4:]}"
+        confirmation_hash = hashlib.sha256(compact_code.encode("ascii")).digest()
         with self._lock, self._connect() as connection:
             changed = connection.execute(
-                "UPDATE identity_transactions SET status='completed',subject_id=?,completed_at=? "
+                "UPDATE identity_transactions SET status='completed',subject_id=?,completed_at=?,confirmation_hash=? "
                 "WHERE id=? AND status='pending'",
-                (subject_id, _timestamp(self.clock()), transaction_id),
+                (subject_id, _timestamp(self.clock()), confirmation_hash, transaction_id),
             ).rowcount
         if not changed:
             raise AccessControlError("INVALID_LOGIN", "login request is no longer available", status=409)
+        return confirmation_code
 
-    def consume_identity_device_code(self, device_code: str) -> Subject | None:
-        """Return ``None`` while pending, otherwise consume exactly once."""
+    def consume_identity_device_code(
+        self, device_code: str, confirmation_code: str | None = None
+    ) -> Subject | None:
+        """Return ``None`` while pending, then require browser confirmation."""
 
         match = _DEVICE_PATTERN.fullmatch(device_code if isinstance(device_code, str) else "")
         if match is None:
             raise AccessControlError("INVALID_LOGIN", "device code is invalid", status=400)
         transaction_id, secret = match.groups()
+        invalid_confirmation = False
+        subject_id: str | None = None
         with self._lock, self._connect() as connection:
             row = connection.execute("SELECT * FROM identity_transactions WHERE id=?", (transaction_id,)).fetchone()
             if row is None or not secrets.compare_digest(
@@ -727,13 +757,50 @@ class AccessControlStore:
                 return None
             if row["status"] != "completed" or row["subject_id"] is None:
                 raise AccessControlError("INVALID_LOGIN", "device code was already consumed", status=409)
-            changed = connection.execute(
-                "UPDATE identity_transactions SET status='consumed',consumed_at=? WHERE id=? AND status='completed'",
-                (_timestamp(self.clock()), transaction_id),
-            ).rowcount
-            if not changed:
-                raise AccessControlError("INVALID_LOGIN", "device code was already consumed", status=409)
-            subject_id = str(row["subject_id"])
+            if confirmation_code is None:
+                raise AccessControlError(
+                    "CONFIRMATION_REQUIRED",
+                    "enter the confirmation code shown in the browser",
+                    status=428,
+                )
+            normalized_code = confirmation_code.strip().replace("-", "").upper()
+            confirmation_hash = row["confirmation_hash"]
+            valid_format = _CONFIRMATION_PATTERN.fullmatch(confirmation_code.strip()) is not None
+            valid_code = (
+                valid_format
+                and confirmation_hash is not None
+                and secrets.compare_digest(
+                    bytes(confirmation_hash), hashlib.sha256(normalized_code.encode("ascii")).digest()
+                )
+            )
+            if not valid_code:
+                attempts = int(row["confirmation_attempts"]) + 1
+                if attempts >= _MAX_CONFIRMATION_ATTEMPTS:
+                    connection.execute(
+                        "UPDATE identity_transactions SET status='consumed',confirmation_attempts=?,consumed_at=? "
+                        "WHERE id=? AND status='completed'",
+                        (attempts, _timestamp(self.clock()), transaction_id),
+                    )
+                else:
+                    connection.execute(
+                        "UPDATE identity_transactions SET confirmation_attempts=? WHERE id=? AND status='completed'",
+                        (attempts, transaction_id),
+                    )
+                invalid_confirmation = True
+            else:
+                changed = connection.execute(
+                    "UPDATE identity_transactions SET status='consumed',consumed_at=? WHERE id=? AND status='completed'",
+                    (_timestamp(self.clock()), transaction_id),
+                ).rowcount
+                if not changed:
+                    raise AccessControlError("INVALID_LOGIN", "device code was already consumed", status=409)
+                subject_id = str(row["subject_id"])
+        if invalid_confirmation:
+            raise AccessControlError(
+                "INVALID_CONFIRMATION", "confirmation code is invalid", status=400
+            )
+        if subject_id is None:  # pragma: no cover - guarded by transaction state
+            raise AccessControlError("INVALID_LOGIN", "login request is invalid", status=409)
         return self.subject(subject_id)
 
     def authenticate(self, authorization: str | None) -> AuthContext:

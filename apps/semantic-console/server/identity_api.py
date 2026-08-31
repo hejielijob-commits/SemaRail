@@ -17,8 +17,8 @@ class IdentityApi:
     """Device-style bridge around browser authorization-code login.
 
     The browser callback never receives a SemaRail bearer token. The initiating
-    CLI or client exchanges its high-entropy one-time device code after the
-    external identity has been verified.
+    CLI or client exchanges its high-entropy one-time device code only after
+    also submitting the browser-only code generated after identity verification.
     """
 
     def __init__(self, store: AccessControlStore, providers: IdentityProviderRegistry | None = None) -> None:
@@ -76,7 +76,7 @@ class IdentityApi:
                     profile=profile.profile,
                     organization_id=provider.organization_id,
                 )
-                self.store.complete_identity_login(transaction_id, subject.id)
+                confirmation_code = self.store.complete_identity_login(transaction_id, subject.id)
                 auth = AuthContext(subject, "external_identity")
                 self.store.record_audit(
                     action="identity.login",
@@ -86,15 +86,30 @@ class IdentityApi:
                     details={"transactionId": transaction_id},
                 )
                 return 200, {
-                    "status": "authenticated",
+                    "status": "confirmation_required",
                     "provider": provider.id,
-                    "message": "Identity verified. You can return to SemaRail.",
+                    "confirmationCode": confirmation_code,
+                    "message": (
+                        "Identity verified. Enter this code only in the SemaRail CLI "
+                        "that you personally started. Do not share it with anyone."
+                    ),
                 }
             if method == "POST" and path == "/api/v1/auth/device/token":
                 device_code = payload.get("deviceCode")
                 if not isinstance(device_code, str):
                     raise AccessControlError("INVALID_REQUEST", "deviceCode is required")
-                subject = self.store.consume_identity_device_code(device_code)
+                confirmation_code = payload.get("confirmationCode")
+                if confirmation_code is not None and not isinstance(confirmation_code, str):
+                    raise AccessControlError("INVALID_REQUEST", "confirmationCode is invalid")
+                try:
+                    subject = self.store.consume_identity_device_code(device_code, confirmation_code)
+                except AccessControlError as exc:
+                    if exc.code == "CONFIRMATION_REQUIRED":
+                        return 202, {
+                            "status": "confirmation_required",
+                            "message": exc.safe_message,
+                        }
+                    raise
                 if subject is None:
                     return 202, {"status": "authorization_pending"}
                 session = self.store.issue_session(subject.id)

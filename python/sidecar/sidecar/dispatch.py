@@ -24,6 +24,7 @@ from .errors import (
     WREN_UNAVAILABLE,
 )
 from .protocol import PROTOCOL_VERSION
+from .semantic_policy import filter_semantic_result
 from .sql_policy import SqlPolicyError, validate_semantic_sql
 
 
@@ -361,7 +362,7 @@ class Dispatcher:
             ) from exc
 
     def _context_ask(self, params: Any) -> Any:
-        object_params = _method_params(
+        object_params, authorization_policy = _semantic_params(
             params,
             method="context.ask",
             fields={"projectDir", "question"},
@@ -378,8 +379,10 @@ class Dispatcher:
             )
         try:
             if callable(provider):
-                return provider(object_params)
-            return provider.ask(object_params)
+                result = provider(object_params)
+            else:
+                result = provider.ask(object_params)
+            return _filter_semantic_response("context.ask", result, authorization_policy)
         except RpcFault:
             raise
         except Exception as exc:
@@ -392,7 +395,7 @@ class Dispatcher:
             ) from exc
 
     def _project_describe(self, params: Any) -> Any:
-        object_params = _method_params(
+        object_params, authorization_policy = _semantic_params(
             params,
             method="project.describe",
             fields={"projectDir"},
@@ -408,7 +411,7 @@ class Dispatcher:
                 retryable=True,
             )
         try:
-            return describe(object_params)
+            return _filter_semantic_response("project.describe", describe(object_params), authorization_policy)
         except RpcFault:
             raise
         except Exception as exc:
@@ -421,7 +424,7 @@ class Dispatcher:
             ) from exc
 
     def _query_dry_plan(self, params: Any) -> Any:
-        object_params = _method_params(
+        object_params, authorization_policy = _semantic_params(
             params,
             method="query.dryPlan",
             fields={"projectDir", "semanticSql"},
@@ -447,8 +450,10 @@ class Dispatcher:
             )
         try:
             if callable(planner):
-                return planner(object_params)
-            return planner.dry_plan(object_params)
+                result = planner(object_params)
+            else:
+                result = planner.dry_plan(object_params)
+            return _filter_semantic_response("query.dryPlan", result, authorization_policy)
         except RpcFault:
             raise
         except Exception as exc:
@@ -536,6 +541,30 @@ def _method_params(
             f"{method} params are invalid",
         )
     return cast(Mapping[str, Any], params)
+
+
+def _semantic_params(
+    params: Any,
+    *,
+    method: str,
+    fields: set[str],
+) -> tuple[Mapping[str, Any], Mapping[str, Any] | None]:
+    """Keep Core's compiled policy out of the Wren adapter call shape."""
+
+    if not isinstance(params, Mapping):
+        raise RpcFault(INVALID_PARAMS, "validation", "params must be an object")
+    if set(params) - (fields | {"authorizationPolicy"}) or not fields.issubset(params):
+        raise RpcFault(INVALID_PARAMS, "validation", f"{method} params are invalid")
+    policy = params.get("authorizationPolicy")
+    if policy is not None and not isinstance(policy, Mapping):
+        raise RpcFault(INVALID_PARAMS, "validation", "authorizationPolicy is invalid")
+    return ({key: params[key] for key in fields}, cast(Mapping[str, Any] | None, policy))
+
+
+def _filter_semantic_response(method: str, result: Any, policy: Mapping[str, Any] | None) -> Any:
+    # RuntimeRpcGateway always supplies one (including bootstrap's explicit
+    # allow policy); direct sidecar/MCP embedders retain their v1 behavior.
+    return result if policy is None else filter_semantic_result(method, result, policy)
 
 
 def _required_string(

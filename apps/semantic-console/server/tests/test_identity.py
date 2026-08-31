@@ -149,7 +149,7 @@ class IdentityTests(unittest.TestCase):
 
         self.assertEqual(expired.exception.code, "UNAUTHENTICATED")
 
-    def test_device_login_returns_session_only_to_one_time_device_code(self) -> None:
+    def test_device_login_requires_browser_confirmation_then_returns_one_session(self) -> None:
         api = IdentityApi(self.store, IdentityProviderRegistry({"work-sso": FakeProvider()}))
         status, started = api.dispatch("POST", "/api/v1/auth/device/start", {}, {"provider": "work-sso"}, None) or (0, {})
         self.assertEqual(status, 201)
@@ -167,11 +167,25 @@ class IdentityTests(unittest.TestCase):
             None,
             None,
         ) or (0, {})
-        self.assertEqual((status, callback["status"]), (200, "authenticated"))
+        self.assertEqual((status, callback["status"]), (200, "confirmation_required"))
+        self.assertRegex(callback["confirmationCode"], r"^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$")
         self.assertNotIn("accessToken", callback)
+        self.assertNotIn(callback["confirmationCode"].encode(), self.database.read_bytes())
+
+        status, confirmation_required = api.dispatch(
+            "POST", "/api/v1/auth/device/token", {}, {"deviceCode": started["deviceCode"]}, None
+        ) or (0, {})
+        self.assertEqual((status, confirmation_required["status"]), (202, "confirmation_required"))
 
         status, session = api.dispatch(
-            "POST", "/api/v1/auth/device/token", {}, {"deviceCode": started["deviceCode"]}, None
+            "POST",
+            "/api/v1/auth/device/token",
+            {},
+            {
+                "deviceCode": started["deviceCode"],
+                "confirmationCode": callback["confirmationCode"],
+            },
+            None,
         ) or (0, {})
         self.assertEqual(status, 200)
         auth = self.store.authenticate(f"Bearer {session['accessToken']}")
@@ -181,6 +195,80 @@ class IdentityTests(unittest.TestCase):
             "POST", "/api/v1/auth/device/token", {}, {"deviceCode": started["deviceCode"]}, None
         ) or (0, {})
         self.assertEqual((status, reused["code"]), (409, "INVALID_LOGIN"))
+
+    def test_forwarded_authorization_url_and_device_code_cannot_swap_the_victims_session(self) -> None:
+        api = IdentityApi(self.store, IdentityProviderRegistry({"work-sso": FakeProvider()}))
+        _, attacker_started = api.dispatch(
+            "POST", "/api/v1/auth/device/start", {}, {"provider": "work-sso"}, None
+        ) or (0, {})
+        forwarded_state = parse_qs(
+            urlsplit(attacker_started["verificationUriComplete"]).query
+        )["state"][0]
+
+        status, victim_browser = api.dispatch(
+            "GET",
+            "/api/v1/auth/callback/work-sso",
+            {"state": forwarded_state, "code": "verified-code"},
+            None,
+            None,
+        ) or (0, {})
+        self.assertEqual((status, victim_browser["status"]), (200, "confirmation_required"))
+
+        status, stolen_without_confirmation = api.dispatch(
+            "POST",
+            "/api/v1/auth/device/token",
+            {},
+            {"deviceCode": attacker_started["deviceCode"]},
+            None,
+        ) or (0, {})
+        self.assertEqual(
+            (status, stolen_without_confirmation["status"]),
+            (202, "confirmation_required"),
+        )
+        self.assertNotIn("accessToken", stolen_without_confirmation)
+
+        status, guessed = api.dispatch(
+            "POST",
+            "/api/v1/auth/device/token",
+            {},
+            {"deviceCode": attacker_started["deviceCode"], "confirmationCode": "AAAA-AAAA"},
+            None,
+        ) or (0, {})
+        self.assertEqual((status, guessed["code"]), (400, "INVALID_CONFIRMATION"))
+        self.assertNotIn("accessToken", guessed)
+
+    def test_confirmation_guess_limit_is_committed_and_terminal(self) -> None:
+        api = IdentityApi(self.store, IdentityProviderRegistry({"work-sso": FakeProvider()}))
+        _, started = api.dispatch(
+            "POST", "/api/v1/auth/device/start", {}, {"provider": "work-sso"}, None
+        ) or (0, {})
+        state = parse_qs(urlsplit(started["verificationUriComplete"]).query)["state"][0]
+        _, callback = api.dispatch(
+            "GET",
+            "/api/v1/auth/callback/work-sso",
+            {"state": state, "code": "verified-code"},
+            None,
+            None,
+        ) or (0, {})
+
+        for _ in range(5):
+            status, denied = api.dispatch(
+                "POST",
+                "/api/v1/auth/device/token",
+                {},
+                {"deviceCode": started["deviceCode"], "confirmationCode": "1111-1111"},
+                None,
+            ) or (0, {})
+            self.assertEqual((status, denied["code"]), (400, "INVALID_CONFIRMATION"))
+
+        status, terminal = api.dispatch(
+            "POST",
+            "/api/v1/auth/device/token",
+            {},
+            {"deviceCode": started["deviceCode"], "confirmationCode": callback["confirmationCode"]},
+            None,
+        ) or (0, {})
+        self.assertEqual((status, terminal["code"]), (409, "INVALID_LOGIN"))
 
     def test_identity_api_lists_providers_and_rejects_a_denied_callback(self) -> None:
         api = IdentityApi(self.store, IdentityProviderRegistry({"work-sso": FakeProvider()}))
@@ -512,6 +600,7 @@ class IdentityTests(unittest.TestCase):
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            stdin=subprocess.PIPE,
             text=True,
         )
         try:
@@ -523,8 +612,9 @@ class IdentityTests(unittest.TestCase):
                 f"{endpoint}/api/v1/auth/callback/work-sso?state={quote(state)}&code=verified-code",
                 timeout=3,
             ) as response:
-                self.assertEqual(json.loads(response.read())["status"], "authenticated")
-            stdout, stderr = process.communicate(timeout=10)
+                callback = json.loads(response.read())
+                self.assertEqual(callback["status"], "confirmation_required")
+            stdout, stderr = process.communicate(input=f"{callback['confirmationCode']}\n", timeout=10)
             self.assertEqual(process.returncode, 0, stderr)
             self.assertIn("Signed in as Employee A", stdout)
             saved = json.loads(session_file.read_text(encoding="utf-8"))

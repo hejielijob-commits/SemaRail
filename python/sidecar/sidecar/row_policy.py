@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import math
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -93,7 +94,12 @@ def _condition(
         raise RowPolicyError("row filter field is invalid")
     if operator not in {"eq", "in"} or not isinstance(values, list) or not values or len(values) > _MAX_VALUES:
         raise RowPolicyError("row filter operator or values are invalid")
-    if any(not isinstance(item, (str, int, float, bool)) or item is None for item in values):
+    if any(
+        not isinstance(item, (str, int, float, bool))
+        or item is None
+        or (isinstance(item, float) and not math.isfinite(item))
+        for item in values
+    ):
         raise RowPolicyError("row filter value is invalid")
     if operator == "eq" and len(values) != 1:
         raise RowPolicyError("eq row filter requires one value")
@@ -114,6 +120,7 @@ def _is_restricted(rule: Mapping[str, Any]) -> bool:
 
 
 def _validate_column(name: str, rules: list[Mapping[str, Any]]) -> None:
+    normalized_name = name.lower()
     for rule in rules:
         denied = rule.get("deniedColumns", [])
         allowed = rule.get("allowedColumns")
@@ -121,7 +128,11 @@ def _validate_column(name: str, rules: list[Mapping[str, Any]]) -> None:
             raise RowPolicyError("denied column policy is invalid")
         if allowed is not None and (not isinstance(allowed, list) or any(not isinstance(item, str) for item in allowed)):
             raise RowPolicyError("allowed column policy is invalid")
-        if name in denied or (allowed is not None and name not in allowed):
+        normalized_denied = {item.lower() for item in denied}
+        normalized_allowed = {item.lower() for item in allowed} if allowed is not None else None
+        if normalized_name in normalized_denied or (
+            normalized_allowed is not None and normalized_name not in normalized_allowed
+        ):
             raise RowPolicyError("column is not allowed")
 
 

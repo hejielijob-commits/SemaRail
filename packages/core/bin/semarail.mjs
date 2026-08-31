@@ -5,6 +5,7 @@ import { execFileSync, spawn } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, resolve } from 'node:path'
+import { createInterface } from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -138,16 +139,29 @@ async function authLogin(args) {
   }
   const deadline = Date.parse(started.expiresAt)
   const interval = Math.max(1, Math.min(Number(started.interval) || 2, 10)) * 1000
+  let confirmationCode
   while (Number.isFinite(deadline) && Date.now() < deadline) {
     await delay(interval)
     const response = await fetch(new URL('/api/v1/auth/device/token', endpoint), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deviceCode: started.deviceCode }),
+      body: JSON.stringify({ deviceCode: started.deviceCode, ...(confirmationCode ? { confirmationCode } : {}) }),
       signal: AbortSignal.timeout(10_000),
     })
     const body = await response.json()
     if (response.status === 202 && body?.status === 'authorization_pending') continue
+    if (response.status === 202 && body?.status === 'confirmation_required') {
+      const prompt = createInterface({ input: process.stdin, output: process.stdout })
+      try {
+        confirmationCode = (await prompt.question('Enter the confirmation code shown in your browser: ')).trim()
+      } finally {
+        prompt.close()
+      }
+      if (!/^[A-HJ-NP-Z2-9]{4}-?[A-HJ-NP-Z2-9]{4}$/i.test(confirmationCode)) {
+        throw new Error('employee confirmation code is invalid')
+      }
+      continue
+    }
     if (!response.ok) throw new Error('employee authorization failed')
     const path = authFilePath(options)
     saveSession(path, endpoint, body)

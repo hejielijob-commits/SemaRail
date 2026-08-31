@@ -11,6 +11,7 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 from server.project import ProjectStore
+from server.models import DatasourceRecord
 from server.remote_mcp import SemaRailTokenVerifier, create_remote_mcp_server
 from server.runtime_rpc import RuntimeRpcGateway
 
@@ -61,6 +62,12 @@ class RemoteMcpTests(unittest.TestCase):
             "schema_version: 5\nname: remote-mcp-test\ndata_source: postgres\n", encoding="utf-8"
         )
         project = ProjectStore(project_dir, state_dir=root / "state", validator=FakeValidator())
+        self.datasource_id = "remote-mcp-datasource"
+        project.datasource_records()[self.datasource_id] = DatasourceRecord(
+            self.datasource_id, "Remote warehouse", "postgres", {"database": "remote"}
+        )
+        project.active_datasource_id = self.datasource_id
+        project.save_datasources()
         self.dispatcher = RecordingDispatcher()
         self.gateway = RuntimeRpcGateway(
             project,
@@ -74,6 +81,7 @@ class RemoteMcpTests(unittest.TestCase):
             "Remote MCP",
             {
                 "schemaVersion": 1,
+                "datasourceId": self.datasource_id,
                 "projects": ["remote-mcp-test"],
                 "tools": ["project:validate", "semantic:read", "query:plan", "query:execute", "query:cancel"],
                 "tables": {

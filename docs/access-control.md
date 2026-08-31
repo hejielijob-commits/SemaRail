@@ -34,6 +34,7 @@ one explicit physical table. Its permitted rows come from the trusted
 ```json
 {
   "schemaVersion": 1,
+  "datasourceId": "server-issued-datasource-id",
   "projects": ["sales-project"],
   "tools": ["project:validate", "semantic:read", "query:plan", "query:execute", "query:cancel"],
   "limits": {"maxRows": 200, "timeoutMs": 10000},
@@ -56,6 +57,14 @@ one explicit physical table. Its permitted rows come from the trusted
   }
 }
 ```
+
+`datasourceId` is the opaque ID returned by the server's datasource API, not a
+display name or database URL. It binds every table in this document unless an
+individual table supplies its own `datasourceId`. Existing schema-version-1
+policies without either binding remain readable for migration, but non-bootstrap
+data-facing requests fail closed until they are updated with an ID for the active datasource.
+When two datasources expose the same `schema.table`, only rules bound to the
+currently active datasource participate in authorization or policy compilation.
 
 If employee A has `{"regionCodes":["CN-JIA"]}` and employee B has
 `{"regionCodes":["CN-YI"]}`, the same SQL is executed with different mandatory
@@ -131,9 +140,14 @@ semarail auth status
 semarail auth logout
 ```
 
-The CLI opens the browser authorization page, polls with a high-entropy one-time
-device code, and stores only the resulting short-lived SemaRail session. Provider
-access/refresh tokens are neither returned nor persisted. On Windows the session
+The CLI opens the browser authorization page and polls with a high-entropy one-time
+device code. After the provider callback, the browser displays a separate eight-character
+confirmation code that must be entered into the CLI before it can receive a session.
+Forwarding the complete authorization URL and device code therefore cannot transfer the
+browser user's session without that user's explicit post-callback confirmation. The
+confirmation code is stored only as a bounded-attempt digest and consumed with the login.
+The CLI stores only the resulting short-lived SemaRail session. Provider access/refresh
+tokens are neither returned nor persisted. On Windows the session
 file receives a user-only ACL; on POSIX it is mode `0600`. Override its location
 with `--session-file` or `SEMARAIL_AUTH_FILE`.
 

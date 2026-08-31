@@ -74,6 +74,21 @@ try {
   })
   await waitForConsole(endpoint, child)
 
+  // Runtime policies are intentionally bound to an opaque, server-issued
+  // datasource ID. Seed a non-connecting profile so the acceptance exercises
+  // the same binding path as the Console without requiring a live database.
+  const datasource = await adminJson(endpoint, '/api/datasources', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'Split acceptance warehouse',
+      type: 'postgres',
+      connection: { host: '127.0.0.1', port: 5432, database: 'acceptance', user: 'readonly' },
+    }),
+  })
+  if (typeof datasource.id !== 'string' || datasource.id.length === 0) {
+    throw new Error('bootstrap did not create a server-owned datasource identity')
+  }
+
   const account = await adminJson(endpoint, '/api/v1/access/service-accounts', {
     method: 'POST',
     body: JSON.stringify({ name: 'Split acceptance Harness' }),
@@ -84,6 +99,7 @@ try {
       name: 'Split acceptance semantic read',
       document: {
         schemaVersion: 1,
+        datasourceId: datasource.id,
         projects: ['semarail_sales'],
         tools: ['runtime:health', 'project:validate', 'semantic:read'],
         tables: {},

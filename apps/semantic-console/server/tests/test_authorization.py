@@ -6,6 +6,10 @@ from server.access_control import Subject
 from server.authorization import PolicyEngine
 
 
+DATASOURCE_A = "datasource-a"
+DATASOURCE_B = "datasource-b"
+
+
 def policy(policy_id: str, region_attribute: str = "regionCodes") -> dict:
     return {
         "id": policy_id,
@@ -14,6 +18,7 @@ def policy(policy_id: str, region_attribute: str = "regionCodes") -> dict:
         "version": 1,
         "document": {
             "schemaVersion": 1,
+            "datasourceId": DATASOURCE_A,
             "projects": ["sales"],
             "tools": ["semantic:read", "query:execute", "query:cancel"],
             "tables": {
@@ -38,8 +43,8 @@ class PolicyEngineTests(unittest.TestCase):
         self.user_b = Subject("user-b", "org-sales", "user", "B", {"regionCodes": ["CN-YI"]})
 
     def test_sales_region_values_are_derived_from_each_subject(self) -> None:
-        decision_a = self.engine.authorize_table(self.user_a, "sales.orders", [policy("pol-sales")])
-        decision_b = self.engine.authorize_table(self.user_b, "sales.orders", [policy("pol-sales")])
+        decision_a = self.engine.authorize_table(self.user_a, "sales.orders", [policy("pol-sales")], datasource_id=DATASOURCE_A)
+        decision_b = self.engine.authorize_table(self.user_b, "sales.orders", [policy("pol-sales")], datasource_id=DATASOURCE_A)
 
         self.assertTrue(decision_a.allowed)
         self.assertEqual(self.engine.allowed_values(decision_a, "region_code"), ("CN-JIA",))
@@ -48,14 +53,14 @@ class PolicyEngineTests(unittest.TestCase):
         self.assertNotIn("customer_phone", decision_a.allowed_columns or ())
 
     def test_requested_region_can_only_intersect_with_authorized_values(self) -> None:
-        decision = self.engine.authorize_table(self.user_a, "sales.orders", [policy("pol-sales")])
+        decision = self.engine.authorize_table(self.user_a, "sales.orders", [policy("pol-sales")], datasource_id=DATASOURCE_A)
         allowed = set(self.engine.allowed_values(decision, "region_code"))
         self.assertEqual(allowed.intersection({"CN-JIA"}), {"CN-JIA"})
         self.assertEqual(allowed.intersection({"CN-YI"}), set())
 
     def test_multiple_bound_policies_union_allowed_region_scopes(self) -> None:
         user = Subject("manager", "org-sales", "user", "Manager", {"regionCodes": ["CN-JIA", "CN-YI"]})
-        decision = self.engine.authorize_table(user, "sales.orders", [policy("pol-manager")])
+        decision = self.engine.authorize_table(user, "sales.orders", [policy("pol-manager")], datasource_id=DATASOURCE_A)
         self.assertEqual(self.engine.allowed_values(decision, "region_code"), ("CN-JIA", "CN-YI"))
 
     def test_unrestricted_allow_grant_widens_row_union_without_invalid_empty_group(self) -> None:
@@ -64,18 +69,35 @@ class PolicyEngineTests(unittest.TestCase):
         unrestricted["document"]["tables"]["sales.orders"]["rows"] = []
 
         decision = self.engine.authorize_table(
-            self.user_a, "sales.orders", [policy("pol-region"), unrestricted]
+            self.user_a, "sales.orders", [policy("pol-region"), unrestricted], datasource_id=DATASOURCE_A
         )
 
         self.assertTrue(decision.allowed)
         self.assertIsNone(decision.row_filter)
 
+    def test_unrestricted_column_grant_widens_allow_union_but_deny_still_wins(self) -> None:
+        restricted = policy("pol-restricted")
+        unrestricted = policy("pol-unrestricted")
+        unrestricted["document"]["tables"]["sales.orders"]["columns"].pop("allow")
+        unrestricted["document"]["tables"]["sales.orders"]["columns"]["deny"] = ["customer_phone"]
+
+        decision = self.engine.authorize_table(
+            self.user_a,
+            "sales.orders",
+            [restricted, unrestricted],
+            datasource_id=DATASOURCE_A,
+        )
+
+        self.assertTrue(decision.allowed)
+        self.assertIsNone(decision.allowed_columns)
+        self.assertIn("customer_phone", decision.denied_columns)
+
     def test_missing_subject_attribute_and_malformed_policy_fail_closed(self) -> None:
         missing = Subject("user-c", "org-sales", "user", "C", {})
-        self.assertFalse(self.engine.authorize_table(missing, "sales.orders", [policy("pol-sales")]).allowed)
+        self.assertFalse(self.engine.authorize_table(missing, "sales.orders", [policy("pol-sales")], datasource_id=DATASOURCE_A).allowed)
         malformed = policy("pol-bad")
         malformed["document"]["tables"]["sales.orders"]["rows"][0]["operator"] = "raw_sql"
-        self.assertFalse(self.engine.authorize_table(self.user_a, "sales.orders", [malformed]).allowed)
+        self.assertFalse(self.engine.authorize_table(self.user_a, "sales.orders", [malformed], datasource_id=DATASOURCE_A).allowed)
 
     def test_tool_scope_defaults_to_deny_and_explicit_deny_wins(self) -> None:
         self.assertTrue(self.engine.authorize_method(self.user_a, "context.ask", [policy("pol-sales")]).allowed)
@@ -103,7 +125,7 @@ class PolicyEngineTests(unittest.TestCase):
         foreign_rule["rows"] = []
 
         compiled = self.engine.compile_data_policy(
-            self.user_a, [current, foreign], project_id="sales"
+            self.user_a, [current, foreign], project_id="sales", datasource_id=DATASOURCE_A
         )
 
         row_filter = compiled["tables"]["sales.orders"]["rowFilter"]
@@ -112,6 +134,48 @@ class PolicyEngineTests(unittest.TestCase):
             row_filter["conditions"][0]["conditions"][1]["values"], ["CN-JIA"]
         )
         self.assertEqual(compiled["policyVersions"], ["pol-current:1"])
+
+    def test_same_table_name_is_scoped_to_the_matching_datasource(self) -> None:
+        source_a = policy("pol-source-a")
+        source_b = policy("pol-source-b")
+        source_b["document"]["datasourceId"] = DATASOURCE_B
+        source_b["document"]["tables"]["sales.orders"]["rows"][0]["valueFrom"] = "subject.id"
+
+        compiled = self.engine.compile_data_policy(
+            self.user_a, [source_a, source_b], datasource_id=DATASOURCE_A
+        )
+
+        self.assertEqual(compiled["policyVersions"], ["pol-source-a:1"])
+        row_filter = compiled["tables"]["sales.orders"]["rowFilter"]
+        self.assertEqual(row_filter["conditions"][0]["conditions"][1]["values"], ["CN-JIA"])
+        self.assertFalse(
+            self.engine.authorize_table(
+                self.user_a, "sales.orders", [source_a], datasource_id=DATASOURCE_B
+            ).allowed
+        )
+
+    def test_legacy_unbound_table_policy_remains_readable_but_fails_closed(self) -> None:
+        legacy = policy("pol-legacy")
+        legacy["document"].pop("datasourceId")
+
+        self.assertFalse(
+            self.engine.authorize_table(
+                self.user_a, "sales.orders", [legacy], datasource_id=DATASOURCE_A
+            ).allowed
+        )
+        with self.assertRaisesRegex(Exception, "data policy compilation failed"):
+            self.engine.compile_data_policy(self.user_a, [legacy], datasource_id=DATASOURCE_A)
+
+    def test_per_table_binding_is_supported_without_a_document_binding(self) -> None:
+        bound = policy("pol-table-bound")
+        bound["document"].pop("datasourceId")
+        bound["document"]["tables"]["sales.orders"]["datasourceId"] = DATASOURCE_A
+
+        self.assertTrue(
+            self.engine.authorize_table(
+                self.user_a, "sales.orders", [bound], datasource_id=DATASOURCE_A
+            ).allowed
+        )
 
 
 if __name__ == "__main__":

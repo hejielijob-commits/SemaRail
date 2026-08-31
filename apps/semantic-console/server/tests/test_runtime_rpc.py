@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from server.app import create_app
+from server.models import DatasourceRecord
 from server.project import ProjectStore
 from server.runtime_rpc import RuntimeRpcGateway
 from server.service import SemanticConsoleService
@@ -49,6 +50,12 @@ class RuntimeRpcTests(unittest.TestCase):
             encoding="utf-8",
         )
         self.project = ProjectStore(project_dir, state_dir=root / "state", validator=FakeValidator())
+        self.datasource_id = "runtime-datasource"
+        self.project.datasource_records()[self.datasource_id] = DatasourceRecord(
+            self.datasource_id, "Runtime warehouse", "postgres", {"database": "runtime"}
+        )
+        self.project.active_datasource_id = self.datasource_id
+        self.project.save_datasources()
         self.dispatcher = RecordingDispatcher()
         self.token = "test-token-that-is-at-least-thirty-two-characters"
         self.authorization = f"Bearer {self.token}"
@@ -65,8 +72,8 @@ class RuntimeRpcTests(unittest.TestCase):
         self.assertEqual(response["result"]["service"], "semarail-core")
         self.assertEqual(response["result"]["apiVersion"], "1")
         self.assertTrue(response["result"]["capabilities"]["queryCancellation"])
-        self.assertFalse(response["result"]["capabilities"]["governedQuery"])
-        self.assertEqual(response["result"]["readiness"]["governedQuery"], "setup_required")
+        self.assertTrue(response["result"]["capabilities"]["governedQuery"])
+        self.assertEqual(response["result"]["readiness"]["governedQuery"], "ready")
 
     def test_query_pins_project_credentials_and_limits_server_side(self) -> None:
         status, response = self.gateway.dispatch(
@@ -155,6 +162,32 @@ class RuntimeRpcTests(unittest.TestCase):
                 self.assertTrue(response["ok"])
                 self.assertEqual(self.dispatcher.requests[-1]["params"]["projectDir"], str(self.project.project_dir))
 
+    def test_runtime_compiles_policy_for_all_semantic_metadata_calls_and_bootstrap_stays_unrestricted(self) -> None:
+        for method, params in (
+            ("project.describe", {}),
+            ("context.ask", {"question": "orders"}),
+            ("query.dryPlan", {"semanticSql": "SELECT * FROM orders"}),
+        ):
+            with self.subTest(method=method):
+                status, response = self.gateway.dispatch(
+                    {"protocolVersion": "1", "id": f"bootstrap-{method}", "method": method, "params": params},
+                    authorization=self.authorization,
+                )
+                self.assertEqual(status, 200)
+                self.assertTrue(response["ok"])
+                compiled = self.dispatcher.requests[-1]["params"]["authorizationPolicy"]
+                self.assertEqual(compiled["defaultEffect"], "allow")
+
+    def test_runtime_fails_closed_when_semantic_policy_cannot_be_compiled(self) -> None:
+        with patch.object(self.gateway.policy_engine, "compile_data_policy", side_effect=RuntimeError("missing policy")):
+            status, response = self.gateway.dispatch(
+                {"protocolVersion": "1", "id": "metadata-policy-missing", "method": "context.ask", "params": {"question": "orders"}},
+                authorization=self.authorization,
+            )
+        self.assertEqual(status, 403)
+        self.assertEqual(response["error"]["code"], "FORBIDDEN")
+        self.assertEqual(self.dispatcher.requests, [])
+
     def test_runtime_rpc_requires_a_bearer_token(self) -> None:
         status, response = self.gateway.dispatch(
             {"protocolVersion": "1", "id": "health-2", "method": "health", "params": {}},
@@ -173,6 +206,7 @@ class RuntimeRpcTests(unittest.TestCase):
             "Sales query",
             {
                 "schemaVersion": 1,
+                "datasourceId": self.datasource_id,
                 "projects": ["runtime-test"],
                 "tools": ["query:execute"],
                 "tables": {},
@@ -206,6 +240,7 @@ class RuntimeRpcTests(unittest.TestCase):
             policy["id"],
             {
                 "schemaVersion": 1,
+                "datasourceId": self.datasource_id,
                 "projects": ["runtime-test"],
                 "tools": ["semantic:read"],
                 "tables": {},
@@ -243,6 +278,7 @@ class RuntimeRpcTests(unittest.TestCase):
             "Employee sales region",
             {
                 "schemaVersion": 1,
+                "datasourceId": self.datasource_id,
                 "projects": ["runtime-test"],
                 "tools": ["query:execute"],
                 "tables": {
@@ -286,6 +322,7 @@ class RuntimeRpcTests(unittest.TestCase):
             "Sales query",
             {
                 "schemaVersion": 1,
+                "datasourceId": self.datasource_id,
                 "projects": ["runtime-test"],
                 "tools": ["query:execute"],
                 "tables": {},
@@ -323,6 +360,66 @@ class RuntimeRpcTests(unittest.TestCase):
         self.assertEqual(denied_status, 403)
         self.assertEqual(denied["error"]["code"], "FORBIDDEN")
         self.assertEqual(len(self.dispatcher.requests), dispatch_count)
+
+    def test_query_policy_is_rejected_when_the_active_datasource_changes(self) -> None:
+        account = self.gateway.access_control.create_service_account("Source-bound agent")
+        policy = self.gateway.access_control.create_policy(
+            "Source A only",
+            {
+                "schemaVersion": 1,
+                "datasourceId": self.datasource_id,
+                "projects": ["runtime-test"],
+                "tools": ["query:execute"],
+                "tables": {"public.orders": {"effect": "allow"}},
+            },
+        )
+        self.gateway.access_control.bind_policy(account.id, policy["id"])
+        issued = self.gateway.access_control.issue_api_key(account.id)
+        self.project.datasource_records()["other-datasource"] = DatasourceRecord(
+            "other-datasource", "Other warehouse", "postgres", {"database": "other"}
+        )
+        self.project.active_datasource_id = "other-datasource"
+        self.project.save_datasources()
+
+        status, response = self.gateway.dispatch(
+            {
+                "protocolVersion": "1",
+                "id": "wrong-source",
+                "method": "query.run",
+                "params": {"question": "Orders", "semanticSql": "SELECT * FROM orders", "queryId": "source-2"},
+            },
+            authorization=f"Bearer {issued['apiKey']}",
+        )
+
+        self.assertEqual((status, response["error"]["code"]), (403, "FORBIDDEN"))
+        self.assertEqual(self.dispatcher.requests, [])
+
+    def test_legacy_unbound_policy_cannot_execute_a_query(self) -> None:
+        account = self.gateway.access_control.create_service_account("Legacy agent")
+        policy = self.gateway.access_control.create_policy(
+            "Legacy policy",
+            {
+                "schemaVersion": 1,
+                "projects": ["runtime-test"],
+                "tools": ["query:execute"],
+                "tables": {"public.orders": {"effect": "allow"}},
+            },
+        )
+        self.gateway.access_control.bind_policy(account.id, policy["id"])
+        issued = self.gateway.access_control.issue_api_key(account.id)
+
+        status, response = self.gateway.dispatch(
+            {
+                "protocolVersion": "1",
+                "id": "legacy-source",
+                "method": "query.run",
+                "params": {"question": "Orders", "semanticSql": "SELECT * FROM orders", "queryId": "legacy-1"},
+            },
+            authorization=f"Bearer {issued['apiKey']}",
+        )
+
+        self.assertEqual((status, response["error"]["code"]), (403, "FORBIDDEN"))
+        self.assertEqual(self.dispatcher.requests, [])
 
 
 if __name__ == "__main__":

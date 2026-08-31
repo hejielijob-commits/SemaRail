@@ -31,6 +31,7 @@ MAX_TIMEOUT_MS = 30_000
 _PUBLIC_METHODS = frozenset(
     {"health", "project.validate", "project.describe", "context.ask", "query.dryPlan", "query.run", "query.cancel"}
 )
+_DATA_POLICY_METHODS = frozenset({"project.describe", "context.ask", "query.dryPlan", "query.run"})
 _REQUEST_FIELDS = frozenset({"protocolVersion", "id", "method", "params", "deadlineMs"})
 _LOGGER = logging.getLogger("semarail-core.runtime")
 
@@ -114,7 +115,16 @@ class RuntimeRpcGateway:
             return 400, _error(request_id, "INVALID_PARAMS", "params must be an object")
         policies = [] if auth.subject.id == BOOTSTRAP_SUBJECT_ID else self.access_control.policies_for_subject(auth.subject.id)
         project_id = str(self.project.overview().get("name") or "")
-        decision = self.policy_engine.authorize_method(auth.subject, str(method), policies, project_id=project_id)
+        # Data-facing authorization is bound to the server-known active
+        # datasource; callers cannot select or spoof a source in the public
+        # RPC payload.
+        datasource_id = self.project.active_datasource_identifier() if method in _DATA_POLICY_METHODS else None
+        if method in _DATA_POLICY_METHODS and auth.subject.id != BOOTSTRAP_SUBJECT_ID and datasource_id is None:
+            decision = PolicyDecision(False, "active datasource binding is required")
+        else:
+            decision = self.policy_engine.authorize_method(
+                auth.subject, str(method), policies, project_id=project_id, datasource_id=datasource_id
+            )
         if not decision.allowed:
             self._audit(auth, str(method), "denied", request_id, decision)
             return 403, _error(request_id, "FORBIDDEN", "permission is required")
@@ -122,10 +132,10 @@ class RuntimeRpcGateway:
         if isinstance(normalized, str):
             self._audit(auth, str(method), "denied", request_id, decision)
             return 400, _error(request_id, "INVALID_PARAMS", normalized)
-        if method == "query.run" and auth.subject.id != BOOTSTRAP_SUBJECT_ID:
+        if method in _DATA_POLICY_METHODS:
             try:
                 normalized["authorizationPolicy"] = self.policy_engine.compile_data_policy(
-                    auth.subject, policies, project_id=project_id
+                    auth.subject, policies, project_id=project_id, datasource_id=datasource_id
                 )
             except Exception:
                 self._audit(auth, str(method), "denied", request_id, decision)
