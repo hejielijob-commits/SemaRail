@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-wren = ["wrenai==0.13.2"]
+wren = ["wrenai==0.13.3"]
 remote-mcp = ["mcp[cli]==1.28.1"]
 
 [project.scripts]
