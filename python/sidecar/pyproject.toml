@@ -13,14 +13,14 @@ requires-python = ">=3.11"
 dependencies = ["sqlglot>=29"]
 
 [project.optional-dependencies]
-test = ["pytest>=8", "mcp[cli]==1.28.1"]
+test = ["pytest>=8", "mcp[cli]==2.1.1"]
 # The MVP query path is PostgreSQL-only; include Wren's pinned psycopg extra
 # when the optional runtime is installed.  The default sidecar remains
 # dependency-free and reports DATABASE_ERROR until a driver is available.
 wren = ["wrenai[postgres]==0.13.2"]
 # Agent-neutral MCP runtime and official Python client. Wren 0.13.2 still uses
 # the v1 FastMCP API, so keep the SDK at its upstream lockfile version.
-mcp = ["wrenai[mcp]==0.13.2", "mcp[cli]==1.28.1"]
+mcp = ["wrenai[mcp]==0.13.2", "mcp[cli]==2.1.1"]
 
 [project.scripts]
 # SemaRail-owned commands. The DSH-prefixed entries remain compatibility
