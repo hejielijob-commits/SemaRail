@@ -4,9 +4,10 @@
 
 Superseded by [0004](0004-stable-semarail-semantic-mcp.md).
 
-> Historical interface note: new integrations use `semarail-mcp` and
-> `semarail-query-mcp`. Command names in the decision record below describe the
-> superseded implementation and must not be copied into new client settings.
+> Historical interface note: new integrations use SemaRail's authenticated
+> Streamable HTTP MCP endpoint or `semarail mcp bridge`. The direct commands and
+> upstream interface described below are trusted-local history and must not be
+> copied into shared client settings.
 
 ## Context
 
@@ -39,7 +40,8 @@ added.
 
 - Native MCP behavior is exercised in CI with an isolated DuckDB project and
   the official Python MCP client.
-- Other agents use `wren serve mcp`; they do not depend on Harness packages.
+- At the time of this decision, other agents used the upstream MCP server. This
+  is no longer the supported shared deployment boundary.
 - Harness continues to provide the current governed PostgreSQL execution and
   conversation-native presentation path.
 - MySQL support in the Semantic Console remains metadata, connection testing,

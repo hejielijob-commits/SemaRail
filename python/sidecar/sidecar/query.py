@@ -65,6 +65,14 @@ MAX_PREVIEW_BYTES = 1_048_576
 DEFAULT_TIMEOUT_MS = 30_000
 MAX_TIMEOUT_MS = 30_000
 MAX_QUERY_CONCURRENCY = 2
+MAX_DATABASE_SESSION_BYTES = 32_768
+MAX_DATABASE_SESSION_ATTRIBUTES = 32
+MAX_DATABASE_SESSION_VALUES = 1_000
+MAX_DATABASE_SESSION_POLICIES = 64
+_DATABASE_SESSION_FIELDS = {
+    "schemaVersion", "subjectId", "organizationId", "attributes", "policyVersions",
+}
+_DATABASE_ATTRIBUTE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,63}\Z")
 
 
 class QueryPlanner(Protocol):
@@ -87,6 +95,7 @@ class DatabaseExecutor(Protocol):
         connection_info: Mapping[str, Any] | None,
         limits: "QueryLimits",
         query_parameters: Mapping[str, Any] | None = None,
+        database_session: "DatabaseSession | None" = None,
     ) -> dict[str, Any]:
         """Execute one already-planned native SQL query."""
 
@@ -102,6 +111,79 @@ class QueryLimits:
     max_rows: int = MAX_QUERY_ROWS
     preview_rows: int = MAX_PREVIEW_ROWS
     max_bytes: int = MAX_PREVIEW_BYTES
+
+
+@dataclass(frozen=True, slots=True)
+class DatabaseSession:
+    """Validated, server-issued identity context for transaction-local RLS."""
+
+    subject_id: str
+    organization_id: str
+    attributes_json: str
+    policy_versions_json: str
+
+
+def _database_session_scalar(value: Any) -> bool:
+    return (
+        isinstance(value, (str, int, float, bool))
+        and not (isinstance(value, float) and not math.isfinite(value))
+        and not (isinstance(value, str) and len(value.encode("utf-8")) > 4_096)
+    )
+
+
+def _database_session(policy: Mapping[str, Any]) -> DatabaseSession:
+    """Strictly validate the Core-issued RLS context embedded in a policy."""
+
+    raw = policy.get("databaseSession")
+    if not isinstance(raw, Mapping) or set(raw) != _DATABASE_SESSION_FIELDS or raw.get("schemaVersion") != 1:
+        raise RowPolicyError("database session is missing or invalid")
+    subject_id = raw.get("subjectId")
+    organization_id = raw.get("organizationId")
+    if (
+        not isinstance(subject_id, str)
+        or not 1 <= len(subject_id.encode("utf-8")) <= 256
+        or not isinstance(organization_id, str)
+        or not 1 <= len(organization_id.encode("utf-8")) <= 256
+    ):
+        raise RowPolicyError("database session identity is invalid")
+    attributes = raw.get("attributes")
+    if (
+        not isinstance(attributes, Mapping)
+        or len(attributes) > MAX_DATABASE_SESSION_ATTRIBUTES
+        or any(not isinstance(name, str) or not _DATABASE_ATTRIBUTE_NAME.fullmatch(name) for name in attributes)
+    ):
+        raise RowPolicyError("database session attributes are invalid")
+    normalized_attributes: dict[str, Any] = {}
+    for name, value in attributes.items():
+        if isinstance(value, (list, tuple)):
+            if not value or len(value) > MAX_DATABASE_SESSION_VALUES or any(not _database_session_scalar(item) for item in value):
+                raise RowPolicyError("database session attribute value is invalid")
+            normalized_attributes[name] = list(value)
+        elif _database_session_scalar(value):
+            normalized_attributes[name] = value
+        else:
+            raise RowPolicyError("database session attribute value is invalid")
+    policy_versions = raw.get("policyVersions")
+    outer_versions = policy.get("policyVersions")
+    if (
+        not isinstance(policy_versions, list)
+        or policy_versions != outer_versions
+        or len(policy_versions) > MAX_DATABASE_SESSION_POLICIES
+        or any(
+            not isinstance(version, str) or not 1 <= len(version.encode("utf-8")) <= 256
+            for version in policy_versions
+        )
+    ):
+        raise RowPolicyError("database session policy versions are invalid")
+    attributes_json = json.dumps(
+        normalized_attributes, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
+    )
+    policy_versions_json = json.dumps(
+        policy_versions, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+    )
+    if len(attributes_json.encode("utf-8")) + len(policy_versions_json.encode("utf-8")) > MAX_DATABASE_SESSION_BYTES:
+        raise RowPolicyError("database session is too large")
+    return DatabaseSession(subject_id, organization_id, attributes_json, policy_versions_json)
 
 
 @dataclass(slots=True)
@@ -548,11 +630,13 @@ class WrenQueryService:
         execution_sql = native_sql
         query_parameters: Mapping[str, Any] | None = None
         applied_tables: tuple[str, ...] = ()
+        database_session: DatabaseSession | None = None
         authorization_policy = params.get("authorizationPolicy")
         if authorization_policy is not None:
             if not isinstance(authorization_policy, Mapping):
                 raise RpcFault(INVALID_PARAMS, "validation", "authorizationPolicy is invalid")
             try:
+                database_session = _database_session(authorization_policy)
                 authorized = apply_row_policy(native_sql, authorization_policy)
                 execution_sql = validate_native_sql(authorized.sql, allowed_physical=allowed_physical)
                 query_parameters = authorized.parameters
@@ -602,6 +686,8 @@ class WrenQueryService:
         }
         if query_parameters is not None:
             executor_args["query_parameters"] = query_parameters
+        if database_session is not None:
+            executor_args["database_session"] = database_session
         result = self.executor.execute(**executor_args)
         if authorization_policy is not None:
             # Do not expose resolved subject values or the rewritten SQL. The
@@ -654,6 +740,7 @@ class PsycopgQueryExecutor:
         connection_info: Mapping[str, Any] | None,
         limits: QueryLimits,
         query_parameters: Mapping[str, Any] | None = None,
+        database_session: DatabaseSession | None = None,
     ) -> dict[str, Any]:
         del project_dir  # Resolution happens before this boundary.
         _assert_executor_limits(limits)
@@ -727,6 +814,8 @@ class PsycopgQueryExecutor:
             deadline_timer.start()
 
             self._configure_read_only(connection, limits.timeout_ms)
+            if database_session is not None:
+                self._configure_database_session(connection, database_session)
             cursor = connection.cursor()
             try:
                 bounded_sql = _bounded_select_sql(native_sql, limits.max_rows)
@@ -861,6 +950,40 @@ class PsycopgQueryExecutor:
             # timeout_ms has already been type/range checked, so interpolating
             # this one integer avoids relying on server-specific SET binding.
             cursor.execute(f"SET LOCAL statement_timeout = {timeout_ms}")
+        finally:
+            close_cursor = getattr(cursor, "close", None)
+            if callable(close_cursor):
+                try:
+                    close_cursor()
+                except Exception:
+                    pass
+
+    @staticmethod
+    def _configure_database_session(connection: Any, session: DatabaseSession) -> None:
+        """Install fixed transaction-local GUCs before any user SQL runs."""
+
+        if not isinstance(session, DatabaseSession):
+            raise RpcFault(
+                POLICY_DENIED,
+                "authorization",
+                "database session is invalid",
+                retryable=False,
+            )
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                "SELECT "
+                "set_config('semarail.subject_id', %s, true), "
+                "set_config('semarail.organization_id', %s, true), "
+                "set_config('semarail.attributes', %s, true), "
+                "set_config('semarail.policy_versions', %s, true)",
+                (
+                    session.subject_id,
+                    session.organization_id,
+                    session.attributes_json,
+                    session.policy_versions_json,
+                ),
+            )
         finally:
             close_cursor = getattr(cursor, "close", None)
             if callable(close_cursor):
@@ -1079,6 +1202,8 @@ class EnvPsycopgExecutor(PsycopgQueryExecutor):
         project_dir: str,
         connection_info: Mapping[str, Any] | None,
         limits: QueryLimits,
+        query_parameters: Mapping[str, Any] | None = None,
+        database_session: DatabaseSession | None = None,
     ) -> dict[str, Any]:
         info = connection_info
         if info is None:
@@ -1103,6 +1228,8 @@ class EnvPsycopgExecutor(PsycopgQueryExecutor):
             project_dir=project_dir,
             connection_info=info,
             limits=limits,
+            query_parameters=query_parameters,
+            database_session=database_session,
         )
 
 

@@ -2,13 +2,17 @@
 
 ## Status
 
-Superseded in part by [0004](0004-stable-semarail-semantic-mcp.md). The governed
-query boundary remains accepted.
+Superseded as a deployment recommendation by
+[0004](0004-stable-semarail-semantic-mcp.md) and
+[0005](0005-enterprise-identity-and-data-authorization.md). The structural
+query boundary remains accepted, but shared Agent deployments use authenticated
+Core HTTP MCP or its authenticated stdio bridge.
 
-> Historical interface note: the accepted boundary is now exposed by
-> `semarail-query-mcp` with the `semarail_governed_query` tool. The DSH-prefixed
-> names below describe the superseded implementation; only the CLI alias remains
-> temporarily available for compatibility.
+> Historical interface note: the names and two-process deployment below
+> describe the superseded trusted-local implementation. `semarail-query-mcp`
+> remains available for isolated local evaluation; it does not resolve a managed
+> Subject or enforce current per-user policy. Shared deployments must not use it
+> as an employee or multi-tenant authorization boundary.
 
 ## Context
 
@@ -42,8 +46,9 @@ service as production-ready.
 - Harness RPC and presentation contracts remain unchanged.
 - MCP clients receive the same versioned result, policy errors, and hard limits
   as Harness queries.
-- Native Wren MCP remains available without DSH for evaluation, but governed
-  deployments should use `--no-connect` and route execution through DSH.
+- The upstream MCP and direct SemaRail adapters remain available for isolated
+  trusted-local evaluation. Shared governed deployments now route all tools
+  through authenticated Core HTTP MCP or `semarail mcp bridge`.
 - The DSH execution adapter remains PostgreSQL-only. MySQL support in the
   Semantic Console does not imply governed MySQL execution.
 - Real PostgreSQL acceptance now exercises both the framed sidecar and the

@@ -2,10 +2,10 @@
 
 ## Status
 
-Accepted and partially implemented. Service accounts, authenticated Streamable
-HTTP MCP, external employee sign-in, unified Subject mapping, and portable data
-policy enforcement are implemented. Database-native defense in depth remains a
-staged follow-up.
+Accepted and implemented for PostgreSQL deployments. Service accounts,
+authenticated Streamable HTTP MCP, external employee sign-in, unified Subject
+mapping, portable data policy enforcement, durable PostgreSQL control-plane
+storage, and transaction-local PostgreSQL RLS context are implemented.
 
 ## Context
 
@@ -50,7 +50,7 @@ predicate cannot be removed by an outer `OR`, aggregation, alias, or join.
 Resolved identity values and rewritten enforcement SQL are not returned to the
 agent.
 
-PostgreSQL Row Level Security is planned as a second enforcement layer for
+PostgreSQL Row Level Security is available as a second enforcement layer for
 production deployments. The common SemaRail policy engine remains authoritative
 across PostgreSQL, MySQL, ClickHouse, SQLite, and DuckDB adapters; native database
 controls are adapter-specific defense in depth.
@@ -63,9 +63,10 @@ semantic project. Plaintext API keys are returned once and never persisted.
 Credential revocation, rotation, subject disabling, subject-attribute changes,
 and policy version updates take effect on the next request.
 
-A production multi-user deployment will move this metadata behind a transactional
-control-plane service and durable database. The schema and API contract, rather
-than the local SQLite file, are the compatibility boundary.
+A production multi-user deployment can store this metadata in PostgreSQL by
+setting `SEMARAIL_ACCESS_CONTROL_DATABASE_URL`. Migrations are transactional and
+versioned; configured storage failures never fall back to SQLite. The schema and
+API contract, rather than the local SQLite file, are the compatibility boundary.
 
 ### Transport rollout
 

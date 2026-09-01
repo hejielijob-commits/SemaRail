@@ -929,6 +929,115 @@ def _run_read_only_probe(dsn: str) -> None:
             pass
 
 
+def _install_rls_fixture(args: argparse.Namespace, target: ProvisionedTarget) -> None:
+    """Enable one representative native RLS policy in the isolated fixture."""
+
+    psycopg, sql = _load_psycopg()
+    try:
+        connection = psycopg.connect(
+            _admin_dsn_for_database(args, target.database), autocommit=True
+        )
+    except Exception as exc:
+        raise E2EFailure("could not connect to install the PostgreSQL RLS fixture") from exc
+    try:
+        statements = (
+            "ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY",
+            "ALTER TABLE public.orders FORCE ROW LEVEL SECURITY",
+            "DROP POLICY IF EXISTS semarail_orders_region ON public.orders",
+            """
+            CREATE POLICY semarail_orders_region ON public.orders
+            FOR SELECT
+            TO PUBLIC
+            USING (
+              EXISTS (
+                SELECT 1
+                FROM public.customers AS customer
+                JOIN public.regions AS region ON region.id = customer.region_id
+                WHERE customer.id = orders.customer_id
+                  AND region.name IN (
+                    SELECT jsonb_array_elements_text(
+                      COALESCE(
+                        NULLIF(current_setting('semarail.attributes', true), ''),
+                        '{}'
+                      )::jsonb -> 'regionCodes'
+                    )
+                  )
+              )
+            )
+            """,
+        )
+        for statement in statements:
+            connection.execute(statement)
+        bypass = connection.execute(
+            "SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = %s",
+            (target.role,),
+        ).fetchone()
+        if not bypass or bool(bypass[0]) or bool(bypass[1]):
+            raise E2EFailure("temporary query role can bypass PostgreSQL RLS")
+        owner = connection.execute(
+            "SELECT pg_get_userbyid(relowner) FROM pg_class "
+            "WHERE oid = 'public.orders'::regclass"
+        ).fetchone()
+        if not owner or owner[0] == target.role:
+            raise E2EFailure("temporary query role unexpectedly owns the protected table")
+    except E2EFailure:
+        raise
+    except Exception as exc:
+        raise E2EFailure("PostgreSQL RLS fixture installation failed") from exc
+    finally:
+        try:
+            connection.close()
+        except Exception:
+            pass
+
+
+def _run_rls_identity_probe(client: SidecarClient, project_dir: Path) -> None:
+    """Prove that the same SQL returns different rows for two trusted subjects."""
+
+    def run(subject: str, region: str) -> list[int]:
+        policy = {
+            "schemaVersion": 1,
+            "defaultEffect": "deny",
+            "tables": {
+                "public.orders": {
+                    "rows": [],
+                    "allowedColumns": ["id"],
+                    "deniedColumns": [],
+                }
+            },
+            "policyVersions": ["postgres-rls-e2e:1"],
+            "databaseSession": {
+                "schemaVersion": 1,
+                "subjectId": subject,
+                "organizationId": "e2e-sales",
+                "attributes": {"regionCodes": [region]},
+                "policyVersions": ["postgres-rls-e2e:1"],
+            },
+        }
+        response = client.request(
+            "query.run",
+            {
+                "projectDir": str(project_dir),
+                "question": "按当前员工地区列出订单编号",
+                "semanticSql": "SELECT orders.id FROM orders ORDER BY orders.id",
+                "queryId": _request_id(),
+                "authorizationPolicy": policy,
+            },
+        )
+        result = _assert_ok(response, f"RLS identity probe for {subject}")
+        rows = result.get("previewRows")
+        if not isinstance(rows, list):
+            raise E2EFailure("RLS identity probe returned invalid rows")
+        return [int(row["id"]) for row in rows if isinstance(row, Mapping) and "id" in row]
+
+    region_a = run("employee-a", "华东")
+    region_b = run("employee-b", "华南")
+    if region_a != [1, 4, 5] or region_b != [2]:
+        raise E2EFailure("PostgreSQL RLS did not isolate employee regions")
+    if set(region_a) & set(region_b):
+        raise E2EFailure("PostgreSQL RLS returned overlapping employee rows")
+
+
 def _dry_run(args: argparse.Namespace, project_dir: Path, python_path: Path) -> int:
     _validate_fixture(project_dir)
     if args.mode == "existing":
@@ -1035,6 +1144,9 @@ def main(argv: Iterable[str] | None = None) -> int:
             repo_dir / "python" / "sidecar",
         )
         _run_timeout_and_cancel(client, project_dir)
+        if target is not None:
+            _install_rls_fixture(args, target)
+            _run_rls_identity_probe(client, project_dir)
         stderr = client.stderr_text
         if target is not None and target.password in stderr:
             raise E2EFailure("sidecar diagnostics leaked the temporary role password")
@@ -1046,6 +1158,10 @@ def main(argv: Iterable[str] | None = None) -> int:
         print("  health/project validation/smoke result metadata: passed")
         print("  framed sidecar and governed MCP query paths: passed")
         print("  row bounds/policy/read-only account/timeout/cancel: passed")
+        print(
+            "  PostgreSQL transaction context/RLS employee isolation: "
+            + ("passed" if target is not None else "not modified in existing mode")
+        )
         return 0
     except E2EFailure as exc:
         print(f"POSTGRES_E2E_FAIL: {exc}", file=sys.stderr)

@@ -5,7 +5,7 @@
 .mcp-overview span, .mcp-meta dt { color: var(--muted-soft); font-size: 10px; font-weight: 750; letter-spacing: 0.07em; text-transform: uppercase; }
 .mcp-overview strong { overflow: hidden; font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .mcp-server-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 16px 0; }
-.mcp-server-card { min-width: 0; padding: 21px; }
+.mcp-server-card { min-width: 0; margin: 16px 0; padding: 21px; }
 .mcp-card-heading { display: flex; align-items: flex-start; gap: 13px; }
 .mcp-card-icon { display: grid; width: 39px; height: 39px; flex: 0 0 39px; place-items: center; border-radius: 10px; }
 .mcp-card-icon.ready { background: var(--success-soft); color: var(--success); }
@@ -21,6 +21,8 @@
 .mcp-command-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--border); padding: 5px 7px 5px 12px; }
 .mcp-command-label > span { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 10px; font-weight: 700; }
 .mcp-command > code { display: block; overflow-x: auto; padding: 13px; color: var(--text); font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; font-size: 10px; line-height: 1.6; white-space: nowrap; }
+.mcp-endpoint { display: flex; align-items: center; justify-content: space-between; gap: 12px; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); padding: 6px 7px 6px 13px; }
+.mcp-endpoint code { overflow: hidden; font: 11px/1.5 "Cascadia Code", "SFMono-Regular", Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
 .mcp-config { padding: 22px; }
 .mcp-config-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 15px; }
 .mcp-config-heading h2 { margin-top: 5px; font-size: 17px; }
@@ -29,6 +31,13 @@
 .mcp-callout.warning { border-color: color-mix(in srgb, var(--warning) 32%, var(--border)); background: var(--warning-soft); color: var(--warning); }
 .mcp-callout > div { min-width: 0; }
 .mcp-callout strong { font-size: 11px; }
+.mcp-auth-kinds { display: flex; flex-wrap: wrap; gap: 7px; }
+.mcp-auth-kinds span { border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border)); border-radius: 999px; background: var(--surface); padding: 3px 8px; color: var(--text); font-size: 10px; font-weight: 700; }
+.mcp-local { margin-top: 16px; padding: 16px 18px; }
+.mcp-local summary { cursor: pointer; color: var(--muted); font-size: 11px; font-weight: 700; }
+.mcp-local > div { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px 16px; padding-top: 15px; }
+.mcp-local h2 { font-size: 14px; }
+.mcp-local p { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .mcp-loading { padding: 24px; }
 @media (max-width: 900px) { .mcp-server-grid { grid-template-columns: 1fr; } }
 @media (max-width: 680px) { .mcp-overview { grid-template-columns: 1fr; } .mcp-overview > div + div { border-top: 1px solid var(--border); border-left: 0; } .mcp-config-heading, .mcp-title-line { align-items: flex-start; flex-direction: column; } }

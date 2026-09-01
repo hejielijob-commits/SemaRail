@@ -52,6 +52,48 @@ class PolicyEngineTests(unittest.TestCase):
         self.assertIn("customer_phone", decision_a.denied_columns)
         self.assertNotIn("customer_phone", decision_a.allowed_columns or ())
 
+    def test_database_session_projects_only_row_rule_attributes_for_rls(self) -> None:
+        user_a = Subject(
+            "user-a",
+            "org-sales",
+            "user",
+            "A",
+            {"regionCodes": ["甲"], "apiSecret": "must-not-cross-process-boundary"},
+        )
+        user_b = Subject(
+            "user-b",
+            "org-sales",
+            "user",
+            "B",
+            {"regionCodes": ["乙"], "apiSecret": "must-not-cross-process-boundary"},
+        )
+
+        compiled_a = self.engine.compile_data_policy(
+            user_a, [policy("pol-sales")], project_id="sales", datasource_id=DATASOURCE_A
+        )
+        compiled_b = self.engine.compile_data_policy(
+            user_b, [policy("pol-sales")], project_id="sales", datasource_id=DATASOURCE_A
+        )
+
+        self.assertEqual(compiled_a["databaseSession"], {
+            "schemaVersion": 1,
+            "subjectId": "user-a",
+            "organizationId": "org-sales",
+            "attributes": {"regionCodes": ["甲"]},
+            "policyVersions": ["pol-sales:1"],
+        })
+        self.assertEqual(compiled_b["databaseSession"]["attributes"], {"regionCodes": ["乙"]})
+        self.assertNotIn("apiSecret", str(compiled_a))
+
+    def test_database_session_rejects_oversized_referenced_attribute(self) -> None:
+        subject = Subject(
+            "user-a", "org-sales", "user", "A", {"regionCodes": ["x" * 1_025]}
+        )
+        with self.assertRaises(Exception):
+            self.engine.compile_data_policy(
+                subject, [policy("pol-sales")], project_id="sales", datasource_id=DATASOURCE_A
+            )
+
     def test_requested_region_can_only_intersect_with_authorized_values(self) -> None:
         decision = self.engine.authorize_table(self.user_a, "sales.orders", [policy("pol-sales")], datasource_id=DATASOURCE_A)
         allowed = set(self.engine.allowed_values(decision, "region_code"))

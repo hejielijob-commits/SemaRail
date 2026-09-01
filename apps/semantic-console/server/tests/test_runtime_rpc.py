@@ -58,8 +58,30 @@ class RuntimeRpcTests(unittest.TestCase):
         self.project.save_datasources()
         self.dispatcher = RecordingDispatcher()
         self.token = "test-token-that-is-at-least-thirty-two-characters"
-        self.authorization = f"Bearer {self.token}"
+        self.admin_authorization = f"Bearer {self.token}"
         self.gateway = RuntimeRpcGateway(self.project, self.dispatcher, auth_token=self.token)
+        runtime_account = self.gateway.access_control.create_service_account(
+            "Runtime test Agent", attributes={"regionCodes": ["CN-JIA"]}
+        )
+        runtime_policy = self.gateway.access_control.create_policy(
+            "Runtime test access",
+            {
+                "schemaVersion": 1,
+                "datasourceId": self.datasource_id,
+                "projects": ["runtime-test"],
+                "tools": [
+                    "runtime:health", "project:validate", "semantic:read",
+                    "query:plan", "query:execute", "query:cancel",
+                ],
+                "tables": {
+                    "public.orders": {"effect": "allow"},
+                    "public.sales": {"effect": "allow"},
+                },
+            },
+        )
+        self.gateway.access_control.bind_policy(runtime_account.id, runtime_policy["id"])
+        runtime_key = self.gateway.access_control.issue_api_key(runtime_account.id)
+        self.authorization = f"Bearer {runtime_key['apiKey']}"
 
     def test_health_exposes_stable_core_handshake(self) -> None:
         status, response = self.gateway.dispatch(
@@ -162,7 +184,7 @@ class RuntimeRpcTests(unittest.TestCase):
                 self.assertTrue(response["ok"])
                 self.assertEqual(self.dispatcher.requests[-1]["params"]["projectDir"], str(self.project.project_dir))
 
-    def test_runtime_compiles_policy_for_all_semantic_metadata_calls_and_bootstrap_stays_unrestricted(self) -> None:
+    def test_runtime_compiles_policy_for_all_semantic_metadata_calls(self) -> None:
         for method, params in (
             ("project.describe", {}),
             ("context.ask", {"question": "orders"}),
@@ -170,13 +192,43 @@ class RuntimeRpcTests(unittest.TestCase):
         ):
             with self.subTest(method=method):
                 status, response = self.gateway.dispatch(
-                    {"protocolVersion": "1", "id": f"bootstrap-{method}", "method": method, "params": params},
+                    {"protocolVersion": "1", "id": f"managed-{method}", "method": method, "params": params},
                     authorization=self.authorization,
                 )
                 self.assertEqual(status, 200)
                 self.assertTrue(response["ok"])
                 compiled = self.dispatcher.requests[-1]["params"]["authorizationPolicy"]
-                self.assertEqual(compiled["defaultEffect"], "allow")
+                self.assertEqual(compiled["defaultEffect"], "deny")
+
+    def test_runtime_rejects_bootstrap_administrator_credential(self) -> None:
+        status, response = self.gateway.dispatch(
+            {
+                "protocolVersion": "1",
+                "id": "bootstrap-query",
+                "method": "query.run",
+                "params": {
+                    "question": "Revenue",
+                    "semanticSql": "SELECT * FROM orders",
+                    "queryId": "bootstrap-query",
+                },
+            },
+            authorization=self.admin_authorization,
+        )
+
+        self.assertEqual(status, 403)
+        self.assertEqual(response["error"]["code"], "FORBIDDEN")
+        self.assertEqual(response["error"]["message"], "managed Agent credentials are required")
+        self.assertEqual(self.dispatcher.requests, [])
+        event = self.gateway.access_control.list_audit()[0]
+        self.assertEqual(event["subjectId"], "bootstrap-admin")
+        self.assertEqual(event["decision"], "denied")
+
+        health_status, health = self.gateway.dispatch(
+            {"protocolVersion": "1", "id": "bootstrap-health", "method": "health", "params": {}},
+            authorization=self.admin_authorization,
+        )
+        self.assertEqual(health_status, 200)
+        self.assertTrue(health["ok"])
 
     def test_runtime_fails_closed_when_semantic_policy_cannot_be_compiled(self) -> None:
         with patch.object(self.gateway.policy_engine, "compile_data_policy", side_effect=RuntimeError("missing policy")):
@@ -273,7 +325,10 @@ class RuntimeRpcTests(unittest.TestCase):
         user = self.gateway.access_control.upsert_external_user(
             provider="dingtalk", external_subject="employee-a", name="Employee A"
         )
-        self.gateway.access_control.update_user(user.id, attributes={"regionCodes": ["CN-JIA"]})
+        self.gateway.access_control.update_user(
+            user.id,
+            attributes={"regionCodes": ["CN-JIA"], "privateProfile": "must-not-reach-sidecar"},
+        )
         policy = self.gateway.access_control.create_policy(
             "Employee sales region",
             {
@@ -314,7 +369,37 @@ class RuntimeRpcTests(unittest.TestCase):
         compiled = self.dispatcher.requests[-1]["params"]["authorizationPolicy"]
         row_filter = compiled["tables"]["public.sales"]["rowFilter"]
         self.assertEqual(row_filter["conditions"][0]["conditions"][0]["values"], ["CN-JIA"])
+        self.assertEqual(compiled["databaseSession"]["subjectId"], user.id)
+        self.assertEqual(compiled["databaseSession"]["attributes"], {"regionCodes": ["CN-JIA"]})
+        self.assertNotIn("privateProfile", str(compiled))
         self.assertEqual(self.gateway.access_control.list_audit()[0]["subjectId"], user.id)
+
+    def test_client_cannot_supply_or_override_database_identity_context(self) -> None:
+        dispatch_count = len(self.dispatcher.requests)
+        status, response = self.gateway.dispatch(
+            {
+                "protocolVersion": "1",
+                "id": "spoofed-session",
+                "method": "query.run",
+                "params": {
+                    "question": "Revenue",
+                    "semanticSql": "SELECT * FROM sales",
+                    "queryId": "spoofed-session",
+                    "authorizationPolicy": {
+                        "databaseSession": {
+                            "subjectId": "administrator",
+                            "organizationId": "other-org",
+                            "attributes": {"regionCodes": ["*"]},
+                        }
+                    },
+                },
+            },
+            authorization=self.authorization,
+        )
+
+        self.assertEqual(status, 400)
+        self.assertEqual(response["error"]["code"], "INVALID_PARAMS")
+        self.assertEqual(len(self.dispatcher.requests), dispatch_count)
 
     def test_unbinding_policy_immediately_revokes_existing_service_account_credential(self) -> None:
         account = self.gateway.access_control.create_service_account("Sales Agent")
@@ -348,7 +433,7 @@ class RuntimeRpcTests(unittest.TestCase):
         unbind_status, unbound = app.request(
             "DELETE",
             f"/api/v1/access/policy-bindings/{account.id}/{policy['id']}",
-            authorization=self.authorization,
+            authorization=self.admin_authorization,
         )
 
         self.assertEqual((unbind_status, unbound["status"]), (200, "unbound"))

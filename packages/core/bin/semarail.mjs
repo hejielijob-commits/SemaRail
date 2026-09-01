@@ -19,6 +19,7 @@ function usage() {
     'Usage:',
     '  semarail start --project <directory> [--port 48763] [--state-dir <directory>]',
     '  semarail mcp serve --project <directory> [--port 48764] [--state-dir <directory>]',
+    '  semarail mcp bridge [--endpoint http://127.0.0.1:48763] [--session-file <file>]',
     '  semarail status [--endpoint http://127.0.0.1:48763]',
     '  semarail auth login --provider <id> [--endpoint http://127.0.0.1:48763] [--no-open]',
     '  semarail auth status [--endpoint http://127.0.0.1:48763]',
@@ -326,6 +327,41 @@ async function serveMcp(args) {
   })
 }
 
+async function bridgeMcp(args) {
+  const options = parseOptions(args)
+  const unsupported = [...options.keys()].filter(key => !['endpoint', 'session-file', 'token-env', 'python'].includes(key))
+  if (unsupported.length > 0) throw new Error(`unsupported bridge option: --${unsupported[0]}`)
+  const endpoint = options.get('endpoint')
+  if (endpoint) endpointOption(new Map([['endpoint', endpoint]]))
+  const tokenEnv = options.get('token-env') ?? 'SEMARAIL_MCP_TOKEN'
+  if (!/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(tokenEnv)) throw new Error('token-env is invalid')
+  const python = options.get('python') ?? process.env.SEMARAIL_PYTHON?.trim() ?? (process.platform === 'win32' ? 'python.exe' : 'python3')
+  const bootstrap = resolve(packageRoot, 'runtime', 'bootstrap.py')
+  const consoleRoot = resolve(packageRoot, 'python', 'semantic-console')
+  const childArgs = [bootstrap, '--', '-m', 'server.stdio_mcp', '--token-env', tokenEnv]
+  if (endpoint) childArgs.push('--endpoint', endpoint)
+  const sessionFile = options.get('session-file')
+  if (sessionFile) childArgs.push('--session-file', resolve(sessionFile))
+  const child = spawn(python, childArgs, {
+    cwd: consoleRoot,
+    stdio: 'inherit',
+    windowsHide: true,
+    env: {
+      ...process.env,
+      PYTHONDONTWRITEBYTECODE: '1',
+    },
+  })
+  const forward = signal => {
+    try { child.kill(signal) } catch {}
+  }
+  process.once('SIGINT', forward)
+  process.once('SIGTERM', forward)
+  process.exitCode = await new Promise((resolveExit, reject) => {
+    child.once('error', reject)
+    child.once('exit', code => resolveExit(code ?? 1))
+  })
+}
+
 async function main(argv = process.argv.slice(2)) {
   const [command, ...args] = argv
   if (command === '--version' || command === '-v') {
@@ -345,6 +381,7 @@ async function main(argv = process.argv.slice(2)) {
   if (command === 'auth' && args[0] === 'status') return authStatus(args.slice(1))
   if (command === 'auth' && args[0] === 'logout') return authLogout(args.slice(1))
   if (command === 'mcp' && args[0] === 'serve') return serveMcp(args.slice(1))
+  if (command === 'mcp' && args[0] === 'bridge') return bridgeMcp(args.slice(1))
   if (command === 'status') return status(args)
   throw new Error(`unknown command: ${command}`)
 }

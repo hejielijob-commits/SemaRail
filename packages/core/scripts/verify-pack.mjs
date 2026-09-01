@@ -23,7 +23,7 @@ const required = [
   'python/semantic-console/server/app.py', 'python/semantic-console/server/runtime_rpc.py',
   'python/semantic-console/server/access_control.py', 'python/semantic-console/server/authorization.py',
   'python/semantic-console/server/identity.py', 'python/semantic-console/server/identity_api.py',
-  'python/semantic-console/server/remote_mcp.py',
+  'python/semantic-console/server/remote_mcp.py', 'python/semantic-console/server/stdio_mcp.py',
   'python/semantic-console/server/README.md', 'python/semantic-console/server/openapi.json',
   'semantic-console-web/index.html', 'README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md',
 ]

@@ -23,6 +23,7 @@ remote-mcp = ["mcp[cli]==1.28.1"]
 [project.scripts]
 wren-semantic-console = "server.app:main"
 semarail-remote-mcp = "server.remote_mcp:main"
+semarail-stdio-mcp = "server.stdio_mcp:main"
 
 [tool.setuptools]
 packages = ["server"]

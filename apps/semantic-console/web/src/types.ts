@@ -15,22 +15,36 @@ export type ConsoleSection =
   | "instructions"
   | "mdl";
 
-export interface McpServerProfile {
-  status: "ready" | "setup_required";
-  command: string;
-  args: string[];
-  toolMode?: string;
-  databaseDsnEnv?: string;
-  datasourceType?: string | null;
-}
-
 export interface McpIntegrationResponse {
-  schemaVersion: number;
-  transport: "stdio";
-  projectPath: string;
-  semantic: McpServerProfile;
-  governedQuery: McpServerProfile;
-  clientConfig: { mcpServers: Record<string, { command: string; args: string[]; env?: Record<string, string> }> };
+  schemaVersion: 2;
+  transport: "streamable-http";
+  endpoint: { url: string; authentication: "bearer" };
+  authentication: {
+    type: "bearer";
+    acceptedCredentials: ("service_account_key" | "employee_session")[];
+    tokenPlacement: "authorization_header";
+  };
+  readiness: {
+    status: "ready" | "setup_required";
+    semanticContext: "ready" | "setup_required";
+    governedQuery: "ready" | "setup_required";
+    datasourceType: string | null;
+    endpointConfiguration: "ready" | "defaulted";
+  };
+  tools: string[];
+  clientConfig: {
+    mcpServers: Record<string, {
+      url: string;
+      transport: "streamable-http";
+      headers: { Authorization: string };
+    }>;
+  };
+  trustedLocalOperator: {
+    status: "compatibility_only";
+    transport: "stdio";
+    audience: "trusted_local_operator";
+    userIsolation: false;
+  };
 }
 
 export interface AccessCredential {

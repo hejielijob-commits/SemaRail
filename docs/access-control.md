@@ -61,7 +61,7 @@ one explicit physical table. Its permitted rows come from the trusted
 `datasourceId` is the opaque ID returned by the server's datasource API, not a
 display name or database URL. It binds every table in this document unless an
 individual table supplies its own `datasourceId`. Existing schema-version-1
-policies without either binding remain readable for migration, but non-bootstrap
+policies without either binding remain readable for migration, but Agent
 data-facing requests fail closed until they are updated with an ID for the active datasource.
 When two datasources expose the same `schema.table`, only rules bound to the
 currently active datasource participate in authorization or policy compilation.
@@ -191,15 +191,38 @@ receiving identity/key-management permission, while an Access administrator can
 manage subjects and policies without automatically receiving project editing
 permission.
 
+## PostgreSQL defense in depth
+
+Production PostgreSQL deployments can enable database-native RLS in addition
+to SemaRail's portable SQL policy enforcement. Core projects only row-rule
+attributes into a validated transaction context; the Sidecar installs it with
+parameterized, transaction-local settings before user SQL. See
+[PostgreSQL row-level security](postgresql-rls.md) for the query-role contract,
+policy template, control-plane PostgreSQL configuration, and acceptance gate.
+
 ## Current boundary
 
 The alpha distribution includes an authenticated, stateless Streamable HTTP MCP
 endpoint at `/mcp`, started with `semarail mcp serve`. It verifies the same API
 keys and routes every tool through the same current Runtime/PolicyEngine as Core.
+The bootstrap administrator credential is rejected by semantic/query Agent
+runtime methods and the remote MCP boundary (the Core health check remains
+available for local administration); only managed service-account keys and
+employee sessions are accepted for Agent work.
+
+For clients that only support stdio, `semarail mcp bridge` reads either the
+protected employee session created by `semarail auth login` or a service-account
+key from `SEMARAIL_MCP_TOKEN`, then forwards the five stable tools to Core. The
+bridge validates the managed credential format and does not accept the bootstrap
+administrator token. It
+does not accept identity, policy, datasource, project, or credential values as
+tool arguments. The older direct `semarail-mcp` and `semarail-query-mcp`
+commands are trusted-local compatibility paths and do not provide per-user
+isolation.
 
 The management API and the rest of the current Console remain intended for a
-trusted administrator on the Core host. Employee/OIDC/DingTalk login and unified
-policy enforcement are implemented; database-native PostgreSQL RLS and a
-production multi-tenant control-plane store remain follow-up defense-in-depth
-work. Non-loopback MCP requires an explicit allowed Host and TLS termination;
-do not expose the loopback Console API as an internet-facing service.
+trusted administrator on the Core host. Employee/OIDC/DingTalk login, unified
+policy enforcement, optional PostgreSQL control-plane storage, and PostgreSQL
+RLS transaction context are implemented. Non-loopback MCP requires an explicit
+allowed Host and TLS termination; do not expose the loopback Console API as an
+internet-facing service.

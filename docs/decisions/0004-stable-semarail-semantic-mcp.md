@@ -13,8 +13,10 @@ usable and should not be duplicated or converted into another model.
 
 ## Decision
 
-`semarail-mcp` is SemaRail's stable stdio MCP server. It exposes exactly four
-read-only tools in schema version 1:
+SemaRail owns a stable, transport-independent MCP contract. Authenticated Core
+Streamable HTTP is the default multi-user transport, and `semarail mcp bridge`
+provides the same contract to stdio-only clients. The contract exposes four
+read-only semantic tools in schema version 1:
 
 1. `semarail_validate_project` validates the server-selected project.
 2. `semarail_list_models` lists its models, relationships, and views.
@@ -26,9 +28,13 @@ argument. `SemanticService` is a thin internal boundary: it invokes the pinned
 WrenAI public runtime APIs and passes through the existing bounded project
 structures. It is not a second semantic model, parser, or persistence format.
 
-Database execution remains a separate capability. Agents that need it compose
-the semantic server with `semarail-query-mcp`, whose only execution tool is
-`semarail_governed_query` and whose credential source is also fixed at startup.
+The authenticated endpoint and bridge also expose `semarail_governed_query`.
+Every call enters Core, resolves a managed Subject and its current policy, and
+keeps project paths and datasource credentials server-side.
+
+The direct `semarail-mcp` and `semarail-query-mcp` commands remain trusted-local
+operator compatibility tools. They do not implement per-user identity or policy
+isolation and are not the multi-user contract.
 
 WrenAI's native MCP server may remain in compatibility tests or advanced local
 experiments, but its tool names and schemas are not SemaRail's public contract.

@@ -45,7 +45,7 @@ The primary routes are:
 | `GET /api/v1/access/users` | Administrator-only employee identities, trusted attributes, and policy bindings |
 | `PUT /api/v1/access/users/{id}` | Administrator-only employee name/attribute update |
 | `PUT /api/v1/access/users/{id}/status` | Administrator-only immediate employee enable/disable |
-| `GET /api/mcp-integration` | Secret-free stdio MCP readiness, commands, and generic client configuration |
+| `GET /api/mcp-integration` | Authenticated remote MCP readiness, secret-free client configuration, and trusted-local compatibility guidance |
 | `GET /api/project` | Project overview, draft count, revision, active datasource |
 | `GET /api/datasource-types` | Field metadata for configured, runtime-available drivers |
 | `GET/POST /api/datasources` | Redacted datasource list/create |
@@ -77,7 +77,11 @@ The primary routes are:
 | `GET /api/versions` | Published snapshot list |
 | `POST /api/versions/{id}/rollback` | Validate and restore a snapshot |
 
-`POST /api/v1/runtime/rpc` requires `Authorization: Bearer <token>`. Set a token of at least 32 characters in `SEMARAIL_API_TOKEN` before starting Core. The public request cannot select a project, send database credentials, or override query limits; those values are pinned by Core. The currently supported v1 methods are `health`, `project.validate`, `project.describe`, `context.ask`, `query.dryPlan`, `query.run`, and `query.cancel`. Identity-provider configuration and employee CLI login are documented in `docs/access-control.md` at the repository root.
+`POST /api/v1/runtime/rpc` requires `Authorization: Bearer <token>`. Set a token of at least 32 characters in `SEMARAIL_API_TOKEN` before starting Core. The public request cannot select a project, send database credentials, choose a Subject, supply an authorization policy, or override query limits; those values are resolved by Core. The currently supported v1 methods are `health`, `project.validate`, `project.describe`, `context.ask`, `query.dryPlan`, `query.run`, and `query.cancel`. The authenticated Streamable HTTP MCP endpoint and `semarail mcp bridge` both enter this same boundary. Direct `semarail-mcp` and `semarail-query-mcp` processes are trusted-local compatibility tools and are not a per-user authorization boundary. Identity-provider configuration and employee CLI login are documented in `docs/access-control.md` at the repository root.
+
+The bootstrap administrator token is accepted by the Console management APIs and the read-only Core health check, but intentionally rejected by semantic/query runtime methods, remote MCP, and the authenticated stdio bridge. Create a scoped service-account key or use an employee session for Agent access. Configure `SEMARAIL_REMOTE_MCP_URL` when the public MCP endpoint differs from the loopback default; the value must be an HTTP(S) URL without embedded credentials, query parameters, or fragments.
+
+Access-control state defaults to a local SQLite file under the private state directory. For a shared production control plane, set `SEMARAIL_ACCESS_CONTROL_DATABASE_URL` to a PostgreSQL URI. If that configured database is unavailable or has an unknown migration version, startup fails closed and never falls back to SQLite. Governed PostgreSQL execution uses `SEMARAIL_DATABASE_URL`; keep both database URLs only in the Core process environment.
 
 Edits never mutate the project until publish. Publishing validates/builds a
 temporary tree, writes a generated MDL target, snapshots that **new** tree, and

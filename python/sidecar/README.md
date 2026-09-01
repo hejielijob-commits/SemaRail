@@ -79,22 +79,28 @@ and the CLI default uses `LazyWrenAdapter` plus a lazy psycopg executor.
 Protocol and adapter tests can inject fake Wren/database implementations, so
 they do not need Wren or a database installed.
 
-## Governed MCP adapter
+## Trusted-local MCP adapters
 
-The optional MCP entry point reuses the same `WrenQueryService` and
-`EnvPsycopgExecutor` instead of reimplementing query policy:
+The optional direct MCP entry points reuse `WrenQueryService` and
+`EnvPsycopgExecutor` instead of reimplementing structural SQL policy:
 
 ```text
 semarail-mcp --project C:\data\semantic-project
 semarail-query-mcp --project C:\data\semantic-project
 ```
 
-The governed-query server exposes only `semarail_governed_query` over stdio. The project directory and DSN
+These direct processes are for one trusted local operator. They do not resolve a
+managed Subject, retrieve current per-user policies, or produce identity audit.
+They must not be used as a shared employee or multi-tenant access boundary. The
+default deployment is authenticated Core HTTP MCP; stdio-only clients should use
+`semarail mcp bridge`, which forwards all tools to Core.
+
+The direct governed-query server exposes only `semarail_governed_query` over stdio. The project directory and DSN
 environment-variable name are fixed at process startup and never appear as tool
 arguments. MCP request cancellation is forwarded to the executor's database
 cancellation hook. Install `.[wren,mcp]` to use this entry point.
 
-For Agent deployments, pair `semarail-mcp` (the stable read-only tools
+For isolated local evaluation, pair `semarail-mcp` (the stable read-only tools
 `semarail_validate_project`, `semarail_list_models`, `semarail_get_context`, and
 `semarail_plan_query`) with
 `semarail-query-mcp` (governed execution). The legacy `dsh-data-agent-mcp`

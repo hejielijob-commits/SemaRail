@@ -11,6 +11,7 @@ test('CLI exposes branded help and version', () => {
   assert.match(help.stdout, /SemaRail Core/)
   assert.match(help.stdout, /semarail start --project/)
   assert.match(help.stdout, /semarail mcp serve --project/)
+  assert.match(help.stdout, /semarail mcp bridge/)
   assert.match(help.stdout, /semarail auth login --provider/)
   const version = spawnSync(process.execPath, [cli, '--version'], { encoding: 'utf8' })
   assert.equal(version.stdout.trim(), '0.1.0-alpha.3')
@@ -48,4 +49,13 @@ test('remote MCP fails closed without authentication configuration', () => {
   })
   assert.equal(result.status, 1)
   assert.doesNotMatch(result.stderr, /Bearer|[a-f0-9]{64}/)
+})
+
+test('stdio MCP bridge validates its fixed endpoint before launching Python', () => {
+  const result = spawnSync(process.execPath, [cli, 'mcp', 'bridge', '--endpoint', 'http://example.com:48763'], {
+    encoding: 'utf8',
+    env: { ...process.env, SEMARAIL_MCP_TOKEN: 'service-account-token-that-must-not-appear' },
+  })
+  assert.equal(result.status, 1)
+  assert.doesNotMatch(result.stderr, /service-account-token-that-must-not-appear|Bearer/)
 })

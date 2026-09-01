@@ -87,13 +87,26 @@ class RuntimeRpcGateway:
         self.dispatcher = dispatcher if dispatcher is not None else _default_dispatcher(project)
         configured = auth_token if auth_token is not None else os.environ.get("SEMARAIL_API_TOKEN", "")
         self.auth_token = configured.strip()
-        self.access_control = access_control or AccessControlStore(
+        self.access_control = access_control or AccessControlStore.from_config(
             self.project.state_dir / "access-control.sqlite3",
             bootstrap_token=self.auth_token,
         )
         self.policy_engine = policy_engine or PolicyEngine()
 
-    def dispatch(self, body: Any, authorization: str | None = None) -> tuple[int, dict[str, Any]]:
+    def dispatch(
+        self,
+        body: Any,
+        authorization: str | None = None,
+        *,
+        transport: str = "runtime-rpc",
+    ) -> tuple[int, dict[str, Any]]:
+        """Dispatch one authenticated request and emit a metadata-only audit event.
+
+        ``transport`` is trusted server context, not a public request field. It
+        lets entry points distinguish remote MCP from the ordinary Core RPC
+        boundary without copying bearer tokens or request content into audit.
+        """
+
         request_id = _request_id(body)
         try:
             auth = self.access_control.authenticate(authorization)
@@ -113,34 +126,74 @@ class RuntimeRpcGateway:
         params = body.get("params")
         if not isinstance(params, Mapping):
             return 400, _error(request_id, "INVALID_PARAMS", "params must be an object")
-        policies = [] if auth.subject.id == BOOTSTRAP_SUBJECT_ID else self.access_control.policies_for_subject(auth.subject.id)
+        # The bootstrap credential is an administration/recovery credential,
+        # never an Agent data credential. Console management routes authenticate
+        # it independently; the runtime boundary requires a revocable managed
+        # service key or employee session.
+        if auth.subject.id == BOOTSTRAP_SUBJECT_ID and method != "health":
+            decision = PolicyDecision(False, "bootstrap credential is not accepted by the agent runtime")
+            self._audit(
+                auth, str(method), "denied", request_id, decision,
+                transport=transport,
+                query_id=params.get("queryId") if method in {"query.run", "query.cancel"} else None,
+            )
+            return 403, _error(request_id, "FORBIDDEN", "managed Agent credentials are required")
+        policies = (
+            [] if auth.subject.id == BOOTSTRAP_SUBJECT_ID
+            else self.access_control.policies_for_subject(auth.subject.id)
+        )
         project_id = str(self.project.overview().get("name") or "")
         # Data-facing authorization is bound to the server-known active
         # datasource; callers cannot select or spoof a source in the public
         # RPC payload.
         datasource_id = self.project.active_datasource_identifier() if method in _DATA_POLICY_METHODS else None
-        if method in _DATA_POLICY_METHODS and auth.subject.id != BOOTSTRAP_SUBJECT_ID and datasource_id is None:
+        if method in _DATA_POLICY_METHODS and datasource_id is None:
             decision = PolicyDecision(False, "active datasource binding is required")
         else:
             decision = self.policy_engine.authorize_method(
                 auth.subject, str(method), policies, project_id=project_id, datasource_id=datasource_id
             )
         if not decision.allowed:
-            self._audit(auth, str(method), "denied", request_id, decision)
+            self._audit(
+                auth, str(method), "denied", request_id, decision,
+                transport=transport, datasource_id=datasource_id,
+                query_id=params.get("queryId") if method in {"query.run", "query.cancel"} else None,
+            )
             return 403, _error(request_id, "FORBIDDEN", "permission is required")
         normalized = self._normalize(method, params, decision)
         if isinstance(normalized, str):
-            self._audit(auth, str(method), "denied", request_id, decision)
+            self._audit(
+                auth, str(method), "denied", request_id, decision,
+                transport=transport, datasource_id=datasource_id,
+                query_id=params.get("queryId") if method in {"query.run", "query.cancel"} else None,
+            )
             return 400, _error(request_id, "INVALID_PARAMS", normalized)
+        compiled_policy: Mapping[str, Any] | None = None
         if method in _DATA_POLICY_METHODS:
             try:
-                normalized["authorizationPolicy"] = self.policy_engine.compile_data_policy(
+                compiled_policy = self.policy_engine.compile_data_policy(
                     auth.subject, policies, project_id=project_id, datasource_id=datasource_id
                 )
+                normalized["authorizationPolicy"] = compiled_policy
             except Exception:
-                self._audit(auth, str(method), "denied", request_id, decision)
+                self._audit(
+                    auth, str(method), "denied", request_id, decision,
+                    transport=transport, datasource_id=datasource_id,
+                    query_id=normalized.get("queryId") if method in {"query.run", "query.cancel"} else None,
+                )
                 return 403, _error(request_id, "FORBIDDEN", "data access policy is invalid")
         if self.dispatcher is None:
+            self._audit(
+                auth,
+                str(method),
+                "error",
+                request_id,
+                decision,
+                transport=transport,
+                datasource_id=datasource_id,
+                query_id=normalized.get("queryId") if method in {"query.run", "query.cancel"} else None,
+                compiled_policy=compiled_policy,
+            )
             return 503, _error(request_id, "WREN_UNAVAILABLE", "SemaRail runtime is unavailable")
         internal = {
             "protocolVersion": CORE_PROTOCOL_VERSION,
@@ -177,7 +230,17 @@ class RuntimeRpcGateway:
                     },
                 },
             }
-        self._audit(auth, str(method), "allowed" if response.get("ok") is True else "error", request_id, decision)
+        self._audit(
+            auth,
+            str(method),
+            "allowed" if response.get("ok") is True else "error",
+            request_id,
+            decision,
+            transport=transport,
+            datasource_id=datasource_id,
+            query_id=normalized.get("queryId") if method in {"query.run", "query.cancel"} else None,
+            compiled_policy=compiled_policy,
+        )
         return 200, response
 
     def _normalize(
@@ -235,7 +298,37 @@ class RuntimeRpcGateway:
         result: str,
         request_id: str,
         decision: PolicyDecision,
+        *,
+        transport: str,
+        datasource_id: str | None = None,
+        query_id: Any = None,
+        compiled_policy: Mapping[str, Any] | None = None,
     ) -> None:
+        safe_transport = transport if transport in {"runtime-rpc", "remote-mcp"} else "runtime-rpc"
+        safe_query_id = query_id[:128] if isinstance(query_id, str) else None
+        policy_versions = list(decision.policy_versions)
+        policy_tables: list[str] = []
+        if compiled_policy is not None:
+            raw_versions = compiled_policy.get("policyVersions")
+            if isinstance(raw_versions, list) and all(isinstance(item, str) for item in raw_versions):
+                policy_versions = raw_versions[:64]
+            # These are the tables whose compiled controls were supplied to
+            # the execution boundary, not a claim about the exact SQL access
+            # path. Query text and resolved row values stay absent.
+            raw_tables = compiled_policy.get("tables")
+            if isinstance(raw_tables, Mapping):
+                policy_tables = sorted(str(item) for item in raw_tables)[:1_000]
+        details: dict[str, Any] = {
+            "requestId": request_id,
+            "transport": safe_transport,
+            "authenticationMethod": auth.method,
+            "policyTables": policy_tables,
+            "policyVersions": policy_versions,
+        }
+        if datasource_id is not None:
+            details["datasourceId"] = datasource_id
+        if safe_query_id is not None:
+            details["queryId"] = safe_query_id
         try:
             self.access_control.record_audit(
                 action=action,
@@ -243,7 +336,7 @@ class RuntimeRpcGateway:
                 auth=auth,
                 resource=str(self.project.overview().get("name") or ""),
                 policy_version=decision.version_key or None,
-                details={"requestId": request_id},
+                details=details,
             )
         except AccessControlError:
             _LOGGER.error("runtime audit write failed")

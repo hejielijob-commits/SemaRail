@@ -16,6 +16,14 @@ All notable user-visible changes to this project are documented here. The format
   authorization, short-lived revocable SemaRail sessions, immutable provider
   identities, external-organization allowlisting, employee administration, and
   the same table/column/row policies used by service accounts.
+- Authenticated Streamable HTTP MCP plus an authenticated stdio-to-Core bridge
+  for clients that cannot connect to HTTP MCP directly.
+- Optional PostgreSQL access-control storage with serialized, versioned
+  migrations and fail-closed startup when the configured store is unavailable.
+- Transaction-local PostgreSQL Subject context, an RLS deployment guide, and an
+  acceptance scenario proving that two identities see disjoint regional rows.
+- Metadata-only runtime audit details for transport, authentication method,
+  datasource, query id, policy tables, and policy versions.
 
 ### Changed
 
@@ -38,6 +46,12 @@ All notable user-visible changes to this project are documented here. The format
 - Physical table row/column enforcement now resolves aliases by SQL lexical
   scope and keeps other-project policies out of the current project's compiled
   data policy.
+- Agent runtime and MCP entry points require managed service-account keys or
+  employee sessions for semantic/query work; the bootstrap administrator
+  credential is limited to Console administration and the Core health check.
+- The MCP Integration page now presents authenticated HTTP as the default and
+  labels direct stdio adapters as trusted-local compatibility only, without
+  returning server project paths, datasource DSNs, or bearer credentials.
 
 ## [0.1.0-alpha.1] - 2026-08-30
 

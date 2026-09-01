@@ -135,6 +135,31 @@ class AccessControlStore:
         except OSError:
             pass
 
+    @classmethod
+    def from_config(
+        cls,
+        path: str | Path,
+        *,
+        bootstrap_token: str | None = None,
+        database_url: str | None = None,
+        clock: Callable[[], datetime] = _utc_now,
+    ) -> "AccessControlStore":
+        """Open the configured control-plane store without changing SQLite defaults.
+
+        ``SEMARAIL_ACCESS_CONTROL_DATABASE_URL`` is deliberately separate
+        from analytical datasource credentials.  A configured PostgreSQL URL
+        never falls back to SQLite if its driver or migration is unavailable.
+        """
+
+        configured = (database_url or os.environ.get("SEMARAIL_ACCESS_CONTROL_DATABASE_URL", "")).strip()
+        if not configured:
+            return cls(path, bootstrap_token=bootstrap_token, clock=clock)
+        try:
+            from .access_control_storage import PostgreSQLAccessControlStore
+        except ImportError:  # pragma: no cover - direct module loading
+            from access_control_storage import PostgreSQLAccessControlStore  # type: ignore[no-redef]
+        return PostgreSQLAccessControlStore(configured, bootstrap_token=bootstrap_token, clock=clock)
+
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.path, timeout=10)
@@ -295,6 +320,22 @@ class AccessControlStore:
             connection.execute(
                 "INSERT OR IGNORE INTO organizations(id,name,created_at) VALUES(?,?,?)",
                 (DEFAULT_ORGANIZATION_ID, "Default organization", _timestamp(self.clock())),
+            )
+            # Older local stores predate an explicit migration ledger.  All
+            # compatibility changes above run before recording this baseline,
+            # so opening a legacy database remains an in-place, no-data-loss
+            # upgrade.
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS access_control_schema_migrations "
+                "(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO access_control_schema_migrations(version,applied_at) VALUES(?,?)",
+                (1, _timestamp(self.clock())),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO access_control_schema_migrations(version,applied_at) VALUES(?,?)",
+                (2, _timestamp(self.clock())),
             )
 
     def create_service_account(
@@ -1006,11 +1047,11 @@ class AccessControlStore:
         return hashlib.pbkdf2_hmac("sha256", secret.encode("utf-8"), salt, _PBKDF2_ITERATIONS)
 
     @staticmethod
-    def _subject_from_row(row: sqlite3.Row) -> Subject:
+    def _subject_from_row(row: Mapping[str, Any]) -> Subject:
         return Subject(str(row["id"]), str(row["organization_id"]), str(row["kind"]), str(row["name"]), json.loads(str(row["attributes_json"])), str(row["status"]))
 
     @staticmethod
-    def _credential_public(row: sqlite3.Row) -> dict[str, Any]:
+    def _credential_public(row: Mapping[str, Any]) -> dict[str, Any]:
         return {
             "id": row["id"], "subjectId": row["subject_id"], "label": row["label"],
             "createdAt": row["created_at"], "expiresAt": row["expires_at"],

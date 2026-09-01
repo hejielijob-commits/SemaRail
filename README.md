@@ -18,8 +18,9 @@ SemaRail is agent-neutral. Any MCP-capable client can use its semantic tools. It
 ## Features
 
 - **Visual semantic modeling** — import database schemas and manage models, fields, relationships, views, cubes, business rules, and reviewed SQL knowledge.
-- **Agent-neutral MCP tools** — expose semantic context and governed query planning to Codex and other MCP-capable agents through stdio.
-- **Governed data access** — parse generated PostgreSQL with `sqlglot`, enforce physical-object allowlists, reject unsafe statements, and apply read-only, timeout, row, byte, and concurrency limits.
+- **Agent-neutral MCP tools** — expose semantic context and governed queries through authenticated Streamable HTTP, with an authenticated stdio bridge for clients that require it.
+- **Governed data access** — resolve every request to a current Subject and policy, parse generated PostgreSQL with `sqlglot`, enforce table/column/row rules and physical-object allowlists, and apply read-only, timeout, row, byte, and concurrency limits.
+- **Enterprise identity and policy** — use revocable service-account keys or DingTalk/OIDC employee sessions, change permissions without reinstalling Agents, and audit decisions without storing SQL, result rows, or secrets.
 - **Common database metadata** — test connections, browse schemas, and import models from PostgreSQL, MySQL, SQLite, ClickHouse, and DuckDB.
 - **Versioned semantic projects** — validate drafts, inspect generated source and diffs, publish revisions, and roll back changes.
 - **Bilingual metadata** — maintain English and Simplified Chinese display names without changing stable technical identifiers.
@@ -128,46 +129,54 @@ Open [http://127.0.0.1:48763](http://127.0.0.1:48763). The server binds to loopb
 
 ## Use SemaRail with MCP agents
 
-SemaRail provides two separate stdio servers so deployments can expose semantic discovery without automatically granting database access.
-
-![SemaRail MCP integration](docs/images/mcp-integration.png)
-
-### Semantic MCP server
-
-The semantic server reads the project but does not connect to the database. It exposes:
+The default multi-user integration is SemaRail's authenticated Streamable HTTP
+MCP endpoint. It exposes the same five stable tools to any MCP-capable Agent:
 
 - `semarail_validate_project`
 - `semarail_list_models`
 - `semarail_get_context`
 - `semarail_plan_query`
+- `semarail_governed_query`
 
-Start it with:
+![SemaRail MCP integration](docs/images/mcp-integration.png)
 
-```powershell
-& .\.venv\Scripts\semarail-mcp.exe `
-  --project C:\path\to\semantic-project
-```
+### Start authenticated MCP
 
-Register the command, project argument, and repository-sidecar working directory in your MCP client. For Codex, MCP servers can be added in its MCP settings or with `codex mcp add`.
-
-### Governed query MCP server
-
-The optional execution server adds `semarail_governed_query`. Give it a read-only PostgreSQL DSN through an operating-system environment variable or secret manager; never place the DSN in a prompt or MCP tool argument.
+Start the MCP endpoint against the same project and state directory as Core:
 
 ```powershell
-$env:SEMARAIL_DATABASE_URL = "postgresql://readonly_user:password@localhost:5432/database"
-& .\.venv\Scripts\semarail-query-mcp.exe `
+$env:SEMARAIL_API_TOKEN = "<local bootstrap token>"
+semarail mcp serve `
   --project C:\path\to\semantic-project `
-  --database-dsn-env SEMARAIL_DATABASE_URL
+  --state-dir C:\path\to\semarail-state
 ```
 
-Project selection and the credential source are fixed when the server starts. Generated SQL is checked against the semantic project's physical allowlist before it can run.
+The endpoint is `http://127.0.0.1:48764/mcp`. The bootstrap token initializes
+the shared control-plane store but is rejected by remote MCP. In **Access
+control**, create a service account, assign trusted attributes, bind a
+project/datasource/table/column/row policy, and issue a one-time key. Configure
+that managed key in the Agent's private environment or secret manager:
 
-Run the credential-free MCP acceptance test with:
-
-```powershell
-pnpm acceptance:mcp
+```json
+{
+  "mcpServers": {
+    "semarail": {
+      "url": "http://127.0.0.1:48764/mcp",
+      "transport": "streamable-http",
+      "headers": {
+        "Authorization": "Bearer ${SEMARAIL_TOKEN}"
+      }
+    }
+  }
+}
 ```
+
+Every call re-authenticates the key or employee session and reads current policy,
+so disabling an account, revoking a key, changing attributes, or unbinding a
+policy affects the next request. Datasource credentials and project paths remain
+inside Core and never enter MCP client configuration. Loopback is the safe
+default; a non-loopback bind requires an explicit `--allowed-host` and a TLS
+reverse proxy.
 
 ### Service accounts, employees, and row permissions (alpha)
 
@@ -177,20 +186,37 @@ For example, two agents can run the same sales query while account A is restrict
 
 Employees can sign in through a configured DingTalk or generic OIDC provider with `semarail auth login --provider <id>`. The browser callback never receives a SemaRail bearer token; the initiating CLI exchanges a one-time device code for a bounded session and then enters the same Subject/PolicyEngine path as an API key. New employees have no data policy until an administrator assigns trusted attributes and a policy in **Access control**. See [Access control (alpha)](docs/access-control.md) for provider configuration and security boundaries.
 
-### Authenticated Streamable HTTP MCP (alpha)
+### Authenticated stdio bridge
 
-Start the authenticated MCP endpoint against the same project and state directory as Core:
+For an Agent that only supports stdio, log in once and configure the bridge as
+its MCP command:
 
 ```powershell
-$env:SEMARAIL_API_TOKEN = "<bootstrap token>"
-semarail mcp serve `
-  --project C:\path\to\semantic-project `
-  --state-dir C:\path\to\semarail-state
+semarail auth login --provider dingtalk --endpoint http://127.0.0.1:48763
+semarail mcp bridge --endpoint http://127.0.0.1:48763
 ```
 
-The endpoint is `http://127.0.0.1:48764/mcp`. Configure the MCP client with a managed service-account key in the `Authorization: Bearer <key>` header. It exposes the four stable semantic tools plus `semarail_governed_query`; every call reuses the current Subject, project/tool policy, query limits, and table/column/row policy enforced by Core.
+The bridge reads the ACL-protected employee session written by `semarail auth
+login` and forwards every tool to Core's authenticated runtime. It does not load
+Wren, open a database, accept a Subject/policy/DSN argument, or print the token.
+For a service account instead, set `SEMARAIL_MCP_TOKEN` in the bridge process's
+private environment. Use `--token-env <NAME>` to select another environment
+variable name.
 
-Loopback is the safe default. A non-loopback bind requires an explicit `--allowed-host` and should be placed behind a TLS reverse proxy; the current alpha command does not terminate TLS itself. Employee sign-in and short-lived sessions are implemented, but a centrally exposed employee gateway still requires a trusted TLS reverse proxy and deployment hardening before production use.
+### Trusted local operator compatibility
+
+`semarail-mcp` and `semarail-query-mcp` remain available for compatibility and
+isolated local evaluation. They directly load the project/Sidecar and therefore
+do **not** provide per-user Subject resolution, immediate policy changes, or
+identity audit. Do not use them as a shared employee or multi-tenant boundary.
+Use authenticated HTTP MCP or `semarail mcp bridge` instead.
+
+Run MCP acceptance tests with:
+
+```powershell
+pnpm acceptance:mcp
+pnpm acceptance:split
+```
 
 ## DeepSeek Harness plugin
 
@@ -245,7 +271,7 @@ The plugin accepts only connection settings; project paths, credentials, and exe
     timeoutMs: 30000
 ```
 
-Set `SEMARAIL_DATABASE_URL` only in the Core process environment when governed PostgreSQL execution is required. The Harness plugin never receives the DSN. Never expose the Core bootstrap `SEMARAIL_API_TOKEN` to Harness or another Agent: it intentionally bypasses ordinary project and data policy so an administrator can recover the local control plane.
+Set `SEMARAIL_DATABASE_URL` only in the Core process environment when governed PostgreSQL execution is required. The Harness plugin never receives the DSN. Never expose the Core bootstrap `SEMARAIL_API_TOKEN` to Harness or another Agent: it is limited to Console administration, recovery, and the read-only Core health check; semantic/query runtime methods and MCP boundaries reject it. Use a managed `sr_live_...` key or employee session instead.
 
 The Client opens the Semantic Console at `http://127.0.0.1:48763` by default. An embedding can pass `semanticConsoleUrl` to the exported view/link props or set `localStorage['semarail.semantic-console-url']`; only credential-free absolute HTTP(S) URLs are accepted. The former `dsh-wren-data-agent.semantic-console-url` key is read only as a migration fallback.
 
@@ -256,10 +282,11 @@ All model-generated SQL is treated as untrusted input.
 - PostgreSQL statements are parsed structurally with `sqlglot`.
 - DML, multi-statement SQL, dangerous functions, and unauthorized objects fail closed.
 - Query execution uses a read-only account with row, byte, timeout, concurrency, and cancellation limits.
+- PostgreSQL deployments can add transaction-local Subject context and native RLS as a second enforcement layer; see [PostgreSQL row-level security](docs/postgresql-rls.md).
 - Protocol and presentation payloads are JSON-safe and versioned; unknown versions fail closed.
 - Sidecar stdout is protocol-only; diagnostics go to stderr.
 - Datasource credentials remain server-side and are redacted from Console API responses.
-- The Console remains loopback-only in this alpha release. Subject policies, table/column/row authorization and audit events are implemented; production multi-tenant administration, approval workflows, a hardened remote identity gateway, and database-native RLS remain deployment work.
+- The Console remains loopback-only in this alpha release. Subject policies, table/column/row authorization, PostgreSQL RLS context, optional PostgreSQL control-plane storage, and metadata-only audit events are implemented. Internet exposure still requires a hardened reverse proxy, TLS, deployment monitoring, backup/restore, and an organization-specific identity configuration.
 
 ## Repository layout
 

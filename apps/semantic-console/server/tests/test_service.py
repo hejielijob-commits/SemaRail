@@ -160,7 +160,7 @@ class SemanticConsoleServiceTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(error["code"], "INVALID_PATH")
 
-    def test_mcp_integration_exposes_safe_stdio_configuration(self):
+    def test_mcp_integration_defaults_to_authenticated_remote_configuration(self):
         service = SemanticConsoleService(self.make_project())
         datasource = service.create_datasource(
             {"name": "pg", "type": "postgres", "connection": {"host": "localhost", "password": "never-return"}}
@@ -169,17 +169,22 @@ class SemanticConsoleServiceTests(unittest.TestCase):
         status, integration = service.dispatch("GET", "/api/mcp-integration")
 
         self.assertEqual(status, 200)
-        self.assertEqual(integration["transport"], "stdio")
-        self.assertEqual(integration["semantic"]["status"], "ready")
-        self.assertEqual(integration["governedQuery"]["status"], "ready")
-        self.assertEqual(integration["governedQuery"]["datasourceType"], "postgres")
-        self.assertEqual(integration["semantic"]["command"], "semarail-mcp")
-        self.assertEqual(integration["governedQuery"]["command"], "semarail-query-mcp")
-        self.assertEqual(integration["governedQuery"]["databaseDsnEnv"], "SEMARAIL_DATABASE_URL")
-        self.assertIn(str(self.tmp_path / "project"), integration["semantic"]["args"])
-        self.assertEqual(integration["clientConfig"]["mcpServers"]["semarail-query"]["env"]["SEMARAIL_DATABASE_URL"], "<POSTGRESQL_DSN>")
+        self.assertEqual(integration["schemaVersion"], 2)
+        self.assertEqual(integration["transport"], "streamable-http")
+        self.assertEqual(integration["endpoint"]["authentication"], "bearer")
+        self.assertEqual(integration["authentication"]["acceptedCredentials"], ["service_account_key", "employee_session"])
+        self.assertEqual(integration["readiness"]["semanticContext"], "ready")
+        self.assertEqual(integration["readiness"]["governedQuery"], "ready")
+        self.assertEqual(integration["readiness"]["datasourceType"], "postgres")
+        self.assertEqual(integration["readiness"]["endpointConfiguration"], "defaulted")
+        remote = integration["clientConfig"]["mcpServers"]["semarail"]
+        self.assertEqual(remote["transport"], "streamable-http")
+        self.assertEqual(remote["headers"]["Authorization"], "Bearer ${SEMARAIL_TOKEN}")
+        self.assertFalse(integration["trustedLocalOperator"]["userIsolation"])
         serialized = json.dumps(integration)
         self.assertNotIn("never-return", serialized)
+        self.assertNotIn(str(self.tmp_path), serialized)
+        self.assertNotIn("DATABASE_URL", serialized)
         self.assertNotIn(datasource.get("connection", {}).get("password", "never-return"), serialized)
 
     def test_mcp_integration_marks_mysql_governed_execution_unsupported(self):
@@ -189,9 +194,38 @@ class SemanticConsoleServiceTests(unittest.TestCase):
 
         integration = service.mcp_integration()
 
-        self.assertEqual(integration["semantic"]["status"], "ready")
-        self.assertEqual(integration["governedQuery"]["status"], "setup_required")
-        self.assertEqual(integration["governedQuery"]["datasourceType"], "mysql")
+        self.assertEqual(integration["readiness"]["semanticContext"], "ready")
+        self.assertEqual(integration["readiness"]["governedQuery"], "setup_required")
+        self.assertEqual(integration["readiness"]["datasourceType"], "mysql")
+
+    def test_mcp_integration_accepts_only_credential_free_remote_endpoint(self):
+        service = SemanticConsoleService(self.make_project())
+        with patch.dict(
+            "os.environ", {"SEMARAIL_REMOTE_MCP_URL": "https://mcp.example.test/mcp"}
+        ):
+            configured = service.mcp_integration()
+        self.assertEqual(configured["endpoint"]["url"], "https://mcp.example.test/mcp")
+        self.assertEqual(configured["readiness"]["endpointConfiguration"], "ready")
+
+        with patch.dict(
+            "os.environ",
+            {"SEMARAIL_REMOTE_MCP_URL": "https://user:secret@mcp.example.test/mcp?token=bad"},
+        ):
+            rejected = service.mcp_integration()
+        self.assertEqual(rejected["endpoint"]["url"], "http://127.0.0.1:48764/mcp")
+        self.assertEqual(rejected["readiness"]["endpointConfiguration"], "defaulted")
+        self.assertNotIn("secret", json.dumps(rejected))
+
+        for unsafe in (
+            "http://mcp.example.test/mcp",
+            "https://mcp.example.test:not-a-port/mcp",
+            "http://[invalid",
+        ):
+            with self.subTest(unsafe=unsafe):
+                with patch.dict("os.environ", {"SEMARAIL_REMOTE_MCP_URL": unsafe}):
+                    rejected = service.mcp_integration()
+                self.assertEqual(rejected["endpoint"]["url"], "http://127.0.0.1:48764/mcp")
+                self.assertEqual(rejected["readiness"]["endpointConfiguration"], "defaulted")
 
     def test_business_model_projection_updates_wren_and_locales_as_drafts(self):
         store = self.make_project()

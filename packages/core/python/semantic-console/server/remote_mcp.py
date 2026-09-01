@@ -19,11 +19,11 @@ from mcp.server.fastmcp.server import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 
 try:
-    from .access_control import AccessControlError, AccessControlStore
+    from .access_control import AccessControlError, AccessControlStore, BOOTSTRAP_SUBJECT_ID
     from .project import ProjectStore
     from .runtime_rpc import RuntimeRpcGateway
 except ImportError:  # pragma: no cover - direct module loading
-    from access_control import AccessControlError, AccessControlStore  # type: ignore[no-redef]
+    from access_control import AccessControlError, AccessControlStore, BOOTSTRAP_SUBJECT_ID  # type: ignore[no-redef]
     from project import ProjectStore  # type: ignore[no-redef]
     from runtime_rpc import RuntimeRpcGateway  # type: ignore[no-redef]
 
@@ -42,6 +42,11 @@ class SemaRailTokenVerifier:
         try:
             auth = self.store.authenticate(f"Bearer {token}")
         except AccessControlError:
+            return None
+        # The bootstrap credential exists only for loopback administration and
+        # must never become a reusable bearer credential on a network-facing
+        # MCP endpoint. Remote MCP accepts managed, revocable identities only.
+        if auth.subject.id == BOOTSTRAP_SUBJECT_ID:
             return None
         return AccessToken(
             token=token,
@@ -76,6 +81,7 @@ class RuntimeMcpBridge:
                 "params": dict(params),
             },
             f"Bearer {access.token}",
+            transport="remote-mcp",
         )
         if status != 200 or response.get("ok") is not True:
             error = response.get("error")
@@ -188,6 +194,14 @@ def create_remote_mcp_server(
             except Exception:
                 pass
             raise
+
+    # MCP 1.28's compatibility mode otherwise ignores unknown arguments.
+    # Reject them so a caller cannot believe it supplied a Subject, policy,
+    # datasource, project path, or credential override that Core did not use.
+    for tool in server._tool_manager.list_tools():  # noqa: SLF001 - pinned MCP 1.28 contract
+        tool.parameters["additionalProperties"] = False
+        tool.fn_metadata.arg_model.model_config["extra"] = "forbid"
+        tool.fn_metadata.arg_model.model_rebuild(force=True)
 
     return server
 

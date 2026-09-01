@@ -100,7 +100,7 @@ export class ApiClient {
     return this.request<ProjectSummary>("/api/project");
   }
 
-  /** Load secret-free stdio MCP commands and readiness for the active project. */
+  /** Load the secret-free authenticated remote MCP configuration and readiness. */
   getMcpIntegration(): Promise<McpIntegrationResponse> {
     return this.request<McpIntegrationResponse>("/api/mcp-integration");
   }

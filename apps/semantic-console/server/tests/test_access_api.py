@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -303,6 +304,41 @@ class AccessControlAdminApiTests(unittest.TestCase):
             "GET", "/api/v1/access/users", authorization=issued_by_scope["access:admin"]
         )
         self.assertEqual(status, 200)
+
+        status, response = self.app.request("GET", "/api/mcp-integration")
+        self.assertEqual((status, response["code"]), (401, "UNAUTHENTICATED"))
+        status, response = self.app.request(
+            "GET", "/api/mcp-integration", authorization=issued_by_scope["access:admin"]
+        )
+        self.assertEqual((status, response["code"]), (403, "FORBIDDEN"))
+        status, integration = self.app.request(
+            "GET", "/api/mcp-integration", authorization=issued_by_scope["console:admin"]
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(integration["schemaVersion"], 2)
+
+    def test_openapi_defaults_console_routes_to_bearer_and_marks_only_public_flows(self) -> None:
+        specification = json.loads(
+            (Path(__file__).resolve().parents[1] / "openapi.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(specification["security"], [{"RuntimeBearer": []}])
+        public_operations = {
+            (path, method)
+            for path, item in specification["paths"].items()
+            for method, operation in item.items()
+            if method in {"get", "post", "put", "delete", "patch"}
+            and operation.get("security") == []
+        }
+        self.assertEqual(
+            public_operations,
+            {
+                ("/api/health", "get"),
+                ("/api/v1/auth/providers", "get"),
+                ("/api/v1/auth/device/start", "post"),
+                ("/api/v1/auth/callback/{provider}", "get"),
+                ("/api/v1/auth/device/token", "post"),
+            },
+        )
 
     def test_management_api_rejects_invalid_policy_before_persistence(self) -> None:
         status, response = self.app.request(

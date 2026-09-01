@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import re
 from collections.abc import Mapping
 from secrets import token_urlsafe
 from typing import Any, Callable
+from urllib.parse import urlsplit
 
 import yaml
 
@@ -41,6 +43,7 @@ class ApiServiceError(RuntimeError):
 
 
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_$-]*$")
+_DEFAULT_REMOTE_MCP_URL = "http://127.0.0.1:48764/mcp"
 
 
 def _required_string(value: Any, name: str) -> str:
@@ -124,16 +127,15 @@ class SemanticConsoleService:
         return self.project.overview()
 
     def mcp_integration(self) -> dict[str, Any]:
-        """Describe the local stdio MCP composition without exposing secrets.
+        """Describe the authenticated remote MCP boundary without secrets.
 
-        MCP servers are spawned by the consuming agent, so this endpoint reports
-        configuration readiness rather than pretending they are persistent
-        background services.  The database DSN remains an explicit placeholder:
-        saved Console credentials never cross this read boundary.
+        This response is safe to render or copy: it never includes the server's
+        project path, datasource credentials, or a bearer token.  Readiness is
+        configuration readiness and does not claim that the separately hosted
+        Streamable HTTP process is currently reachable.
         """
 
         overview = self.project.overview()
-        project_path = str(self.project.project_dir)
         project_exists = bool(overview.get("projectExists"))
         wren = overview.get("wren") if isinstance(overview.get("wren"), Mapping) else {}
         active = overview.get("activeDatasource") if isinstance(overview.get("activeDatasource"), Mapping) else {}
@@ -142,37 +144,69 @@ class SemanticConsoleService:
             datasource_type = "postgres"
 
         semantic_ready = project_exists and bool(wren.get("available"))
-        governed_ready = project_exists and datasource_type == "postgres"
-        semantic_args = ["--project", project_path]
-        governed_args = ["--project", project_path, "--database-dsn-env", "SEMARAIL_DATABASE_URL"]
+        governed_ready = semantic_ready and datasource_type == "postgres"
+        configured_endpoint = os.environ.get("SEMARAIL_REMOTE_MCP_URL", "").strip()
+        endpoint_url = configured_endpoint or _DEFAULT_REMOTE_MCP_URL
+        try:
+            parsed_endpoint = urlsplit(endpoint_url)
+            endpoint_port = parsed_endpoint.port
+            loopback = parsed_endpoint.hostname in {"127.0.0.1", "localhost", "::1"}
+            endpoint_valid = (
+                parsed_endpoint.scheme in {"http", "https"}
+                and bool(parsed_endpoint.netloc)
+                and (parsed_endpoint.scheme == "https" or loopback)
+                and parsed_endpoint.username is None
+                and parsed_endpoint.password is None
+                and (endpoint_port is None or 1 <= endpoint_port <= 65_535)
+                and not parsed_endpoint.query
+                and not parsed_endpoint.fragment
+            )
+        except ValueError:
+            endpoint_valid = False
+        if not endpoint_valid:
+            endpoint_url = _DEFAULT_REMOTE_MCP_URL
         client_config = {
             "mcpServers": {
-                "semarail-semantic": {"command": "semarail-mcp", "args": semantic_args},
-                "semarail-query": {
-                    "command": "semarail-query-mcp",
-                    "args": governed_args,
-                    "env": {"SEMARAIL_DATABASE_URL": "<POSTGRESQL_DSN>"},
-                },
+                "semarail": {
+                    "url": endpoint_url,
+                    "transport": "streamable-http",
+                    "headers": {"Authorization": "Bearer ${SEMARAIL_TOKEN}"},
+                }
             }
         }
         return {
-            "schemaVersion": 1,
-            "transport": "stdio",
-            "projectPath": project_path,
-            "semantic": {
-                "status": "ready" if semantic_ready else "setup_required",
-                "command": "semarail-mcp",
-                "args": semantic_args,
-                "toolMode": "semantic_only",
+            "schemaVersion": 2,
+            "transport": "streamable-http",
+            "endpoint": {
+                "url": endpoint_url,
+                "authentication": "bearer",
             },
-            "governedQuery": {
-                "status": "ready" if governed_ready else "setup_required",
-                "command": "semarail-query-mcp",
-                "args": governed_args,
-                "databaseDsnEnv": "SEMARAIL_DATABASE_URL",
+            "authentication": {
+                "type": "bearer",
+                "acceptedCredentials": ["service_account_key", "employee_session"],
+                "tokenPlacement": "authorization_header",
+            },
+            "readiness": {
+                "status": "ready" if semantic_ready and governed_ready else "setup_required",
+                "semanticContext": "ready" if semantic_ready else "setup_required",
+                "governedQuery": "ready" if governed_ready else "setup_required",
                 "datasourceType": datasource_type or None,
+                "endpointConfiguration": "ready" if configured_endpoint and endpoint_valid else "defaulted",
             },
+            "tools": [
+                "semarail_validate_project",
+                "semarail_list_models",
+                "semarail_get_context",
+                "semarail_plan_query",
+                "semarail_governed_query",
+            ],
             "clientConfig": client_config,
+            "trustedLocalOperator": {
+                "status": "compatibility_only",
+                "transport": "stdio",
+                "audience": "trusted_local_operator",
+                "userIsolation": False,
+            },
         }
 
     def datasource_type_list(self) -> list[dict[str, Any]]:

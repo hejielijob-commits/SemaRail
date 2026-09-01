@@ -12,6 +12,7 @@ from unittest.mock import patch
 from sidecar.dispatch import Dispatcher
 from sidecar.errors import CANCELLED, DATABASE_ERROR, POLICY_DENIED, TIMEOUT
 from sidecar.query import (
+    DatabaseSession,
     MAX_PREVIEW_BYTES,
     PostgresQueryExecutor,
     QueryLimits,
@@ -47,11 +48,11 @@ class FakeCursor:
         ]
         self.rows = list(rows)
         self.execute_error = execute_error
-        self.executed: list[str] = []
+        self.executed: list[tuple[str, Any | None]] = []
         self.closed = False
 
-    def execute(self, sql: str) -> None:
-        self.executed.append(sql)
+    def execute(self, sql: str, parameters: Any | None = None) -> None:
+        self.executed.append((sql, parameters))
         if self.execute_error is not None and sql.startswith("SELECT"):
             raise self.execute_error
 
@@ -70,6 +71,7 @@ class FakeConnection:
         self.cancelled = threading.Event()
         self.closed = False
         self.readonly: tuple[bool, bool] | None = None
+        self.rolled_back = False
 
     def set_session(self, *, readonly: bool, autocommit: bool) -> None:
         self.readonly = (readonly, autocommit)
@@ -87,7 +89,7 @@ class FakeConnection:
         self.cancelled.set()
 
     def rollback(self) -> None:
-        return None
+        self.rolled_back = True
 
     def close(self) -> None:
         self.closed = True
@@ -99,8 +101,8 @@ class BlockingCursor(FakeCursor):
         self.started = started
         self.release = release
 
-    def execute(self, sql: str) -> None:
-        self.executed.append(sql)
+    def execute(self, sql: str, parameters: Any | None = None) -> None:
+        self.executed.append((sql, parameters))
         if sql.startswith("SELECT"):
             self.started.set()
             self.release.wait(2)
@@ -436,6 +438,13 @@ class QueryTests(unittest.TestCase):
             "schemaVersion": 1,
             "defaultEffect": "deny",
             "policyVersions": ["pol-sales:3"],
+            "databaseSession": {
+                "schemaVersion": 1,
+                "subjectId": "user-a",
+                "organizationId": "org-sales",
+                "attributes": {"regionCodes": ["CN-JIA"]},
+                "policyVersions": ["pol-sales:3"],
+            },
             "tables": {
                 "public.sales": {
                     "rowFilter": {
@@ -468,8 +477,11 @@ class QueryTests(unittest.TestCase):
         })
 
         self.assertIn("FROM (SELECT * FROM public.sales WHERE", seen["native_sql"])
+        self.assertLess(seen["native_sql"].index("WHERE"), seen["native_sql"].index("GROUP BY"))
         self.assertNotIn("CN-JIA", seen["native_sql"])
         self.assertEqual(set(seen["query_parameters"].values()), {"org-sales", "CN-JIA"})
+        self.assertEqual(seen["database_session"].subject_id, "user-a")
+        self.assertEqual(seen["database_session"].attributes_json, '{"regionCodes":["CN-JIA"]}')
         self.assertEqual(result["nativeSql"], original_sql)
         self.assertEqual(result["authorization"], {
             "rowPolicyApplied": True,
@@ -506,10 +518,117 @@ class QueryTests(unittest.TestCase):
                     "defaultEffect": "deny",
                     "tables": {},
                     "policyVersions": ["pol-sales:1"],
+                    "databaseSession": {
+                        "schemaVersion": 1,
+                        "subjectId": "user-a",
+                        "organizationId": "org-sales",
+                        "attributes": {},
+                        "policyVersions": ["pol-sales:1"],
+                    },
                 },
             })
         self.assertEqual(getattr(caught.exception, "error").code, POLICY_DENIED)
         self.assertEqual(getattr(caught.exception, "error").phase, "authorization")
+
+    def test_service_rejects_missing_or_oversized_database_session_fail_closed(self) -> None:
+        base_policy = {
+            "schemaVersion": 1,
+            "defaultEffect": "allow",
+            "tables": {},
+            "policyVersions": [],
+        }
+        service = WrenQueryService(
+            FakePlanner(),
+            PresentationExecutor([], []),
+            connection_resolver=lambda *_: {"connectionUrl": "postgresql://local.invalid/db"},
+        )
+        params = {
+            "projectDir": ".",
+            "question": "Orders",
+            "semanticSql": "SELECT order_id, amount FROM orders",
+            "queryId": "q-session-invalid",
+        }
+        for database_session in (
+            None,
+            {
+                "schemaVersion": 1,
+                "subjectId": "user-a",
+                "organizationId": "org-sales",
+                "attributes": {"regionCodes": ["x" * 40_000]},
+                "policyVersions": [],
+            },
+        ):
+            policy = dict(base_policy)
+            if database_session is not None:
+                policy["databaseSession"] = database_session
+            with self.subTest(database_session_present=database_session is not None):
+                with self.assertRaises(Exception) as caught:
+                    service.run({**params, "authorizationPolicy": policy})
+                self.assertEqual(getattr(caught.exception, "error").code, POLICY_DENIED)
+                self.assertEqual(getattr(caught.exception, "error").phase, "authorization")
+
+    def test_rls_context_is_parameterized_and_set_before_user_sql(self) -> None:
+        connection = FakeConnection([(1, "10.25")])
+        executor = PostgresQueryExecutor(connection_factory=lambda _: connection)
+        malicious = "甲'); SELECT pg_sleep(9); --"
+        session = DatabaseSession(
+            subject_id="user-a",
+            organization_id="org-sales",
+            attributes_json=json.dumps({"regionCodes": [malicious]}, ensure_ascii=False),
+            policy_versions_json='["pol-sales:3"]',
+        )
+
+        executor.execute(
+            query_id="q-rls",
+            semantic_sql="SELECT order_id, amount FROM orders",
+            native_sql="SELECT order_id, amount FROM orders",
+            project_dir=".",
+            connection_info={"connectionUrl": "postgresql://local.invalid/db"},
+            limits=QueryLimits(),
+            database_session=session,
+        )
+
+        self.assertEqual(connection.readonly, (True, False))
+        self.assertEqual(len(connection.cursors), 3)
+        timeout_sql, timeout_params = connection.cursors[0].executed[0]
+        context_sql, context_params = connection.cursors[1].executed[0]
+        user_sql, _ = connection.cursors[2].executed[0]
+        self.assertTrue(timeout_sql.startswith("SET LOCAL statement_timeout"))
+        self.assertIsNone(timeout_params)
+        self.assertEqual(context_sql.count("set_config("), 4)
+        self.assertIn("set_config('semarail.attributes', %s, true)", context_sql)
+        self.assertNotIn(malicious, context_sql)
+        self.assertIn(malicious, context_params[2])
+        self.assertNotIn(malicious, user_sql)
+        self.assertTrue(connection.rolled_back)
+        self.assertTrue(connection.closed)
+
+    def test_rls_context_failure_never_runs_user_sql_and_always_cleans_up(self) -> None:
+        class ContextFailConnection(FakeConnection):
+            def cursor(self) -> FakeCursor:
+                cursor = FakeCursor(self.rows)
+                if len(self.cursors) == 1:
+                    cursor.execute_error = RuntimeError("set_config rejected")
+                self.cursors.append(cursor)
+                return cursor
+
+        connection = ContextFailConnection([])
+        executor = PostgresQueryExecutor(connection_factory=lambda _: connection)
+        with self.assertRaises(Exception) as caught:
+            executor.execute(
+                query_id="q-rls-fail",
+                semantic_sql="SELECT order_id, amount FROM orders",
+                native_sql="SELECT order_id, amount FROM orders",
+                project_dir=".",
+                connection_info={"connectionUrl": "postgresql://local.invalid/db"},
+                limits=QueryLimits(),
+                database_session=DatabaseSession("user-a", "org-sales", "{}", "[]"),
+            )
+
+        self.assertEqual(getattr(caught.exception, "error").code, DATABASE_ERROR)
+        self.assertEqual(len(connection.cursors), 2)
+        self.assertTrue(connection.rolled_back)
+        self.assertTrue(connection.closed)
 
     def test_query_result_is_bounded_and_uses_exact_strings_for_numeric_precision(self) -> None:
         connection = FakeConnection([(1, "10.25"), (2, "20.50"), (3, "30.75")])

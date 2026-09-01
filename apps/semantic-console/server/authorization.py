@@ -45,6 +45,16 @@ _ALLOWED_OPERATORS = {"eq", "in"}
 _LIMIT_FIELDS = {"maxRows", "previewRows", "maxPreviewBytes", "timeoutMs"}
 _DOCUMENT_FIELDS = {"schemaVersion", "projects", "tools", "denyTools", "limits", "tables", "datasourceId"}
 _TABLE_RULE_FIELDS = {"effect", "tenantField", "rows", "columns", "datasourceId"}
+_MAX_DATABASE_SESSION_BYTES = 32_768
+
+
+def _database_attribute_name(value: str) -> bool:
+    return (
+        1 <= len(value) <= 64
+        and value.isascii()
+        and (value[0].isalpha() or value[0] == "_")
+        and all(character.isalnum() or character == "_" for character in value)
+    )
 
 
 def _identifier(value: Any, *, wildcard: bool = False) -> bool:
@@ -66,6 +76,40 @@ def _datasource_identifier(value: Any) -> bool:
     return isinstance(value, str) and 1 <= len(value) <= 128 and all(
         character.isalnum() or character in {"-", "_"} for character in value
     )
+
+
+def _database_session_value(value: Any) -> Any:
+    """Keep database-session projection secret-free, finite, and JSON-safe."""
+
+    values = list(value) if isinstance(value, (list, tuple)) else [value]
+    if (
+        not values
+        or len(values) > 1_000
+        or any(
+            not isinstance(item, (str, int, float, bool))
+            or (isinstance(item, float) and not math.isfinite(item))
+            or (isinstance(item, str) and len(item) > 1_024)
+            for item in values
+        )
+    ):
+        raise PolicyError("database session attribute value is invalid")
+    return values if isinstance(value, (list, tuple)) else values[0]
+
+
+def _row_attribute_names(rule: Mapping[str, Any]) -> set[str]:
+    """Return only subject attributes actually referenced by row rules."""
+
+    names: set[str] = set()
+    rows = rule.get("rows", [])
+    if not isinstance(rows, list):
+        raise PolicyError("rows must be an array")
+    for condition in rows:
+        if not isinstance(condition, Mapping):
+            raise PolicyError("row condition is invalid")
+        source = condition.get("valueFrom")
+        if isinstance(source, str) and source.startswith("subject.attributes."):
+            names.add(source.removeprefix("subject.attributes."))
+    return names
 
 
 def validate_policy_document(document: Any) -> Mapping[str, Any]:
@@ -393,7 +437,19 @@ class PolicyEngine:
         """Resolve bound table rules into a secret-free execution policy."""
 
         if subject.id == BOOTSTRAP_SUBJECT_ID:
-            return {"schemaVersion": 1, "defaultEffect": "allow", "tables": {}, "policyVersions": []}
+            return {
+                "schemaVersion": 1,
+                "defaultEffect": "allow",
+                "tables": {},
+                "policyVersions": [],
+                "databaseSession": {
+                    "schemaVersion": 1,
+                    "subjectId": subject.id,
+                    "organizationId": subject.organization_id,
+                    "attributes": {},
+                    "policyVersions": [],
+                },
+            }
         try:
             if not _datasource_identifier(datasource_id):
                 raise PolicyError("datasource binding is required")
@@ -426,19 +482,61 @@ class PolicyEngine:
                     "allowedColumns": list(decision.allowed_columns) if decision.allowed_columns is not None else None,
                     "deniedColumns": list(decision.denied_columns),
                 }
+            policy_versions = sorted(
+                {
+                    version
+                    for decision_table in table_names
+                    for version in self.authorize_table(
+                        subject, decision_table, policies, project_id=project_id, datasource_id=datasource_id
+                    ).policy_versions
+                }
+            )
+            requested_attributes: set[str] = set()
+            for table in compiled:
+                for document, _ in documents:
+                    rule = _table_rule(document, table, datasource_id=datasource_id)
+                    if rule is not None and rule.get("effect", "allow") == "allow":
+                        requested_attributes.update(_row_attribute_names(rule))
+            if len(requested_attributes) > 32:
+                raise PolicyError("too many database session attributes")
+            if any(not _database_attribute_name(name) for name in requested_attributes):
+                raise PolicyError("database session attribute name is invalid")
+            projected_attributes = {
+                name: _database_session_value(subject.attributes[name])
+                for name in sorted(requested_attributes)
+                if name in subject.attributes
+            }
+            if requested_attributes - set(projected_attributes):
+                raise PolicyError("database session attribute is missing")
+            if (
+                not isinstance(subject.id, str)
+                or not 1 <= len(subject.id.encode("utf-8")) <= 256
+                or not isinstance(subject.organization_id, str)
+                or not 1 <= len(subject.organization_id.encode("utf-8")) <= 256
+                or len(policy_versions) > 64
+                or any(not 1 <= len(version.encode("utf-8")) <= 256 for version in policy_versions)
+            ):
+                raise PolicyError("database session identity is invalid")
+            if len(json.dumps(
+                {"attributes": projected_attributes, "policyVersions": policy_versions},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")) > _MAX_DATABASE_SESSION_BYTES:
+                raise PolicyError("database session is too large")
             return {
                 "schemaVersion": 1,
                 "defaultEffect": "deny",
                 "tables": compiled,
-                "policyVersions": sorted(
-                    {
-                        version
-                        for decision_table in table_names
-                        for version in self.authorize_table(
-                            subject, decision_table, policies, project_id=project_id, datasource_id=datasource_id
-                        ).policy_versions
-                    }
-                ),
+                "policyVersions": policy_versions,
+                "databaseSession": {
+                    "schemaVersion": 1,
+                    "subjectId": subject.id,
+                    "organizationId": subject.organization_id,
+                    "attributes": projected_attributes,
+                    "policyVersions": policy_versions,
+                },
             }
         except (PolicyError, TypeError, ValueError) as exc:
             raise PolicyError("data policy compilation failed") from exc
