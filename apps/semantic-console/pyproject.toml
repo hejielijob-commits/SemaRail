@@ -18,7 +18,7 @@ dependencies = [
 
 [project.optional-dependencies]
 wren = ["wrenai==0.13.2"]
-remote-mcp = ["mcp[cli]==1.28.1"]
+remote-mcp = ["mcp[cli]==2.1.1"]
 
 [project.scripts]
 wren-semantic-console = "server.app:main"
