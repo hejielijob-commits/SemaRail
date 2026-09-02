@@ -44,6 +44,22 @@ Explore and maintain field-level model relationships in an interactive graph.
 
 ![Semantic relationship graph](docs/images/relationship-graph.png)
 
+## Project roadmap
+
+This roadmap highlights major project milestones. For file-level release notes,
+see [CHANGELOG.md](CHANGELOG.md).
+
+| Date | Status | Milestone |
+| --- | --- | --- |
+| 2026-08-30 | Completed | Established the SemaRail brand, Semantic Console, stable semantic MCP contract, and separate Core/DeepSeek Harness plugin packages. |
+| 2026-08-31 | Completed | Added DingTalk and OIDC employee sign-in, revocable sessions, trusted subject attributes, and administrator-managed account access. |
+| 2026-09-01 | Completed | Added project-, datasource-, table-, column-, and row-scoped authorization with immediate policy and credential revocation. |
+| 2026-09-02 | Completed | Added multi-user authenticated MCP, PostgreSQL-backed access-control storage, transaction-local subject context, and PostgreSQL RLS isolation. |
+| 2026-09-03 | Completed | Hardened permission-control acceptance with real PostgreSQL 17 tests, first-request MCP query startup, clean Linux CI builds, and A/B employee row-isolation verification. |
+| Next | Planned | Extend governed query execution beyond PostgreSQL while preserving the same policy, limits, audit, and cancellation contract. |
+| Next | Planned | Add a managed CSV/Excel ingestion workflow backed by DuckDB, without exposing uploaded files or local paths to Agents. |
+| Later | Planned | Publish versioned SemaRail Core and DeepSeek Harness plugin packages after the alpha installation and upgrade flow is stable. |
+
 ## Tech stack
 
 - Python 3.11+
