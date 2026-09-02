@@ -17,4 +17,14 @@ describe('SemaRail DeepSeek Harness plugin', () => {
     expect(manifest.peerDependencies?.['@deepseek-ai/dsh-subprocess']).toBeUndefined()
     expect(manifest.dsh?.client?.platform).toBe('web')
   })
+
+  it('builds the Client intermediate before requesting an artifact-only bundle', () => {
+    const buildScript = readFileSync(join(packageDir, 'scripts', 'build.mjs'), 'utf8')
+    const clientBuild = "node(resolve(clientDir, 'scripts', 'build.mjs'))"
+    const compileIndex = buildScript.indexOf(clientBuild)
+    const artifactOnlyIndex = buildScript.indexOf("DSH_CLIENT_ARTIFACT_ONLY: '1'")
+
+    expect(compileIndex).toBeGreaterThan(-1)
+    expect(artifactOnlyIndex).toBeGreaterThan(compileIndex)
+  })
 })

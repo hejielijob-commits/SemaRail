@@ -27,6 +27,10 @@ for (const name of ['python', 'runtime', 'semantic-console-web']) {
 }
 mkdirSync(resolve(packageDir, 'lib'), { recursive: true })
 node(tsc, ['-p', resolve(contractDir, 'tsconfig.json')])
+// A clean checkout has no Client CommonJS intermediate. Build it explicitly
+// before the artifact-only pass instead of relying on a previous workspace
+// build or a developer's stale .build directory.
+node(resolve(clientDir, 'scripts', 'build.mjs'))
 node(resolve(clientDir, 'scripts', 'build.mjs'), [], {
   env: {
     ...process.env,
