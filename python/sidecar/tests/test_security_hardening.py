@@ -54,6 +54,7 @@ class SecurityHardeningTests(unittest.TestCase):
             "SELECT 1; DROP TABLE orders",
             "COPY orders TO STDOUT",
             "CALL dangerous_proc()",
+            "SELECT pg_sleep(1)",
         ):
             with self.subTest(sql=sql):
                 with self.assertRaises(SqlPolicyError):

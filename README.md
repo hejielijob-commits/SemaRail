@@ -317,6 +317,10 @@ Additional integration gates:
 
 ```powershell
 pnpm acceptance
+# Run the real PostgreSQL 17/RLS gate. It requires administrator settings and
+# creates, then cleans, isolated test database/role fixtures.
+pnpm acceptance:postgres
+# Preview the PostgreSQL acceptance prerequisites without changing the database.
 & .\.venv\Scripts\python.exe scripts\acceptance-postgres.py --dry-run
 pnpm acceptance:replay --dry-run
 pnpm evaluate:golden --self-test

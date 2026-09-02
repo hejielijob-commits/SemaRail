@@ -350,7 +350,8 @@ def _parse_one_read_only(sql: str) -> exp.Expression:
 def validate_semantic_sql(sql: str) -> str:
     """Type-check semantic SQL as one read-only PostgreSQL query."""
 
-    _parse_one_read_only(sql)
+    statement = _parse_one_read_only(sql)
+    _check_dangerous_functions(statement)
     return sql.strip()
 
 
@@ -379,6 +380,16 @@ def _check_functions(statement: exp.Expression) -> None:
         name = _function_name(function)
         if name in DANGEROUS_FUNCTIONS or name not in SAFE_FUNCTIONS:
             raise SqlPolicyError("query contains a function outside the allowlist")
+
+
+def _check_dangerous_functions(statement: exp.Expression) -> None:
+    """Reject known side-effecting/resource functions before semantic planning."""
+
+    for function in statement.find_all(exp.Func):
+        if isinstance(function, (exp.Connector, exp.Case, exp.If, exp.Explode, exp.Unnest)):
+            continue
+        if _function_name(function) in DANGEROUS_FUNCTIONS:
+            raise SqlPolicyError("query contains a denied function")
 
 
 def _cte_names(statement: exp.Expression) -> set[str]:

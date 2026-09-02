@@ -6,12 +6,14 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Mapping
+from unittest.mock import patch
 
 from mcp.server.fastmcp.exceptions import ToolError
 
 from sidecar.errors import POLICY_DENIED, RpcFault
-from sidecar.mcp_gateway import create_governed_mcp_server
+from sidecar.mcp_gateway import _default_query_service, create_governed_mcp_server
 
 
 class FakeQueryService:
@@ -58,6 +60,25 @@ class BlockingQueryService(FakeQueryService):
 
 
 class GovernedMcpGatewayTests(unittest.TestCase):
+    def test_default_service_warms_advisory_dependencies_before_worker_threads(self) -> None:
+        class WarmService(FakeQueryService):
+            def __init__(self) -> None:
+                super().__init__()
+                self.warmed = False
+
+            def prepare_for_worker_threads(self) -> None:
+                self.warmed = True
+
+        service = WarmService()
+        with patch(
+            "sidecar.wren_adapter.default_dependencies",
+            return_value=SimpleNamespace(query_service=service),
+        ):
+            selected = _default_query_service()
+
+        self.assertIs(selected, service)
+        self.assertTrue(service.warmed)
+
     def test_tool_pins_project_and_connection_policy_server_side(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)

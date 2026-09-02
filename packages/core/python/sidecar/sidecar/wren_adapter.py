@@ -94,6 +94,7 @@ class LazyWrenAdapter:
         self.expected_version = expected_version
         self.logger = logger or logging.getLogger("sidecar.wren")
         self._context: ModuleType | None = None
+        self._memory_index_module: Any | object = _UNSET
         self._version: str | None | object = _UNSET
 
     def health(self) -> dict[str, Any]:
@@ -123,6 +124,13 @@ class LazyWrenAdapter:
         """
 
         self._load_context()
+
+    def prepare_query_runtime(self) -> None:
+        """Load query dependencies before a transport dispatches worker threads."""
+
+        self._load_context()
+        self._load_engine_factory()
+        self._load_memory_index_module()
 
     def validate(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Validate/build a Wren project and return safe aggregate counts.
@@ -229,6 +237,20 @@ class LazyWrenAdapter:
                 "semantic context lookup failed",
                 retryable=False,
             ) from exc
+
+    def recall_sql_history(self, params: Mapping[str, Any]) -> list[dict[str, str]]:
+        """Recall confirmed SQL without building the full semantic manifest."""
+
+        project_path = self._project_path(params, phase="context.ask")
+        question = params.get("question")
+        if not isinstance(question, str) or not question.strip():
+            raise RpcFault(
+                INVALID_PARAMS,
+                "validation",
+                "question is required",
+                retryable=False,
+            )
+        return self._recall_sql_history(question, project_path, backend="grep")
 
     def describe(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Return the project schema through SemaRail's stable read contract.
@@ -558,6 +580,8 @@ class LazyWrenAdapter:
         self,
         question: str,
         project_path: Path,
+        *,
+        backend: str | None = None,
     ) -> list[dict[str, str]]:
         """Recall confirmed SQL through Wren's public pluggable index.
 
@@ -567,11 +591,20 @@ class LazyWrenAdapter:
         """
 
         try:
-            memory = self._module_loader("wren.memory.index_backend")
+            memory = self._load_memory_index_module()
+            if memory is None:
+                return []
             get_index = getattr(memory, "get_index", None)
             if not callable(get_index):
                 return []
-            index = get_index(project_path, str(project_path / ".wren" / "memory"))
+            if backend is None:
+                index = get_index(project_path, str(project_path / ".wren" / "memory"))
+            else:
+                index = get_index(
+                    project_path,
+                    str(project_path / ".wren" / "memory"),
+                    backend=backend,
+                )
             search = getattr(index, "search", None)
             if not callable(search):
                 return []
@@ -612,6 +645,16 @@ class LazyWrenAdapter:
                 item["sourcePath"] = source_path
             recalled.append(item)
         return recalled
+
+    def _load_memory_index_module(self) -> Any | None:
+        if self._memory_index_module is not _UNSET:
+            return self._memory_index_module
+        try:
+            module = self._module_loader("wren.memory.index_backend")
+        except Exception:
+            module = None
+        self._memory_index_module = module
+        return module
 
     def _load_engine_factory(self) -> EngineFactory:
         try:

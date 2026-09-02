@@ -22,6 +22,19 @@ def _configure_logging(level: str = "WARNING") -> logging.Logger:
     return logger
 
 
+def _prepare_query_workers(dependencies: SidecarDependencies) -> None:
+    """Load native-backed query dependencies before worker threads exist."""
+
+    prepared: set[int] = set()
+    for service in (dependencies.query_service, dependencies.query_runner):
+        if service is None or id(service) in prepared:
+            continue
+        prepare = getattr(service, "prepare_for_worker_threads", None)
+        if callable(prepare):
+            prepare()
+        prepared.add(id(service))
+
+
 def run(
     stdin: BinaryIO,
     stdout: BinaryIO,
@@ -36,6 +49,7 @@ def run(
         # One adapter instance backs both methods so context import/version
         # discovery is lazy and cached for the process lifetime.
         dependencies = default_dependencies(logger=active_logger)
+    _prepare_query_workers(dependencies)
     serve(
         stdin,
         stdout,

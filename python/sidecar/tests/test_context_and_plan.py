@@ -78,6 +78,33 @@ class FakeEngine:
 
 
 class ContextAndDryPlanTests(unittest.TestCase):
+    def test_dedicated_sql_history_recall_forces_non_semantic_grep_backend(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            project = Path(temp)
+            (project / "wren_project.yml").write_text("name: demo\n", encoding="utf-8")
+            selected: list[str | None] = []
+
+            class FakeIndex:
+                def search(self, _question: str, *, limit: int) -> list[dict[str, Any]]:
+                    self.limit = limit
+                    return []
+
+            def get_index(*_: Any, backend: str | None = None) -> FakeIndex:
+                selected.append(backend)
+                return FakeIndex()
+
+            adapter = LazyWrenAdapter(
+                module_loader=lambda _name: SimpleNamespace(get_index=get_index),
+            )
+
+            self.assertEqual(
+                adapter.recall_sql_history(
+                    {"projectDir": str(project), "question": "Show revenue"}
+                ),
+                [],
+            )
+            self.assertEqual(selected, ["grep"])
+
     def test_describe_uses_the_existing_manifest_without_context_lookup(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             project = Path(temp)

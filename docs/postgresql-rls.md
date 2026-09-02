@@ -100,6 +100,9 @@ closed and does not fall back to SQLite.
 
 `pnpm run acceptance:postgres` provisions an isolated database and
 `NOSUPERUSER NOBYPASSRLS` read-only role when PostgreSQL administrator settings
-are available. It now verifies that two trusted Subject contexts executing the
-same SQL receive disjoint regional rows. `--mode existing` never changes the
-target database, so the RLS provisioning probe is intentionally skipped there.
+are available. The gate copies the semantic project into its private run
+directory and normalizes the accepted connection to `SEMARAIL_DATABASE_URL`,
+so saved Console datasource state cannot redirect the test. It verifies that
+two trusted Subject contexts executing the same SQL receive disjoint regional
+rows. `--mode existing` never changes the target database, so the RLS
+provisioning probe is intentionally skipped there.

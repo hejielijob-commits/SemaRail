@@ -522,6 +522,13 @@ class WrenQueryService:
         self.executor = executor
         self.connection_resolver = connection_resolver or load_active_connection
 
+    def prepare_for_worker_threads(self) -> None:
+        """Preload native-backed planner modules before async worker dispatch."""
+
+        prepare = getattr(self.planner, "prepare_query_runtime", None)
+        if callable(prepare):
+            prepare()
+
     def run(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Validate, dry-plan, and execute one bounded query."""
 
@@ -562,11 +569,16 @@ class WrenQueryService:
                 retryable=False,
             ) from exc
         sql_history: list[dict[str, Any]] = []
+        history_lookup = getattr(self.planner, "recall_sql_history", None)
         context_lookup = getattr(self.planner, "ask", None)
-        if callable(context_lookup):
+        if callable(history_lookup) or callable(context_lookup):
             try:
-                context = context_lookup({"projectDir": project_dir, "question": question})
-                raw_history = context.get("sqlHistory", []) if isinstance(context, Mapping) else []
+                lookup_params = {"projectDir": project_dir, "question": question}
+                if callable(history_lookup):
+                    raw_history = history_lookup(lookup_params)
+                else:
+                    context = context_lookup(lookup_params)
+                    raw_history = context.get("sqlHistory", []) if isinstance(context, Mapping) else []
                 if isinstance(raw_history, list):
                     sql_history = [dict(item) for item in raw_history[:5] if isinstance(item, Mapping)]
             except Exception:

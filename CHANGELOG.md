@@ -53,6 +53,18 @@ All notable user-visible changes to this project are documented here. The format
   labels direct stdio adapters as trusted-local compatibility only, without
   returning server project paths, datasource DSNs, or bearer credentials.
 
+### Fixed
+
+- Preload Wren query dependencies before framed sidecar worker startup, so a first-request `query.run` cannot deadlock on native module initialization.
+- PostgreSQL acceptance now normalizes its runtime connection to
+  `SEMARAIL_DATABASE_URL` and executes against an isolated semantic-project
+  copy, so a developer's saved Console datasource cannot shadow the fixture.
+- Governed stdio MCP preloads Wren query modules before worker dispatch and
+  uses the dependency-free confirmed-SQL index during query execution,
+  preventing first-call deadlocks without changing the full context API.
+- Known dangerous functions such as `pg_sleep` are rejected as
+  `POLICY_DENIED` before semantic planning.
+
 ## [0.1.0-alpha.1] - 2026-08-30
 
 ### Added

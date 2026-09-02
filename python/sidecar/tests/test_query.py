@@ -162,6 +162,37 @@ class PresentationExecutor:
 
 
 class QueryTests(unittest.TestCase):
+    def test_query_prefers_dedicated_sql_history_recall_over_full_context(self) -> None:
+        class DedicatedRecallPlanner(FakePlanner):
+            def recall_sql_history(self, params: dict[str, Any]) -> list[dict[str, str]]:
+                self.recall_params = params
+                return [{
+                    "id": "sql:revenue",
+                    "question": "Daily revenue",
+                    "sql": "SELECT day, SUM(amount) FROM orders GROUP BY day",
+                }]
+
+            def ask(self, _params: dict[str, Any]) -> dict[str, Any]:
+                raise AssertionError("full semantic context must not be built for query history")
+
+        planner = DedicatedRecallPlanner()
+        result = WrenQueryService(
+            planner,
+            PresentationExecutor(
+                [{"name": "amount", "type": "DECIMAL", "semanticRole": "measure"}],
+                [{"amount": "12.50"}],
+            ),
+            connection_resolver=lambda *_: {"dsn": "process-local"},
+        ).run({
+            "projectDir": ".",
+            "question": "Show revenue",
+            "semanticSql": "SELECT amount FROM orders",
+            "queryId": "q-dedicated-history",
+        })
+
+        self.assertEqual(result["sqlHistory"][0]["id"], "sql:revenue")
+        self.assertEqual(planner.recall_params["question"], "Show revenue")
+
     def test_query_presentation_carries_question_and_actual_recalled_sql(self) -> None:
         class RecallPlanner(FakePlanner):
             def ask(self, params: dict[str, Any]) -> dict[str, Any]:

@@ -21,10 +21,10 @@ Examples (PowerShell):
     # administrator.  The script creates and cleans its own database/role.
     .venv\\Scripts\\python.exe scripts\\acceptance-postgres.py
 
-    # Use an existing DSN already held in WREN_DATABASE_URL; this mode never
+    # Use an existing DSN already held in SEMARAIL_DATABASE_URL; this mode never
     # provisions or cleans database objects.
     .venv\\Scripts\\python.exe scripts\\acceptance-postgres.py \\
-        --mode existing --database-dsn-env WREN_DATABASE_URL
+        --mode existing --database-dsn-env SEMARAIL_DATABASE_URL
 """
 
 from __future__ import annotations
@@ -50,6 +50,7 @@ from typing import Any, Iterable, Mapping
 
 
 PROTOCOL_VERSION = "1"
+DEFAULT_DATABASE_DSN_ENV = "SEMARAIL_DATABASE_URL"
 MAX_FRAME_BYTES = 16 * 1024 * 1024
 SAFE_ENV_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,127}\Z")
 SAFE_IDENTIFIER = re.compile(r"[a-z_][a-z0-9_]{0,62}\Z")
@@ -606,6 +607,22 @@ def _request_id() -> str:
     return "e2e-" + uuid.uuid4().hex
 
 
+def _runtime_process_env(environ: Mapping[str, str], dsn: str) -> dict[str, str]:
+    """Pin the accepted DSN to the SemaRail-owned runtime environment key."""
+
+    process_env = dict(environ)
+    process_env[DEFAULT_DATABASE_DSN_ENV] = dsn
+    return process_env
+
+
+def _prepare_project_fixture(project_dir: Path, run_dir: Path) -> Path:
+    """Copy the semantic project so local Console state cannot shadow the fixture DSN."""
+
+    destination = run_dir / "project"
+    shutil.copytree(project_dir, destination)
+    return destination.resolve()
+
+
 def _assert_ok(response: Mapping[str, Any], label: str) -> Mapping[str, Any]:
     if response.get("protocolVersion") != PROTOCOL_VERSION:
         raise E2EFailure(f"{label} returned an unexpected protocol version")
@@ -773,7 +790,7 @@ async def _run_governed_mcp_smoke_async(
             "--project",
             str(project_dir),
             "--database-dsn-env",
-            "WREN_DATABASE_URL",
+            DEFAULT_DATABASE_DSN_ENV,
         ],
         cwd=str(sidecar_root),
         env=child_env,
@@ -826,7 +843,7 @@ async def _run_governed_mcp_smoke_async(
             )
             if "POLICY_DENIED" not in diagnostic:
                 raise E2EFailure("governed MCP returned an unexpected policy error")
-            dsn = child_env.get("WREN_DATABASE_URL", "")
+            dsn = child_env.get(DEFAULT_DATABASE_DSN_ENV, "")
             if dsn and dsn in diagnostic:
                 raise E2EFailure("governed MCP diagnostics leaked the database DSN")
 
@@ -1077,7 +1094,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--admin-user", default="")
     parser.add_argument("--admin-database", default="")
     parser.add_argument("--admin-sslmode", default="")
-    parser.add_argument("--database-dsn-env", default="WREN_DATABASE_URL")
+    parser.add_argument("--database-dsn-env", default=DEFAULT_DATABASE_DSN_ENV)
     parser.add_argument("--keep-artifacts", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser
@@ -1105,6 +1122,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     client: SidecarClient | None = None
     succeeded = False
     try:
+        runtime_project_dir = _prepare_project_fixture(project_dir, run_dir)
         if args.mode == "provision":
             target = _provision_target(args)
             dsn = target.dsn
@@ -1113,40 +1131,49 @@ def main(argv: Iterable[str] | None = None) -> int:
         if not dsn:
             raise E2EFailure("database DSN is empty")
         _run_read_only_probe(dsn)
-        process_env = dict(os.environ)
+        process_env = _runtime_process_env(os.environ, dsn)
         # The only credential crossing into the child environment is the
         # process-local DSN.  It is never sent in an RPC params object.
-        # The sidecar defaults to WREN_DATABASE_URL.  Keep the caller's
-        # source-name semantics for existing mode, but normalize the child
-        # process to this one well-known, process-local key so every RPC test
-        # uses the same contract.
-        process_env["WREN_DATABASE_URL"] = dsn
+        # Existing mode may read a caller-selected legacy environment name,
+        # but every child is normalized to the SemaRail-owned runtime key.
         client = SidecarClient(
             python_path,
             env=process_env,
             sidecar_root=repo_dir / "python" / "sidecar",
         )
+        smoke = json.loads(
+            (runtime_project_dir / "smoke-cases.json").read_text(encoding="utf-8")
+        )
         client.start()
+        cases = smoke.get("cases")
+        if not isinstance(cases, list) or not cases:
+            raise E2EFailure("smoke corpus contains no query cases")
+        # The first framed request intentionally exercises query.run. Wren's
+        # native-backed modules must already be loaded on the main thread;
+        # health or project.validate must not be required as an implicit warmup.
+        _run_smoke_cases(client, runtime_project_dir, {"cases": [cases[0]]})
         health = client.request("health", {}, timeout=15)
         health_result = _assert_ok(health, "health")
         if health_result.get("wrenAvailable") is not True:
             raise E2EFailure("Wren 0.13.2 is not available in the selected Python environment")
-        validation = client.request("project.validate", {"projectDir": str(project_dir)}, timeout=35)
+        validation = client.request(
+            "project.validate", {"projectDir": str(runtime_project_dir)}, timeout=35
+        )
         validation_result = _assert_ok(validation, "project.validate")
         if validation_result.get("valid") is not True or validation_result.get("errorCount") != 0:
             raise E2EFailure("Wren example project validation failed")
-        _run_smoke_cases(client, project_dir, json.loads((project_dir / "smoke-cases.json").read_text(encoding="utf-8")))
-        _run_bounds_and_policy(client, project_dir)
+        _run_smoke_cases(client, runtime_project_dir, smoke)
+        _run_bounds_and_policy(client, runtime_project_dir)
         _run_governed_mcp_smoke(
             python_path,
-            project_dir,
+            runtime_project_dir,
             process_env,
             repo_dir / "python" / "sidecar",
         )
-        _run_timeout_and_cancel(client, project_dir)
+        _run_timeout_and_cancel(client, runtime_project_dir)
         if target is not None:
             _install_rls_fixture(args, target)
-            _run_rls_identity_probe(client, project_dir)
+            _run_rls_identity_probe(client, runtime_project_dir)
         stderr = client.stderr_text
         if target is not None and target.password in stderr:
             raise E2EFailure("sidecar diagnostics leaked the temporary role password")

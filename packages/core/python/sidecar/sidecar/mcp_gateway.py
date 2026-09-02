@@ -63,6 +63,9 @@ def _default_query_service() -> GovernedQueryService:
     service = default_dependencies().query_service
     if service is None:  # pragma: no cover - construction invariant
         raise RuntimeError("governed query service is unavailable")
+    prepare = getattr(service, "prepare_for_worker_threads", None)
+    if callable(prepare):
+        prepare()
     return service
 
 

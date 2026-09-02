@@ -96,10 +96,10 @@ def load_active_connection(
     environ: Mapping[str, str] | None = None,
     state_file: str | Path | None = None,
 ) -> Mapping[str, Any] | None:
-    """Load the active local profile, falling back to the legacy DSN env.
+    """Load the active local profile, falling back to the configured DSN env.
 
     A missing state file or an unselected profile preserves the existing
-    ``WREN_DATABASE_URL`` deployment behavior.  A selected but malformed or
+    environment-based deployment behavior. A selected but malformed or
     unsupported profile fails closed instead of silently querying a different
     database from the environment.
     """
