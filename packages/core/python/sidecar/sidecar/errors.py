@@ -82,6 +82,7 @@ UNSUPPORTED_VERSION = "UNSUPPORTED_VERSION"
 PROTOCOL_ERROR = "PROTOCOL_ERROR"
 FRAME_TOO_LARGE = "FRAME_TOO_LARGE"
 TRUNCATED_FRAME = "TRUNCATED_FRAME"
+RESULT_TOO_LARGE = "RESULT_TOO_LARGE"
 
 # Keep this set synchronized with packages/contract/src/errors.ts. Every error
 # is normalized against it at the final response boundary, including errors
@@ -106,5 +107,6 @@ STABLE_ERROR_CODES = frozenset(
         PROTOCOL_ERROR,
         UNSUPPORTED_VERSION,
         INTERNAL_ERROR,
+        RESULT_TOO_LARGE,
     }
 )

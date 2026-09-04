@@ -119,8 +119,15 @@ function extractDataQueryMetas(entries) {
     // fallback for older fixtures, but prefer the public durable shape.
     const meta = event?.data?.meta ?? event?.data?.message?.meta
     if (!meta || typeof meta !== 'object' || Array.isArray(meta)) continue
-    if (meta.schemaVersion !== 1 || typeof meta.queryId !== 'string') continue
+    if ((meta.schemaVersion !== 1 && meta.schemaVersion !== 2) || typeof meta.queryId !== 'string') continue
     if (typeof meta.status !== 'string' || !Array.isArray(meta.columns) || !Array.isArray(meta.previewRows)) continue
+    if (meta.schemaVersion === 2) {
+      if (meta.status === 'success' && meta.delivery === 'inline' && meta.artifact !== undefined) continue
+      if (meta.status === 'success' && meta.delivery === 'artifact') {
+        if (meta.previewRows.length > 20 || typeof meta.artifact?.downloadUrl !== 'string') continue
+      } else if (meta.status === 'success' && meta.delivery !== 'inline') continue
+      if (meta.status === 'error' && (meta.delivery !== undefined || meta.artifact !== undefined)) continue
+    }
     metas.push(meta)
   }
   return metas

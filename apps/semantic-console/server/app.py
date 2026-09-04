@@ -12,6 +12,7 @@ import argparse
 import json
 import logging
 import os
+import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 try:  # Package import when started with ``python -m server``.
     from .access_control import AccessControlError, AuthContext, BOOTSTRAP_SUBJECT_ID
     from .access_api import AccessControlAdminApi
+    from .artifact_store import ArtifactDownload, ArtifactError
     from .identity_api import IdentityApi
     from .service import SemanticConsoleService
     from .project import ProjectStore
@@ -27,6 +29,7 @@ try:  # Package import when started with ``python -m server``.
 except ImportError:  # Direct ``python app.py`` / test loading by file path.
     from access_control import AccessControlError, AuthContext, BOOTSTRAP_SUBJECT_ID  # type: ignore[no-redef]
     from access_api import AccessControlAdminApi  # type: ignore[no-redef]
+    from artifact_store import ArtifactDownload, ArtifactError  # type: ignore[no-redef]
     from identity_api import IdentityApi  # type: ignore[no-redef]
     from service import SemanticConsoleService  # type: ignore[no-redef]
     from project import ProjectStore  # type: ignore[no-redef]
@@ -42,6 +45,7 @@ _PUBLIC_CONSOLE_ROUTES = frozenset(
         ("GET", "/api/datasource-types"),
     }
 )
+_ARTIFACT_DOWNLOAD_ROUTE = re.compile(r"/api/v1/artifacts/([^/]+)/download\Z")
 
 
 def _allowed_browser_origin(origin: str | None) -> bool:
@@ -106,6 +110,15 @@ class SemanticConsoleApplication:
             query[key] = values[-1] if values else ""
         if method.upper() == "POST" and parsed.path == "/api/v1/runtime/rpc":
             return self.runtime_rpc.dispatch(body, authorization)
+        if method.upper() == "GET" and _ARTIFACT_DOWNLOAD_ROUTE.fullmatch(parsed.path):
+            result = self.resolve_artifact_download(target, authorization=authorization)
+            if isinstance(result, ArtifactDownload):
+                # The embeddable adapter remains JSON-shaped for callers that
+                # do not use the HTTP handler.  The real HTTP path streams the
+                # same immutable file with attachment headers.
+                return 200, {"artifact": result.metadata.as_dict()}
+            if result is not None:
+                return result
         if method.upper() == "GET" and parsed.path == "/api/v1/auth/capabilities":
             try:
                 auth = self.runtime_rpc.access_control.authenticate(authorization)
@@ -170,6 +183,35 @@ class SemanticConsoleApplication:
             return status, result["__error__"]
         return status, result
 
+    def resolve_artifact_download(
+        self,
+        target: str,
+        *,
+        authorization: str | None = None,
+    ) -> ArtifactDownload | tuple[int, dict[str, Any]] | None:
+        """Resolve the binary artifact route for the HTTP adapter.
+
+        A non-artifact target returns ``None``.  Errors are returned as the
+        ordinary ``(status, JSON)`` shape so both embedded and real HTTP
+        callers get stable, credential-free messages.
+        """
+
+        parsed = urlsplit(target)
+        match = _ARTIFACT_DOWNLOAD_ROUTE.fullmatch(parsed.path)
+        if match is None:
+            return None
+        query = parse_qs(parsed.query, keep_blank_values=True)
+        token_values = query.get("token", [])
+        token = token_values[-1] if token_values else ""
+        try:
+            return self.runtime_rpc.download_artifact(
+                match.group(1), token, authorization, transport="core-http"
+            )
+        except ArtifactError as exc:
+            return exc.status, {"code": exc.code, "message": exc.safe_message}
+        except AccessControlError as exc:
+            return exc.status, {"code": exc.code, "message": exc.safe_message}
+
 
 def create_app(
     service: SemanticConsoleService | None = None,
@@ -225,6 +267,18 @@ class _Handler(BaseHTTPRequestHandler):
             if not self._origin_allowed():
                 self._send_json(403, {"code": "ORIGIN_NOT_ALLOWED", "message": "request origin is not allowed"})
                 return
+            if method == "GET" and _ARTIFACT_DOWNLOAD_ROUTE.fullmatch(urlsplit(self.path).path):
+                result = self.application.resolve_artifact_download(
+                    self.path,
+                    authorization=self.headers.get("Authorization"),
+                )
+                if isinstance(result, ArtifactDownload):
+                    self._send_artifact(result)
+                elif isinstance(result, tuple):
+                    self._send_json(result[0], result[1])
+                else:  # pragma: no cover - route matcher and resolver agree
+                    self._send_json(404, {"code": "NOT_FOUND", "message": "artifact was not found"})
+                return
             if method == "GET" and not urlsplit(self.path).path.startswith("/api/"):
                 if self._serve_static():
                     return
@@ -260,6 +314,29 @@ class _Handler(BaseHTTPRequestHandler):
             self.wfile.write(encoded)
         except OSError:
             pass
+
+    def _send_artifact(self, download: ArtifactDownload) -> None:
+        """Stream an already-authorized immutable artifact without redirecting."""
+
+        metadata = download.metadata
+        self.send_response(200)
+        self._headers(content_type=metadata.content_type)
+        self.send_header("Content-Disposition", f'attachment; filename="{metadata.filename}"')
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Content-Length", str(metadata.size or 0))
+        self.end_headers()
+        try:
+            with download.path.open("rb") as stream:
+                while True:
+                    chunk = stream.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+        except OSError:
+            # Headers may already be on the wire; there is no safe JSON error
+            # shape to append after a partial binary body.
+            return
 
     def _host_allowed(self) -> bool:
         host_header = self.headers.get("Host", "")
@@ -368,6 +445,18 @@ class SemanticConsoleHTTPServer(ThreadingHTTPServer):
     def __init__(self, address: tuple[str, int], application: SemanticConsoleApplication) -> None:
         self.application = application
         super().__init__(address, _Handler)
+        # A real Core HTTP server knows its bound port only after bind (not
+        # from a request Host header).  Publish that trusted authority for
+        # descriptors generated after startup; explicitly configured bases
+        # (for a reverse proxy or TLS terminator) remain untouched.
+        setter = getattr(self.application.runtime_rpc, "set_artifact_base_url", None)
+        explicit = bool(getattr(self.application.runtime_rpc, "artifact_base_url_explicit", False))
+        if callable(setter) and not explicit:
+            bound_host = str(self.server_address[0])
+            if bound_host in {"0.0.0.0", "::", ""}:
+                bound_host = "127.0.0.1"
+            authority = f"[{bound_host}]" if ":" in bound_host and not bound_host.startswith("[") else bound_host
+            setter(f"http://{authority}:{int(self.server_address[1])}")
 
 
 def serve(

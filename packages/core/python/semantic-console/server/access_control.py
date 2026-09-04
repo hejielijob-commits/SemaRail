@@ -367,6 +367,45 @@ class AccessControlStore:
             raise AccessControlError("SUBJECT_NOT_FOUND", "subject was not found", status=404)
         return self._subject_from_row(row)
 
+    def is_subject_credential_active(self, subject_id: str, credential_id: str) -> bool:
+        """Return whether a previously bound subject credential is still valid.
+
+        Artifact download uses a one-time artifact token, so it cannot call
+        :meth:`authenticate` with the original API-key/session secret.  This
+        metadata-only check revalidates the credential and subject state at
+        download time without ever requiring or persisting that secret.
+        """
+
+        if not isinstance(subject_id, str) or not isinstance(credential_id, str):
+            return False
+        now = self.clock().astimezone(UTC)
+        try:
+            with self._connect() as connection:
+                subject = connection.execute(
+                    "SELECT status FROM subjects WHERE id=?", (subject_id,)
+                ).fetchone()
+                if subject is None or subject["status"] != "active":
+                    return False
+                credential = connection.execute(
+                    "SELECT subject_id,expires_at,revoked_at FROM credentials WHERE id=?",
+                    (credential_id,),
+                ).fetchone()
+                if credential is not None:
+                    if credential["subject_id"] != subject_id or credential["revoked_at"] is not None:
+                        return False
+                    expiry = _parse_timestamp(credential["expires_at"])
+                    return expiry is None or expiry > now
+                session = connection.execute(
+                    "SELECT subject_id,expires_at,revoked_at FROM sessions WHERE id=?",
+                    (credential_id,),
+                ).fetchone()
+                if session is None or session["subject_id"] != subject_id or session["revoked_at"] is not None:
+                    return False
+                expiry = _parse_timestamp(str(session["expires_at"]))
+                return expiry is not None and expiry > now
+        except (AccessControlError, TypeError, ValueError, KeyError):
+            return False
+
     def list_service_accounts(self) -> list[dict[str, Any]]:
         with self._connect() as connection:
             rows = connection.execute(

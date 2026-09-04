@@ -11,11 +11,11 @@ export * from './query.js'
 import type { RpcRequest, RpcResponse } from './rpc.js'
 import type { SemanticContext } from './context.js'
 import type { ChartSpecV1 } from './chart.js'
-import type { DataQueryInput, DataQueryPresentation } from './query.js'
+import type { DataQueryInput, DataQueryPresentation, DataQueryPresentationV1, DataQueryPresentationV2 } from './query.js'
 import { rpcRequestSchema, rpcResponseSchema } from './rpc.js'
 import { semanticContextSchema } from './context.js'
 import { chartSpecV1Schema } from './chart.js'
-import { dataQueryInputSchema, dataQueryPresentationSchema } from './query.js'
+import { dataQueryInputSchema, dataQueryPresentationSchema, dataQueryPresentationV1Schema, dataQueryPresentationV2Schema } from './query.js'
 import type { SafeParseResult } from './json.js'
 
 /** Parse an RPC request without throwing on invalid input. */
@@ -35,3 +35,9 @@ export const safeParseChartSpecV1 = (value: unknown): SafeParseResult<ChartSpecV
 
 /** Parse DataQuery presentation without throwing on invalid input. */
 export const safeParseDataQueryPresentation = (value: unknown): SafeParseResult<DataQueryPresentation> => dataQueryPresentationSchema.safeParse(value)
+
+/** Parse a replay-compatible v1 DataQuery presentation without throwing. */
+export const safeParseDataQueryPresentationV1 = (value: unknown): SafeParseResult<DataQueryPresentationV1> => dataQueryPresentationV1Schema.safeParse(value)
+
+/** Parse a v2 inline/artifact DataQuery presentation without throwing. */
+export const safeParseDataQueryPresentationV2 = (value: unknown): SafeParseResult<DataQueryPresentationV2> => dataQueryPresentationV2Schema.safeParse(value)

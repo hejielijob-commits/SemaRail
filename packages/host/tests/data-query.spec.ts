@@ -9,6 +9,7 @@ import {
   CONTEXT_TOOL_NAME,
   apply,
   createDataQueryTool,
+  renderDataQueryResult,
   type QueryGateway,
 } from '../src/index.ts'
 import type { DataQueryPresentation } from '@hejielijob/dsh-wren-data-agent-contract'
@@ -32,6 +33,46 @@ function success(queryInput: { semanticSql: string }): DataQueryPresentation {
     previewRows: [{ day: 'all', revenue: '1' }],
     chart: { version: 1, type: 'bar', x: 'day', y: ['revenue'], tooltip: true },
     stats: { returnedRows: 1, durationMs: 12, truncated: false },
+  }
+}
+
+function artifactSuccess(queryInput: { semanticSql: string }): DataQueryPresentation {
+  const previewRows = Array.from({ length: 20 }, (_, index) => ({ day: `day-${index}`, revenue: String(index) }))
+  return {
+    schemaVersion: 2,
+    queryId: 'q-artifact-1',
+    status: 'success',
+    delivery: 'artifact',
+    semanticSql: queryInput.semanticSql,
+    columns: [
+      { name: 'day', type: 'TEXT', semanticRole: 'dimension' },
+      { name: 'revenue', type: 'BIGINT', semanticRole: 'measure' },
+    ],
+    previewRows,
+    stats: { returnedRows: 40, previewedRows: previewRows.length, durationMs: 18, truncated: true },
+    artifact: {
+      id: 'artifact-q-artifact-1', format: 'csv', fileName: 'orders.csv', rowCount: 40, sizeBytes: 4096,
+      sha256: 'a'.repeat(64), expiresAt: '2099-01-01T00:00:00Z',
+      downloadUrl: 'https://console.example.test/api/artifacts/artifact-q-artifact-1',
+    },
+  }
+}
+
+function v2Error(queryInput: { semanticSql: string }): DataQueryPresentation {
+  return {
+    schemaVersion: 2,
+    queryId: 'q-error-v2',
+    status: 'error',
+    semanticSql: queryInput.semanticSql,
+    columns: [],
+    previewRows: [],
+    stats: { returnedRows: 0, previewedRows: 0, durationMs: 7, truncated: false },
+    error: {
+      code: 'DATABASE_ERROR',
+      phase: 'query',
+      message: 'dsn=postgres://user:secret@example.invalid/db',
+      retryable: true,
+    },
   }
 }
 
@@ -131,6 +172,48 @@ describe('Wren data_query Host boundary', () => {
     expect(result.nativeSql).toBe("SELECT 'all' AS day, COUNT(*) AS revenue FROM orders")
     expect(result.chart).toMatchObject({ version: 1, type: 'bar' })
     expect(result.previewRows).toHaveLength(1)
+  })
+
+  it('keeps the full artifact presentation in presentationMeta but bounds model content', async () => {
+    const gateway: QueryGateway = { async query(queryInput) { return artifactSuccess(queryInput) } }
+    const tool = createDataQueryTool(gateway)
+    const result = await tool.execute(input, { signal: new AbortController().signal })
+    const content = renderDataQueryResult(result)
+    const modelResult = JSON.parse(content[0]?.text ?? '{}') as Record<string, unknown>
+    expect(modelResult).toMatchObject({
+      status: 'success',
+      delivery: 'artifact',
+      summary: expect.stringContaining('40 row(s)'),
+      previewHint: expect.stringContaining('first 20'),
+      stats: { returnedRows: 40, previewedRows: 20, durationMs: 18, truncated: true },
+    })
+    expect(modelResult).toHaveProperty('downloadUrl', 'https://console.example.test/api/artifacts/artifact-q-artifact-1')
+    expect(modelResult).toHaveProperty('previewHint', expect.stringContaining('do not paste the full CSV into the chat context'))
+    expect(modelResult).toHaveProperty('expiresAt', '2099-01-01T00:00:00Z')
+    expect(modelResult).not.toHaveProperty('artifact.sha256')
+    expect(JSON.stringify(modelResult)).not.toContain('nativeSql')
+    const meta = tool.output.presentationMeta?.(input, result)
+    expect(meta).toMatchObject({ schemaVersion: 2, delivery: 'artifact', artifact: { sha256: 'a'.repeat(64), rowCount: 40 } })
+  })
+
+  it('renders v2 errors as a safe code/retryability summary', () => {
+    const content = renderDataQueryResult(v2Error(input))
+    const modelResult = JSON.parse(content[0]?.text ?? '{}') as Record<string, unknown>
+    expect(modelResult).toMatchObject({
+      schemaVersion: 2,
+      status: 'error',
+      summary: 'SemaRail query failed (DATABASE_ERROR).',
+      error: { code: 'DATABASE_ERROR', retryable: true },
+    })
+    expect(JSON.stringify(modelResult)).not.toContain('secret')
+    expect(JSON.stringify(modelResult)).not.toContain('semanticSql')
+  })
+
+  it('sanitizes v2 gateway error diagnostics before durable presentation metadata', async () => {
+    const tool = createDataQueryTool({ async query() { return v2Error(input) } })
+    const result = await tool.execute(input, { signal: new AbortController().signal })
+    expect(result).toMatchObject({ status: 'error', error: { code: 'DATABASE_ERROR', message: 'SemaRail could not read the data source.' } })
+    expect(JSON.stringify(result)).not.toContain('secret')
   })
 
   it('fails closed when a gateway returns an over-bound presentation', async () => {

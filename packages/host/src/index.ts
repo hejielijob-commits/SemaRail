@@ -9,6 +9,11 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { Context } from '@deepseek-ai/cordis'
 import {
+  DATA_QUERY_PRESENTATION_VERSION,
+  MAX_ARTIFACT_BYTES,
+  MAX_ARTIFACT_PREVIEW_ROWS,
+  MAX_INLINE_PREVIEW_BYTES,
+  MAX_INLINE_PREVIEW_ROWS,
   MAX_PREVIEW_BYTES,
   MAX_PREVIEW_ROWS,
   MAX_QUERY_ROWS,
@@ -40,6 +45,9 @@ import {
   type QueryGateway,
   type SemanticContextGateway,
 } from './types.js'
+import { renderDataQueryResult } from './presentation.js'
+
+export { projectDataQueryForModel, renderDataQueryResult } from './presentation.js'
 
 export type { QueryGateway, SemanticContextGateway } from './types.js'
 export { QueryGatewayError, SemanticContextGatewayError } from './types.js'
@@ -76,7 +84,7 @@ export const TOOL_NAME = 'data_query' as const
 export const CONTEXT_TOOL_NAME = 'semarail_semantic_context' as const
 /** Stable SystemPrompt section name for the Wren data-agent operating rules. */
 export const SYSTEM_PROMPT_SECTION_NAME = 'semarail:data-agent' as const
-export { MAX_PREVIEW_BYTES, MAX_PREVIEW_ROWS, MAX_QUERY_ROWS, SCHEMA_VERSION }
+export { DATA_QUERY_PRESENTATION_VERSION, MAX_ARTIFACT_BYTES, MAX_ARTIFACT_PREVIEW_ROWS, MAX_INLINE_PREVIEW_BYTES, MAX_INLINE_PREVIEW_ROWS, MAX_PREVIEW_BYTES, MAX_PREVIEW_ROWS, MAX_QUERY_ROWS, SCHEMA_VERSION }
 
 /** Stable bounds shared with the version-one contract. */
 export const MAX_QUERY_TEXT_LENGTH = 64_000 as const
@@ -165,14 +173,6 @@ function normalizeGatewayResult(input: DataQueryInput, value: DataQueryPresentat
     : normalized)
 }
 
-function renderResult(value: unknown): Array<{ type: 'text'; text: string }> {
-  const result = parseDataQueryPresentation(value)
-  if (result.status === 'error') {
-    return [{ type: 'text', text: `SemaRail query failed (${result.error.code}).` }]
-  }
-  return [{ type: 'text', text: `SemaRail query returned ${result.stats.returnedRows} row(s).` }]
-}
-
 type SemanticContextToolError = {
   readonly schemaVersion: typeof SCHEMA_VERSION
   readonly status: 'error'
@@ -238,7 +238,7 @@ export function createDataQueryTool(gateway: QueryGateway): ToolDefinition {
       // `type: json` is compiled by defineTool into an open JSON schema. The
       // contract parser below remains the authoritative runtime validator.
       schema: { type: 'json' },
-      render: (_args, value) => renderResult(value),
+      render: (_args, value) => renderDataQueryResult(value),
       presentationMeta: (_args, value) => parseDataQueryPresentation(value) as unknown as JsonValue,
     },
     async execute(args, exec: ToolRunContext): Promise<JsonValue> {

@@ -24,5 +24,6 @@ You should receive an acknowledgement within seven days. Please allow time for v
 - Treat every model-generated SQL statement as untrusted.
 - Run database queries with a dedicated read-only account and a minimal object allowlist.
 - Keep database credentials in environment variables or a secret manager, never in repository files or Harness configuration.
-- The Semantic Console binds to loopback and has no authentication in the alpha release. Do not expose it directly to a network or the public internet.
+- The Semantic Console and Core bind to loopback by default. Keep the bootstrap administrator token private, use scoped service-account keys or employee sessions for Agents, and place TLS plus an explicit Host allowlist in front of any non-loopback MCP deployment.
+- Treat temporary query-result download URLs as bearer capabilities. Do not paste them into logs or tickets; they expire after 15 minutes and are revalidated against the issuing identity, credential, datasource, and policy context.
 - Remove credentials and private business data from bug reports, screenshots, fixtures, and logs.

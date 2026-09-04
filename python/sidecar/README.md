@@ -52,7 +52,13 @@ The initial methods are:
 - `query.run` — requires `projectDir`, `question`, `semanticSql`, and
   `queryId`. Optional `chartIntent`, `timeoutMs`, `maxRows` (at most 500),
   `previewRows` (at most 200), `maxPreviewBytes` (at most 1 MiB), and
-  `databaseDsnEnv` are accepted. The sidecar dry-plans through Wren, then
+  `databaseDsnEnv` are accepted. Core may additionally attach its trusted
+  internal `artifactRequest` capability. Results up to 50 rows and 128 KiB of
+  compact UTF-8 JSON remain inline; larger results stream to a UTF-8 CSV
+  artifact (at most 16 MiB), with only its first 20 rows retained in the
+  presentation. Artifact metadata is limited to `id`, `format`, `fileName`,
+  `rowCount`, `sizeBytes`, `sha256`, and `expiresAt`; local paths, tokens, and
+  download URLs never cross the sidecar boundary. The sidecar dry-plans through Wren, then
   applies a second PostgreSQL AST check for one read-only statement, allowed
   functions, and MDL-derived physical tables. The default DSN environment
   variable is `SEMARAIL_DATABASE_URL`; the DSN is resolved inside the sidecar and

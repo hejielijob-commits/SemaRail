@@ -17,13 +17,17 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.fastmcp.server import TransportSecuritySettings
 from mcp.types import ToolAnnotations
+from starlette.requests import Request
+from starlette.responses import JSONResponse, StreamingResponse
 
 try:
     from .access_control import AccessControlError, AccessControlStore, BOOTSTRAP_SUBJECT_ID
+    from .artifact_store import ArtifactDownload, ArtifactError
     from .project import ProjectStore
     from .runtime_rpc import RuntimeRpcGateway
 except ImportError:  # pragma: no cover - direct module loading
     from access_control import AccessControlError, AccessControlStore, BOOTSTRAP_SUBJECT_ID  # type: ignore[no-redef]
+    from artifact_store import ArtifactDownload, ArtifactError  # type: ignore[no-redef]
     from project import ProjectStore  # type: ignore[no-redef]
     from runtime_rpc import RuntimeRpcGateway  # type: ignore[no-redef]
 
@@ -64,8 +68,9 @@ class SemaRailTokenVerifier:
 class RuntimeMcpBridge:
     """Translate stable MCP tools into the authenticated Core RPC contract."""
 
-    def __init__(self, gateway: RuntimeRpcGateway) -> None:
+    def __init__(self, gateway: RuntimeRpcGateway, *, artifact_base_url: str | None = None) -> None:
         self.gateway = gateway
+        self.artifact_base_url = artifact_base_url
 
     async def call(self, method: str, params: Mapping[str, Any]) -> dict[str, Any]:
         access = get_access_token()
@@ -82,6 +87,7 @@ class RuntimeMcpBridge:
             },
             f"Bearer {access.token}",
             transport="remote-mcp",
+            artifact_base_url=self.artifact_base_url,
         )
         if status != 200 or response.get("ok") is not True:
             error = response.get("error")
@@ -116,6 +122,7 @@ def create_remote_mcp_server(
     port: int = DEFAULT_REMOTE_MCP_PORT,
     allowed_hosts: Sequence[str] | None = None,
     gateway: RuntimeRpcGateway | None = None,
+    artifact_base_url: str | None = None,
 ) -> FastMCP:
     """Create one authenticated, stateless Streamable HTTP MCP server."""
 
@@ -124,12 +131,20 @@ def create_remote_mcp_server(
     project_store = gateway.project if gateway is not None else ProjectStore(project, state_dir=state_dir)
     runtime = gateway or RuntimeRpcGateway(project_store)
     verifier = SemaRailTokenVerifier(runtime.access_control)
-    bridge = RuntimeMcpBridge(runtime)
     defaults = [f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"]
     safe_hosts = list(allowed_hosts) if allowed_hosts is not None else defaults
     if not safe_hosts or any(not isinstance(item, str) or not item.strip() for item in safe_hosts):
         raise ValueError("at least one allowed Host header is required")
     issuer_host = "localhost" if host in {"127.0.0.1", "::1"} else host
+    trusted_artifact_base_url = artifact_base_url
+    if trusted_artifact_base_url is None:
+        artifact_host = "localhost" if host in {"127.0.0.1", "::1"} else host
+        authority = f"[{artifact_host}]" if ":" in artifact_host and not artifact_host.startswith("[") else artifact_host
+        trusted_artifact_base_url = f"http://{authority}:{port}"
+    # RuntimeRpcGateway performs strict HTTP(S)/authority validation.  Do it
+    # once at server construction, before any tool can emit a URL.
+    trusted_artifact_base_url = runtime._validate_artifact_base_url(trusted_artifact_base_url)  # noqa: SLF001
+    bridge = RuntimeMcpBridge(runtime, artifact_base_url=trusted_artifact_base_url)
     server = FastMCP(
         "semarail",
         instructions=(
@@ -154,6 +169,62 @@ def create_remote_mcp_server(
         ),
         log_level="WARNING",
     )
+
+    @server.custom_route(
+        "/api/v1/artifacts/{artifact_id}/download",
+        methods=["GET"],
+        name="semarail_artifact_download",
+        include_in_schema=False,
+    )
+    async def semarail_artifact_download(request: Request) -> StreamingResponse | JSONResponse:
+        """Stream a Core-owned artifact; custom routes do not redirect."""
+
+        artifact_id = request.path_params.get("artifact_id", "")
+        token = request.query_params.get("token", "")
+        try:
+            download = await asyncio.to_thread(
+                runtime.download_artifact,
+                artifact_id,
+                token,
+                request.headers.get("authorization"),
+                transport="remote-mcp",
+            )
+        except (ArtifactError, AccessControlError) as exc:
+            return JSONResponse(
+                {"code": exc.code, "message": exc.safe_message},
+                status_code=exc.status,
+                headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+            )
+        if not isinstance(download, ArtifactDownload):  # pragma: no cover - gateway contract guard
+            return JSONResponse(
+                {"code": "ARTIFACT_UNAVAILABLE", "message": "artifact is unavailable"},
+                status_code=404,
+                headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
+            )
+
+        async def chunks() -> Any:
+            try:
+                with download.path.open("rb") as stream:
+                    while True:
+                        chunk = stream.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        yield chunk
+            except OSError:
+                return
+
+        metadata = download.metadata
+        return StreamingResponse(
+            chunks(),
+            media_type=metadata.content_type.split(";", 1)[0],
+            headers={
+                "Content-Disposition": f'attachment; filename="{metadata.filename}"',
+                "Cache-Control": "no-store",
+                "Pragma": "no-cache",
+                "Content-Length": str(metadata.size or 0),
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
 
     @server.tool(annotations=_readonly("Validate the SemaRail semantic project"))
     async def semarail_validate_project() -> dict[str, Any]:

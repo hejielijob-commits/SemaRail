@@ -31,6 +31,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import csv
+import hashlib
 import json
 import os
 import queue
@@ -45,6 +47,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -1055,6 +1058,103 @@ def _run_rls_identity_probe(client: SidecarClient, project_dir: Path) -> None:
         raise E2EFailure("PostgreSQL RLS returned overlapping employee rows")
 
 
+def _run_rls_artifact_probe(client: SidecarClient, project_dir: Path, run_dir: Path) -> None:
+    """Prove streamed CSV bytes contain only rows allowed by PostgreSQL RLS."""
+
+    artifact_dir = (run_dir / "artifacts").resolve()
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    semantic_sql = (
+        "SELECT orders.id AS order_id, a.id AS item_a, b.id AS item_b, c.id AS item_c "
+        "FROM orders CROSS JOIN order_items AS a CROSS JOIN order_items AS b "
+        "CROSS JOIN order_items AS c ORDER BY orders.id, a.id, b.id, c.id"
+    )
+
+    def run(subject: str, region: str, expected_ids: set[int]) -> int:
+        policy = {
+            "schemaVersion": 1,
+            "defaultEffect": "deny",
+            "tables": {
+                "public.orders": {
+                    "rows": [],
+                    "allowedColumns": ["id"],
+                    "deniedColumns": [],
+                },
+                "public.order_items": {
+                    "rows": [],
+                    "allowedColumns": ["id"],
+                    "deniedColumns": [],
+                },
+            },
+            "policyVersions": ["postgres-rls-artifact-e2e:1"],
+            "databaseSession": {
+                "schemaVersion": 1,
+                "subjectId": subject,
+                "organizationId": "e2e-sales",
+                "attributes": {"regionCodes": [region]},
+                "policyVersions": ["postgres-rls-artifact-e2e:1"],
+            },
+        }
+        artifact_id = f"art_{uuid.uuid4().hex}"
+        filename = f"semarail-{artifact_id}.csv"
+        expires_at = (datetime.now(UTC) + timedelta(minutes=15)).isoformat()
+        response = client.request(
+            "query.run",
+            {
+                "projectDir": str(project_dir),
+                "question": "导出当前员工可见的订单组合",
+                "semanticSql": semantic_sql,
+                "queryId": _request_id(),
+                "authorizationPolicy": policy,
+                "artifactRequest": {
+                    "schemaVersion": 1,
+                    "id": artifact_id,
+                    "directory": str(artifact_dir),
+                    "filename": filename,
+                    "format": "csv",
+                    "contentType": "text/csv; charset=utf-8",
+                    "createdAt": datetime.now(UTC).isoformat(),
+                    "expiresAt": expires_at,
+                    "inlineMaxRows": 50,
+                    "inlineMaxBytes": 128 * 1024,
+                    "previewRows": 20,
+                    "maxBytes": 16 * 1024 * 1024,
+                },
+            },
+            timeout=35,
+        )
+        result = _assert_ok(response, f"RLS artifact probe for {subject}")
+        artifact = result.get("artifact")
+        if not isinstance(artifact, Mapping) or artifact.get("id") != artifact_id:
+            raise E2EFailure("large PostgreSQL result did not produce the requested artifact")
+        if set(artifact) != {"id", "format", "fileName", "rowCount", "sizeBytes", "sha256", "expiresAt"}:
+            raise E2EFailure("sidecar artifact metadata exposed an unexpected field")
+        if len(result.get("previewRows", [])) != 20 or "chart" in result:
+            raise E2EFailure("artifact presentation was not bounded to a chart-free 20-row preview")
+        output = artifact_dir / filename
+        try:
+            raw = output.read_bytes()
+        except OSError as exc:
+            raise E2EFailure("sidecar artifact file was not published") from exc
+        if len(raw) != artifact.get("sizeBytes") or hashlib.sha256(raw).hexdigest() != artifact.get("sha256"):
+            raise E2EFailure("sidecar artifact bytes did not match attested metadata")
+        try:
+            with output.open("r", encoding="utf-8", newline="") as stream:
+                rows = list(csv.DictReader(stream))
+        except (OSError, UnicodeError, csv.Error) as exc:
+            raise E2EFailure("sidecar artifact is not a valid UTF-8 CSV") from exc
+        actual_ids = {int(row["order_id"]) for row in rows}
+        if actual_ids != expected_ids:
+            raise E2EFailure("artifact CSV crossed the employee's PostgreSQL RLS region boundary")
+        if len(rows) != artifact.get("rowCount"):
+            raise E2EFailure("artifact CSV row count did not match metadata")
+        return len(rows)
+
+    rows_a = run("employee-a", "华东", {1, 4, 5})
+    rows_b = run("employee-b", "华南", {2})
+    if rows_a != 500 or rows_b != 216:
+        raise E2EFailure("RLS artifact probe returned unexpected bounded row counts")
+
+
 def _dry_run(args: argparse.Namespace, project_dir: Path, python_path: Path) -> int:
     _validate_fixture(project_dir)
     if args.mode == "existing":
@@ -1174,6 +1274,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         if target is not None:
             _install_rls_fixture(args, target)
             _run_rls_identity_probe(client, runtime_project_dir)
+            _run_rls_artifact_probe(client, runtime_project_dir, run_dir)
         stderr = client.stderr_text
         if target is not None and target.password in stderr:
             raise E2EFailure("sidecar diagnostics leaked the temporary role password")
@@ -1187,6 +1288,10 @@ def main(argv: Iterable[str] | None = None) -> int:
         print("  row bounds/policy/read-only account/timeout/cancel: passed")
         print(
             "  PostgreSQL transaction context/RLS employee isolation: "
+            + ("passed" if target is not None else "not modified in existing mode")
+        )
+        print(
+            "  streamed CSV/RLS artifact isolation: "
             + ("passed" if target is not None else "not modified in existing mode")
         )
         return 0

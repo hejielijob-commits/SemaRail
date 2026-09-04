@@ -124,7 +124,7 @@ export interface DataQueryViewProps extends Pick<ToolCallOwnerProps, 'callId' | 
 }
 
 /** Version-one result metadata shape accepted by the fail-closed guard. */
-export interface DataQueryMeta {
+export interface DataQueryMetaV1 {
   readonly schemaVersion: 1
   readonly queryId: string
   readonly status: 'success' | 'error'
@@ -135,9 +135,77 @@ export interface DataQueryMeta {
   readonly columns: readonly DataQueryMetaColumn[]
   readonly previewRows: readonly Readonly<Record<string, DataQueryScalar>>[]
   readonly chart?: DataQueryChart
-  readonly stats: DataQueryStats
+  readonly delivery?: never
+  readonly artifact?: never
+  readonly stats: DataQueryStatsV1
   readonly error?: DataQueryError
 }
+
+/** Version-two CSV artifact metadata. */
+export interface DataQueryArtifact {
+  readonly id: string
+  readonly format: 'csv'
+  readonly fileName: string
+  readonly rowCount: number
+  readonly sizeBytes: number
+  readonly sha256: string
+  readonly expiresAt: string
+  readonly downloadUrl: string
+}
+
+/** Version-two result metadata shared by inline and artifact deliveries. */
+interface DataQueryMetaV2Base {
+  readonly schemaVersion: 2
+  readonly queryId: string
+  readonly status: 'success'
+  readonly semanticSql: string
+  readonly question?: string
+  readonly sqlHistory?: readonly DataQuerySqlHistoryReference[]
+  readonly nativeSql?: string
+  readonly columns: readonly DataQueryMetaColumn[]
+  readonly previewRows: readonly Readonly<Record<string, DataQueryScalar>>[]
+  readonly stats: DataQueryStatsV2
+  readonly error?: never
+}
+
+/** Version-two small result metadata. */
+export interface DataQueryInlineMetaV2 extends DataQueryMetaV2Base {
+  readonly delivery: 'inline'
+  readonly artifact?: never
+  readonly chart?: DataQueryChart
+}
+
+/** Version-two large result metadata backed by a CSV artifact. */
+export interface DataQueryArtifactMetaV2 extends DataQueryMetaV2Base {
+  readonly delivery: 'artifact'
+  readonly artifact: DataQueryArtifact
+  /** Artifact previews are table-only; a chart could imply the full CSV is in context. */
+  readonly chart?: never
+}
+
+/** Version-two error metadata; errors never carry delivery or artifact data. */
+export interface DataQueryErrorMetaV2 {
+  readonly schemaVersion: 2
+  readonly queryId: string
+  readonly status: 'error'
+  readonly semanticSql: string
+  readonly question?: string
+  readonly sqlHistory?: readonly DataQuerySqlHistoryReference[]
+  readonly nativeSql?: string
+  readonly columns: readonly DataQueryMetaColumn[]
+  readonly previewRows: readonly Readonly<Record<string, DataQueryScalar>>[]
+  readonly chart?: never
+  readonly delivery?: never
+  readonly artifact?: never
+  readonly stats: DataQueryStatsV2
+  readonly error: DataQueryError
+}
+
+/** Version-two metadata union. */
+export type DataQueryMetaV2 = DataQueryInlineMetaV2 | DataQueryArtifactMetaV2 | DataQueryErrorMetaV2
+
+/** Client metadata union for replay-compatible v1 and current v2 results. */
+export type DataQueryMeta = DataQueryMetaV1 | DataQueryInlineMetaV2 | DataQueryArtifactMetaV2 | DataQueryErrorMetaV2
 
 /** Confirmed Wren NL-to-SQL example actually recalled for this query. */
 export interface DataQuerySqlHistoryReference {
@@ -157,12 +225,23 @@ export interface DataQueryMetaColumn {
 /** JSON-safe scalar shown in the result table and chart. */
 export type DataQueryScalar = string | number | boolean | null
 
-/** Bounded query statistics. */
-export interface DataQueryStats {
+/** Version-one bounded query statistics. */
+export interface DataQueryStatsV1 {
   readonly returnedRows: number
   readonly durationMs: number
   readonly truncated: boolean
 }
+
+/** Version-two bounded query statistics, including preview cardinality. */
+export interface DataQueryStatsV2 {
+  readonly returnedRows: number
+  readonly durationMs: number
+  readonly truncated: boolean
+  readonly previewedRows: number
+}
+
+/** Bounded query statistics accepted by both presentation versions. */
+export type DataQueryStats = DataQueryStatsV1 | DataQueryStatsV2
 
 /** Validated ChartSpecV1 persisted inside a successful presentation. */
 export interface DataQueryChart {
@@ -203,7 +282,13 @@ const MAX_ROW_KEYS = 64
 const MAX_STRING = 4_000
 const MAX_SQL = 64_000
 const MAX_QUERY_ROWS = 500
+const DATA_QUERY_PRESENTATION_VERSION = 2
+const MAX_ARTIFACT_PREVIEW_ROWS = 20
+const MAX_INLINE_PREVIEW_ROWS = 50
+/** Keep the browser guard aligned with the shared 16 MiB artifact contract. */
+export const MAX_ARTIFACT_BYTES = 16_777_216 as const
 const MAX_PREVIEW_BYTES = 1_048_576
+const MAX_INLINE_PREVIEW_BYTES = 131_072
 export const DATA_QUERY_PAGE_SIZE = 20
 
 /** Card-only styles; every selector is scoped below this plugin's root. */
@@ -262,6 +347,18 @@ ${SEMANTIC_CONSOLE_CARD_STYLES}
 [data-query-stats] span + span { position: relative; }
 [data-query-stats] span + span::before { position: absolute; left: -7px; top: 50%; width: 2px; height: 2px; border-radius: 50%; background: var(--wren-text-tertiary); content: ""; }
 [data-query-error] { margin: 0 16px 12px; padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #c23b3b) 9%, transparent); color: var(--wren-text); overflow-wrap: anywhere; }
+[data-query-artifact] { display: grid; gap: 8px; margin: 0 16px 14px; padding: 12px; border: 1px solid var(--wren-border); border-radius: 9px; background: var(--wren-bg-subtle); }
+[data-query-artifact-heading], [data-query-artifact-stats] { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; gap: 7px 12px; }
+[data-query-artifact-heading] code { min-width: 0; overflow: hidden; color: var(--wren-text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+[data-query-artifact-stats] { color: var(--wren-text-secondary); font-size: 12px; }
+[data-query-artifact-stats] span + span { position: relative; }
+[data-query-artifact-stats] span + span::before { position: absolute; left: -7px; top: 50%; width: 2px; height: 2px; border-radius: 50%; background: var(--wren-text-tertiary); content: ""; }
+[data-query-artifact] p { margin: 0; color: var(--wren-text-tertiary); font-size: 12px; }
+[data-query-artifact-download] { justify-self: start; min-height: 32px; padding: 6px 11px; border: 1px solid var(--wren-border); border-radius: 7px; background: var(--wren-bg); color: var(--wren-text); font: inherit; font-size: 12px; cursor: pointer; }
+[data-query-artifact-download]:hover:not(:disabled) { border-color: var(--wren-border-strong); background: var(--wren-bg-hover); }
+[data-query-artifact-download]:disabled { cursor: not-allowed; opacity: .5; }
+[data-query-artifact-message="expired"], [data-query-artifact-message="revoked"], [data-query-artifact-message="error"] { color: var(--dsw-alias-state-error-primary, #c33b43) !important; }
+[data-query-artifact-message="downloaded"] { color: var(--wren-success) !important; }
 [data-query-tabs] { min-width: 0; }
 [data-query-tabs] [role="tablist"] { display: flex; gap: 4px; padding: 0 12px; border-bottom: 1px solid var(--wren-border); }
 [data-query-tabs] [role="tab"] { position: relative; min-width: 72px; min-height: 38px; padding: 8px 12px; border: 0; border-radius: 8px 8px 0 0; background: transparent; color: var(--wren-text-secondary); font: inherit; font-weight: 500; cursor: pointer; transition: background-color 120ms ease, color 120ms ease; }
@@ -364,7 +461,7 @@ function parseColumn(value: unknown): DataQueryMetaColumn | undefined {
   return { name, type, semanticRole }
 }
 
-function parseStats(value: unknown): DataQueryStats | undefined {
+function parseStatsV1(value: unknown): DataQueryStatsV1 | undefined {
   if (!isRecord(value) || !hasOnlyKeys(value, ['returnedRows', 'durationMs', 'truncated'])) return undefined
   const returnedRows = value.returnedRows
   const durationMs = value.durationMs
@@ -373,6 +470,19 @@ function parseStats(value: unknown): DataQueryStats | undefined {
   if (typeof durationMs !== 'number' || !Number.isFinite(durationMs) || durationMs < 0 || durationMs > 86_400_000) return undefined
   if (typeof truncated !== 'boolean') return undefined
   return { returnedRows, durationMs, truncated }
+}
+
+function parseStatsV2(value: unknown, maxPreviewRows: number): DataQueryStatsV2 | undefined {
+  if (!isRecord(value) || !hasOnlyKeys(value, ['returnedRows', 'durationMs', 'truncated', 'previewedRows'])) return undefined
+  const returnedRows = value.returnedRows
+  const durationMs = value.durationMs
+  const truncated = value.truncated
+  const previewedRows = value.previewedRows
+  if (typeof returnedRows !== 'number' || !Number.isSafeInteger(returnedRows) || returnedRows < 0 || returnedRows > MAX_QUERY_ROWS) return undefined
+  if (typeof durationMs !== 'number' || !Number.isFinite(durationMs) || durationMs < 0 || durationMs > 86_400_000) return undefined
+  if (typeof truncated !== 'boolean') return undefined
+  if (typeof previewedRows !== 'number' || !Number.isSafeInteger(previewedRows) || previewedRows < 0 || previewedRows > maxPreviewRows) return undefined
+  return { returnedRows, durationMs, truncated, previewedRows }
 }
 
 function isSafeFieldName(value: string): boolean {
@@ -420,64 +530,88 @@ function parseError(value: unknown): DataQueryError | undefined {
   return { code: code as DataQueryErrorCode, phase, message, retryable: value.retryable }
 }
 
-/**
- * Parse the durable `tool/result.meta` value for this view.
- *
- * The guard deliberately accepts exactly schema version 1 and the same
- * bounded fields as the Contract package. Future, incomplete, oversized, or
- * malformed metadata returns null; no untrusted value reaches a chart option
- * or HTML attribute without this check.
- */
-export function parseDataQueryMeta(value: unknown): DataQueryMeta | null {
-  if (!isRecord(value) || !hasOnlyKeys(value, ['schemaVersion', 'queryId', 'status', 'semanticSql', 'question', 'sqlHistory', 'nativeSql', 'columns', 'previewRows', 'chart', 'stats', 'error'])) return null
-  if (value.schemaVersion !== 1 || (value.status !== 'success' && value.status !== 'error')) return null
+function parseSqlHistory(value: unknown): DataQuerySqlHistoryReference[] | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value) || value.length > 5) return undefined
+  const result: DataQuerySqlHistoryReference[] = []
+  for (const raw of value) {
+    if (!isRecord(raw) || !hasOnlyKeys(raw, ['id', 'question', 'sql', 'sourcePath'])) return undefined
+    const id = boundedString(raw.id, 128)
+    const historicalQuestion = boundedString(raw.question, 16_000)
+    const sql = boundedString(raw.sql, MAX_SQL)
+    const sourcePath = raw.sourcePath === undefined ? undefined : boundedString(raw.sourcePath, 512)
+    if (id === undefined || historicalQuestion === undefined || sql === undefined || (raw.sourcePath !== undefined && sourcePath === undefined)) return undefined
+    result.push({ id, question: historicalQuestion, sql, ...(sourcePath === undefined ? {} : { sourcePath }) })
+  }
+  return result
+}
+
+function parseRows(value: unknown, columns: readonly DataQueryMetaColumn[], maxRows: number, maxBytes = MAX_PREVIEW_BYTES): Readonly<Record<string, DataQueryScalar>>[] | undefined {
+  const names = new Set(columns.map(column => column.name))
+  if (names.size !== columns.length || !Array.isArray(value) || value.length > maxRows) return undefined
+  const previewRows: Readonly<Record<string, DataQueryScalar>>[] = []
+  for (const candidate of value) {
+    if (!isRecord(candidate) || Object.keys(candidate).length !== columns.length || Object.keys(candidate).length > MAX_ROW_KEYS) return undefined
+    const row: Record<string, DataQueryScalar> = {}
+    for (const [key, raw] of Object.entries(candidate)) {
+      if (!names.has(key)) return undefined
+      const item = scalar(raw)
+      if (item === undefined) return undefined
+      row[key] = item
+    }
+    for (const column of columns) if (!Object.prototype.hasOwnProperty.call(row, column.name)) return undefined
+    previewRows.push(row)
+  }
+  try {
+    if (new TextEncoder().encode(JSON.stringify(previewRows)).byteLength > maxBytes) return undefined
+  } catch {
+    return undefined
+  }
+  return previewRows
+}
+
+function parseBaseMeta(value: Record<string, unknown>, maxRows: number, maxBytes = MAX_PREVIEW_BYTES): {
+  readonly queryId: string
+  readonly semanticSql: string
+  readonly question?: string
+  readonly sqlHistory?: DataQuerySqlHistoryReference[]
+  readonly nativeSql?: string
+  readonly columns: DataQueryMetaColumn[]
+  readonly previewRows: Readonly<Record<string, DataQueryScalar>>[]
+} | null {
   const queryId = boundedString(value.queryId, 128)
   const semanticSql = boundedString(value.semanticSql, MAX_SQL)
   if (queryId === undefined || semanticSql === undefined) return null
   const question = value.question === undefined ? undefined : boundedString(value.question, 16_000)
   if (value.question !== undefined && question === undefined) return null
-  let sqlHistory: DataQuerySqlHistoryReference[] | undefined
-  if (value.sqlHistory !== undefined) {
-    if (!Array.isArray(value.sqlHistory) || value.sqlHistory.length > 5) return null
-    sqlHistory = []
-    for (const raw of value.sqlHistory) {
-      if (!isRecord(raw) || !hasOnlyKeys(raw, ['id', 'question', 'sql', 'sourcePath'])) return null
-      const id = boundedString(raw.id, 128)
-      const historicalQuestion = boundedString(raw.question, 16_000)
-      const sql = boundedString(raw.sql, MAX_SQL)
-      const sourcePath = raw.sourcePath === undefined ? undefined : boundedString(raw.sourcePath, 512)
-      if (id === undefined || historicalQuestion === undefined || sql === undefined || (raw.sourcePath !== undefined && sourcePath === undefined)) return null
-      sqlHistory.push({ id, question: historicalQuestion, sql, ...(sourcePath === undefined ? {} : { sourcePath }) })
-    }
-  }
+  const sqlHistory = parseSqlHistory(value.sqlHistory)
+  if (value.sqlHistory !== undefined && sqlHistory === undefined) return null
   if (!Array.isArray(value.columns) || value.columns.length > MAX_COLUMNS) return null
   const columns = value.columns.map(parseColumn)
   if (columns.some(column => column === undefined)) return null
   const parsedColumns = columns as DataQueryMetaColumn[]
-  const names = new Set(parsedColumns.map(column => column.name))
-  if (names.size !== parsedColumns.length || !Array.isArray(value.previewRows) || value.previewRows.length > MAX_ROWS) return null
-  const previewRows: Readonly<Record<string, DataQueryScalar>>[] = []
-  for (const candidate of value.previewRows) {
-    if (!isRecord(candidate) || Object.keys(candidate).length !== parsedColumns.length || Object.keys(candidate).length > MAX_ROW_KEYS) return null
-    const row: Record<string, DataQueryScalar> = {}
-    for (const [key, raw] of Object.entries(candidate)) {
-      if (!names.has(key)) return null
-      const item = scalar(raw)
-      if (item === undefined) return null
-      row[key] = item
-    }
-    for (const column of parsedColumns) if (!Object.prototype.hasOwnProperty.call(row, column.name)) return null
-    previewRows.push(row)
-  }
-  try {
-    if (new TextEncoder().encode(JSON.stringify(previewRows)).byteLength > MAX_PREVIEW_BYTES) return null
-  } catch {
-    return null
-  }
-  const stats = parseStats(value.stats)
-  if (stats === undefined || previewRows.length > stats.returnedRows || (!stats.truncated && previewRows.length !== stats.returnedRows)) return null
+  const previewRows = parseRows(value.previewRows, parsedColumns, maxRows, maxBytes)
+  if (previewRows === undefined) return null
   const nativeSql = value.nativeSql === undefined ? undefined : boundedString(value.nativeSql, MAX_SQL)
   if (value.nativeSql !== undefined && nativeSql === undefined) return null
+  return {
+    queryId,
+    semanticSql,
+    ...(question === undefined ? {} : { question }),
+    ...(sqlHistory === undefined ? {} : { sqlHistory }),
+    ...(nativeSql === undefined ? {} : { nativeSql }),
+    columns: parsedColumns,
+    previewRows,
+  }
+}
+
+function parseV1Meta(value: Record<string, unknown>): DataQueryMetaV1 | null {
+  if (!hasOnlyKeys(value, ['schemaVersion', 'queryId', 'status', 'semanticSql', 'question', 'sqlHistory', 'nativeSql', 'columns', 'previewRows', 'chart', 'stats', 'error'])) return null
+  if (value.status !== 'success' && value.status !== 'error') return null
+  const base = parseBaseMeta(value, MAX_ROWS)
+  if (base === null) return null
+  const stats = parseStatsV1(value.stats)
+  if (stats === undefined || base.previewRows.length > stats.returnedRows || (!stats.truncated && base.previewRows.length !== stats.returnedRows)) return null
   const chart = value.chart === undefined ? undefined : parseChartSpecV1(value.chart)
   if (value.chart !== undefined && chart === undefined) return null
   const error = value.error === undefined ? undefined : parseError(value.error)
@@ -486,18 +620,78 @@ export function parseDataQueryMeta(value: unknown): DataQueryMeta | null {
   if (value.status === 'error' && (error === undefined || chart !== undefined)) return null
   return {
     schemaVersion: 1,
-    queryId,
-    status: value.status,
-    semanticSql,
-    ...(question === undefined ? {} : { question }),
-    ...(sqlHistory === undefined ? {} : { sqlHistory }),
-    ...(nativeSql === undefined ? {} : { nativeSql }),
-    columns: parsedColumns,
-    previewRows,
+    ...base,
     ...(chart === undefined ? {} : { chart }),
     stats,
     ...(error === undefined ? {} : { error }),
+    status: value.status,
   }
+}
+
+function parseArtifact(value: unknown): DataQueryArtifact | undefined {
+  if (!isRecord(value) || !hasOnlyKeys(value, ['id', 'format', 'fileName', 'rowCount', 'sizeBytes', 'sha256', 'expiresAt', 'downloadUrl'])) return undefined
+  const id = boundedString(value.id, 128)
+  const format = value.format
+  const fileName = boundedString(value.fileName, 256)
+  const rowCount = value.rowCount
+  const sizeBytes = value.sizeBytes
+  const sha256 = boundedString(value.sha256, 72)
+  const expiresAt = boundedString(value.expiresAt, 64)
+  const downloadUrl = boundedString(value.downloadUrl, 2_048)
+  if (id === undefined || format !== 'csv' || fileName === undefined || !/^[^\\/\u0000-\u001f]+\.csv$/iu.test(fileName)) return undefined
+  if (typeof rowCount !== 'number' || !Number.isSafeInteger(rowCount) || rowCount < 0 || rowCount > MAX_QUERY_ROWS) return undefined
+  if (typeof sizeBytes !== 'number' || !Number.isSafeInteger(sizeBytes) || sizeBytes < 0 || sizeBytes > MAX_ARTIFACT_BYTES) return undefined
+  if (sha256 === undefined || !/^(?:sha256:)?[a-f0-9]{64}$/iu.test(sha256)) return undefined
+  if (expiresAt === undefined || !/^\d{4}-\d{2}-\d{2}T[^\s]+(?:Z|[+-]\d{2}:?\d{2})$/u.test(expiresAt) || !Number.isFinite(Date.parse(expiresAt))) return undefined
+  if (downloadUrl === undefined) return undefined
+  let parsedUrl: URL
+  try {
+    parsedUrl = new URL(downloadUrl)
+  } catch {
+    return undefined
+  }
+  if ((parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') || parsedUrl.username !== '' || parsedUrl.password !== '' || parsedUrl.hash !== '') return undefined
+  return { id, format, fileName, rowCount, sizeBytes, sha256, expiresAt, downloadUrl: parsedUrl.href }
+}
+
+function parseV2Meta(value: Record<string, unknown>): DataQueryMetaV2 | null {
+  if (!hasOnlyKeys(value, ['schemaVersion', 'queryId', 'status', 'semanticSql', 'question', 'sqlHistory', 'nativeSql', 'columns', 'previewRows', 'chart', 'stats', 'error', 'delivery', 'artifact'])) return null
+  if (value.status !== 'success' && value.status !== 'error') return null
+  const delivery = value.delivery
+  const artifactMode = value.status === 'success' && delivery === 'artifact'
+  const inlineMode = value.status === 'success' && delivery === 'inline'
+  const maxPreviewRows = artifactMode ? MAX_ARTIFACT_PREVIEW_ROWS : inlineMode ? MAX_INLINE_PREVIEW_ROWS : MAX_ROWS
+  const base = parseBaseMeta(value, maxPreviewRows, inlineMode ? MAX_INLINE_PREVIEW_BYTES : MAX_PREVIEW_BYTES)
+  if (base === null) return null
+  const stats = parseStatsV2(value.stats, maxPreviewRows)
+  if (stats === undefined || stats.previewedRows !== base.previewRows.length || base.previewRows.length > stats.returnedRows || (!stats.truncated && base.previewRows.length !== stats.returnedRows)) return null
+  if (value.status === 'error') {
+    const error = parseError(value.error)
+    if (delivery !== undefined || value.artifact !== undefined || value.chart !== undefined || error === undefined) return null
+    return { schemaVersion: 2, ...base, status: 'error', stats, error }
+  }
+  if (value.error !== undefined || (delivery !== 'inline' && delivery !== 'artifact')) return null
+  if (delivery === 'inline') {
+    const chart = value.chart === undefined ? undefined : parseChartSpecV1(value.chart)
+    if (value.artifact !== undefined || (value.chart !== undefined && chart === undefined)) return null
+    return { schemaVersion: 2, ...base, status: 'success', delivery, stats, ...(chart === undefined ? {} : { chart }) }
+  }
+  if (value.chart !== undefined) return null
+  const artifact = parseArtifact(value.artifact)
+  if (artifact === undefined || artifact.rowCount !== stats.returnedRows) return null
+  return { schemaVersion: 2, ...base, status: 'success', delivery, stats, artifact }
+}
+
+/**
+ * Parse durable `tool/result.meta` from the replay-compatible v1 or v2
+ * presentation. Future, incomplete, oversized, or malformed metadata returns
+ * null; no untrusted value reaches a chart option or HTML attribute.
+ */
+export function parseDataQueryMeta(value: unknown): DataQueryMeta | null {
+  if (!isRecord(value)) return null
+  if (value.schemaVersion === 1) return parseV1Meta(value)
+  if (value.schemaVersion === DATA_QUERY_PRESENTATION_VERSION) return parseV2Meta(value)
+  return null
 }
 
 function isSettled(block: DataQueryViewProps['block']): block is DataQueryResultBlock {
@@ -901,8 +1095,14 @@ function DataQueryTable({ meta }: { readonly meta: DataQueryMeta }): ReactNode {
       ? { column, descending: !current.descending }
       : { column, descending: false })
   }
-  if (rows.length === 0) return element('div', { 'data-query-empty': true, role: 'status' }, 'No rows returned')
+  if (rows.length === 0) {
+    const artifact = meta.schemaVersion === 2 && meta.delivery === 'artifact' ? meta.artifact : undefined
+    return element('div', { 'data-query-empty': true, role: 'status' }, artifact !== undefined && artifact.rowCount > 0
+      ? 'No preview rows available; download the CSV to view the complete result.'
+      : 'No rows returned')
+  }
   const rangeEnd = Math.min(pageStart + DATA_QUERY_PAGE_SIZE, rows.length)
+  const resultRowCount = meta.schemaVersion === 2 && meta.delivery === 'artifact' ? meta.artifact.rowCount : rows.length
   return element('div', { 'data-query-table-shell': true },
     element('div', { 'data-query-table-scroll': true },
       element('table', { 'data-query-table': true },
@@ -929,13 +1129,147 @@ function DataQueryTable({ meta }: { readonly meta: DataQueryMeta }): ReactNode {
       ),
     ),
     element('div', { 'data-query-pagination': true, role: 'navigation', 'aria-label': 'Table pagination' },
-      element('span', { 'data-query-row-range': true }, `${pageStart + 1}-${rangeEnd} of ${rows.length} rows`),
+      element('span', { 'data-query-row-range': true }, `${pageStart + 1}-${rangeEnd} of ${resultRowCount} rows`),
       element('div', { 'data-query-pagination-actions': true },
         element('button', { type: 'button', disabled: currentPage === 0, onClick: () => setPage(value => Math.max(0, value - 1)), 'aria-label': 'Previous page' }, 'Previous'),
         element('span', { 'data-query-page-label': true, 'aria-live': 'polite' }, `Page ${currentPage + 1} of ${pageCount}`),
         element('button', { type: 'button', disabled: currentPage >= pageCount - 1, onClick: () => setPage(value => Math.min(pageCount - 1, value + 1)), 'aria-label': 'Next page' }, 'Next'),
       ),
     ),
+  )
+}
+
+/** Stable download state shown by the v2 CSV artifact card. */
+export type DataQueryArtifactDownloadState = 'idle' | 'downloading' | 'downloaded' | 'expired' | 'revoked' | 'error'
+
+/** Error used when a CSV artifact has expired before a download starts. */
+export class DataQueryArtifactExpiredError extends Error {
+  constructor() {
+    super('The CSV artifact has expired.')
+    this.name = 'DataQueryArtifactExpiredError'
+  }
+}
+
+/** Error used when current authorization no longer matches the CSV artifact. */
+export class DataQueryArtifactRevokedError extends Error {
+  constructor() {
+    super('The CSV artifact is no longer authorized.')
+    this.name = 'DataQueryArtifactRevokedError'
+  }
+}
+
+/** Return whether an artifact expiry timestamp is at or before the current time. */
+export function isDataQueryArtifactExpired(artifact: DataQueryArtifact, now = Date.now()): boolean {
+  const expiry = Date.parse(artifact.expiresAt)
+  return !Number.isFinite(expiry) || expiry <= now
+}
+
+/** Format artifact bytes without exposing the artifact body to the model. */
+export function formatDataQueryArtifactBytes(sizeBytes: number): string {
+  if (sizeBytes < 1_024) return `${sizeBytes} B`
+  if (sizeBytes < 1_024 * 1_024) return `${(sizeBytes / 1_024).toFixed(sizeBytes < 10_240 ? 1 : 0)} KB`
+  if (sizeBytes < 1_024 * 1_024 * 1_024) return `${(sizeBytes / (1_024 * 1_024)).toFixed(sizeBytes < 10_485_760 ? 1 : 0)} MB`
+  return `${(sizeBytes / (1_024 * 1_024 * 1_024)).toFixed(1)} GB`
+}
+
+/** Fetch one validated artifact and invoke a browser download for its CSV bytes. */
+export async function downloadDataQueryArtifact(
+  artifact: DataQueryArtifact,
+  request: typeof fetch = fetch,
+): Promise<void> {
+  if (isDataQueryArtifactExpired(artifact)) throw new DataQueryArtifactExpiredError()
+  const response = await request(artifact.downloadUrl, { method: 'GET', credentials: 'omit' })
+  if (response.status === 410) {
+    let code: unknown
+    try {
+      const body: unknown = await response.clone().json()
+      code = isRecord(body) ? body.code : undefined
+    } catch {
+      code = undefined
+    }
+    if (code === 'ARTIFACT_EXPIRED' || isDataQueryArtifactExpired(artifact)) {
+      throw new DataQueryArtifactExpiredError()
+    }
+    throw new DataQueryArtifactRevokedError()
+  }
+  if (!response.ok) throw new Error(`CSV download failed (${response.status})`)
+  if (typeof document === 'undefined') return
+  const body = await response.blob()
+  const objectUrl = typeof URL.createObjectURL === 'function' ? URL.createObjectURL(body) : artifact.downloadUrl
+  const anchor = document.createElement('a')
+  anchor.href = objectUrl
+  anchor.download = artifact.fileName
+  anchor.rel = 'noopener noreferrer'
+  anchor.style.display = 'none'
+  document.body.append(anchor)
+  anchor.click()
+  anchor.remove()
+  if (objectUrl !== artifact.downloadUrl && typeof URL.revokeObjectURL === 'function') {
+    // Give the browser a turn to begin the download before revoking the blob.
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
+  }
+}
+
+function DataQueryArtifactPanel({ meta }: { readonly meta: DataQueryArtifactMetaV2 }): ReactNode {
+  const artifact = meta.artifact
+  const [downloadState, setDownloadState] = useState<DataQueryArtifactDownloadState>(() =>
+    isDataQueryArtifactExpired(artifact) ? 'expired' : 'idle')
+  useEffect(() => {
+    if (isDataQueryArtifactExpired(artifact)) {
+      setDownloadState('expired')
+      return undefined
+    }
+    setDownloadState('idle')
+    const delay = Date.parse(artifact.expiresAt) - Date.now()
+    // Keep the button/status honest when an artifact expires while this card
+    // remains mounted. The parser already guarantees a finite timestamp.
+    const timer = setTimeout(() => setDownloadState('expired'), Math.min(delay, 2_147_483_647))
+    return () => clearTimeout(timer)
+  }, [meta.queryId, artifact.id, artifact.expiresAt])
+  const download = async (): Promise<void> => {
+    if (isDataQueryArtifactExpired(artifact)) {
+      setDownloadState('expired')
+      return
+    }
+    setDownloadState('downloading')
+    try {
+      await downloadDataQueryArtifact(artifact)
+      setDownloadState('downloaded')
+    } catch (error: unknown) {
+      setDownloadState(error instanceof DataQueryArtifactExpiredError
+        ? 'expired'
+        : error instanceof DataQueryArtifactRevokedError ? 'revoked' : 'error')
+    }
+  }
+  const buttonText = downloadState === 'downloading'
+    ? 'Downloading…'
+    : downloadState === 'downloaded' ? 'Downloaded' : downloadState === 'error' ? 'Retry download' : 'Download CSV'
+  return element('section', { 'data-query-artifact': true, 'data-query-artifact-state': downloadState, 'aria-label': 'CSV result artifact' },
+    element('div', { 'data-query-artifact-heading': true },
+      element('strong', null, 'CSV export'),
+      element('code', null, artifact.fileName),
+    ),
+    element('div', { 'data-query-artifact-stats': true },
+      element('span', null, `${artifact.rowCount} ${artifact.rowCount === 1 ? 'row' : 'rows'}`),
+      element('span', null, formatDataQueryArtifactBytes(artifact.sizeBytes)),
+      element('span', null, `Expires ${artifact.expiresAt}`),
+    ),
+    element('p', { 'data-query-artifact-preview-hint': true }, `Only the first ${meta.stats.previewedRows} rows are shown in this preview. Download the CSV for all ${artifact.rowCount} rows.`),
+    element('button', {
+      type: 'button',
+      'data-query-artifact-download': true,
+      disabled: downloadState === 'downloading' || downloadState === 'expired' || downloadState === 'revoked',
+      onClick: () => { void download() },
+    }, buttonText),
+    downloadState === 'expired'
+      ? element('p', { 'data-query-artifact-message': 'expired', role: 'status' }, 'This CSV export has expired. Run the query again to create a new download.')
+      : downloadState === 'revoked'
+        ? element('p', { 'data-query-artifact-message': 'revoked', role: 'status' }, 'Access to this CSV export was revoked. Run the query again after checking your permissions.')
+      : downloadState === 'error'
+        ? element('p', { 'data-query-artifact-message': 'error', role: 'status' }, 'The CSV download failed. Check your connection and try again.')
+        : downloadState === 'downloaded'
+          ? element('p', { 'data-query-artifact-message': 'downloaded', role: 'status' }, 'CSV download started.')
+          : null,
   )
 }
 
@@ -976,7 +1310,9 @@ export const DEFAULT_DATA_QUERY_TAB = 'chart' as const
 type QueryTab = typeof DATA_QUERY_TAB_ORDER[number]
 
 function DataQueryTabs({ meta, consoleUrl }: { readonly meta: DataQueryMeta; readonly consoleUrl?: unknown }): ReactNode {
-  const chartAvailable = buildDataQueryChartOption(meta) !== null
+  // A CSV artifact deliberately renders only its bounded 20-row preview; a
+  // chart would otherwise suggest that the visual represents the full file.
+  const chartAvailable = meta.delivery !== 'artifact' && buildDataQueryChartOption(meta) !== null
   const tabIdPrefix = `wren-query-${useId().replace(/:/gu, '')}`
   const tabPanelId = `${tabIdPrefix}-panel`
   const [tab, setTab] = useState<QueryTab>(chartAvailable ? DEFAULT_DATA_QUERY_TAB : 'table')
@@ -1027,6 +1363,9 @@ export function DataQueryRow(props: DataQueryViewProps): ReactNode {
       element(SemanticConsoleLink, { consoleUrl: props.semanticConsoleUrl, surface: 'card' }),
     ),
     error,
+    ...(meta.schemaVersion === 2 && meta.status === 'success' && meta.delivery === 'artifact'
+      ? [element(DataQueryArtifactPanel, { meta })]
+      : []),
     element(DataQueryTabs, { meta, consoleUrl: props.semanticConsoleUrl }),
   )
 }

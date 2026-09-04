@@ -6,14 +6,29 @@ export const PROTOCOL_VERSION = '1' as const
 /** The only Host/Client presentation schema version supported by this release. */
 export const SCHEMA_VERSION = 1 as const
 
+/** Current DataQueryPresentation schema version. v1 remains replay-compatible. */
+export const DATA_QUERY_PRESENTATION_VERSION = 2 as const
+
 /** Maximum rows fetched by one MVP query. */
 export const MAX_QUERY_ROWS = 500 as const
 
 /** Maximum rows persisted in a tool presentation preview. */
 export const MAX_PREVIEW_ROWS = 200 as const
 
+/** Maximum rows retained in an artifact presentation preview. */
+export const MAX_ARTIFACT_PREVIEW_ROWS = 20 as const
+
+/** Maximum rows returned inline before switching to an artifact. */
+export const MAX_INLINE_PREVIEW_ROWS = 50 as const
+
+/** Maximum CSV artifact size accepted at the Host/Client contract boundary. */
+export const MAX_ARTIFACT_BYTES = 16_777_216 as const
+
 /** Maximum UTF-8 JSON bytes persisted for preview rows. */
 export const MAX_PREVIEW_BYTES = 1_048_576 as const
+
+/** Maximum UTF-8 JSON bytes returned inline before switching to an artifact. */
+export const MAX_INLINE_PREVIEW_BYTES = 131_072 as const
 
 /** JSON primitive accepted at a wire boundary. */
 export type JsonPrimitive = string | number | boolean | null
@@ -45,6 +60,8 @@ export interface JsonSchema {
   readonly maxItems?: number
   readonly minLength?: number
   readonly maxLength?: number
+  readonly pattern?: string
+  readonly format?: string
   readonly minimum?: number
   readonly maximum?: number
 }

@@ -24,6 +24,11 @@ All notable user-visible changes to this project are documented here. The format
   acceptance scenario proving that two identities see disjoint regional rows.
 - Metadata-only runtime audit details for transport, authentication method,
   datasource, query id, policy tables, and policy versions.
+- Versioned query-result delivery that keeps small results inline and streams
+  larger results to short-lived CSV artifacts with a bounded Agent preview.
+- Core HTTP and remote MCP artifact download routes with token hashing,
+  attachment/no-store responses, expiry cleanup, and current-authorization
+  revalidation.
 
 ### Changed
 
@@ -52,6 +57,10 @@ All notable user-visible changes to this project are documented here. The format
 - The MCP Integration page now presents authenticated HTTP as the default and
   labels direct stdio adapters as trusted-local compatibility only, without
   returning server project paths, datasource DSNs, or bearer credentials.
+- Query presentations now use schema v2 for live results while continuing to
+  parse durable schema-v1 replays. Inline delivery is capped at 50 rows and
+  128 KiB; artifact previews are capped at 20 rows, CSV files at 16 MiB, and
+  the existing 500-row query limit is unchanged.
 
 ### Fixed
 
@@ -64,6 +73,8 @@ All notable user-visible changes to this project are documented here. The format
   preventing first-call deadlocks without changing the full context API.
 - Known dangerous functions such as `pg_sleep` are rejected as
   `POLICY_DENIED` before semantic planning.
+- Artifact cleanup now preserves temporary files belonging to live pending
+  reservations while removing expired outputs and abandoned temporary files.
 
 ## [0.1.0-alpha.1] - 2026-08-30
 

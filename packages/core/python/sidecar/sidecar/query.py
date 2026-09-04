@@ -20,16 +20,21 @@ planning still work when the optional PostgreSQL driver is not installed.
 from __future__ import annotations
 
 import base64
+import csv
 import datetime as _datetime
+import hashlib
 import json
 import math
+import os
 import re
+import tempfile
 import threading
 import time
 import uuid
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
+from pathlib import Path
 from typing import Any, Protocol
 
 from .datasource_state import DatasourceStateError, load_active_connection
@@ -38,6 +43,7 @@ from .errors import (
     DATABASE_ERROR,
     INVALID_PARAMS,
     POLICY_DENIED,
+    RESULT_TOO_LARGE,
     RpcFault,
     TIMEOUT,
     WREN_UNAVAILABLE,
@@ -69,6 +75,11 @@ MAX_DATABASE_SESSION_BYTES = 32_768
 MAX_DATABASE_SESSION_ATTRIBUTES = 32
 MAX_DATABASE_SESSION_VALUES = 1_000
 MAX_DATABASE_SESSION_POLICIES = 64
+MAX_ARTIFACT_INLINE_ROWS = 50
+MAX_ARTIFACT_INLINE_BYTES = 128 * 1024
+MAX_ARTIFACT_PREVIEW_ROWS = 20
+MAX_ARTIFACT_BYTES = 16 * 1024 * 1024
+ARTIFACT_FORMAT = "csv"
 _DATABASE_SESSION_FIELDS = {
     "schemaVersion", "subjectId", "organizationId", "attributes", "policyVersions",
 }
@@ -96,6 +107,7 @@ class DatabaseExecutor(Protocol):
         limits: "QueryLimits",
         query_parameters: Mapping[str, Any] | None = None,
         database_session: "DatabaseSession | None" = None,
+        artifact_request: "ArtifactRequest | None" = None,
     ) -> dict[str, Any]:
         """Execute one already-planned native SQL query."""
 
@@ -121,6 +133,33 @@ class DatabaseSession:
     organization_id: str
     attributes_json: str
     policy_versions_json: str
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactRequest:
+    """Core-issued controls for adaptive query-result materialization.
+
+    This value is an internal Core-to-sidecar capability.  Public query
+    callers cannot choose an artifact directory or identifier; Core creates
+    this mapping after authenticating and authorizing the request.  The
+    sidecar still validates every field before it touches the filesystem so
+    a malformed internal request fails closed.
+    """
+
+    id: str
+    directory: str
+    expires_at: str
+    inline_max_rows: int = MAX_ARTIFACT_INLINE_ROWS
+    inline_max_bytes: int = MAX_ARTIFACT_INLINE_BYTES
+    preview_rows: int = MAX_ARTIFACT_PREVIEW_ROWS
+    max_bytes: int = MAX_ARTIFACT_BYTES
+    artifact_file_name: str | None = None
+
+    @property
+    def file_name(self) -> str:
+        """Return the only filename the sidecar may materialize."""
+
+        return self.artifact_file_name or f"{self.id}.csv"
 
 
 def _database_session_scalar(value: Any) -> bool:
@@ -206,6 +245,199 @@ def _safe_int(value: Any, *, field: str, default: int, maximum: int, minimum: in
             retryable=False,
         )
     return value
+
+
+_ARTIFACT_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+_ARTIFACT_REQUEST_FIELDS = frozenset(
+    {
+        # These attestation fields are emitted by Core's reservation object.
+        # They carry no filesystem authority, but are accepted only with the
+        # exact values below so the internal request remains versioned.
+        "schemaVersion",
+        "contentType",
+        "format",
+        "createdAt",
+        "id",
+        "directory",
+        # Core may pre-generate a random basename in its reservation.  The
+        # field is optional for the compact contract (where ``id.csv`` is
+        # derived), but when present it is validated as a basename and used
+        # verbatim so Core's download lookup addresses the same file.
+        "filename",
+        "fileName",
+        "inlineMaxRows",
+        "inlineMaxBytes",
+        "previewRows",
+        "maxBytes",
+        "expiresAt",
+    }
+)
+
+
+def _artifact_fault(message: str = "artifact request is invalid") -> RpcFault:
+    """Build one stable error for malformed Core artifact capabilities."""
+
+    return RpcFault(INVALID_PARAMS, "artifact", message, retryable=False)
+
+
+def _artifact_directory(value: Any) -> str:
+    """Validate and canonicalize a Core-selected artifact directory.
+
+    Artifact paths are deliberately stricter than ordinary project paths:
+    they must already exist, be absolute, contain no dot components, and not
+    traverse a symlink.  The final filename is derived from the separately
+    validated artifact id, never from a caller-provided path fragment.
+    """
+
+    if not isinstance(value, str) or not value or len(value) > 32_768 or "\x00" in value:
+        raise _artifact_fault()
+    try:
+        candidate = Path(value)
+    except (TypeError, ValueError, OSError) as exc:
+        raise _artifact_fault() from exc
+    if not candidate.is_absolute():
+        raise _artifact_fault()
+    # Reject traversal before resolving.  This also prevents a path that
+    # happens to resolve inside the directory from being accepted when Core
+    # accidentally sends a non-canonical path.
+    if any(part in {".", ".."} for part in candidate.parts):
+        raise _artifact_fault()
+    # Check the caller spelling before ``resolve``; checking only the
+    # canonical path would erase evidence that ``candidate`` itself was a
+    # symlink.
+    original_current = Path(candidate.anchor)
+    for component in candidate.parts[1:]:
+        original_current /= component
+        try:
+            if original_current.is_symlink():
+                raise _artifact_fault()
+        except OSError as exc:
+            raise _artifact_fault() from exc
+    try:
+        resolved = candidate.resolve(strict=True)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise _artifact_fault() from exc
+    if not resolved.is_dir():
+        raise _artifact_fault()
+    if resolved == Path(resolved.anchor):
+        raise _artifact_fault()
+    # ``resolve`` follows links, so inspect every existing component as well
+    # as the leaf.  This keeps the artifact root stable if an attacker swaps a
+    # symlink into a parent directory between validation and file creation.
+    current = Path(resolved.anchor)
+    for component in resolved.parts[1:]:
+        current /= component
+        try:
+            if current.is_symlink():
+                raise _artifact_fault()
+        except OSError as exc:
+            raise _artifact_fault() from exc
+    return str(resolved)
+
+
+def artifact_request_from_mapping(value: Any) -> ArtifactRequest:
+    """Validate a Core-issued ``artifactRequest`` capability.
+
+    The limits intentionally have safe defaults for forward compatibility,
+    but every supplied value is bounded by the sidecar hard maximum.  Unknown
+    keys are rejected so a future field cannot accidentally become a path,
+    token, or download URL.
+    """
+
+    if isinstance(value, ArtifactRequest):
+        raw: Mapping[str, Any] = {
+            "id": value.id,
+            "directory": value.directory,
+            "inlineMaxRows": value.inline_max_rows,
+            "inlineMaxBytes": value.inline_max_bytes,
+            "previewRows": value.preview_rows,
+            "maxBytes": value.max_bytes,
+            "expiresAt": value.expires_at,
+        }
+        if value.artifact_file_name is not None:
+            raw["filename"] = value.artifact_file_name
+    elif isinstance(value, Mapping):
+        raw = value
+    else:
+        raise _artifact_fault()
+    if set(raw) - _ARTIFACT_REQUEST_FIELDS:
+        raise _artifact_fault()
+    for field in ("id", "directory", "expiresAt"):
+        if field not in raw:
+            raise _artifact_fault()
+
+    artifact_id = raw.get("id")
+    if not isinstance(artifact_id, str) or not _ARTIFACT_ID.fullmatch(artifact_id):
+        raise _artifact_fault()
+    if "schemaVersion" in raw and type(raw.get("schemaVersion")) is not int:
+        raise _artifact_fault()
+    if "schemaVersion" in raw and raw.get("schemaVersion") != SCHEMA_VERSION:
+        raise _artifact_fault()
+    if "format" in raw and raw.get("format") != ARTIFACT_FORMAT:
+        raise _artifact_fault()
+    if "contentType" in raw and raw.get("contentType") != "text/csv; charset=utf-8":
+        raise _artifact_fault()
+
+    def parse_timestamp(field: str) -> None:
+        timestamp = raw.get(field)
+        if not isinstance(timestamp, str) or not 1 <= len(timestamp) <= 128:
+            raise _artifact_fault()
+        try:
+            parsed = _datetime.datetime.fromisoformat(
+                timestamp[:-1] + "+00:00" if timestamp.endswith("Z") else timestamp
+            )
+        except (TypeError, ValueError) as exc:
+            raise _artifact_fault() from exc
+        if parsed.tzinfo is None:
+            raise _artifact_fault()
+
+    if "createdAt" in raw:
+        parse_timestamp("createdAt")
+
+    artifact_file_name = raw.get("filename")
+    file_name_alias = raw.get("fileName")
+    if "filename" in raw and "fileName" in raw and artifact_file_name != file_name_alias:
+        raise _artifact_fault()
+    if "filename" not in raw:
+        artifact_file_name = file_name_alias
+    if artifact_file_name is not None:
+        if (
+            not isinstance(artifact_file_name, str)
+            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,191}\.csv", artifact_file_name)
+        ):
+            raise _artifact_fault()
+    directory = _artifact_directory(raw.get("directory"))
+    expires_at = raw.get("expiresAt")
+    if not isinstance(expires_at, str) or not 1 <= len(expires_at) <= 128:
+        raise _artifact_fault()
+    # Expiry is retained verbatim for Core's signed metadata, but reject
+    # unparseable/non-timezone values so a caller cannot create a perpetual
+    # artifact by accident.
+    try:
+        parsed_expiry = _datetime.datetime.fromisoformat(
+            expires_at[:-1] + "+00:00" if expires_at.endswith("Z") else expires_at
+        )
+    except (TypeError, ValueError) as exc:
+        raise _artifact_fault() from exc
+    if parsed_expiry.tzinfo is None:
+        raise _artifact_fault()
+
+    def bounded(field: str, default: int, maximum: int) -> int:
+        candidate = raw.get(field, default)
+        if type(candidate) is not int or not 1 <= candidate <= maximum:
+            raise _artifact_fault()
+        return candidate
+
+    return ArtifactRequest(
+        id=artifact_id,
+        directory=directory,
+        expires_at=expires_at,
+        inline_max_rows=bounded("inlineMaxRows", MAX_ARTIFACT_INLINE_ROWS, MAX_ARTIFACT_INLINE_ROWS),
+        inline_max_bytes=bounded("inlineMaxBytes", MAX_ARTIFACT_INLINE_BYTES, MAX_ARTIFACT_INLINE_BYTES),
+        preview_rows=bounded("previewRows", MAX_ARTIFACT_PREVIEW_ROWS, MAX_ARTIFACT_PREVIEW_ROWS),
+        max_bytes=bounded("maxBytes", MAX_ARTIFACT_BYTES, MAX_ARTIFACT_BYTES),
+        artifact_file_name=artifact_file_name,
+    )
 
 
 def _query_limits(params: Mapping[str, Any]) -> QueryLimits:
@@ -509,6 +741,176 @@ def _apply_chart_spec(
     return presentation
 
 
+class _CsvByteSink:
+    """Text ``write`` adapter that enforces a UTF-8 byte budget incrementally."""
+
+    def __init__(self, stream: Any, *, max_bytes: int) -> None:
+        self.stream = stream
+        self.max_bytes = max_bytes
+        self.size_bytes = 0
+        self.sha256 = hashlib.sha256()
+
+    def write(self, value: str) -> int:
+        encoded = value.encode("utf-8")
+        if self.size_bytes + len(encoded) > self.max_bytes:
+            raise RpcFault(
+                RESULT_TOO_LARGE,
+                "artifact",
+                "query result exceeds the maximum artifact size",
+                retryable=False,
+            )
+        self.stream.write(encoded)
+        self.size_bytes += len(encoded)
+        self.sha256.update(encoded)
+        return len(value)
+
+
+def _csv_value(value: Any) -> str:
+    """Render an already JSON-safe scalar as one CSV cell."""
+
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "True" if value else "False"
+    return str(value)
+
+
+class _CsvArtifactWriter:
+    """Progressively write one bounded CSV and atomically publish it."""
+
+    def __init__(self, request: ArtifactRequest, columns: Iterable[str]) -> None:
+        self.request = request
+        self.directory = Path(request.directory)
+        self.final_path = self.directory / request.file_name
+        self._tmp_path: Path | None = None
+        self._stream: Any | None = None
+        self._sink: _CsvByteSink | None = None
+        try:
+            descriptor, temporary = tempfile.mkstemp(
+                prefix=f".{request.id}.",
+                suffix=".csv.tmp",
+                dir=str(self.directory),
+            )
+            self._tmp_path = Path(temporary)
+            self._stream = os.fdopen(descriptor, "wb")
+            self._sink = _CsvByteSink(self._stream, max_bytes=request.max_bytes)
+            writer = csv.writer(
+                self._sink,
+                dialect="excel",
+                lineterminator="\r\n",
+                quoting=csv.QUOTE_MINIMAL,
+                doublequote=True,
+            )
+            self._writer = writer
+            writer.writerow(list(columns))
+            self._stream.flush()
+        except Exception:
+            self.abort()
+            raise
+
+    @property
+    def size_bytes(self) -> int:
+        assert self._sink is not None
+        return self._sink.size_bytes
+
+    def write_row(self, row: Mapping[str, Any], columns: Iterable[str]) -> None:
+        if self._stream is None:
+            raise RuntimeError("artifact writer is closed")
+        self._writer.writerow([_csv_value(row.get(column)) for column in columns])
+        # Keep the output progressive while retaining only a small preview in
+        # memory.  Flush is intentionally per row: the hard query limit is
+        # 500, so this remains bounded and makes cancellation responsive.
+        self._stream.flush()
+
+    def finish(self, row_count: int) -> dict[str, Any]:
+        """Close and atomically rename the temporary file, then return metadata."""
+
+        if self._stream is None or self._tmp_path is None or self._sink is None:
+            raise RuntimeError("artifact writer is closed")
+        temporary = self._tmp_path
+        try:
+            self._stream.flush()
+            try:
+                os.fsync(self._stream.fileno())
+            except (AttributeError, OSError):
+                # Durability is best effort on filesystems that do not expose
+                # fsync; atomic publication remains mandatory.
+                pass
+            self._stream.close()
+            self._stream = None
+            os.replace(str(temporary), str(self.final_path))
+            self._tmp_path = None
+        except Exception as exc:
+            self.abort()
+            raise RpcFault(
+                DATABASE_ERROR,
+                "artifact",
+                "query artifact could not be stored",
+                retryable=True,
+            ) from exc
+        return {
+            "id": self.request.id,
+            "format": ARTIFACT_FORMAT,
+            "fileName": self.request.file_name,
+            "rowCount": row_count,
+            "sizeBytes": self._sink.size_bytes,
+            "sha256": self._sink.sha256.hexdigest(),
+            "expiresAt": self.request.expires_at,
+        }
+
+    def abort(self) -> None:
+        """Close the stream and remove an unpublished temporary file."""
+
+        stream = self._stream
+        self._stream = None
+        if stream is not None:
+            try:
+                stream.close()
+            except OSError:
+                pass
+        temporary = self._tmp_path
+        self._tmp_path = None
+        if temporary is not None:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
+def _safe_artifact_metadata(
+    value: Any,
+    request: ArtifactRequest,
+) -> dict[str, Any] | None:
+    """Keep only metadata derived from a valid writer and Core capability."""
+
+    if not isinstance(value, Mapping):
+        return None
+    row_count = value.get("rowCount")
+    size_bytes = value.get("sizeBytes")
+    digest = value.get("sha256")
+    if (
+        type(row_count) is not int
+        or not 0 <= row_count <= MAX_QUERY_ROWS
+        or type(size_bytes) is not int
+        or not 0 <= size_bytes <= request.max_bytes
+        or not isinstance(digest, str)
+        or not re.fullmatch(r"[0-9a-f]{64}", digest)
+    ):
+        return None
+    # Never copy file paths, tokens, URLs, or adapter-controlled names.  The
+    # id, filename, format, and expiry are all derived from the trusted
+    # request, while size/count/digest are facts returned by the writer.
+    return {
+        "id": request.id,
+        "format": ARTIFACT_FORMAT,
+        "fileName": request.file_name,
+        "rowCount": row_count,
+        "sizeBytes": size_bytes,
+        "sha256": digest,
+        "expiresAt": request.expires_at,
+    }
+
+
 class WrenQueryService:
     """Plan semantic SQL with Wren, then execute via an injected DB adapter."""
 
@@ -544,6 +946,7 @@ class WrenQueryService:
             "maxPreviewBytes",
             "databaseDsnEnv",
             "authorizationPolicy",
+            "artifactRequest",
         }
         if set(params) - fields:
             raise RpcFault(INVALID_PARAMS, "validation", "query.run params are invalid")
@@ -552,6 +955,11 @@ class WrenQueryService:
         semantic_sql = _required_query_string(params, "semanticSql", 64_000)
         query_id = _query_id(params.get("queryId"))
         limits = _query_limits(params)
+        artifact_request = (
+            artifact_request_from_mapping(params["artifactRequest"])
+            if "artifactRequest" in params
+            else None
+        )
         chart_intent = params.get("chartIntent")
         if chart_intent is not None and chart_intent not in {"auto", "table", "line", "bar", "pie"}:
             raise RpcFault(INVALID_PARAMS, "validation", "chartIntent is invalid")
@@ -700,7 +1108,21 @@ class WrenQueryService:
             executor_args["query_parameters"] = query_parameters
         if database_session is not None:
             executor_args["database_session"] = database_session
+        if artifact_request is not None:
+            executor_args["artifact_request"] = artifact_request
         result = self.executor.execute(**executor_args)
+        # An injected adapter must never be able to smuggle a local path or a
+        # token into a presentation.  The real PostgreSQL executor emits the
+        # bounded metadata below; any malformed/adapter-supplied artifact is
+        # dropped before the JSON boundary.
+        raw_artifact = result.pop("artifact", None)
+        safe_artifact = (
+            _safe_artifact_metadata(raw_artifact, artifact_request)
+            if artifact_request is not None
+            else None
+        )
+        if safe_artifact is not None:
+            result["artifact"] = safe_artifact
         if authorization_policy is not None:
             # Do not expose resolved subject values or the rewritten SQL. The
             # ordinary Native SQL remains inspectable while enforcement stays
@@ -711,7 +1133,7 @@ class WrenQueryService:
                 "tableCount": len(applied_tables),
                 "policyVersions": list(authorization_policy.get("policyVersions", []))[:64],
             }
-        presentation = _apply_chart_spec(result, chart_intent)
+        presentation = _apply_chart_spec(result, None if safe_artifact is not None else chart_intent)
         presentation["question"] = question
         if sql_history:
             presentation["sqlHistory"] = sql_history
@@ -753,9 +1175,12 @@ class PsycopgQueryExecutor:
         limits: QueryLimits,
         query_parameters: Mapping[str, Any] | None = None,
         database_session: DatabaseSession | None = None,
+        artifact_request: ArtifactRequest | None = None,
     ) -> dict[str, Any]:
         del project_dir  # Resolution happens before this boundary.
         _assert_executor_limits(limits)
+        if artifact_request is not None:
+            artifact_request = artifact_request_from_mapping(artifact_request)
         try:
             native_sql = validate_native_sql(native_sql)
         except SqlPolicyError as exc:
@@ -842,6 +1267,8 @@ class PsycopgQueryExecutor:
                     native_sql=native_sql,
                     limits=limits,
                     started=started,
+                    artifact_request=artifact_request,
+                    cancel_event=state.cancel_requested if state is not None else None,
                 )
             finally:
                 close_cursor = getattr(cursor, "close", None)
@@ -1013,6 +1440,8 @@ class PsycopgQueryExecutor:
         native_sql: str,
         limits: QueryLimits,
         started: float,
+        artifact_request: ArtifactRequest | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> dict[str, Any]:
         description = getattr(cursor, "description", None) or []
         specs = _column_specs(description)
@@ -1020,35 +1449,130 @@ class PsycopgQueryExecutor:
             {"name": name, "type": type_name, "semanticRole": role}
             for name, type_name, role in specs
         ]
+        column_names = [name for name, _type_name, _role in specs]
         preview_rows: list[dict[str, Any]] = []
         preview_bytes = 2  # JSON array brackets.
+        # Adaptive mode keeps at most 50 rows (and at most the 128 KiB JSON
+        # threshold) while deciding whether an artifact is needed.  Once the
+        # threshold is crossed this bounded buffer is flushed to the CSV and
+        # subsequent rows are written directly to disk.
+        inline_candidates: list[dict[str, Any]] = []
+        inline_candidate_bytes = 2
+        artifact_writer: _CsvArtifactWriter | None = None
         returned_rows = 0
         truncated = False
-        for index, row in enumerate(_iter_rows(cursor, limits.max_rows + 1)):
-            if index >= limits.max_rows:
+        try:
+            for index, row in enumerate(_iter_rows(cursor, limits.max_rows + 1)):
+                if cancel_event is not None and cancel_event.is_set():
+                    raise RpcFault(
+                        CANCELLED,
+                        "cancel",
+                        "query was cancelled",
+                        retryable=False,
+                    )
+                if index >= limits.max_rows:
+                    truncated = True
+                    break
+                returned_rows += 1
+                values = row if isinstance(row, (list, tuple)) else tuple(row)
+                mapped: dict[str, Any] = {}
+                for column_index, (name, type_name, _role) in enumerate(specs):
+                    value = values[column_index] if column_index < len(values) else None
+                    mapped[name] = _scalar_for_column(value, type_name)
+
+                if artifact_request is None:
+                    if len(preview_rows) >= limits.preview_rows:
+                        truncated = True
+                        continue
+                    row_bytes = _row_json_bytes(mapped)
+                    # Account for commas between rows.  If this row would
+                    # cross the cap, stop retaining previews but continue
+                    # counting bounded rows.
+                    additional = row_bytes + (1 if preview_rows else 0)
+                    if preview_bytes + additional > limits.max_bytes:
+                        truncated = True
+                        continue
+                    preview_rows.append(mapped)
+                    preview_bytes += additional
+                    continue
+
+                row_bytes = _row_json_bytes(mapped)
+                additional = row_bytes + (1 if inline_candidates else 0)
+                inline_limit = min(artifact_request.inline_max_bytes, limits.max_bytes)
+                crosses_inline_limit = (
+                    len(inline_candidates) >= artifact_request.inline_max_rows
+                    or inline_candidate_bytes + additional > inline_limit
+                )
+                if artifact_writer is None and not crosses_inline_limit:
+                    inline_candidates.append(mapped)
+                    inline_candidate_bytes += additional
+                    continue
+
+                if artifact_writer is None:
+                    artifact_writer = _CsvArtifactWriter(artifact_request, column_names)
+                    for candidate in inline_candidates:
+                        artifact_writer.write_row(candidate, column_names)
+                    artifact_writer.write_row(mapped, column_names)
+                    # The candidate buffer is already ordered, so only the
+                    # first previewRows values are retained in the response.
+                    preview_rows = inline_candidates[: artifact_request.preview_rows]
+                    preview_bytes = 2
+                    for candidate in preview_rows:
+                        candidate_bytes = _row_json_bytes(candidate)
+                        preview_bytes += candidate_bytes + (1 if preview_bytes > 2 else 0)
+                    if len(preview_rows) < artifact_request.preview_rows:
+                        candidate_bytes = _row_json_bytes(mapped)
+                        if (
+                            preview_bytes + candidate_bytes + (1 if preview_rows else 0)
+                            <= min(limits.max_bytes, MAX_PREVIEW_BYTES)
+                        ):
+                            preview_rows.append(mapped)
+                            preview_bytes += candidate_bytes + (1 if len(preview_rows) > 1 else 0)
+                        else:
+                            truncated = True
+                    if len(preview_rows) < returned_rows:
+                        truncated = True
+                    continue
+
+                artifact_writer.write_row(mapped, column_names)
+                if len(preview_rows) >= artifact_request.preview_rows:
+                    truncated = True
+                    continue
+                candidate_bytes = _row_json_bytes(mapped)
+                preview_limit = min(limits.max_bytes, MAX_PREVIEW_BYTES)
+                additional_preview = candidate_bytes + (1 if preview_rows else 0)
+                if preview_bytes + additional_preview > preview_limit:
+                    truncated = True
+                    continue
+                preview_rows.append(mapped)
+                preview_bytes += additional_preview
+
+            if artifact_writer is not None:
+                if cancel_event is not None and cancel_event.is_set():
+                    raise RpcFault(
+                        CANCELLED,
+                        "cancel",
+                        "query was cancelled",
+                        retryable=False,
+                    )
+                artifact = artifact_writer.finish(returned_rows)
+                # Artifact mode always reports a bounded preview.  Keeping
+                # this flag true also distinguishes an artifact with <=20
+                # rows from a fully inline result for consumers that only
+                # inspect stats.
                 truncated = True
-                break
-            returned_rows += 1
-            values = row if isinstance(row, (list, tuple)) else tuple(row)
-            mapped: dict[str, Any] = {}
-            for column_index, (name, type_name, _role) in enumerate(specs):
-                value = values[column_index] if column_index < len(values) else None
-                mapped[name] = _scalar_for_column(value, type_name)
-            if len(preview_rows) >= limits.preview_rows:
-                truncated = True
-                continue
-            row_bytes = _row_json_bytes(mapped)
-            # Account for commas between rows.  If this row would cross the
-            # cap, stop retaining previews but continue counting bounded rows.
-            additional = row_bytes + (1 if preview_rows else 0)
-            if preview_bytes + additional > limits.max_bytes:
-                truncated = True
-                continue
-            preview_rows.append(mapped)
-            preview_bytes += additional
+            else:
+                preview_rows = inline_candidates[: limits.preview_rows] if artifact_request is not None else preview_rows
+                if artifact_request is not None and len(preview_rows) < returned_rows:
+                    truncated = True
+                artifact = None
+        except BaseException:
+            if artifact_writer is not None:
+                artifact_writer.abort()
+            raise
 
         duration_ms = max(0.0, (time.monotonic() - started) * 1000.0)
-        return {
+        result = {
             "schemaVersion": SCHEMA_VERSION,
             "queryId": query_id,
             "status": "success",
@@ -1062,6 +1586,11 @@ class PsycopgQueryExecutor:
                 "truncated": truncated,
             },
         }
+        if artifact is not None:
+            result["artifact"] = artifact
+            # A CSV artifact is the authoritative full result; generated
+            # charts must be suppressed by the service for this mode.
+        return result
 
     @staticmethod
     def _close_connection(connection: Any) -> None:
@@ -1216,6 +1745,7 @@ class EnvPsycopgExecutor(PsycopgQueryExecutor):
         limits: QueryLimits,
         query_parameters: Mapping[str, Any] | None = None,
         database_session: DatabaseSession | None = None,
+        artifact_request: ArtifactRequest | None = None,
     ) -> dict[str, Any]:
         info = connection_info
         if info is None:
@@ -1242,6 +1772,7 @@ class EnvPsycopgExecutor(PsycopgQueryExecutor):
             limits=limits,
             query_parameters=query_parameters,
             database_session=database_session,
+            artifact_request=artifact_request,
         )
 
 

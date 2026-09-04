@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "queryId": "q-artifact-1",
+  "status": "success",
+  "delivery": "artifact",
+  "semanticSql": "select day, revenue from orders",
+  "columns": [
+    { "name": "day", "type": "DATE", "semanticRole": "dimension" },
+    { "name": "revenue", "type": "DECIMAL", "semanticRole": "measure" }
+  ],
+  "previewRows": [
+    { "day": "2026-09-01", "revenue": "10.00" },
+    { "day": "2026-09-02", "revenue": "12.50" },
+    { "day": "2026-09-03", "revenue": "14.00" }
+  ],
+  "stats": { "returnedRows": 45, "previewedRows": 3, "durationMs": 18.2, "truncated": true },
+  "artifact": {
+    "id": "artifact-q-artifact-1",
+    "format": "csv",
+    "fileName": "orders.csv",
+    "rowCount": 45,
+    "sizeBytes": 4096,
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expiresAt": "2099-01-01T00:00:00Z",
+    "downloadUrl": "https://console.example.test/api/artifacts/artifact-q-artifact-1"
+  }
+}

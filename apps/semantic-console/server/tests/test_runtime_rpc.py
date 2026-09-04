@@ -33,6 +33,16 @@ class RecordingDispatcher:
             result = {"status": "ok", "protocolVersion": "1", "wrenAvailable": True}
         elif request["method"] == "project.validate":
             result = {"valid": True, "projectRevision": "sha256:test"}
+        elif request["method"] == "query.run":
+            result = {
+                "schemaVersion": 1,
+                "queryId": request["params"]["queryId"],
+                "status": "success",
+                "semanticSql": request["params"]["semanticSql"],
+                "columns": [{"name": "value", "type": "BIGINT", "semanticRole": "measure"}],
+                "previewRows": [{"value": "1"}],
+                "stats": {"returnedRows": 1, "durationMs": 1, "truncated": False},
+            }
         else:
             result = {"accepted": True}
         return {"protocolVersion": "1", "id": request["id"], "ok": True, "result": result}

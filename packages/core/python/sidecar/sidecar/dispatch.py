@@ -24,6 +24,7 @@ from .errors import (
     WREN_UNAVAILABLE,
 )
 from .protocol import PROTOCOL_VERSION
+from .query import artifact_request_from_mapping
 from .semantic_policy import filter_semantic_result
 from .sql_policy import SqlPolicyError, validate_semantic_sql
 
@@ -598,6 +599,7 @@ def _query_run_params(params: Any) -> Mapping[str, Any]:
         "maxPreviewBytes",
         "databaseDsnEnv",
         "authorizationPolicy",
+        "artifactRequest",
     }
     if not isinstance(params, Mapping):
         raise RpcFault(INVALID_PARAMS, "validation", "params must be an object")
@@ -639,6 +641,12 @@ def _query_run_params(params: Any) -> Mapping[str, Any]:
             raise RpcFault(INVALID_PARAMS, "validation", "databaseDsnEnv is invalid")
     if "authorizationPolicy" in params and not isinstance(params["authorizationPolicy"], Mapping):
         raise RpcFault(INVALID_PARAMS, "validation", "authorizationPolicy is invalid")
+    if "artifactRequest" in params:
+        # Core supplies this capability only after authenticating the public
+        # request.  Validate its shape and hard limits here as well as in the
+        # query service, because injected query providers may bypass the
+        # PostgreSQL executor.
+        artifact_request_from_mapping(params["artifactRequest"])
     return cast(Mapping[str, Any], params)
 
 

@@ -185,6 +185,54 @@ class StdioMcpTests(unittest.TestCase):
         self.assertEqual(_CoreHandler.requests[-1]["body"]["method"], "context.ask")
         self.assertNotIn(token, str(called))
 
+    def test_official_stdio_client_receives_v2_artifact_without_embedding_csv(self) -> None:
+        token = "sr_live_" + "1" * 24 + "_" + "2" * 32
+        download_url = f"{self.endpoint}/api/v1/artifacts/art_test/download?token=temporary"
+        _CoreHandler.response_result = {
+            "schemaVersion": 2,
+            "queryId": "q-artifact",
+            "status": "success",
+            "delivery": "artifact",
+            "semanticSql": "SELECT amount FROM sales",
+            "columns": [{"name": "amount", "type": "NUMERIC", "semanticRole": "measure"}],
+            "previewRows": [{"amount": "12.50"}],
+            "stats": {"returnedRows": 100, "previewedRows": 1, "durationMs": 4, "truncated": True},
+            "artifact": {
+                "id": "art_test",
+                "format": "csv",
+                "fileName": "artifact-test.csv",
+                "rowCount": 100,
+                "sizeBytes": 4096,
+                "sha256": "a" * 64,
+                "expiresAt": "2099-01-01T00:00:00Z",
+                "downloadUrl": download_url,
+            },
+        }
+
+        async def exercise() -> Any:
+            environment = dict(os.environ)
+            environment["SEMARAIL_MCP_TOKEN"] = token
+            parameters = StdioServerParameters(
+                command=sys.executable,
+                args=["-m", "server.stdio_mcp", "--endpoint", self.endpoint],
+                cwd=str(Path(__file__).resolve().parents[2]),
+                env=environment,
+            )
+            async with stdio_client(parameters) as (read_stream, write_stream):
+                async with ClientSession(read_stream, write_stream) as session:
+                    await session.initialize()
+                    return await session.call_tool(
+                        "semarail_governed_query",
+                        {"question": "Revenue?", "semantic_sql": "SELECT amount FROM sales"},
+                    )
+
+        called = asyncio.run(exercise())
+        self.assertFalse(called.isError)
+        self.assertIsInstance(called.structuredContent, dict)
+        self.assertEqual(called.structuredContent["delivery"], "artifact")
+        self.assertEqual(called.structuredContent["artifact"]["downloadUrl"], download_url)
+        self.assertNotIn("amount\n12.50", str(called))
+
     def test_unauthorized_and_forbidden_errors_are_stable_and_redacted(self) -> None:
         token = "sr_key_" + "b" * 40
         transport = CoreHttpTransport(self.endpoint, token)

@@ -7,18 +7,42 @@ agent integrations reuse the existing version-one sidecar response envelope.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from collections.abc import Mapping
 from typing import Any, Protocol
+from urllib.parse import quote, urlsplit
 
 try:
     from .access_control import AccessControlError, AccessControlStore, AuthContext, BOOTSTRAP_SUBJECT_ID
     from .authorization import PolicyDecision, PolicyEngine
+    from .artifact_store import (
+        MAX_ARTIFACT_INLINE_BYTES,
+        MAX_ARTIFACT_INLINE_ROWS,
+        MAX_ARTIFACT_PREVIEW_ROWS,
+        MAX_ARTIFACT_ROWS,
+        ArtifactDownload,
+        ArtifactError,
+        ArtifactMetadata,
+        ArtifactReservation,
+        ArtifactStore,
+    )
     from .project import ProjectStore
 except ImportError:  # pragma: no cover - direct module loading
     from access_control import AccessControlError, AccessControlStore, AuthContext, BOOTSTRAP_SUBJECT_ID  # type: ignore[no-redef]
     from authorization import PolicyDecision, PolicyEngine  # type: ignore[no-redef]
+    from artifact_store import (  # type: ignore[no-redef]
+        MAX_ARTIFACT_INLINE_BYTES,
+        MAX_ARTIFACT_INLINE_ROWS,
+        MAX_ARTIFACT_PREVIEW_ROWS,
+        MAX_ARTIFACT_ROWS,
+        ArtifactDownload,
+        ArtifactError,
+        ArtifactMetadata,
+        ArtifactReservation,
+        ArtifactStore,
+    )
     from project import ProjectStore  # type: ignore[no-redef]
 
 
@@ -34,6 +58,7 @@ _PUBLIC_METHODS = frozenset(
 _DATA_POLICY_METHODS = frozenset({"project.describe", "context.ask", "query.dryPlan", "query.run"})
 _REQUEST_FIELDS = frozenset({"protocolVersion", "id", "method", "params", "deadlineMs"})
 _LOGGER = logging.getLogger("semarail-core.runtime")
+DEFAULT_ARTIFACT_BASE_URL = "http://127.0.0.1:48763"
 
 
 class RuntimeDispatcher(Protocol):
@@ -82,6 +107,9 @@ class RuntimeRpcGateway:
         auth_token: str | None = None,
         access_control: AccessControlStore | None = None,
         policy_engine: PolicyEngine | None = None,
+        artifact_store: ArtifactStore | None = None,
+        artifact_base_url: str | None = None,
+        artifact_ttl_seconds: int | None = None,
     ) -> None:
         self.project = project
         self.dispatcher = dispatcher if dispatcher is not None else _default_dispatcher(project)
@@ -92,6 +120,87 @@ class RuntimeRpcGateway:
             bootstrap_token=self.auth_token,
         )
         self.policy_engine = policy_engine or PolicyEngine()
+        artifact_clock = getattr(self.access_control, "clock", None)
+        configured_artifact_ttl = self._artifact_ttl_seconds(artifact_ttl_seconds)
+        if artifact_store is not None:
+            self.artifacts = artifact_store
+        elif callable(artifact_clock):
+            self.artifacts = ArtifactStore(
+                self.project.state_dir,
+                access_control=self.access_control,
+                clock=artifact_clock,
+                ttl_seconds=configured_artifact_ttl,
+            )
+        else:
+            self.artifacts = ArtifactStore(
+                self.project.state_dir,
+                access_control=self.access_control,
+                ttl_seconds=configured_artifact_ttl,
+            )
+        self._artifact_base_url_explicit = artifact_base_url is not None
+        self._artifact_base_url = self._validate_artifact_base_url(
+            artifact_base_url if artifact_base_url is not None else DEFAULT_ARTIFACT_BASE_URL
+        )
+
+    @staticmethod
+    def _artifact_ttl_seconds(configured: int | None) -> int:
+        """Resolve the server-owned TTL; public query parameters cannot set it."""
+
+        from_value: int | str = (
+            configured
+            if configured is not None
+            else os.environ.get("SEMARAIL_ARTIFACT_TTL_SECONDS", str(15 * 60))
+        )
+        try:
+            value = int(from_value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("artifact TTL configuration is invalid") from exc
+        if isinstance(from_value, bool) or not 60 <= value <= 24 * 60 * 60:
+            raise ValueError("artifact TTL configuration is invalid")
+        return value
+
+    @staticmethod
+    def _validate_artifact_base_url(value: str) -> str:
+        """Validate a trusted deployment URL used for generated downloads."""
+
+        if not isinstance(value, str) or not value or any(ord(char) < 0x20 for char in value):
+            raise ValueError("artifact base URL is invalid")
+        try:
+            parsed = urlsplit(value)
+            # Accessing .port validates malformed numeric ports as well.
+            _ = parsed.port
+        except ValueError as exc:
+            raise ValueError("artifact base URL is invalid") from exc
+        if (
+            parsed.scheme.lower() not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+            or parsed.path not in {"", "/"}
+        ):
+            raise ValueError("artifact base URL is invalid")
+        return value.rstrip("/")
+
+    @property
+    def artifact_base_url(self) -> str:
+        """Trusted base authority used in public artifact descriptors."""
+
+        return self._artifact_base_url
+
+    @property
+    def artifact_base_url_explicit(self) -> bool:
+        """Whether deployment configuration supplied the base URL."""
+
+        return self._artifact_base_url_explicit
+
+    def set_artifact_base_url(self, value: str) -> None:
+        """Set a server-known base URL; never derive it from request headers."""
+
+        if self._artifact_base_url_explicit:
+            return
+        self._artifact_base_url = self._validate_artifact_base_url(value)
 
     def dispatch(
         self,
@@ -99,6 +208,7 @@ class RuntimeRpcGateway:
         authorization: str | None = None,
         *,
         transport: str = "runtime-rpc",
+        artifact_base_url: str | None = None,
     ) -> tuple[int, dict[str, Any]]:
         """Dispatch one authenticated request and emit a metadata-only audit event.
 
@@ -182,7 +292,53 @@ class RuntimeRpcGateway:
                     query_id=normalized.get("queryId") if method in {"query.run", "query.cancel"} else None,
                 )
                 return 403, _error(request_id, "FORBIDDEN", "data access policy is invalid")
+        artifact_reservation: ArtifactReservation | None = None
+        if method == "query.run":
+            # Core owns the artifact identity, expiry, filename, and token.
+            # The request field below is trusted in-process metadata; it is
+            # injected after public params have been normalized, so a caller
+            # cannot select a path, filename, or limit.
+            raw_versions = compiled_policy.get("policyVersions") if compiled_policy else None
+            if isinstance(raw_versions, list) and all(isinstance(item, str) for item in raw_versions):
+                artifact_versions = tuple(raw_versions[:64])
+            else:
+                artifact_versions = tuple(decision.policy_versions)
+            if not isinstance(datasource_id, str) or not auth.credential_id:
+                self._audit(
+                    auth,
+                    str(method),
+                    "denied",
+                    request_id,
+                    decision,
+                    transport=transport,
+                    datasource_id=datasource_id,
+                )
+                return 403, _error(request_id, "FORBIDDEN", "artifact identity binding is required")
+            try:
+                artifact_reservation = self.artifacts.reserve(
+                    subject_id=auth.subject.id,
+                    organization_id=auth.subject.organization_id,
+                    credential_id=auth.credential_id,
+                    query_id=str(normalized["queryId"]),
+                    datasource_id=datasource_id,
+                    policy_versions=artifact_versions,
+                )
+                normalized["artifactRequest"] = self.artifacts.request_for_sidecar(artifact_reservation)
+            except ArtifactError:
+                self._audit(
+                    auth,
+                    str(method),
+                    "error",
+                    request_id,
+                    decision,
+                    transport=transport,
+                    datasource_id=datasource_id,
+                    query_id=normalized.get("queryId"),
+                )
+                return 503, _error(request_id, "ARTIFACT_UNAVAILABLE", "artifact service is unavailable")
         if self.dispatcher is None:
+            if artifact_reservation is not None:
+                self.artifacts.fail(artifact_reservation)
             self._audit(
                 auth,
                 str(method),
@@ -202,7 +358,29 @@ class RuntimeRpcGateway:
             "params": normalized,
             **({"deadlineMs": body["deadlineMs"]} if type(body.get("deadlineMs")) is int else {}),
         }
-        response = self.dispatcher.dispatch(internal)
+        try:
+            response = self.dispatcher.dispatch(internal)
+        except Exception:
+            if artifact_reservation is not None:
+                self.artifacts.fail(artifact_reservation)
+            self._audit(
+                auth,
+                str(method),
+                "error",
+                request_id,
+                decision,
+                transport=transport,
+                datasource_id=datasource_id,
+                query_id=normalized.get("queryId") if method in {"query.run", "query.cancel"} else None,
+                compiled_policy=compiled_policy,
+            )
+            return 503, _error(request_id, "WREN_UNAVAILABLE", "SemaRail runtime is unavailable")
+        if artifact_reservation is not None:
+            response = self._integrate_artifact_response(
+                response,
+                artifact_reservation,
+                artifact_base_url=artifact_base_url,
+            )
         if method == "health" and response.get("ok") is True and isinstance(response.get("result"), Mapping):
             overview = self.project.overview()
             active = overview.get("activeDatasource")
@@ -242,6 +420,205 @@ class RuntimeRpcGateway:
             compiled_policy=compiled_policy,
         )
         return 200, response
+
+    def _integrate_artifact_response(
+        self,
+        response: Any,
+        reservation: ArtifactReservation,
+        *,
+        artifact_base_url: str | None = None,
+    ) -> dict[str, Any]:
+        """Merge only safe sidecar artifact metadata into a query result.
+
+        The sidecar response is untrusted at this boundary.  It may describe
+        the bytes it wrote, but it may not choose Core's path, token, or URL.
+        If a legacy dispatcher returns no artifact descriptor, the reservation
+        is simply failed and the ordinary bounded query response is preserved.
+        """
+
+        if not isinstance(response, Mapping):
+            self.artifacts.fail(reservation)
+            return _error("", "WREN_UNAVAILABLE", "SemaRail runtime returned an invalid response")
+        if response.get("ok") is not True:
+            self.artifacts.fail(reservation)
+            return dict(response)
+        result = response.get("result")
+        if not isinstance(result, Mapping):
+            self.artifacts.fail(reservation)
+            return dict(response)
+        raw_artifact = result.get("artifact")
+        status = result.get("status")
+        preview_rows = result.get("previewRows")
+        stats = result.get("stats")
+        if status not in {"success", "error"} or not isinstance(preview_rows, list) or not isinstance(stats, Mapping):
+            self.artifacts.fail(reservation)
+            return _error(
+                str(response.get("id") or ""),
+                "ARTIFACT_INVALID_RESULT",
+                "sidecar query result is invalid",
+            )
+        returned_rows = stats.get("returnedRows")
+        if (
+            type(returned_rows) is not int
+            or not 0 <= returned_rows <= MAX_ARTIFACT_ROWS
+            or len(preview_rows) > returned_rows
+        ):
+            self.artifacts.fail(reservation)
+            return _error(
+                str(response.get("id") or ""),
+                "ARTIFACT_INVALID_RESULT",
+                "sidecar query result is invalid",
+            )
+        public_stats = {**dict(stats), "previewedRows": len(preview_rows)}
+        safe_result = {
+            key: value
+            for key, value in result.items()
+            if key not in {"artifact", "delivery"}
+        }
+        safe_result["schemaVersion"] = 2
+        safe_result["stats"] = public_stats
+
+        if status == "error":
+            self.artifacts.fail(reservation)
+            safe_result.pop("chart", None)
+            return {**dict(response), "result": safe_result}
+
+        if raw_artifact is None:
+            self.artifacts.fail(reservation)
+            try:
+                preview_size = len(
+                    json.dumps(preview_rows, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                )
+            except (TypeError, ValueError):
+                preview_size = MAX_ARTIFACT_INLINE_BYTES + 1
+            if len(preview_rows) > MAX_ARTIFACT_INLINE_ROWS or preview_size > MAX_ARTIFACT_INLINE_BYTES:
+                return _error(
+                    str(response.get("id") or ""),
+                    "ARTIFACT_INVALID_RESULT",
+                    "large query result did not produce an artifact",
+                )
+            safe_result["delivery"] = "inline"
+            return {**dict(response), "result": safe_result}
+
+        if len(preview_rows) > MAX_ARTIFACT_PREVIEW_ROWS or "chart" in result:
+            self.artifacts.fail(reservation)
+            return _error(
+                str(response.get("id") or ""),
+                "ARTIFACT_INVALID_RESULT",
+                "sidecar artifact presentation is invalid",
+            )
+        try:
+            metadata = self.artifacts.register_sidecar_result(reservation, raw_artifact)
+        except ArtifactError:
+            self.artifacts.fail(reservation)
+            return _error(
+                str(response.get("id") or ""),
+                "ARTIFACT_INVALID_RESULT",
+                "sidecar artifact metadata is invalid",
+            )
+        public = self.artifacts.reservation_public(
+            reservation,
+            metadata,
+            download_path=(
+                f"{self._validate_artifact_base_url(artifact_base_url) if artifact_base_url is not None else self._artifact_base_url}"
+                f"/api/v1/artifacts/{quote(reservation.id, safe='')}"
+                f"/download?token={quote(reservation.token, safe='')}"
+            ),
+        )
+        safe_result["delivery"] = "artifact"
+        safe_result["artifact"] = public
+        return {**dict(response), "result": safe_result}
+
+    def download_artifact(
+        self,
+        artifact_id: str,
+        token: str,
+        authorization: str | None = None,
+        *,
+        transport: str = "core-http",
+    ) -> ArtifactDownload:
+        """Resolve an artifact for HTTP streaming after current-state checks."""
+
+        # Token matching happens before authentication so every wrong artifact
+        # token has one indistinguishable 404 response.
+        try:
+            metadata = self.artifacts.check_token(artifact_id, token)
+        except ArtifactError:
+            raise
+
+        auth: AuthContext | None = None
+        if authorization is not None:
+            try:
+                auth = self.access_control.authenticate(authorization)
+            except AccessControlError as exc:
+                self._audit_artifact(metadata, "denied", transport=transport)
+                raise exc
+
+        current_datasource_id: str | None = self.project.active_datasource_identifier()
+        current_policy_versions: tuple[str, ...] = ()
+        try:
+            subject = self.access_control.subject(metadata.subject_id)
+            policies = self.access_control.policies_for_subject(subject.id)
+            project_id = str(self.project.overview().get("name") or "")
+            decision = self.policy_engine.authorize_method(
+                subject,
+                "query.run",
+                policies,
+                project_id=project_id,
+                datasource_id=current_datasource_id,
+            )
+            if decision.allowed:
+                try:
+                    compiled = self.policy_engine.compile_data_policy(
+                        subject,
+                        policies,
+                        project_id=project_id,
+                        datasource_id=current_datasource_id,
+                    )
+                    raw_versions = compiled.get("policyVersions")
+                    if isinstance(raw_versions, list) and all(isinstance(item, str) for item in raw_versions):
+                        current_policy_versions = tuple(raw_versions[:64])
+                    else:
+                        current_policy_versions = tuple(sorted(decision.policy_versions))
+                except Exception:
+                    current_policy_versions = ()
+        except Exception:
+            current_policy_versions = ()
+
+        try:
+            result = self.artifacts.resolve_download(
+                artifact_id,
+                token,
+                current_datasource_id=current_datasource_id,
+                current_policy_versions=current_policy_versions,
+                authorization=auth,
+            )
+        except ArtifactError:
+            self._audit_artifact(metadata, "denied", transport=transport)
+            raise
+        self._audit_artifact(metadata, "allowed", transport=transport)
+        return result
+
+    def _audit_artifact(self, metadata: ArtifactMetadata, decision: str, *, transport: str) -> None:
+        """Write a metadata-only artifact event (never token, URL, or path)."""
+
+        try:
+            subject = self.access_control.subject(metadata.subject_id)
+            auth = AuthContext(subject, "artifact_token", metadata.credential_id)
+            self.access_control.record_audit(
+                action="artifact.download",
+                decision=decision,
+                auth=auth,
+                resource=f"artifact:{metadata.id}",
+                policy_version=",".join(metadata.policy_versions) or None,
+                details={
+                    "artifactId": metadata.id,
+                    "queryId": metadata.query_id,
+                    "transport": transport if transport in {"core-http", "remote-mcp"} else "core-http",
+                },
+            )
+        except Exception:
+            _LOGGER.error("artifact audit write failed")
 
     def _normalize(
         self,

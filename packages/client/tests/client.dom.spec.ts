@@ -29,6 +29,7 @@ vi.mock('echarts/renderers', () => ({ CanvasRenderer: {} }))
 
 import { DataQueryRow, SemanticConsoleSidebarAction, type DataQueryResultBlock, type DataQueryViewProps } from '../src/client/index.js'
 import replayMeta from './fixtures/query-result-v1.json'
+import artifactMeta from './fixtures/query-result-v2-artifact.json'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -190,6 +191,54 @@ describe('DataQueryRow browser interactions', () => {
     click(revenueHeading!)
     expect(container.querySelector('[data-query-page-label]')?.textContent).toBe('Page 1 of 3')
     expect(tableRows(container)[0]?.[2]).toBe('0')
+  })
+
+  it('renders an artifact download card with bounded preview and handles download failure/expiry', async () => {
+    const fetchMock = vi.fn(async () => new Response('day,revenue\n2026-09-01,10.00\n', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    // jsdom implements anchor.click() by attempting navigation, which emits a
+    // noisy "Not implemented" error. The browser download path is still
+    // exercised through fetch/blob/object URL; only the native navigation
+    // primitive is isolated here.
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    const { container } = mount(artifactMeta)
+    const artifactCard = container.querySelector('[data-query-artifact]')
+    expect(artifactCard).not.toBeNull()
+    expect(artifactCard?.getAttribute('data-query-artifact-state')).toBe('idle')
+    expect(artifactCard?.textContent).toContain('45 rows')
+    expect(artifactCard?.textContent).toContain('4.0 KB')
+    expect(artifactCard?.textContent).toContain('Expires 2099-01-01T00:00:00Z')
+    expect(artifactCard?.textContent).toContain('Only the first 3 rows')
+    expect(container.querySelector('[data-query-tab-panel="table"]')).not.toBeNull()
+    expect(button(container, 'Chart').disabled).toBe(true)
+    expect(container.querySelector('[data-query-row-range]')?.textContent).toBe('1-3 of 45 rows')
+    expect(button(container, 'Download CSV')).toBeInstanceOf(HTMLButtonElement)
+
+    await act(async () => button(container, 'Download CSV').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    expect(fetchMock).toHaveBeenCalledWith(artifactMeta.artifact.downloadUrl, { method: 'GET', credentials: 'omit' })
+    expect(anchorClick).toHaveBeenCalledOnce()
+    expect(container.querySelector('[data-query-artifact]')?.getAttribute('data-query-artifact-state')).toBe('downloaded')
+
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 500 }))
+    await act(async () => button(container, 'Downloaded').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    expect(container.querySelector('[data-query-artifact]')?.getAttribute('data-query-artifact-state')).toBe('error')
+    expect(container.querySelector('[data-query-artifact-message="error"]')?.textContent).toContain('failed')
+
+    fetchMock.mockResolvedValueOnce(new Response(
+      JSON.stringify({ code: 'ARTIFACT_CONTEXT_CHANGED', message: 'artifact is no longer valid' }),
+      { status: 410, headers: { 'Content-Type': 'application/json' } },
+    ))
+    await act(async () => button(container, 'Retry download').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    expect(container.querySelector('[data-query-artifact]')?.getAttribute('data-query-artifact-state')).toBe('revoked')
+    expect((container.querySelector('[data-query-artifact-download]') as HTMLButtonElement | null)?.disabled).toBe(true)
+    expect(container.querySelector('[data-query-artifact-message="revoked"]')?.textContent).toContain('revoked')
+
+    const expired = { ...artifactMeta, artifact: { ...artifactMeta.artifact, expiresAt: '2000-01-01T00:00:00Z' } }
+    const expiredMount = mount(expired)
+    const expiredButton = expiredMount.container.querySelector('[data-query-artifact-download]')
+    expect(expiredMount.container.querySelector('[data-query-artifact]')?.getAttribute('data-query-artifact-state')).toBe('expired')
+    expect((expiredButton as HTMLButtonElement | null)?.disabled).toBe(true)
+    expect(expiredMount.container.querySelector('[data-query-artifact-message="expired"]')?.textContent).toContain('expired')
   })
 
   it('renders malformed settled metadata through the safe DOM fallback', () => {

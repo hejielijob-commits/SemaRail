@@ -20,6 +20,7 @@ SemaRail is agent-neutral. Any MCP-capable client can use its semantic tools. It
 - **Visual semantic modeling** — import database schemas and manage models, fields, relationships, views, cubes, business rules, and reviewed SQL knowledge.
 - **Agent-neutral MCP tools** — expose semantic context and governed queries through authenticated Streamable HTTP, with an authenticated stdio bridge for clients that require it.
 - **Governed data access** — resolve every request to a current Subject and policy, parse generated PostgreSQL with `sqlglot`, enforce table/column/row rules and physical-object allowlists, and apply read-only, timeout, row, byte, and concurrency limits.
+- **Bounded Agent results** — return small query results inline, but turn larger results into a short-lived CSV download with only a 20-row preview in the Agent context.
 - **Enterprise identity and policy** — use revocable service-account keys or DingTalk/OIDC employee sessions, change permissions without reinstalling Agents, and audit decisions without storing SQL, result rows, or secrets.
 - **Common database metadata** — test connections, browse schemas, and import models from PostgreSQL, MySQL, SQLite, ClickHouse, and DuckDB.
 - **Versioned semantic projects** — validate drafts, inspect generated source and diffs, publish revisions, and roll back changes.
@@ -56,6 +57,7 @@ see [CHANGELOG.md](CHANGELOG.md).
 | 2026-09-01 | Completed | Added project-, datasource-, table-, column-, and row-scoped authorization with immediate policy and credential revocation. |
 | 2026-09-02 | Completed | Added multi-user authenticated MCP, PostgreSQL-backed access-control storage, transaction-local subject context, and PostgreSQL RLS isolation. |
 | 2026-09-03 | Completed | Hardened permission-control acceptance with real PostgreSQL 17 tests, first-request MCP query startup, clean Linux CI builds, and A/B employee row-isolation verification. |
+| 2026-09-04 | Completed | Added bounded query-result delivery: up to 50 rows and 128 KiB inline, otherwise a revocable 15-minute CSV artifact with a 20-row Agent preview and 16 MiB ceiling. |
 | Next | Planned | Extend governed query execution beyond PostgreSQL while preserving the same policy, limits, audit, and cancellation contract. |
 | Next | Planned | Add a managed CSV/Excel ingestion workflow backed by DuckDB, without exposing uploaded files or local paths to Agents. |
 | Later | Planned | Publish versioned SemaRail Core and DeepSeek Harness plugin packages after the alpha installation and upgrade flow is stable. |
@@ -193,6 +195,16 @@ policy affects the next request. Datasource credentials and project paths remain
 inside Core and never enter MCP client configuration. Loopback is the safe
 default; a non-loopback bind requires an explicit `--allowed-host` and a TLS
 reverse proxy.
+
+Governed query results use a bounded delivery contract. Results of at most 50
+rows whose UTF-8 JSON representation is at most 128 KiB stay inline. Larger
+results return at most 20 preview rows plus a temporary CSV download URL; the
+full CSV is never inserted into the model context. Downloads expire after 15
+minutes and are invalidated immediately when the issuing credential, subject,
+datasource, or policy context is no longer current. The alpha query ceiling
+remains 500 rows and the CSV ceiling is 16 MiB; this is not a bulk-export API.
+Administrators may set `SEMARAIL_ARTIFACT_TTL_SECONDS` to a value from 60 to
+86400 seconds; the default is 900 seconds and MCP callers cannot override it.
 
 ### Service accounts, employees, and row permissions (alpha)
 

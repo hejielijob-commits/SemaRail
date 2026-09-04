@@ -16,6 +16,9 @@ import {
   submitSqlCandidate,
   SEMANTIC_CONSOLE_URL_STORAGE_KEY,
   LEGACY_SEMANTIC_CONSOLE_URL_STORAGE_KEY,
+  MAX_ARTIFACT_BYTES,
+  formatDataQueryArtifactBytes,
+  isDataQueryArtifactExpired,
   parseDataQueryMeta,
   tokenizeSql,
   type DataQueryResultBlock,
@@ -46,6 +49,25 @@ const validMeta = {
   stats: { returnedRows: 1, durationMs: 12.4, truncated: false },
 } as const
 
+const artifactMeta = {
+  schemaVersion: 2,
+  queryId: 'q-artifact-1',
+  status: 'success',
+  delivery: 'artifact',
+  semanticSql: 'select day, revenue from orders',
+  columns: [
+    { name: 'day', type: 'DATE', semanticRole: 'dimension' },
+    { name: 'revenue', type: 'DECIMAL', semanticRole: 'measure' },
+  ],
+  previewRows: [{ day: '2026-09-01', revenue: '10.00' }],
+  stats: { returnedRows: 45, previewedRows: 1, durationMs: 18.2, truncated: true },
+  artifact: {
+    id: 'artifact-q-artifact-1', format: 'csv', fileName: 'orders.csv', rowCount: 45, sizeBytes: 4096,
+    sha256: 'a'.repeat(64), expiresAt: '2099-01-01T00:00:00Z',
+    downloadUrl: 'https://console.example.test/api/artifacts/artifact-q-artifact-1',
+  },
+} as const
+
 function settled(meta?: unknown): DataQueryResultBlock {
   return {
     kind: 'tool-result',
@@ -59,7 +81,45 @@ function settled(meta?: unknown): DataQueryResultBlock {
 describe('data_query Client adapter', () => {
   it('accepts the version-one result presentation and rejects future versions', () => {
     expect(parseDataQueryMeta(validMeta)?.queryId).toBe('q-1')
-    expect(parseDataQueryMeta({ ...validMeta, schemaVersion: 2 })).toBeNull()
+    expect(parseDataQueryMeta({ ...validMeta, schemaVersion: 3 })).toBeNull()
+  })
+
+  it('accepts v2 inline/artifact metadata and keeps artifact previews bounded', () => {
+    expect(parseDataQueryMeta({
+      ...validMeta,
+      schemaVersion: 2,
+      delivery: 'inline',
+      stats: { ...validMeta.stats, previewedRows: 1 },
+    })).toMatchObject({ schemaVersion: 2, delivery: 'inline', stats: { previewedRows: 1 } })
+    const parsed = parseDataQueryMeta(artifactMeta)
+    expect(parsed).toMatchObject({ delivery: 'artifact', artifact: { rowCount: 45, format: 'csv' } })
+    expect(parseDataQueryMeta({ ...artifactMeta, artifact: { ...artifactMeta.artifact, downloadUrl: 'javascript:alert(1)' } })).toBeNull()
+    expect(parseDataQueryMeta({ ...artifactMeta, artifact: { ...artifactMeta.artifact, sizeBytes: MAX_ARTIFACT_BYTES + 1 } })).toBeNull()
+    expect(parseDataQueryMeta({ ...artifactMeta, artifact: { ...artifactMeta.artifact, downloadUrl: `${artifactMeta.artifact.downloadUrl}#fragment` } })).toBeNull()
+    expect(parseDataQueryMeta({ ...artifactMeta, artifact: { ...artifactMeta.artifact, expiresAt: '2099-01-01T00:00:00' } })).toBeNull()
+    expect(parseDataQueryMeta({ ...artifactMeta, artifact: { ...artifactMeta.artifact, rowCount: 501 }, stats: { ...artifactMeta.stats, returnedRows: 501 } })).toBeNull()
+    expect(parseDataQueryMeta({ ...artifactMeta, previewRows: Array.from({ length: 21 }, () => ({ day: 'd', revenue: '1' })), stats: { ...artifactMeta.stats, previewedRows: 21 } })).toBeNull()
+    expect(parseDataQueryMeta({ ...artifactMeta, chart: { version: 1, type: 'line', x: 'day', y: ['revenue'] } })).toBeNull()
+
+    const inlineRows = Array.from({ length: 51 }, () => ({ day: '2026-09-01', revenue: '1.00' }))
+    expect(parseDataQueryMeta({
+      ...validMeta, schemaVersion: 2, delivery: 'inline', previewRows: inlineRows,
+      stats: { returnedRows: 51, previewedRows: 51, durationMs: 1, truncated: false },
+    })).toBeNull()
+
+    const maxInlineBytes = 131_072
+    const emptyEnvelopeBytes = new TextEncoder().encode(JSON.stringify([{ blob: '' }])).byteLength
+    const blob = 'x'.repeat(maxInlineBytes - emptyEnvelopeBytes)
+    const inlineBoundary = {
+      ...validMeta, schemaVersion: 2, delivery: 'inline',
+      columns: [{ name: 'blob', type: 'VARCHAR', semanticRole: 'dimension' }], previewRows: [{ blob }],
+      stats: { returnedRows: 1, previewedRows: 1, durationMs: 1, truncated: false },
+    }
+    expect(parseDataQueryMeta(inlineBoundary)).not.toBeNull()
+    expect(parseDataQueryMeta({ ...inlineBoundary, previewRows: [{ blob: `${blob}x` }] })).toBeNull()
+    expect(formatDataQueryArtifactBytes(4096)).toBe('4.0 KB')
+    expect(isDataQueryArtifactExpired(artifactMeta.artifact, Date.parse('2098-01-01T00:00:00Z'))).toBe(false)
+    expect(isDataQueryArtifactExpired(artifactMeta.artifact, Date.parse('2100-01-01T00:00:00Z'))).toBe(true)
   })
 
   it('fails closed for malformed rows and unknown fields', () => {

@@ -8,6 +8,15 @@ from .app import (
     create_app,
     serve,
 )
+from .artifact_store import (
+    ARTIFACT_TTL_SECONDS,
+    MAX_ARTIFACT_BYTES,
+    ArtifactDownload,
+    ArtifactError,
+    ArtifactMetadata,
+    ArtifactReservation,
+    ArtifactStore,
+)
 from .project import ProjectError, ProjectStore, WrenProjectAdapter
 from .service import ApiServiceError, SemanticConsoleService
 from .views import ViewStore
@@ -15,8 +24,15 @@ from .view_preview import ViewPreviewError, ViewPreviewService
 
 __all__ = [
     "ApiServiceError",
+    "ARTIFACT_TTL_SECONDS",
     "DEFAULT_HOST",
     "DEFAULT_PORT",
+    "MAX_ARTIFACT_BYTES",
+    "ArtifactDownload",
+    "ArtifactError",
+    "ArtifactMetadata",
+    "ArtifactReservation",
+    "ArtifactStore",
     "ProjectError",
     "ProjectStore",
     "SemanticConsoleApplication",

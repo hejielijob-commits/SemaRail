@@ -35,6 +35,7 @@ The primary routes are:
 | --- | --- |
 | `GET /api/health` | Core process and semantic-runtime readiness |
 | `POST /api/v1/runtime/rpc` | Authenticated, versioned agent runtime handshake/context/query/cancel boundary |
+| `GET /api/v1/artifacts/{id}/download?token=...` | Core-owned, short-lived query artifact download (`attachment`, `no-store`; invalid token is 404 and expired token is 410) |
 | `GET /api/v1/auth/providers` | Public list of configured identity provider ids and labels |
 | `POST /api/v1/auth/device/start` | Create a bounded one-time browser/device login transaction |
 | `GET /api/v1/auth/callback/{provider}` | Verify OAuth/OIDC state and show a browser-only one-time confirmation code |
@@ -80,6 +81,35 @@ The primary routes are:
 `POST /api/v1/runtime/rpc` requires `Authorization: Bearer <token>`. Set a token of at least 32 characters in `SEMARAIL_API_TOKEN` before starting Core. The public request cannot select a project, send database credentials, choose a Subject, supply an authorization policy, or override query limits; those values are resolved by Core. The currently supported v1 methods are `health`, `project.validate`, `project.describe`, `context.ask`, `query.dryPlan`, `query.run`, and `query.cancel`. The authenticated Streamable HTTP MCP endpoint and `semarail mcp bridge` both enter this same boundary. Direct `semarail-mcp` and `semarail-query-mcp` processes are trusted-local compatibility tools and are not a per-user authorization boundary. Identity-provider configuration and employee CLI login are documented in `docs/access-control.md` at the repository root.
 
 The bootstrap administrator token is accepted by the Console management APIs and the read-only Core health check, but intentionally rejected by semantic/query runtime methods, remote MCP, and the authenticated stdio bridge. Create a scoped service-account key or use an employee session for Agent access. Configure `SEMARAIL_REMOTE_MCP_URL` when the public MCP endpoint differs from the loopback default; the value must be an HTTP(S) URL without embedded credentials, query parameters, or fragments.
+
+### Query artifacts
+
+`query.run` is the only public operation that can produce an artifact. Core
+creates a random reservation before entering the sidecar and injects a trusted
+internal `artifactRequest` containing only the artifact id, random filename,
+CSV content type, expiry, and the fixed 16 MiB maximum. Set
+`SEMARAIL_ARTIFACT_TTL_SECONDS` to 60–86400 seconds on the Core/MCP service to
+change the default 900-second lifetime. Public callers cannot select the expiry
+or provide a path, filename, output format, or execution limit. A sidecar success
+response may include only safe metadata:
+
+```json
+{"artifact":{"id":"art_<random>","format":"csv","fileName":"artifact-<random>.csv","rowCount":500,"sizeBytes":1234,"sha256":"<64 hex>","expiresAt":"<Core expiry>"}}
+```
+
+Core adds the temporary `token` and `downloadUrl` to the result. The
+token is returned only in that response and is persisted only as a salted hash
+in `<state_dir>/artifacts.sqlite3`; bytes live under `<state_dir>/artifacts`.
+The reservation expires after the configured lifetime (15 minutes by default).
+Its database record also binds the query id, organization, subject, credential,
+datasource, and policy versions. Sidecar metadata must not contain a
+local path, token, URL, SQL, or rows. Before streaming, Core rechecks that the
+original subject and credential remain active, the active datasource id is the
+same, the current compiled policy-version list is unchanged, the file is no
+larger than 16 MiB, and its SHA-256 matches. Expired/context-invalid artifacts
+are not downloadable. The remote Streamable HTTP MCP server registers the
+same route with `FastMCP.custom_route`; it returns the same attachment and
+cache headers without redirecting.
 
 Access-control state defaults to a local SQLite file under the private state directory. For a shared production control plane, set `SEMARAIL_ACCESS_CONTROL_DATABASE_URL` to a PostgreSQL URI. If that configured database is unavailable or has an unknown migration version, startup fails closed and never falls back to SQLite. Governed PostgreSQL execution uses `SEMARAIL_DATABASE_URL`; keep both database URLs only in the Core process environment.
 

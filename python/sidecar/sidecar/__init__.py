@@ -12,7 +12,7 @@ from .dispatch import (
     SidecarDependencies,
     dispatch_request,
 )
-from .errors import RpcError, RpcFault
+from .errors import RESULT_TOO_LARGE, RpcError, RpcFault
 from .protocol import (
     DEFAULT_MAX_FRAME_BYTES,
     PROTOCOL_VERSION,
@@ -31,6 +31,12 @@ from .query import (
     MAX_PREVIEW_ROWS,
     MAX_QUERY_ROWS,
     MAX_TIMEOUT_MS,
+    ARTIFACT_FORMAT,
+    MAX_ARTIFACT_BYTES,
+    MAX_ARTIFACT_INLINE_BYTES,
+    MAX_ARTIFACT_INLINE_ROWS,
+    MAX_ARTIFACT_PREVIEW_ROWS,
+    ArtifactRequest,
     PostgresQueryExecutor,
     QueryLimits,
     SqlPolicyError,
@@ -38,6 +44,7 @@ from .query import (
     validate_native_sql,
     validate_read_only_sql,
     validate_semantic_sql,
+    artifact_request_from_mapping,
 )
 from .sql_policy import DANGEROUS_FUNCTIONS, PhysicalAllowlist, PhysicalTable
 from .semantic_service import (
@@ -71,6 +78,7 @@ __all__ = [
     "RpcDispatcher",
     "RpcError",
     "RpcFault",
+    "RESULT_TOO_LARGE",
     "RpcRequest",
     "SidecarDependencies",
     "decode_frame",
@@ -90,6 +98,13 @@ __all__ = [
     "MAX_QUERY_ROWS",
     "MAX_QUERY_CONCURRENCY",
     "MAX_TIMEOUT_MS",
+    "ARTIFACT_FORMAT",
+    "MAX_ARTIFACT_BYTES",
+    "MAX_ARTIFACT_INLINE_BYTES",
+    "MAX_ARTIFACT_INLINE_ROWS",
+    "MAX_ARTIFACT_PREVIEW_ROWS",
+    "ArtifactRequest",
+    "artifact_request_from_mapping",
     "PostgresQueryExecutor",
     "QueryLimits",
     "SqlPolicyError",

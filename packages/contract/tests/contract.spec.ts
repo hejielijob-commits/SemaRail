@@ -1,14 +1,22 @@
 import { describe, expect, it } from 'vitest'
 import {
   ContractValidationError,
+  DATA_QUERY_PRESENTATION_V2_JSON_SCHEMA,
+  MAX_ARTIFACT_BYTES,
+  DATA_QUERY_PRESENTATION_VERSION,
+  MAX_ARTIFACT_PREVIEW_ROWS,
+  MAX_INLINE_PREVIEW_BYTES,
+  MAX_INLINE_PREVIEW_ROWS,
   MAX_PREVIEW_BYTES,
   MAX_PREVIEW_ROWS,
+  MAX_QUERY_ROWS,
   parseChartSpecV1,
   parseDataQueryPresentation,
   parseRpcRequest,
   parseRpcResponse,
   parseSemanticContext,
   safeParseDataQueryInput,
+  safeParseDataQueryPresentationV2,
 } from '../src/index.js'
 
 const column = { name: 'total', type: 'DECIMAL(18,2)', semanticRole: 'measure' as const }
@@ -86,5 +94,118 @@ describe('DataQuery presentation limits and scalar policy', () => {
   it('returns a discriminated safe-parse failure', () => {
     const result = safeParseDataQueryInput({ question: '', semanticSql: 'SELECT 1' })
     expect(result.success).toBe(false)
+  })
+
+  it('parses v2 inline delivery while preserving v1 replay shape', () => {
+    const parsedV1 = parseDataQueryPresentation(success())
+    expect(parsedV1.schemaVersion).toBe(1)
+    expect(parsedV1).not.toHaveProperty('delivery')
+    const parsedV2 = parseDataQueryPresentation({
+      ...success(),
+      schemaVersion: DATA_QUERY_PRESENTATION_VERSION,
+      delivery: 'inline',
+      stats: { returnedRows: 1, previewedRows: 1, durationMs: 12, truncated: false },
+    })
+    expect(parsedV2).toMatchObject({ schemaVersion: 2, status: 'success', delivery: 'inline', stats: { previewedRows: 1 } })
+
+    const tooManyRows = Array.from({ length: MAX_INLINE_PREVIEW_ROWS + 1 }, () => ({ total: '1.00' }))
+    expect(() => parseDataQueryPresentation({
+      ...success(tooManyRows), schemaVersion: DATA_QUERY_PRESENTATION_VERSION, delivery: 'inline',
+      stats: { returnedRows: tooManyRows.length, previewedRows: tooManyRows.length, durationMs: 12, truncated: false },
+    })).toThrow(/at most 50/)
+
+    const emptyEnvelopeBytes = new TextEncoder().encode(JSON.stringify([{ total: '' }])).byteLength
+    const boundaryValue = 'x'.repeat(MAX_INLINE_PREVIEW_BYTES - emptyEnvelopeBytes)
+    const inlineAtBoundary = {
+      ...success([{ total: boundaryValue }]), schemaVersion: DATA_QUERY_PRESENTATION_VERSION, delivery: 'inline',
+      columns: [{ ...column, type: 'VARCHAR' }],
+      stats: { returnedRows: 1, previewedRows: 1, durationMs: 12, truncated: false },
+    }
+    expect(parseDataQueryPresentation(inlineAtBoundary)).toMatchObject({ delivery: 'inline' })
+    expect(() => parseDataQueryPresentation({ ...inlineAtBoundary, previewRows: [{ total: `${boundaryValue}x` }] })).toThrow(/131072/)
+  })
+
+  it('bounds v2 artifact previews at 20 rows and keeps artifact metadata strict', () => {
+    const previewRows = Array.from({ length: MAX_ARTIFACT_PREVIEW_ROWS }, (_, index) => ({ total: String(index) }))
+    const artifact = {
+      id: 'artifact-1',
+      format: 'csv',
+      fileName: 'orders.csv',
+      rowCount: 40,
+      sizeBytes: 1_024,
+      sha256: 'a'.repeat(64),
+      expiresAt: '2026-09-04T12:00:00Z',
+      downloadUrl: 'https://console.example.test/api/artifacts/artifact-1',
+    }
+    const result = parseDataQueryPresentation({
+      ...success(previewRows),
+      schemaVersion: DATA_QUERY_PRESENTATION_VERSION,
+      delivery: 'artifact',
+      artifact,
+      stats: { returnedRows: 40, previewedRows: previewRows.length, durationMs: 12, truncated: true },
+    })
+    expect(result).toMatchObject({ delivery: 'artifact', artifact: { format: 'csv', rowCount: 40 } })
+    expect(parseDataQueryPresentation({
+      ...success(previewRows), schemaVersion: DATA_QUERY_PRESENTATION_VERSION, delivery: 'artifact', artifact: { ...artifact, downloadUrl: `${artifact.downloadUrl}?token=short-lived` },
+      stats: { returnedRows: 40, previewedRows: 20, durationMs: 12, truncated: true },
+    })).toMatchObject({ artifact: { downloadUrl: `${artifact.downloadUrl}?token=short-lived` } })
+    expect(() => parseDataQueryPresentation({
+      ...success([...previewRows, { total: '20' }]),
+      schemaVersion: DATA_QUERY_PRESENTATION_VERSION,
+      delivery: 'artifact',
+      artifact,
+      stats: { returnedRows: 40, previewedRows: 21, durationMs: 12, truncated: true },
+    })).toThrow(/at most 20/)
+    expect(() => parseDataQueryPresentation({
+      ...success(previewRows), schemaVersion: DATA_QUERY_PRESENTATION_VERSION, delivery: 'artifact', artifact: { ...artifact, downloadUrl: 'javascript:alert(1)' },
+      stats: { returnedRows: 40, previewedRows: 20, durationMs: 12, truncated: true },
+    })).toThrow(/downloadUrl/)
+    expect(() => parseDataQueryPresentation({
+      ...success(previewRows), schemaVersion: DATA_QUERY_PRESENTATION_VERSION, delivery: 'artifact', artifact: { ...artifact, sizeBytes: MAX_ARTIFACT_BYTES + 1 },
+      stats: { returnedRows: 40, previewedRows: 20, durationMs: 12, truncated: true },
+    })).toThrow(/sizeBytes/)
+    expect(() => parseDataQueryPresentation({
+      ...success(previewRows), schemaVersion: DATA_QUERY_PRESENTATION_VERSION, delivery: 'artifact', artifact: { ...artifact, downloadUrl: `${artifact.downloadUrl}#fragment` },
+      stats: { returnedRows: 40, previewedRows: 20, durationMs: 12, truncated: true },
+    })).toThrow(/downloadUrl/)
+    expect(() => parseDataQueryPresentation({
+      ...success(previewRows), schemaVersion: DATA_QUERY_PRESENTATION_VERSION, delivery: 'artifact', artifact: { ...artifact, expiresAt: '2026-09-04T12:00:00' },
+      stats: { returnedRows: 40, previewedRows: 20, durationMs: 12, truncated: true },
+    })).toThrow(/expiresAt/)
+    expect(() => parseDataQueryPresentation({
+      ...success(previewRows), schemaVersion: DATA_QUERY_PRESENTATION_VERSION, delivery: 'artifact', artifact: { ...artifact, rowCount: MAX_QUERY_ROWS + 1 },
+      stats: { returnedRows: MAX_QUERY_ROWS + 1, previewedRows: 20, durationMs: 12, truncated: true },
+    })).toThrow(/returnedRows|rowCount/)
+    expect(() => parseDataQueryPresentation({
+      ...success(previewRows), schemaVersion: DATA_QUERY_PRESENTATION_VERSION, delivery: 'artifact', artifact,
+      chart: { version: 1, type: 'line', x: 'total', y: ['total'] },
+      stats: { returnedRows: 40, previewedRows: 20, durationMs: 12, truncated: true },
+    })).toThrow(/chart/)
+  })
+
+  it('fails closed for unsafe v2 error or delivery combinations', () => {
+    const base = {
+      ...success(),
+      schemaVersion: DATA_QUERY_PRESENTATION_VERSION,
+      stats: { returnedRows: 1, previewedRows: 1, durationMs: 1, truncated: false },
+    }
+    expect(parseDataQueryPresentation({
+      ...base,
+      status: 'error',
+      error: { code: 'DATABASE_ERROR', phase: 'query', message: 'safe error', retryable: false },
+    })).toMatchObject({ schemaVersion: 2, status: 'error', stats: { previewedRows: 1 } })
+    expect(() => parseDataQueryPresentation({
+      ...base,
+      status: 'error', delivery: 'artifact',
+      error: { code: 'DATABASE_ERROR', phase: 'query', message: 'safe error', retryable: false },
+    })).toThrow(/delivery/)
+    expect(() => parseDataQueryPresentation({
+      ...base, delivery: 'inline', stats: { returnedRows: 1, previewedRows: 0, durationMs: 1, truncated: false },
+    })).toThrow(/previewedRows/)
+    expect(safeParseDataQueryPresentationV2({ ...base, schemaVersion: 3 }).success).toBe(false)
+  })
+
+  it('emits a valid schema shape without impossible empty enums', () => {
+    expect(JSON.stringify(DATA_QUERY_PRESENTATION_V2_JSON_SCHEMA)).not.toContain('"enum":[]')
   })
 })
