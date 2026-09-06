@@ -1,0 +1,22 @@
+name: performance_reviews
+table_reference:
+  schema: hr
+  table: performance_reviews
+primary_key: [employee_id, review_date]
+columns:
+  - {name: employee_id, type: BIGINT, not_null: true}
+  - {name: review_date, type: DATE, not_null: true}
+  - {name: manager_id, type: BIGINT}
+  - {name: department_code, type: VARCHAR, not_null: true}
+  - {name: region_code, type: VARCHAR, not_null: true}
+  - name: performance_score
+    type: DECIMAL
+    not_null: true
+    properties: {description: "Quarterly performance score; current review is 2024-09-30 and average alias is average_performance / 季度绩效评分，当前评审日为 2024-09-30，平均值别名为 average_performance。"}
+  - name: satisfaction_score
+    type: DECIMAL
+    not_null: true
+    properties: {description: "Sensitive employee satisfaction score; current review is 2024-09-30 and average alias is average_satisfaction / 敏感满意度评分，当前评审日为 2024-09-30，平均值别名为 average_satisfaction。"}
+  - {name: employee, type: employees, relationship: performance_employee}
+  - {name: department, type: departments, relationship: performance_department}
+  - {name: region, type: regions, relationship: performance_region}

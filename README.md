@@ -122,6 +122,8 @@ pnpm install
 pnpm build
 ```
 
+For a larger, reproducible local validation against 100,000 synthetic employees and five authorization roles, see the [HR enterprise benchmark](benchmarks/hr-enterprise/README.md). It runs separately from CI and requires Docker.
+
 Create the Python environment and install the semantic runtime, MCP servers, Console, governed PostgreSQL query driver, and Console metadata drivers:
 
 ```powershell

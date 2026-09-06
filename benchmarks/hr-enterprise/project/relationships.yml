@@ -1,0 +1,49 @@
+relationships:
+  - name: departments_region
+    models: [departments, regions]
+    join_type: MANY_TO_ONE
+    condition: departments.region_code = regions.region_code
+  - name: employees_department
+    models: [employees, departments]
+    join_type: MANY_TO_ONE
+    condition: employees.department_code = departments.department_code
+  - name: employees_region
+    models: [employees, regions]
+    join_type: MANY_TO_ONE
+    condition: employees.region_code = regions.region_code
+  - name: compensation_employee
+    models: [compensation_history, employees]
+    join_type: MANY_TO_ONE
+    condition: compensation_history.employee_id = employees.employee_id
+  - name: compensation_department
+    models: [compensation_history, departments]
+    join_type: MANY_TO_ONE
+    condition: compensation_history.department_code = departments.department_code
+  - name: compensation_region
+    models: [compensation_history, regions]
+    join_type: MANY_TO_ONE
+    condition: compensation_history.region_code = regions.region_code
+  - name: performance_employee
+    models: [performance_reviews, employees]
+    join_type: MANY_TO_ONE
+    condition: performance_reviews.employee_id = employees.employee_id
+  - name: performance_department
+    models: [performance_reviews, departments]
+    join_type: MANY_TO_ONE
+    condition: performance_reviews.department_code = departments.department_code
+  - name: performance_region
+    models: [performance_reviews, regions]
+    join_type: MANY_TO_ONE
+    condition: performance_reviews.region_code = regions.region_code
+  - name: attendance_employee
+    models: [attendance_monthly, employees]
+    join_type: MANY_TO_ONE
+    condition: attendance_monthly.employee_id = employees.employee_id
+  - name: attendance_department
+    models: [attendance_monthly, departments]
+    join_type: MANY_TO_ONE
+    condition: attendance_monthly.department_code = departments.department_code
+  - name: attendance_region
+    models: [attendance_monthly, regions]
+    join_type: MANY_TO_ONE
+    condition: attendance_monthly.region_code = regions.region_code

@@ -1,0 +1,14 @@
+name: departments
+table_reference:
+  schema: hr
+  table: departments
+primary_key: department_code
+columns:
+  - {name: department_code, type: VARCHAR, is_primary_key: true, not_null: true}
+  - name: department_name
+    type: VARCHAR
+    not_null: true
+    properties: {description: "Department name inherited from the source HR dataset / 来源数据集中的部门名称。"}
+  - {name: region_code, type: VARCHAR, not_null: true}
+  - {name: cost_center, type: VARCHAR, not_null: true}
+  - {name: region, type: regions, relationship: departments_region}

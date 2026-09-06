@@ -1,0 +1,27 @@
+name: attendance_monthly
+table_reference:
+  schema: hr
+  table: attendance_monthly
+primary_key: [employee_id, attendance_month]
+columns:
+  - {name: employee_id, type: BIGINT, not_null: true}
+  - name: attendance_month
+    type: DATE
+    not_null: true
+    properties: {description: "Monthly snapshot key; latest/current snapshot is 2024-09-01 / 月度快照键，最新快照为 2024-09-01。"}
+  - {name: manager_id, type: BIGINT}
+  - {name: department_code, type: VARCHAR, not_null: true, properties: {description: "Stable department grouping key / 稳定部门分组键。"}}
+  - {name: region_code, type: VARCHAR, not_null: true, properties: {description: "Stable region grouping key / 稳定区域分组键。"}}
+  - {name: overtime_hours, type: DECIMAL, not_null: true}
+  - {name: sick_days, type: DECIMAL, not_null: true}
+  - name: overtime_hours_rolling_12m
+    type: DECIMAL
+    not_null: true
+    properties: {description: "Trailing twelve-month overtime total, meaningful on the latest snapshot / 近十二个月加班时数，最新快照用于年度口径。"}
+  - name: sick_days_rolling_12m
+    type: DECIMAL
+    not_null: true
+    properties: {description: "Trailing twelve-month sick-day total, meaningful on the latest snapshot / 近十二个月病假天数，最新快照用于年度口径。"}
+  - {name: employee, type: employees, relationship: attendance_employee}
+  - {name: department, type: departments, relationship: attendance_department}
+  - {name: region, type: regions, relationship: attendance_region}

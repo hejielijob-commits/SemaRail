@@ -1,0 +1,6 @@
+schema_version: 5
+name: semarail_hr_enterprise
+version: "1.0"
+catalog: wren
+schema: hr
+data_source: postgres

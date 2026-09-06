@@ -1,0 +1,21 @@
+name: compensation_history
+table_reference:
+  schema: hr
+  table: compensation_history
+primary_key: [employee_id, effective_date]
+columns:
+  - {name: employee_id, type: BIGINT, not_null: true}
+  - name: effective_date
+    type: DATE
+    not_null: true
+    properties: {description: "Salary snapshot effective date; latest/current is 2024-09-01 and trends preserve this field / 薪资快照生效日，最新快照为 2024-09-01，趋势直接保留此字段。"}
+  - {name: manager_id, type: BIGINT}
+  - {name: department_code, type: VARCHAR, not_null: true, properties: {description: "Stable department grouping key / 稳定部门分组键。"}}
+  - {name: region_code, type: VARCHAR, not_null: true, properties: {description: "Stable region grouping key / 稳定区域分组键。"}}
+  - name: monthly_salary
+    type: DECIMAL
+    not_null: true
+    properties: {description: "Sensitive monthly base salary in benchmark currency; average alias is average_salary / 敏感月度基本薪资，平均值别名为 average_salary。"}
+  - {name: employee, type: employees, relationship: compensation_employee}
+  - {name: department, type: departments, relationship: compensation_department}
+  - {name: region, type: regions, relationship: compensation_region}

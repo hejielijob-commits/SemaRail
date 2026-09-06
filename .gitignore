@@ -3,6 +3,7 @@ lib/
 dist/
 .build/
 .acceptance/
+.benchmark-data/
 .desktop-packages/
 coverage/
 .DS_Store

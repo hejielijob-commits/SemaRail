@@ -1,0 +1,3156 @@
+{
+  "schemaVersion": 2,
+  "oracleVersion": 2,
+  "corpusId": "semarail-hr-enterprise-v1",
+  "dataset": {
+    "manifestPath": ".benchmark-data/hr-enterprise/generated/manifest.json",
+    "seed": 20260904,
+    "sha256": "2b1e07caf58e7678a780d428c1a8893a95d9c4a556134fd8e7368db5ed596cdb",
+    "generatedManifestSha256": "43cc11018e9d2e46b8e1a9e9c1a99562fda44e36d06af1ca27de7ce633f32c77"
+  },
+  "actors": {
+    "employee": {
+      "employeeId": 1
+    },
+    "department_manager": {
+      "employeeId": 627
+    },
+    "hrbp": {
+      "regionCodes": [
+        "APAC"
+      ]
+    },
+    "compensation_admin": {
+      "regionCodes": [
+        "APAC"
+      ]
+    },
+    "hr_director": {}
+  },
+  "thresholds": {
+    "firstPass": 48,
+    "afterAtMostOneRepair": 54,
+    "authorization": 15
+  },
+  "physicalTables": [
+    "hr.regions",
+    "hr.departments",
+    "hr.employees",
+    "hr.compensation_history",
+    "hr.performance_reviews",
+    "hr.attendance_monthly"
+  ],
+  "questions": [
+    {
+      "id": "current-headcount",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "当前在职员工总数是多少？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT COUNT(DISTINCT employee_id) AS headcount FROM employees WHERE resigned = FALSE",
+        "nativeSql": "SELECT COUNT(DISTINCT employee_id) AS headcount FROM hr.employees WHERE resigned = FALSE"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "headcount"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": false,
+        "maxRows": 50,
+        "rows": [
+          {
+            "headcount": 89990
+          }
+        ],
+        "columnAliases": {
+          "headcount": [
+            "active_count",
+            "employee_count"
+          ]
+        }
+      }
+    },
+    {
+      "id": "headcount-region",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "各区域当前在职员工数是多少？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT region_code, COUNT(DISTINCT employee_id) AS headcount FROM employees WHERE resigned = FALSE GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT region_code, COUNT(DISTINCT employee_id) AS headcount FROM hr.employees WHERE resigned = FALSE GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "region_code",
+          "headcount"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "region_code": "ANZ",
+            "headcount": 14813
+          },
+          {
+            "region_code": "APAC",
+            "headcount": 15061
+          },
+          {
+            "region_code": "EMEA",
+            "headcount": 14991
+          },
+          {
+            "region_code": "LATAM",
+            "headcount": 14937
+          },
+          {
+            "region_code": "MENA",
+            "headcount": 15101
+          },
+          {
+            "region_code": "NAM",
+            "headcount": 15087
+          }
+        ],
+        "columnAliases": {
+          "headcount": [
+            "active_count",
+            "employee_count"
+          ]
+        }
+      }
+    },
+    {
+      "id": "headcount-department",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "按在职人数从高到低列出前 20 个部门编码（department_code）及员工数；人数相同时按部门编码升序。",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT department_code, COUNT(DISTINCT employee_id) AS headcount FROM employees WHERE resigned = FALSE GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 20",
+        "nativeSql": "SELECT department_code, COUNT(DISTINCT employee_id) AS headcount FROM hr.employees WHERE resigned = FALSE GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 20"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "department_code",
+          "headcount"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "department_code": "APAC-OPERATIONS",
+            "headcount": 1772
+          },
+          {
+            "department_code": "MENA-IT",
+            "headcount": 1749
+          },
+          {
+            "department_code": "LATAM-IT",
+            "headcount": 1746
+          },
+          {
+            "department_code": "NAM-FINANCE",
+            "headcount": 1742
+          },
+          {
+            "department_code": "NAM-MARKETING",
+            "headcount": 1735
+          },
+          {
+            "department_code": "MENA-CUSTOMER-SUPPORT",
+            "headcount": 1734
+          },
+          {
+            "department_code": "LATAM-SALES",
+            "headcount": 1729
+          },
+          {
+            "department_code": "EMEA-OPERATIONS",
+            "headcount": 1722
+          },
+          {
+            "department_code": "NAM-CUSTOMER-SUPPORT",
+            "headcount": 1719
+          },
+          {
+            "department_code": "EMEA-LEGAL",
+            "headcount": 1711
+          },
+          {
+            "department_code": "MENA-LEGAL",
+            "headcount": 1698
+          },
+          {
+            "department_code": "MENA-MARKETING",
+            "headcount": 1696
+          },
+          {
+            "department_code": "EMEA-MARKETING",
+            "headcount": 1691
+          },
+          {
+            "department_code": "NAM-OPERATIONS",
+            "headcount": 1690
+          },
+          {
+            "department_code": "APAC-IT",
+            "headcount": 1683
+          },
+          {
+            "department_code": "EMEA-FINANCE",
+            "headcount": 1683
+          },
+          {
+            "department_code": "APAC-HR",
+            "headcount": 1681
+          },
+          {
+            "department_code": "APAC-ENGINEERING",
+            "headcount": 1678
+          },
+          {
+            "department_code": "LATAM-MARKETING",
+            "headcount": 1678
+          },
+          {
+            "department_code": "ANZ-LEGAL",
+            "headcount": 1676
+          }
+        ],
+        "columnAliases": {
+          "headcount": [
+            "active_count",
+            "employee_count"
+          ]
+        }
+      }
+    },
+    {
+      "id": "attrition-rate",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "全公司离职率是多少？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT AVG(CASE WHEN resigned THEN 1.0 ELSE 0.0 END) AS attrition_rate FROM employees",
+        "nativeSql": "SELECT AVG(CASE WHEN resigned THEN 1.0 ELSE 0.0 END) AS attrition_rate FROM hr.employees"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "attrition_rate"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": false,
+        "maxRows": 50,
+        "rows": [
+          {
+            "attrition_rate": 0.1001
+          }
+        ]
+      }
+    },
+    {
+      "id": "attrition-region",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "各区域离职率是多少？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT region_code, AVG(CASE WHEN resigned THEN 1.0 ELSE 0.0 END) AS attrition_rate FROM employees GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT region_code, AVG(CASE WHEN resigned THEN 1.0 ELSE 0.0 END) AS attrition_rate FROM hr.employees GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "region_code",
+          "attrition_rate"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "region_code": "ANZ",
+            "attrition_rate": 0.10322072890180409
+          },
+          {
+            "region_code": "APAC",
+            "attrition_rate": 0.09776553046187024
+          },
+          {
+            "region_code": "EMEA",
+            "attrition_rate": 0.10222781171397773
+          },
+          {
+            "region_code": "LATAM",
+            "attrition_rate": 0.09920395609697262
+          },
+          {
+            "region_code": "MENA",
+            "attrition_rate": 0.09979135618479881
+          },
+          {
+            "region_code": "NAM",
+            "attrition_rate": 0.09842237361061312
+          }
+        ]
+      }
+    },
+    {
+      "id": "average-age",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "当前员工平均年龄是多少？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT AVG(age) AS average_age FROM employees WHERE resigned = FALSE",
+        "nativeSql": "SELECT AVG(age) AS average_age FROM hr.employees WHERE resigned = FALSE"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "average_age"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": false,
+        "maxRows": 50,
+        "rows": [
+          {
+            "average_age": 41.01621291254584
+          }
+        ]
+      }
+    },
+    {
+      "id": "gender-count",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "按性别统计当前员工数。",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT gender, COUNT(*) AS employee_count FROM employees WHERE resigned = FALSE GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT gender, COUNT(*) AS employee_count FROM hr.employees WHERE resigned = FALSE GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "gender",
+          "employee_count"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "gender": "Female",
+            "employee_count": 43185
+          },
+          {
+            "gender": "Male",
+            "employee_count": 43224
+          },
+          {
+            "gender": "Other",
+            "employee_count": 3581
+          }
+        ],
+        "columnAliases": {
+          "employee_count": [
+            "headcount",
+            "active_count"
+          ]
+        }
+      }
+    },
+    {
+      "id": "education-count",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "按员工数从高到低统计各学历；人数相同时按学历升序。",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT education_level, COUNT(*) AS employee_count FROM employees GROUP BY 1 ORDER BY 2 DESC, 1",
+        "nativeSql": "SELECT education_level, COUNT(*) AS employee_count FROM hr.employees GROUP BY 1 ORDER BY 2 DESC, 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "education_level",
+          "employee_count"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "education_level": "Bachelor",
+            "employee_count": 50041
+          },
+          {
+            "education_level": "High School",
+            "employee_count": 30004
+          },
+          {
+            "education_level": "Master",
+            "employee_count": 14904
+          },
+          {
+            "education_level": "PhD",
+            "employee_count": 5051
+          }
+        ],
+        "columnAliases": {
+          "employee_count": [
+            "headcount",
+            "active_count"
+          ]
+        }
+      }
+    },
+    {
+      "id": "top-job-titles",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "员工数量最多的十个岗位是什么？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT job_title, COUNT(*) AS employee_count FROM employees GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10",
+        "nativeSql": "SELECT job_title, COUNT(*) AS employee_count FROM hr.employees GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "job_title",
+          "employee_count"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "job_title": "Specialist",
+            "employee_count": 14507
+          },
+          {
+            "job_title": "Manager",
+            "employee_count": 14325
+          },
+          {
+            "job_title": "Technician",
+            "employee_count": 14285
+          },
+          {
+            "job_title": "Analyst",
+            "employee_count": 14261
+          },
+          {
+            "job_title": "Engineer",
+            "employee_count": 14217
+          },
+          {
+            "job_title": "Consultant",
+            "employee_count": 14210
+          },
+          {
+            "job_title": "Developer",
+            "employee_count": 14195
+          }
+        ],
+        "columnAliases": {
+          "employee_count": [
+            "headcount",
+            "active_count"
+          ]
+        }
+      }
+    },
+    {
+      "id": "remote-frequency",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "不同远程办公比例各有多少员工？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT remote_work_frequency, COUNT(*) AS employee_count FROM employees GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT remote_work_frequency, COUNT(*) AS employee_count FROM hr.employees GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "remote_work_frequency",
+          "employee_count"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "remote_work_frequency": 0,
+            "employee_count": 19837
+          },
+          {
+            "remote_work_frequency": 25,
+            "employee_count": 20235
+          },
+          {
+            "remote_work_frequency": 50,
+            "employee_count": 19706
+          },
+          {
+            "remote_work_frequency": 75,
+            "employee_count": 20173
+          },
+          {
+            "remote_work_frequency": 100,
+            "employee_count": 20049
+          }
+        ],
+        "columnAliases": {
+          "employee_count": [
+            "headcount",
+            "active_count"
+          ]
+        }
+      }
+    },
+    {
+      "id": "average-projects",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "各区域员工平均负责多少项目？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT region_code, AVG(projects_handled) AS average_projects FROM employees GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT region_code, AVG(projects_handled) AS average_projects FROM hr.employees GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "region_code",
+          "average_projects"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "region_code": "ANZ",
+            "average_projects": 24.511744763288533
+          },
+          {
+            "region_code": "APAC",
+            "average_projects": 24.572515425627508
+          },
+          {
+            "region_code": "EMEA",
+            "average_projects": 24.43693855551563
+          },
+          {
+            "region_code": "LATAM",
+            "average_projects": 24.18140151972018
+          },
+          {
+            "region_code": "MENA",
+            "average_projects": 24.306110283159462
+          },
+          {
+            "region_code": "NAM",
+            "average_projects": 24.577745906537587
+          }
+        ]
+      }
+    },
+    {
+      "id": "average-training",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "按平均培训时数从高到低列出前 20 个部门编码（department_code）；相同时按部门编码升序。",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT department_code, AVG(training_hours) AS average_training_hours FROM employees GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 20",
+        "nativeSql": "SELECT department_code, AVG(training_hours) AS average_training_hours FROM hr.employees GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 20"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "department_code",
+          "average_training_hours"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "department_code": "APAC-ENGINEERING",
+            "average_training_hours": 50.906029331884845
+          },
+          {
+            "department_code": "APAC-LEGAL",
+            "average_training_hours": 50.53678929765886
+          },
+          {
+            "department_code": "MENA-HR",
+            "average_training_hours": 50.42599672310213
+          },
+          {
+            "department_code": "APAC-FINANCE",
+            "average_training_hours": 50.404061998931056
+          },
+          {
+            "department_code": "EMEA-LEGAL",
+            "average_training_hours": 50.390937829293996
+          },
+          {
+            "department_code": "APAC-SALES",
+            "average_training_hours": 50.358695652173914
+          },
+          {
+            "department_code": "EMEA-HR",
+            "average_training_hours": 50.28532755820249
+          },
+          {
+            "department_code": "LATAM-MARKETING",
+            "average_training_hours": 50.267529665587915
+          },
+          {
+            "department_code": "MENA-ENGINEERING",
+            "average_training_hours": 50.254614549402824
+          },
+          {
+            "department_code": "LATAM-OPERATIONS",
+            "average_training_hours": 50.23072594259989
+          },
+          {
+            "department_code": "NAM-ENGINEERING",
+            "average_training_hours": 50.18308291597106
+          },
+          {
+            "department_code": "ANZ-SALES",
+            "average_training_hours": 50.14867064568638
+          },
+          {
+            "department_code": "MENA-LEGAL",
+            "average_training_hours": 50.0921052631579
+          },
+          {
+            "department_code": "APAC-HR",
+            "average_training_hours": 50.00484913793103
+          },
+          {
+            "department_code": "ANZ-CUSTOMER-SUPPORT",
+            "average_training_hours": 49.982642777155654
+          },
+          {
+            "department_code": "MENA-CUSTOMER-SUPPORT",
+            "average_training_hours": 49.94764126490409
+          },
+          {
+            "department_code": "MENA-IT",
+            "average_training_hours": 49.89932537623248
+          },
+          {
+            "department_code": "NAM-FINANCE",
+            "average_training_hours": 49.89724961079398
+          },
+          {
+            "department_code": "EMEA-FINANCE",
+            "average_training_hours": 49.875401069518716
+          },
+          {
+            "department_code": "ANZ-LEGAL",
+            "average_training_hours": 49.85850556438792
+          }
+        ]
+      }
+    },
+    {
+      "id": "average-work-hours",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "按区域编码（region_code）升序返回各区域员工平均每周工作时数。",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT region_code, AVG(work_hours_per_week) AS average_weekly_hours FROM employees GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT region_code, AVG(work_hours_per_week) AS average_weekly_hours FROM hr.employees GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "region_code",
+          "average_weekly_hours"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "region_code": "ANZ",
+            "average_weekly_hours": 45.04970335391694
+          },
+          {
+            "region_code": "APAC",
+            "average_weekly_hours": 45.05702989276942
+          },
+          {
+            "region_code": "EMEA",
+            "average_weekly_hours": 44.95155108396215
+          },
+          {
+            "region_code": "LATAM",
+            "average_weekly_hours": 44.8715474611024
+          },
+          {
+            "region_code": "MENA",
+            "average_weekly_hours": 44.94652757078987
+          },
+          {
+            "region_code": "NAM",
+            "average_weekly_hours": 44.86602127405283
+          }
+        ],
+        "columnAliases": {
+          "average_weekly_hours": [
+            "average_work_hours_per_week"
+          ]
+        }
+      }
+    },
+    {
+      "id": "promotion-count",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "各区域员工平均晋升次数是多少？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT region_code, AVG(promotions) AS average_promotions FROM employees GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT region_code, AVG(promotions) AS average_promotions FROM hr.employees GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "region_code",
+          "average_promotions"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "region_code": "ANZ",
+            "average_promotions": 0.9858336360334181
+          },
+          {
+            "region_code": "APAC",
+            "average_promotions": 1.0002995267477386
+          },
+          {
+            "region_code": "EMEA",
+            "average_promotions": 0.9971852916516948
+          },
+          {
+            "region_code": "LATAM",
+            "average_promotions": 1.0
+          },
+          {
+            "region_code": "MENA",
+            "average_promotions": 1.0091803278688525
+          },
+          {
+            "region_code": "NAM",
+            "average_promotions": 1.005617306083423
+          }
+        ]
+      }
+    },
+    {
+      "id": "resigned-department",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "离职人数最多的十个部门是哪几个？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT department_code, COUNT(*) AS resigned_count FROM employees WHERE resigned = TRUE GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10",
+        "nativeSql": "SELECT department_code, COUNT(*) AS resigned_count FROM hr.employees WHERE resigned = TRUE GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "department_code",
+          "resigned_count"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "department_code": "ANZ-MARKETING",
+            "resigned_count": 228
+          },
+          {
+            "department_code": "EMEA-HR",
+            "resigned_count": 219
+          },
+          {
+            "department_code": "NAM-MARKETING",
+            "resigned_count": 215
+          },
+          {
+            "department_code": "ANZ-LEGAL",
+            "resigned_count": 211
+          },
+          {
+            "department_code": "EMEA-SALES",
+            "resigned_count": 211
+          },
+          {
+            "department_code": "APAC-IT",
+            "resigned_count": 208
+          },
+          {
+            "department_code": "LATAM-FINANCE",
+            "resigned_count": 208
+          },
+          {
+            "department_code": "LATAM-ENGINEERING",
+            "resigned_count": 203
+          },
+          {
+            "department_code": "MENA-LEGAL",
+            "resigned_count": 202
+          },
+          {
+            "department_code": "ANZ-FINANCE",
+            "resigned_count": 201
+          }
+        ]
+      }
+    },
+    {
+      "id": "current-salary-region",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "各区域当前平均月薪是多少？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT region_code, AVG(monthly_salary) AS average_salary FROM compensation_history WHERE effective_date = DATE '2024-09-01' GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT region_code, AVG(monthly_salary) AS average_salary FROM hr.compensation_history WHERE effective_date = DATE '2024-09-01' GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "region_code",
+          "average_salary"
+        ],
+        "requiredModels": [
+          "compensation_history"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "region_code": "ANZ",
+            "average_salary": 6404.646446301005
+          },
+          {
+            "region_code": "APAC",
+            "average_salary": 6399.787336009105
+          },
+          {
+            "region_code": "EMEA",
+            "average_salary": 6402.299676607977
+          },
+          {
+            "region_code": "LATAM",
+            "average_salary": 6412.733687130623
+          },
+          {
+            "region_code": "MENA",
+            "average_salary": 6395.776453055141
+          },
+          {
+            "region_code": "NAM",
+            "average_salary": 6404.135293414605
+          }
+        ],
+        "columnAliases": {
+          "average_salary": [
+            "average_monthly_salary"
+          ]
+        }
+      }
+    },
+    {
+      "id": "current-salary-title",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "当前平均月薪最高的十个岗位是什么？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT e.job_title, AVG(c.monthly_salary) AS average_salary FROM compensation_history c JOIN employees e ON c.employee_id = e.employee_id WHERE c.effective_date = DATE '2024-09-01' GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10",
+        "nativeSql": "SELECT e.job_title, AVG(c.monthly_salary) AS average_salary FROM hr.compensation_history c JOIN hr.employees e ON c.employee_id = e.employee_id WHERE c.effective_date = DATE '2024-09-01' GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "job_title",
+          "average_salary"
+        ],
+        "requiredModels": [
+          "employees",
+          "compensation_history"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "job_title": "Engineer",
+            "average_salary": 7799.324752057396
+          },
+          {
+            "job_title": "Manager",
+            "average_salary": 7798.324607329843
+          },
+          {
+            "job_title": "Consultant",
+            "average_salary": 7152.090077410275
+          },
+          {
+            "job_title": "Developer",
+            "average_salary": 6490.137372314195
+          },
+          {
+            "job_title": "Specialist",
+            "average_salary": 5855.3353553456955
+          },
+          {
+            "job_title": "Analyst",
+            "average_salary": 5195.820769931982
+          },
+          {
+            "job_title": "Technician",
+            "average_salary": 4545.148757437872
+          }
+        ],
+        "columnAliases": {
+          "average_salary": [
+            "average_monthly_salary"
+          ]
+        }
+      }
+    },
+    {
+      "id": "current-performance-region",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "各区域当前平均绩效是多少？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT region_code, AVG(performance_score) AS average_performance FROM performance_reviews WHERE review_date = DATE '2024-09-30' GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT region_code, AVG(performance_score) AS average_performance FROM hr.performance_reviews WHERE review_date = DATE '2024-09-30' GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "region_code",
+          "average_performance"
+        ],
+        "requiredModels": [
+          "performance_reviews"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "region_code": "ANZ",
+            "average_performance": 2.997336239254147
+          },
+          {
+            "region_code": "APAC",
+            "average_performance": 3.003833942371054
+          },
+          {
+            "region_code": "EMEA",
+            "average_performance": 2.998263265061684
+          },
+          {
+            "region_code": "LATAM",
+            "average_performance": 3.0069955373296344
+          },
+          {
+            "region_code": "MENA",
+            "average_performance": 2.9895678092399405
+          },
+          {
+            "region_code": "NAM",
+            "average_performance": 2.976753914186686
+          }
+        ],
+        "columnAliases": {
+          "average_performance": [
+            "average_performance_score"
+          ]
+        }
+      }
+    },
+    {
+      "id": "current-satisfaction-region",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "各区域当前平均满意度是多少？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT region_code, AVG(satisfaction_score) AS average_satisfaction FROM performance_reviews WHERE review_date = DATE '2024-09-30' GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT region_code, AVG(satisfaction_score) AS average_satisfaction FROM hr.performance_reviews WHERE review_date = DATE '2024-09-30' GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "region_code",
+          "average_satisfaction"
+        ],
+        "requiredModels": [
+          "performance_reviews"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "region_code": "ANZ",
+            "average_satisfaction": 3.0056580699842548
+          },
+          {
+            "region_code": "APAC",
+            "average_satisfaction": 2.999767567243756
+          },
+          {
+            "region_code": "EMEA",
+            "average_satisfaction": 2.999789795185055
+          },
+          {
+            "region_code": "LATAM",
+            "average_satisfaction": 3.0042009407791617
+          },
+          {
+            "region_code": "MENA",
+            "average_satisfaction": 2.990562742175853
+          },
+          {
+            "region_code": "NAM",
+            "average_satisfaction": 2.9947065853950057
+          }
+        ],
+        "columnAliases": {
+          "average_satisfaction": [
+            "average_satisfaction_score"
+          ]
+        }
+      }
+    },
+    {
+      "id": "annual-overtime-region",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "各区域近十二个月平均加班时数是多少？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT region_code, AVG(overtime_hours_rolling_12m) AS average_overtime_hours FROM attendance_monthly WHERE attendance_month = DATE '2024-09-01' GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT region_code, AVG(overtime_hours_rolling_12m) AS average_overtime_hours FROM hr.attendance_monthly WHERE attendance_month = DATE '2024-09-01' GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "region_code",
+          "average_overtime_hours"
+        ],
+        "requiredModels": [
+          "attendance_monthly"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "region_code": "ANZ",
+            "average_overtime_hours": 14.526819227509383
+          },
+          {
+            "region_code": "APAC",
+            "average_overtime_hours": 14.451626430240221
+          },
+          {
+            "region_code": "EMEA",
+            "average_overtime_hours": 14.535273685471314
+          },
+          {
+            "region_code": "LATAM",
+            "average_overtime_hours": 14.523097334459052
+          },
+          {
+            "region_code": "MENA",
+            "average_overtime_hours": 14.51064083457526
+          },
+          {
+            "region_code": "NAM",
+            "average_overtime_hours": 14.542249312776383
+          }
+        ]
+      }
+    },
+    {
+      "id": "annual-sick-region",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "各区域近十二个月平均病假天数是多少？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT region_code, AVG(sick_days_rolling_12m) AS average_sick_days FROM attendance_monthly WHERE attendance_month = DATE '2024-09-01' GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT region_code, AVG(sick_days_rolling_12m) AS average_sick_days FROM hr.attendance_monthly WHERE attendance_month = DATE '2024-09-01' GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "region_code",
+          "average_sick_days"
+        ],
+        "requiredModels": [
+          "attendance_monthly"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "region_code": "ANZ",
+            "average_sick_days": 7.06132703717157
+          },
+          {
+            "region_code": "APAC",
+            "average_sick_days": 6.957347391122028
+          },
+          {
+            "region_code": "EMEA",
+            "average_sick_days": 7.0
+          },
+          {
+            "region_code": "LATAM",
+            "average_sick_days": 7.009166566156073
+          },
+          {
+            "region_code": "MENA",
+            "average_sick_days": 7.0130551415797315
+          },
+          {
+            "region_code": "NAM",
+            "average_sick_days": 7.010935819290068
+          }
+        ]
+      }
+    },
+    {
+      "id": "manager-count",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "当前在职员工中，有直属下属记录的经理人数是多少？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT COUNT(DISTINCT manager_id) AS manager_count FROM employees WHERE resigned = FALSE AND manager_id IS NOT NULL",
+        "nativeSql": "SELECT COUNT(DISTINCT manager_id) AS manager_count FROM hr.employees WHERE resigned = FALSE AND manager_id IS NOT NULL"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "manager_count"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": false,
+        "maxRows": 50,
+        "rows": [
+          {
+            "manager_count": 14248
+          }
+        ]
+      }
+    },
+    {
+      "id": "departments-per-region",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "每个区域有多少组织单元？",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT region_code, COUNT(*) AS department_count FROM departments GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT region_code, COUNT(*) AS department_count FROM hr.departments GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "region_code",
+          "department_count"
+        ],
+        "requiredModels": [
+          "departments"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "region_code": "ANZ",
+            "department_count": 9
+          },
+          {
+            "region_code": "APAC",
+            "department_count": 9
+          },
+          {
+            "region_code": "EMEA",
+            "department_count": 9
+          },
+          {
+            "region_code": "LATAM",
+            "department_count": 9
+          },
+          {
+            "region_code": "MENA",
+            "department_count": 9
+          },
+          {
+            "region_code": "NAM",
+            "department_count": 9
+          }
+        ]
+      }
+    },
+    {
+      "id": "region-directory",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "列出六个区域的中英文名称。",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT region_code, region_name_zh, region_name_en FROM regions ORDER BY 1",
+        "nativeSql": "SELECT region_code, region_name_zh, region_name_en FROM hr.regions ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "region_code",
+          "region_name_zh",
+          "region_name_en"
+        ],
+        "requiredModels": [
+          "regions"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "region_code": "ANZ",
+            "region_name_zh": "澳大利亚及新西兰",
+            "region_name_en": "Australia and New Zealand"
+          },
+          {
+            "region_code": "APAC",
+            "region_name_zh": "亚太",
+            "region_name_en": "Asia Pacific"
+          },
+          {
+            "region_code": "EMEA",
+            "region_name_zh": "欧洲",
+            "region_name_en": "Europe"
+          },
+          {
+            "region_code": "LATAM",
+            "region_name_zh": "拉丁美洲",
+            "region_name_en": "Latin America"
+          },
+          {
+            "region_code": "MENA",
+            "region_name_zh": "中东及北非",
+            "region_name_en": "Middle East and North Africa"
+          },
+          {
+            "region_code": "NAM",
+            "region_name_zh": "北美",
+            "region_name_en": "North America"
+          }
+        ]
+      }
+    },
+    {
+      "id": "active-by-remote",
+      "language": "zh-CN",
+      "category": "basic",
+      "actor": "hr_director",
+      "question": "按远程办公比例（remote_work_frequency）升序返回当前在职人数分布。",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT remote_work_frequency, COUNT(*) AS active_count FROM employees WHERE resigned = FALSE GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT remote_work_frequency, COUNT(*) AS active_count FROM hr.employees WHERE resigned = FALSE GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "remote_work_frequency",
+          "active_count"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "remote_work_frequency": 0,
+            "active_count": 17956
+          },
+          {
+            "remote_work_frequency": 25,
+            "active_count": 18189
+          },
+          {
+            "remote_work_frequency": 50,
+            "active_count": 17735
+          },
+          {
+            "remote_work_frequency": 75,
+            "active_count": 18099
+          },
+          {
+            "remote_work_frequency": 100,
+            "active_count": 18011
+          }
+        ],
+        "columnAliases": {
+          "active_count": [
+            "headcount",
+            "employee_count"
+          ]
+        }
+      }
+    },
+    {
+      "id": "employee-profile",
+      "language": "en",
+      "category": "basic",
+      "actor": "employee",
+      "question": "Show my employee id, job title, department, and region.",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT employee_id, job_title, department_code, region_code FROM employees ORDER BY employee_id",
+        "nativeSql": "SELECT employee_id, job_title, department_code, region_code FROM hr.employees WHERE employee_id = ${ACTOR_EMPLOYEE_ID} ORDER BY employee_id"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "employee_id",
+          "job_title",
+          "department_code",
+          "region_code"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "employee_id": 1,
+            "job_title": "Specialist",
+            "department_code": "LATAM-IT",
+            "region_code": "LATAM"
+          }
+        ]
+      }
+    },
+    {
+      "id": "employee-salary",
+      "language": "en",
+      "category": "basic",
+      "actor": "employee",
+      "question": "Return my employee ID and current monthly salary.",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT employee_id, monthly_salary FROM compensation_history WHERE effective_date = DATE '2024-09-01' ORDER BY employee_id",
+        "nativeSql": "SELECT employee_id, monthly_salary FROM hr.compensation_history WHERE effective_date = DATE '2024-09-01' AND employee_id = ${ACTOR_EMPLOYEE_ID} ORDER BY employee_id"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "employee_id",
+          "monthly_salary"
+        ],
+        "requiredModels": [
+          "compensation_history"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "employee_id": 1,
+            "monthly_salary": 6750.0
+          }
+        ]
+      }
+    },
+    {
+      "id": "manager-report-count",
+      "language": "en",
+      "category": "basic",
+      "actor": "department_manager",
+      "question": "How many direct reports do I have?",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT COUNT(employee_id) AS direct_report_count FROM employees",
+        "nativeSql": "SELECT COUNT(employee_id) AS direct_report_count FROM hr.employees WHERE manager_id = ${ACTOR_MANAGER_ID}"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "direct_report_count"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": false,
+        "maxRows": 50,
+        "rows": [
+          {
+            "direct_report_count": 313
+          }
+        ]
+      }
+    },
+    {
+      "id": "hrbp-active-count",
+      "language": "en",
+      "category": "basic",
+      "actor": "hrbp",
+      "question": "How many active employees are in my assigned region?",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT COUNT(*) AS active_count FROM employees WHERE resigned = FALSE",
+        "nativeSql": "SELECT COUNT(*) AS active_count FROM hr.employees WHERE resigned = FALSE AND region_code = ${ACTOR_REGION_CODE}"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "active_count"
+        ],
+        "requiredModels": [
+          "employees"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": false,
+        "maxRows": 50,
+        "rows": [
+          {
+            "active_count": 15061
+          }
+        ],
+        "columnAliases": {
+          "active_count": [
+            "headcount",
+            "employee_count"
+          ]
+        }
+      }
+    },
+    {
+      "id": "comp-admin-average",
+      "language": "en",
+      "category": "basic",
+      "actor": "compensation_admin",
+      "question": "What is the current average salary in my assigned region?",
+      "features": [
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT AVG(monthly_salary) AS average_salary FROM compensation_history WHERE effective_date = DATE '2024-09-01'",
+        "nativeSql": "SELECT AVG(monthly_salary) AS average_salary FROM hr.compensation_history WHERE effective_date = DATE '2024-09-01' AND region_code = ${ACTOR_REGION_CODE}"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "average_salary"
+        ],
+        "requiredModels": [
+          "compensation_history"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": false,
+        "maxRows": 50,
+        "rows": [
+          {
+            "average_salary": 6399.787336009105
+          }
+        ],
+        "columnAliases": {
+          "average_salary": [
+            "average_monthly_salary"
+          ]
+        }
+      }
+    },
+    {
+      "id": "salary-trend",
+      "language": "zh-CN",
+      "category": "analytical",
+      "actor": "hr_director",
+      "question": "按薪资快照生效日（effective_date）升序返回全公司平均月薪趋势。",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT effective_date, AVG(monthly_salary) AS average_salary FROM compensation_history GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT effective_date, AVG(monthly_salary) AS average_salary FROM hr.compensation_history GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "effective_date",
+          "average_salary"
+        ],
+        "requiredModels": [
+          "compensation_history"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "effective_date": "2024-03-01",
+            "average_salary": 5953.28478
+          },
+          {
+            "effective_date": "2024-09-01",
+            "average_salary": 6403.211
+          }
+        ],
+        "columnAliases": {
+          "average_salary": [
+            "average_monthly_salary"
+          ]
+        }
+      }
+    },
+    {
+      "id": "performance-trend",
+      "language": "zh-CN",
+      "category": "analytical",
+      "actor": "hr_director",
+      "question": "按原始绩效评审日（review_date）升序返回公司季度平均绩效趋势，不要重新截断日期。",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT review_date, AVG(performance_score) AS average_performance FROM performance_reviews GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT review_date, AVG(performance_score) AS average_performance FROM hr.performance_reviews GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "review_date",
+          "average_performance"
+        ],
+        "requiredModels": [
+          "performance_reviews"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "review_date": "2023-12-31",
+            "average_performance": 2.9961425
+          },
+          {
+            "review_date": "2024-03-31",
+            "average_performance": 2.99582
+          },
+          {
+            "review_date": "2024-06-30",
+            "average_performance": 2.994195
+          },
+          {
+            "review_date": "2024-09-30",
+            "average_performance": 2.99543
+          }
+        ],
+        "columnAliases": {
+          "average_performance": [
+            "average_performance_score"
+          ]
+        }
+      }
+    },
+    {
+      "id": "satisfaction-trend",
+      "language": "zh-CN",
+      "category": "analytical",
+      "actor": "hr_director",
+      "question": "按原始绩效评审日（review_date）升序返回公司季度平均满意度趋势，不要重新截断日期。",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT review_date, AVG(satisfaction_score) AS average_satisfaction FROM performance_reviews GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT review_date, AVG(satisfaction_score) AS average_satisfaction FROM hr.performance_reviews GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "review_date",
+          "average_satisfaction"
+        ],
+        "requiredModels": [
+          "performance_reviews"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "review_date": "2023-12-31",
+            "average_satisfaction": 2.999829500000006
+          },
+          {
+            "review_date": "2024-03-31",
+            "average_satisfaction": 2.998653500000003
+          },
+          {
+            "review_date": "2024-06-30",
+            "average_satisfaction": 3.0004462000000047
+          },
+          {
+            "review_date": "2024-09-30",
+            "average_satisfaction": 2.999088400000004
+          }
+        ],
+        "columnAliases": {
+          "average_satisfaction": [
+            "average_satisfaction_score"
+          ]
+        }
+      }
+    },
+    {
+      "id": "overtime-trend",
+      "language": "zh-CN",
+      "category": "analytical",
+      "actor": "hr_director",
+      "question": "每月平均加班时数如何变化？",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT attendance_month, AVG(overtime_hours) AS average_overtime_hours FROM attendance_monthly GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT attendance_month, AVG(overtime_hours) AS average_overtime_hours FROM hr.attendance_monthly GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "attendance_month",
+          "average_overtime_hours"
+        ],
+        "requiredModels": [
+          "attendance_monthly"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "attendance_month": "2023-10-01",
+            "average_overtime_hours": 1.21123
+          },
+          {
+            "attendance_month": "2023-11-01",
+            "average_overtime_hours": 1.20952
+          },
+          {
+            "attendance_month": "2023-12-01",
+            "average_overtime_hours": 1.20986
+          },
+          {
+            "attendance_month": "2024-01-01",
+            "average_overtime_hours": 1.21045
+          },
+          {
+            "attendance_month": "2024-02-01",
+            "average_overtime_hours": 1.2106
+          },
+          {
+            "attendance_month": "2024-03-01",
+            "average_overtime_hours": 1.20914
+          },
+          {
+            "attendance_month": "2024-04-01",
+            "average_overtime_hours": 1.21593
+          },
+          {
+            "attendance_month": "2024-05-01",
+            "average_overtime_hours": 1.20327
+          },
+          {
+            "attendance_month": "2024-06-01",
+            "average_overtime_hours": 1.20682
+          },
+          {
+            "attendance_month": "2024-07-01",
+            "average_overtime_hours": 1.21201
+          },
+          {
+            "attendance_month": "2024-08-01",
+            "average_overtime_hours": 1.20707
+          },
+          {
+            "attendance_month": "2024-09-01",
+            "average_overtime_hours": 1.20903
+          }
+        ]
+      }
+    },
+    {
+      "id": "sick-trend",
+      "language": "zh-CN",
+      "category": "analytical",
+      "actor": "hr_director",
+      "question": "每月平均病假天数如何变化？",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT attendance_month, AVG(sick_days) AS average_sick_days FROM attendance_monthly GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT attendance_month, AVG(sick_days) AS average_sick_days FROM hr.attendance_monthly GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "attendance_month",
+          "average_sick_days"
+        ],
+        "requiredModels": [
+          "attendance_monthly"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "attendance_month": "2023-10-01",
+            "average_sick_days": 0.58589
+          },
+          {
+            "attendance_month": "2023-11-01",
+            "average_sick_days": 0.58461
+          },
+          {
+            "attendance_month": "2023-12-01",
+            "average_sick_days": 0.5862
+          },
+          {
+            "attendance_month": "2024-01-01",
+            "average_sick_days": 0.58302
+          },
+          {
+            "attendance_month": "2024-02-01",
+            "average_sick_days": 0.58079
+          },
+          {
+            "attendance_month": "2024-03-01",
+            "average_sick_days": 0.58248
+          },
+          {
+            "attendance_month": "2024-04-01",
+            "average_sick_days": 0.58217
+          },
+          {
+            "attendance_month": "2024-05-01",
+            "average_sick_days": 0.58951
+          },
+          {
+            "attendance_month": "2024-06-01",
+            "average_sick_days": 0.58331
+          },
+          {
+            "attendance_month": "2024-07-01",
+            "average_sick_days": 0.58026
+          },
+          {
+            "attendance_month": "2024-08-01",
+            "average_sick_days": 0.58594
+          },
+          {
+            "attendance_month": "2024-09-01",
+            "average_sick_days": 0.58437
+          }
+        ]
+      }
+    },
+    {
+      "id": "salary-performance-region",
+      "language": "zh-CN",
+      "category": "analytical",
+      "actor": "hr_director",
+      "question": "按区域编码（region_code）升序返回当前平均月薪和当前平均绩效。",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT c.region_code, AVG(c.monthly_salary) AS average_salary, AVG(p.performance_score) AS average_performance FROM compensation_history c JOIN performance_reviews p ON c.employee_id = p.employee_id WHERE c.effective_date = DATE '2024-09-01' AND p.review_date = DATE '2024-09-30' GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT c.region_code, AVG(c.monthly_salary) AS average_salary, AVG(p.performance_score) AS average_performance FROM hr.compensation_history c JOIN hr.performance_reviews p ON c.employee_id = p.employee_id WHERE c.effective_date = DATE '2024-09-01' AND p.review_date = DATE '2024-09-30' GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "region_code",
+          "average_salary",
+          "average_performance"
+        ],
+        "requiredModels": [
+          "compensation_history",
+          "performance_reviews"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "region_code": "ANZ",
+            "average_salary": 6404.646446301005,
+            "average_performance": 2.997336239254147
+          },
+          {
+            "region_code": "APAC",
+            "average_salary": 6399.787336009105,
+            "average_performance": 3.003833942371054
+          },
+          {
+            "region_code": "EMEA",
+            "average_salary": 6402.299676607977,
+            "average_performance": 2.998263265061684
+          },
+          {
+            "region_code": "LATAM",
+            "average_salary": 6412.733687130623,
+            "average_performance": 3.0069955373296344
+          },
+          {
+            "region_code": "MENA",
+            "average_salary": 6395.776453055141,
+            "average_performance": 2.9895678092399405
+          },
+          {
+            "region_code": "NAM",
+            "average_salary": 6404.135293414605,
+            "average_performance": 2.976753914186686
+          }
+        ],
+        "columnAliases": {
+          "average_salary": [
+            "average_monthly_salary"
+          ],
+          "average_performance": [
+            "average_performance_score"
+          ]
+        }
+      }
+    },
+    {
+      "id": "overtime-performance-department",
+      "language": "zh-CN",
+      "category": "analytical",
+      "actor": "hr_director",
+      "question": "按近 12 个月平均加班时数从高到低列出前 10 个部门编码，并同时返回平均加班时数和当前平均绩效；相同时按部门编码升序。",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT a.department_code, AVG(a.overtime_hours_rolling_12m) AS average_overtime, AVG(p.performance_score) AS average_performance FROM attendance_monthly a JOIN performance_reviews p ON a.employee_id = p.employee_id WHERE a.attendance_month = DATE '2024-09-01' AND p.review_date = DATE '2024-09-30' GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10",
+        "nativeSql": "SELECT a.department_code, AVG(a.overtime_hours_rolling_12m) AS average_overtime, AVG(p.performance_score) AS average_performance FROM hr.attendance_monthly a JOIN hr.performance_reviews p ON a.employee_id = p.employee_id WHERE a.attendance_month = DATE '2024-09-01' AND p.review_date = DATE '2024-09-30' GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "department_code",
+          "average_overtime",
+          "average_performance"
+        ],
+        "requiredModels": [
+          "performance_reviews",
+          "attendance_monthly"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "department_code": "LATAM-IT",
+            "average_overtime": 14.974908520648196,
+            "average_performance": 2.974385781495034
+          },
+          {
+            "department_code": "EMEA-IT",
+            "average_overtime": 14.84120879120879,
+            "average_performance": 2.976923076923077
+          },
+          {
+            "department_code": "NAM-MARKETING",
+            "average_overtime": 14.78923076923077,
+            "average_performance": 2.976923076923077
+          },
+          {
+            "department_code": "MENA-HR",
+            "average_overtime": 14.78208629164391,
+            "average_performance": 3.0109229929000545
+          },
+          {
+            "department_code": "MENA-ENGINEERING",
+            "average_overtime": 14.779044516829533,
+            "average_performance": 3.007057546145494
+          },
+          {
+            "department_code": "ANZ-ENGINEERING",
+            "average_overtime": 14.73431533006001,
+            "average_performance": 3.0709219858156027
+          },
+          {
+            "department_code": "APAC-LEGAL",
+            "average_overtime": 14.734113712374581,
+            "average_performance": 2.9420289855072466
+          },
+          {
+            "department_code": "EMEA-LEGAL",
+            "average_overtime": 14.697576396206534,
+            "average_performance": 2.9720758693361433
+          },
+          {
+            "department_code": "NAM-SALES",
+            "average_overtime": 14.696886947023485,
+            "average_performance": 2.944838885854724
+          },
+          {
+            "department_code": "LATAM-OPERATIONS",
+            "average_overtime": 14.664603263927969,
+            "average_performance": 3.0365785030951042
+          }
+        ],
+        "columnAliases": {
+          "average_overtime": [
+            "average_overtime_hours"
+          ],
+          "average_performance": [
+            "average_performance_score"
+          ]
+        }
+      }
+    },
+    {
+      "id": "salary-attrition-region",
+      "language": "zh-CN",
+      "category": "analytical",
+      "actor": "hr_director",
+      "question": "按区域编码（region_code）升序返回当前平均月薪和离职率（0 到 1 的比例）。",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT e.region_code, AVG(c.monthly_salary) AS average_salary, AVG(CASE WHEN e.resigned THEN 1.0 ELSE 0.0 END) AS attrition_rate FROM employees e JOIN compensation_history c ON e.employee_id = c.employee_id WHERE c.effective_date = DATE '2024-09-01' GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT e.region_code, AVG(c.monthly_salary) AS average_salary, AVG(CASE WHEN e.resigned THEN 1.0 ELSE 0.0 END) AS attrition_rate FROM hr.employees e JOIN hr.compensation_history c ON e.employee_id = c.employee_id WHERE c.effective_date = DATE '2024-09-01' GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "region_code",
+          "average_salary",
+          "attrition_rate"
+        ],
+        "requiredModels": [
+          "employees",
+          "compensation_history"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "region_code": "ANZ",
+            "average_salary": 6404.646446301005,
+            "attrition_rate": 0.10322072890180409
+          },
+          {
+            "region_code": "APAC",
+            "average_salary": 6399.787336009105,
+            "attrition_rate": 0.09776553046187024
+          },
+          {
+            "region_code": "EMEA",
+            "average_salary": 6402.299676607977,
+            "attrition_rate": 0.10222781171397773
+          },
+          {
+            "region_code": "LATAM",
+            "average_salary": 6412.733687130623,
+            "attrition_rate": 0.09920395609697262
+          },
+          {
+            "region_code": "MENA",
+            "average_salary": 6395.776453055141,
+            "attrition_rate": 0.09979135618479881
+          },
+          {
+            "region_code": "NAM",
+            "average_salary": 6404.135293414605,
+            "attrition_rate": 0.09842237361061312
+          }
+        ],
+        "columnAliases": {
+          "average_salary": [
+            "average_monthly_salary"
+          ]
+        }
+      }
+    },
+    {
+      "id": "training-performance",
+      "language": "zh-CN",
+      "category": "analytical",
+      "actor": "hr_director",
+      "question": "按培训时数分档比较当前平均绩效：少于 20 小时为 low，20 至少于 60 小时为 medium，60 小时及以上为 high；按档位名称升序。",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT CASE WHEN e.training_hours < 20 THEN 'low' WHEN e.training_hours < 60 THEN 'medium' ELSE 'high' END AS training_band, AVG(p.performance_score) AS average_performance FROM employees e JOIN performance_reviews p ON e.employee_id = p.employee_id WHERE p.review_date = DATE '2024-09-30' GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT CASE WHEN e.training_hours < 20 THEN 'low' WHEN e.training_hours < 60 THEN 'medium' ELSE 'high' END AS training_band, AVG(p.performance_score) AS average_performance FROM hr.employees e JOIN hr.performance_reviews p ON e.employee_id = p.employee_id WHERE p.review_date = DATE '2024-09-30' GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "training_band",
+          "average_performance"
+        ],
+        "requiredModels": [
+          "employees",
+          "performance_reviews"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "training_band": "high",
+            "average_performance": 3.0008279184124036
+          },
+          {
+            "training_band": "low",
+            "average_performance": 2.99621004338503
+          },
+          {
+            "training_band": "medium",
+            "average_performance": 2.9896727200159647
+          }
+        ],
+        "columnAliases": {
+          "average_performance": [
+            "average_performance_score"
+          ]
+        }
+      }
+    },
+    {
+      "id": "remote-satisfaction",
+      "language": "zh-CN",
+      "category": "analytical",
+      "actor": "hr_director",
+      "question": "按远程办公比例（remote_work_frequency）升序返回当前平均满意度。",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT e.remote_work_frequency, AVG(p.satisfaction_score) AS average_satisfaction FROM employees e JOIN performance_reviews p ON e.employee_id = p.employee_id WHERE p.review_date = DATE '2024-09-30' GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT e.remote_work_frequency, AVG(p.satisfaction_score) AS average_satisfaction FROM hr.employees e JOIN hr.performance_reviews p ON e.employee_id = p.employee_id WHERE p.review_date = DATE '2024-09-30' GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "remote_work_frequency",
+          "average_satisfaction"
+        ],
+        "requiredModels": [
+          "employees",
+          "performance_reviews"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "remote_work_frequency": 0,
+            "average_satisfaction": 2.9899430357412924
+          },
+          {
+            "remote_work_frequency": 25,
+            "average_satisfaction": 3.0143301210773465
+          },
+          {
+            "remote_work_frequency": 50,
+            "average_satisfaction": 2.999575763726785
+          },
+          {
+            "remote_work_frequency": 75,
+            "average_satisfaction": 2.999599960343033
+          },
+          {
+            "remote_work_frequency": 100,
+            "average_satisfaction": 2.9917601875405144
+          }
+        ],
+        "columnAliases": {
+          "average_satisfaction": [
+            "average_satisfaction_score"
+          ]
+        }
+      }
+    },
+    {
+      "id": "manager-performance",
+      "language": "en",
+      "category": "analytical",
+      "actor": "department_manager",
+      "question": "What is the current average performance of my direct reports?",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT AVG(performance_score) AS average_performance FROM performance_reviews WHERE review_date = DATE '2024-09-30'",
+        "nativeSql": "SELECT AVG(performance_score) AS average_performance FROM hr.performance_reviews WHERE review_date = DATE '2024-09-30' AND manager_id = ${ACTOR_MANAGER_ID}"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "average_performance"
+        ],
+        "requiredModels": [
+          "performance_reviews"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": false,
+        "maxRows": 50,
+        "rows": [
+          {
+            "average_performance": 3.0575079872204474
+          }
+        ],
+        "columnAliases": {
+          "average_performance": [
+            "average_performance_score"
+          ]
+        }
+      }
+    },
+    {
+      "id": "hrbp-performance-department",
+      "language": "en",
+      "category": "analytical",
+      "actor": "hrbp",
+      "question": "Return current average performance by department_code in my region, ordered by department_code.",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT department_code, AVG(performance_score) AS average_performance FROM performance_reviews WHERE review_date = DATE '2024-09-30' GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT department_code, AVG(performance_score) AS average_performance FROM hr.performance_reviews WHERE review_date = DATE '2024-09-30' AND region_code = ${ACTOR_REGION_CODE} GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "department_code",
+          "average_performance"
+        ],
+        "requiredModels": [
+          "performance_reviews"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "department_code": "APAC-CUSTOMER-SUPPORT",
+            "average_performance": 3.040086673889491
+          },
+          {
+            "department_code": "APAC-ENGINEERING",
+            "average_performance": 3.0211841390548613
+          },
+          {
+            "department_code": "APAC-FINANCE",
+            "average_performance": 2.968466060929984
+          },
+          {
+            "department_code": "APAC-HR",
+            "average_performance": 3.0070043103448274
+          },
+          {
+            "department_code": "APAC-IT",
+            "average_performance": 3.023796932839767
+          },
+          {
+            "department_code": "APAC-LEGAL",
+            "average_performance": 2.9420289855072466
+          },
+          {
+            "department_code": "APAC-MARKETING",
+            "average_performance": 2.970982142857143
+          },
+          {
+            "department_code": "APAC-OPERATIONS",
+            "average_performance": 3.0514780835881754
+          },
+          {
+            "department_code": "APAC-SALES",
+            "average_performance": 3.0038043478260867
+          }
+        ],
+        "columnAliases": {
+          "average_performance": [
+            "average_performance_score"
+          ]
+        }
+      }
+    },
+    {
+      "id": "comp-salary-trend",
+      "language": "en",
+      "category": "analytical",
+      "actor": "compensation_admin",
+      "question": "Return the average salary trend in my region by effective_date, ordered chronologically.",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT effective_date, AVG(monthly_salary) AS average_salary FROM compensation_history GROUP BY 1 ORDER BY 1",
+        "nativeSql": "SELECT effective_date, AVG(monthly_salary) AS average_salary FROM hr.compensation_history WHERE region_code = ${ACTOR_REGION_CODE} GROUP BY 1 ORDER BY 1"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "effective_date",
+          "average_salary"
+        ],
+        "requiredModels": [
+          "compensation_history"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "effective_date": "2024-03-01",
+            "average_salary": 5949.366111543761
+          },
+          {
+            "effective_date": "2024-09-01",
+            "average_salary": 6399.787336009105
+          }
+        ],
+        "columnAliases": {
+          "average_salary": [
+            "average_monthly_salary"
+          ]
+        }
+      }
+    },
+    {
+      "id": "employee-attendance",
+      "language": "en",
+      "category": "analytical",
+      "actor": "employee",
+      "question": "Show my monthly overtime and sick-day history.",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT attendance_month, overtime_hours, sick_days FROM attendance_monthly ORDER BY attendance_month",
+        "nativeSql": "SELECT attendance_month, overtime_hours, sick_days FROM hr.attendance_monthly WHERE employee_id = ${ACTOR_EMPLOYEE_ID} ORDER BY attendance_month"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "attendance_month",
+          "overtime_hours",
+          "sick_days"
+        ],
+        "requiredModels": [
+          "attendance_monthly"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "attendance_month": "2023-10-01",
+            "overtime_hours": 1,
+            "sick_days": 0
+          },
+          {
+            "attendance_month": "2023-11-01",
+            "overtime_hours": 0,
+            "sick_days": 0
+          },
+          {
+            "attendance_month": "2023-12-01",
+            "overtime_hours": 3,
+            "sick_days": 0
+          },
+          {
+            "attendance_month": "2024-01-01",
+            "overtime_hours": 0,
+            "sick_days": 1
+          },
+          {
+            "attendance_month": "2024-02-01",
+            "overtime_hours": 1,
+            "sick_days": 0
+          },
+          {
+            "attendance_month": "2024-03-01",
+            "overtime_hours": 2,
+            "sick_days": 1
+          },
+          {
+            "attendance_month": "2024-04-01",
+            "overtime_hours": 3,
+            "sick_days": 0
+          },
+          {
+            "attendance_month": "2024-05-01",
+            "overtime_hours": 3,
+            "sick_days": 0
+          },
+          {
+            "attendance_month": "2024-06-01",
+            "overtime_hours": 2,
+            "sick_days": 0
+          },
+          {
+            "attendance_month": "2024-07-01",
+            "overtime_hours": 3,
+            "sick_days": 0
+          },
+          {
+            "attendance_month": "2024-08-01",
+            "overtime_hours": 2,
+            "sick_days": 0
+          },
+          {
+            "attendance_month": "2024-09-01",
+            "overtime_hours": 2,
+            "sick_days": 0
+          }
+        ],
+        "allowedExtraColumns": [
+          "employee_id"
+        ]
+      }
+    },
+    {
+      "id": "salary-change-title",
+      "language": "en",
+      "category": "analytical",
+      "actor": "hr_director",
+      "question": "Return the 10 job titles with the largest increase in average salary from 2024-03-01 to 2024-09-01; break ties by job title.",
+      "features": [
+        "join",
+        "time_series"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT e.job_title, AVG(CASE WHEN c.effective_date = DATE '2024-09-01' THEN c.monthly_salary END) - AVG(CASE WHEN c.effective_date = DATE '2024-03-01' THEN c.monthly_salary END) AS salary_increase FROM compensation_history c JOIN employees e ON c.employee_id = e.employee_id GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10",
+        "nativeSql": "SELECT e.job_title, AVG(CASE WHEN c.effective_date = DATE '2024-09-01' THEN c.monthly_salary END) - AVG(CASE WHEN c.effective_date = DATE '2024-03-01' THEN c.monthly_salary END) AS salary_increase FROM hr.compensation_history c JOIN hr.employees e ON c.employee_id = e.employee_id GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10"
+      },
+      "expectation": {
+        "outcome": "success",
+        "allowRepair": true
+      },
+      "oracle": {
+        "type": "canonical_query",
+        "expectedColumns": [
+          "job_title",
+          "salary_increase"
+        ],
+        "requiredModels": [
+          "employees",
+          "compensation_history"
+        ],
+        "numericTolerance": "0.01",
+        "orderSensitive": true,
+        "maxRows": 50,
+        "rows": [
+          {
+            "job_title": "Engineer",
+            "salary_increase": 548.9913483857354
+          },
+          {
+            "job_title": "Manager",
+            "salary_increase": 548.0766492146604
+          },
+          {
+            "job_title": "Consultant",
+            "salary_increase": 501.38015482054925
+          },
+          {
+            "job_title": "Developer",
+            "salary_increase": 459.8045086297989
+          },
+          {
+            "job_title": "Specialist",
+            "salary_increase": 409.5024815606266
+          },
+          {
+            "job_title": "Analyst",
+            "salary_increase": 364.51076362106414
+          },
+          {
+            "job_title": "Technician",
+            "salary_increase": 318.23146657332836
+          }
+        ]
+      }
+    },
+    {
+      "id": "deny-employee-age",
+      "language": "en",
+      "category": "authorization",
+      "actor": "employee",
+      "question": "Show my age and gender.",
+      "features": [
+        "authorization",
+        "deny",
+        "sensitive_column"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT employee_id, age, gender FROM employees",
+        "nativeSql": "SELECT employee_id, age, gender FROM hr.employees"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    },
+    {
+      "id": "deny-employee-performance",
+      "language": "en",
+      "category": "authorization",
+      "actor": "employee",
+      "question": "List performance scores for employees outside my department.",
+      "features": [
+        "authorization",
+        "deny",
+        "cross_department"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT employee_id, performance_score FROM performance_reviews WHERE department_code <> 'LATAM-IT'",
+        "nativeSql": "SELECT employee_id, performance_score FROM hr.performance_reviews WHERE department_code <> 'LATAM-IT'"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    },
+    {
+      "id": "deny-employee-satisfaction",
+      "language": "en",
+      "category": "authorization",
+      "actor": "employee",
+      "question": "Show my satisfaction score.",
+      "features": [
+        "authorization",
+        "deny",
+        "sensitive_table"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT employee_id, satisfaction_score FROM performance_reviews",
+        "nativeSql": "SELECT employee_id, satisfaction_score FROM hr.performance_reviews"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    },
+    {
+      "id": "deny-manager-salary",
+      "language": "en",
+      "category": "authorization",
+      "actor": "department_manager",
+      "question": "List the monthly salaries of my direct reports.",
+      "features": [
+        "authorization",
+        "deny",
+        "sensitive_table"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT employee_id, monthly_salary FROM compensation_history",
+        "nativeSql": "SELECT employee_id, monthly_salary FROM hr.compensation_history"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    },
+    {
+      "id": "deny-manager-salary-average",
+      "language": "en",
+      "category": "authorization",
+      "actor": "department_manager",
+      "question": "Calculate the average monthly salary of my team.",
+      "features": [
+        "authorization",
+        "deny",
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT AVG(monthly_salary) AS average_salary FROM compensation_history",
+        "nativeSql": "SELECT AVG(monthly_salary) AS average_salary FROM hr.compensation_history"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    },
+    {
+      "id": "deny-manager-salary-history",
+      "language": "zh-CN",
+      "category": "authorization",
+      "actor": "department_manager",
+      "question": "批量导出直属员工薪资历史。",
+      "features": [
+        "authorization",
+        "deny",
+        "bulk_export"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT employee_id, effective_date, monthly_salary FROM compensation_history ORDER BY employee_id, effective_date",
+        "nativeSql": "SELECT employee_id, effective_date, monthly_salary FROM hr.compensation_history ORDER BY employee_id, effective_date"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    },
+    {
+      "id": "deny-hrbp-salary",
+      "language": "zh-CN",
+      "category": "authorization",
+      "actor": "hrbp",
+      "question": "列出授权范围之外区域的员工薪资。",
+      "features": [
+        "authorization",
+        "deny",
+        "cross_region"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT employee_id, monthly_salary FROM compensation_history WHERE region_code <> 'APAC'",
+        "nativeSql": "SELECT employee_id, monthly_salary FROM hr.compensation_history WHERE region_code <> 'APAC'"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    },
+    {
+      "id": "deny-hrbp-salary-rank",
+      "language": "zh-CN",
+      "category": "authorization",
+      "actor": "hrbp",
+      "question": "导出授权区域薪资最高的员工。",
+      "features": [
+        "authorization",
+        "deny",
+        "bulk_export",
+        "ranking"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT employee_id, monthly_salary FROM compensation_history ORDER BY monthly_salary DESC LIMIT 500",
+        "nativeSql": "SELECT employee_id, monthly_salary FROM hr.compensation_history ORDER BY monthly_salary DESC LIMIT 500"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    },
+    {
+      "id": "deny-hrbp-salary-average",
+      "language": "zh-CN",
+      "category": "authorization",
+      "actor": "hrbp",
+      "question": "计算负责区域平均月薪。",
+      "features": [
+        "authorization",
+        "deny",
+        "cte",
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "WITH current_salary AS (SELECT monthly_salary FROM compensation_history WHERE effective_date = DATE '2024-09-01') SELECT AVG(monthly_salary) AS average_salary FROM current_salary",
+        "nativeSql": "WITH current_salary AS (SELECT monthly_salary FROM hr.compensation_history WHERE effective_date = DATE '2024-09-01') SELECT AVG(monthly_salary) AS average_salary FROM current_salary"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    },
+    {
+      "id": "deny-comp-performance",
+      "language": "zh-CN",
+      "category": "authorization",
+      "actor": "compensation_admin",
+      "question": "列出员工绩效评分。",
+      "features": [
+        "authorization",
+        "deny",
+        "sensitive_table"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT employee_id, performance_score FROM performance_reviews",
+        "nativeSql": "SELECT employee_id, performance_score FROM hr.performance_reviews"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    },
+    {
+      "id": "deny-comp-satisfaction",
+      "language": "en",
+      "category": "authorization",
+      "actor": "compensation_admin",
+      "question": "Show employee satisfaction scores.",
+      "features": [
+        "authorization",
+        "deny",
+        "sensitive_column"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT employee_id, satisfaction_score FROM performance_reviews",
+        "nativeSql": "SELECT employee_id, satisfaction_score FROM hr.performance_reviews"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    },
+    {
+      "id": "deny-comp-performance-average",
+      "language": "en",
+      "category": "authorization",
+      "actor": "compensation_admin",
+      "question": "Calculate average performance in my region.",
+      "features": [
+        "authorization",
+        "deny",
+        "aggregate"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT AVG(performance_score) AS average_performance FROM performance_reviews",
+        "nativeSql": "SELECT AVG(performance_score) AS average_performance FROM hr.performance_reviews"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    },
+    {
+      "id": "deny-manager-comp-join",
+      "language": "en",
+      "category": "authorization",
+      "actor": "department_manager",
+      "question": "Join my reports to their compensation records.",
+      "features": [
+        "authorization",
+        "deny",
+        "join",
+        "complex_sql"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT e.employee_id, c.monthly_salary FROM employees e JOIN compensation_history c ON e.employee_id = c.employee_id",
+        "nativeSql": "SELECT e.employee_id, c.monthly_salary FROM hr.employees e JOIN hr.compensation_history c ON e.employee_id = c.employee_id"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    },
+    {
+      "id": "deny-hrbp-comp-join",
+      "language": "en",
+      "category": "authorization",
+      "actor": "hrbp",
+      "question": "Compare performance and salary for my region.",
+      "features": [
+        "authorization",
+        "deny",
+        "join",
+        "complex_sql"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT p.employee_id, p.performance_score, c.monthly_salary FROM performance_reviews p JOIN compensation_history c ON p.employee_id = c.employee_id",
+        "nativeSql": "SELECT p.employee_id, p.performance_score, c.monthly_salary FROM hr.performance_reviews p JOIN hr.compensation_history c ON p.employee_id = c.employee_id"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    },
+    {
+      "id": "deny-comp-review-join",
+      "language": "en",
+      "category": "authorization",
+      "actor": "compensation_admin",
+      "question": "Compare salary with satisfaction scores.",
+      "features": [
+        "authorization",
+        "deny",
+        "join",
+        "complex_sql"
+      ],
+      "canonical": {
+        "semanticSql": "SELECT c.employee_id, c.monthly_salary, p.satisfaction_score FROM compensation_history c JOIN performance_reviews p ON c.employee_id = p.employee_id",
+        "nativeSql": "SELECT c.employee_id, c.monthly_salary, p.satisfaction_score FROM hr.compensation_history c JOIN hr.performance_reviews p ON c.employee_id = p.employee_id"
+      },
+      "expectation": {
+        "outcome": "denied",
+        "errorCode": "POLICY_DENIED",
+        "allowRepair": false
+      },
+      "oracle": {
+        "type": "denial",
+        "errorCode": "POLICY_DENIED",
+        "databaseRowsReturned": 0
+      }
+    }
+  ]
+}

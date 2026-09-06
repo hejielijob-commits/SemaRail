@@ -1,0 +1,45 @@
+name: employees
+table_reference:
+  schema: hr
+  table: employees
+primary_key: employee_id
+columns:
+  - {name: employee_id, type: BIGINT, is_primary_key: true, not_null: true}
+  - name: department_code
+    type: VARCHAR
+    not_null: true
+    properties: {description: "Stable department grouping key; return this unless a department display name is explicitly requested / 稳定部门分组键，未明确要求名称时返回此字段。"}
+  - name: region_code
+    type: VARCHAR
+    not_null: true
+    properties: {description: "Stable region grouping key; return this unless a region display name is explicitly requested / 稳定区域分组键，未明确要求名称时返回此字段。"}
+  - name: manager_id
+    type: BIGINT
+    properties: {description: "Direct manager employee id. Managers are assigned within the same region and department / 同区域同部门直属经理。"}
+  - {name: gender, type: VARCHAR, not_null: true}
+  - {name: age, type: SMALLINT, not_null: true}
+  - {name: job_title, type: VARCHAR, not_null: true}
+  - {name: hire_date, type: DATE, not_null: true}
+  - {name: years_at_company, type: SMALLINT, not_null: true}
+  - {name: education_level, type: VARCHAR, not_null: true}
+  - name: work_hours_per_week
+    type: DECIMAL
+    not_null: true
+    properties: {description: "Weekly work hours; average alias is average_weekly_hours / 每周工作时数，平均值别名为 average_weekly_hours。"}
+  - {name: projects_handled, type: INTEGER, not_null: true}
+  - name: remote_work_frequency
+    type: SMALLINT
+    not_null: true
+    properties: {description: "Percentage of scheduled work performed remotely, from 0 to 100 / 远程办公比例百分数。"}
+  - {name: team_size, type: SMALLINT, not_null: true}
+  - name: training_hours
+    type: DECIMAL
+    not_null: true
+    properties: {description: "Training hours; fixed bands are low <20, medium 20..<60, high >=60 / 培训时数，固定分档为 low、medium、high。"}
+  - {name: promotions, type: SMALLINT, not_null: true}
+  - name: resigned
+    type: BOOLEAN
+    not_null: true
+    properties: {description: "True when the employee has resigned / true 表示员工已离职。"}
+  - {name: department, type: departments, relationship: employees_department}
+  - {name: region, type: regions, relationship: employees_region}

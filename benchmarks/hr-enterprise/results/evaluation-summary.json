@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "corpusId": "semarail-hr-enterprise-v1",
+  "evaluationDate": "2026-09-06",
+  "caseCounts": {
+    "total": 60,
+    "basic": 30,
+    "analytical": 15,
+    "authorization": 15,
+    "zhCN": 40,
+    "en": 20
+  },
+  "modelEvaluation": {
+    "kind": "codex-subagent-direct",
+    "notHarnessEvidence": true,
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "max",
+    "agents": 3,
+    "stages": [
+      {
+        "name": "original-blind-first-pass",
+        "basic": 8,
+        "analytical": 3,
+        "authorization": 15,
+        "passed": 26,
+        "total": 60
+      },
+      {
+        "name": "original-after-one-repair",
+        "basic": 24,
+        "analytical": 3,
+        "authorization": 15,
+        "passed": 42,
+        "total": 60
+      },
+      {
+        "name": "optimized-blind-first-pass",
+        "basic": 23,
+        "analytical": 13,
+        "authorization": 15,
+        "passed": 51,
+        "total": 60
+      },
+      {
+        "name": "strict-classification-correction",
+        "basic": 30,
+        "analytical": 15,
+        "authorization": 15,
+        "passed": 60,
+        "total": 60,
+        "sameAnswersAsPreviousStage": true
+      }
+    ],
+    "optimizedResidualRouting": {
+      "evaluatorMisjudgment": 7,
+      "testSetError": 1,
+      "unclearRequirement": 1,
+      "missingKnowledge": 0,
+      "skillContractError": 0,
+      "tableOrDataProblem": 0
+    }
+  },
+  "deterministicEvaluation": {
+    "passed": 60,
+    "total": 60,
+    "authorization": 15,
+    "dataRows": 1900000,
+    "timingMs": {
+      "median": 47,
+      "p95": 250,
+      "max": 578
+    },
+    "securityProbesPassed": 6,
+    "securityProbesTotal": 6
+  },
+  "validation": {
+    "hrUnitTests": "12/12",
+    "wrenProject": "0 errors, 0 warnings",
+    "wrenDryPlan": "45/45",
+    "repositoryTests": "passed"
+  },
+  "limitations": [
+    "Intermediate first-pass totals are preserved from the task run log; subsequent evaluation overwrote the local intermediate summaries.",
+    "The 60/60 model result includes narrow test and evaluator corrections and is not wholly attributable to model improvement.",
+    "DeepSeek Harness was not tested."
+  ]
+}

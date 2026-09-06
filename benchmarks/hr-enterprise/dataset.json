@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "dataset": {
+    "ref": "mexwell/employee-performance-and-productivity-data",
+    "version": 1,
+    "title": "Employee Performance and Productivity Data",
+    "license": "CC0-1.0",
+    "sourceUrl": "https://www.kaggle.com/datasets/mexwell/employee-performance-and-productivity-data",
+    "versionUrl": "https://www.kaggle.com/datasets/mexwell/employee-performance-and-productivity-data/versions/1",
+    "downloadUrl": "https://www.kaggle.com/api/v1/datasets/download/mexwell/employee-performance-and-productivity-data",
+    "archiveSha256": "abe4a9aa869fe553faec813a06ff93432900d72af2036058f8b84e3dd64db375",
+    "archiveBytes": 2508721,
+    "member": "Extended_Employee_Performance_and_Productivity_Data.csv",
+    "memberSha256": "2b1e07caf58e7678a780d428c1a8893a95d9c4a556134fd8e7368db5ed596cdb",
+    "memberBytes": 11243502,
+    "rows": 100000,
+    "publishedAt": "2024-09-04T08:28:04.200Z"
+  },
+  "transformation": {
+    "version": 1,
+    "seed": 20260904,
+    "snapshotDate": "2024-09-01",
+    "regions": 6,
+    "salaryRowsPerEmployee": 2,
+    "performanceRowsPerEmployee": 4,
+    "attendanceRowsPerEmployee": 12
+  }
+}

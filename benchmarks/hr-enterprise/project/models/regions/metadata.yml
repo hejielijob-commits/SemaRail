@@ -1,0 +1,19 @@
+name: regions
+table_reference:
+  schema: hr
+  table: regions
+primary_key: region_code
+columns:
+  - name: region_code
+    type: VARCHAR
+    is_primary_key: true
+    not_null: true
+    properties: {description: "Stable six-region business code / 六大区域稳定编码。"}
+  - name: region_name_en
+    type: VARCHAR
+    not_null: true
+    properties: {description: "English region name."}
+  - name: region_name_zh
+    type: VARCHAR
+    not_null: true
+    properties: {description: "中文区域名称。"}
