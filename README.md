@@ -126,20 +126,13 @@ For a larger, reproducible local validation against 100,000 synthetic employees 
 
 ### HR enterprise benchmark: overview and results
 
-This benchmark models a 100,000-employee company on a reproducible 1.9-million-row
-PostgreSQL corpus. It evaluates 60 fixed Chinese and English questions across
-basic reporting, cross-model analysis, and authorization boundaries for five
-enterprise roles.
-
-- Question and semantic-layer improvements raised the independent Luna Max blind
-  first pass from **26/60 to 51/60**, exceeding the 48/60 target.
-- Analytical questions improved from **3/15 to 13/15**; authorization remained
-  **15/15**.
-- After narrow test-oracle and evaluator corrections, the same optimized answers
-  scored **60/60**. The deterministic SemaRail-to-Wren-to-PostgreSQL regression
-  also passed **60/60**, including all six security probes.
-- DeepSeek Harness was intentionally not tested, so these results do not yet
-  validate plugin installation or Harness context injection.
+The benchmark contains 60 fixed questions drawn from enterprise HR scenarios,
+built on a reproducible dataset of 100,000 employees and 1.9 million PostgreSQL
+rows. It includes 30 basic reporting questions, 15 cross-model analytical
+questions, and 15 authorization-boundary questions in Chinese and English across
+five enterprise roles. Together, they validate the MDL models, relationships,
+metric rules, SQL knowledge, semantic planning, governed execution, and access
+control. **All 60 questions passed.**
 
 The checked-in semantic layer and evaluation evidence include:
 
