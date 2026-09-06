@@ -124,6 +124,21 @@ pnpm build
 
 For a larger, reproducible local validation against 100,000 synthetic employees and five authorization roles, see the [HR enterprise benchmark](benchmarks/hr-enterprise/README.md). It runs separately from CI and requires Docker.
 
+### HR enterprise benchmark assets
+
+The HR benchmark includes the complete semantic layer and its recorded
+evaluation evidence:
+
+- [Wren MDL project](benchmarks/hr-enterprise/project/wren_project.yml)
+- [six semantic model definitions](benchmarks/hr-enterprise/project/models/)
+- [model relationships](benchmarks/hr-enterprise/project/relationships.yml)
+- [HR metric and authorization rules](benchmarks/hr-enterprise/project/knowledge/rules/hr-metrics.md)
+- [SQL knowledge examples](benchmarks/hr-enterprise/project/knowledge/sql/)
+- [PostgreSQL schema](benchmarks/hr-enterprise/sql/001_schema.sql)
+- [60 evaluation cases](benchmarks/hr-enterprise/golden-questions.json)
+- [evaluation process and results](benchmarks/hr-enterprise/EVALUATION_REPORT.md)
+- [machine-readable result summary](benchmarks/hr-enterprise/results/evaluation-summary.json)
+
 Create the Python environment and install the semantic runtime, MCP servers, Console, governed PostgreSQL query driver, and Console metadata drivers:
 
 ```powershell
