@@ -19,6 +19,35 @@ the scope of that result.
 
 The deterministic layer sends the checked-in canonical semantic SQL through the real semantic planner, policy engine, and PostgreSQL executor. It must pass all 60 cases and all security probes. The separate model layer evaluates real Harness captures with thresholds of 48/60 on the first pass, 54/60 after at most one repair, and 15/15 authorization denials.
 
+## Semantic-layer assets under test
+
+The benchmark exercises a checked-in Wren MDL project rather than an inferred
+or temporary schema. The main inputs are:
+
+- [`project/wren_project.yml`](project/wren_project.yml) — MDL project entry
+  point (`schema_version: 5`, PostgreSQL, `hr` schema)
+- [`project/models/`](project/models/) — six model definitions for employees,
+  departments, regions, compensation, performance, and attendance
+- [`project/relationships.yml`](project/relationships.yml) — employee,
+  department, region, and fact-table relationships
+- [`project/knowledge/rules/hr-metrics.md`](project/knowledge/rules/hr-metrics.md)
+  — bilingual metric definitions, snapshot rules, join grain, ordering, and
+  authorization semantics
+- [`project/knowledge/knowledge.yml`](project/knowledge/knowledge.yml) — Wren
+  knowledge configuration
+- [`project/knowledge/sql/`](project/knowledge/sql/) — approved SQL knowledge
+  examples for current metrics, trends, and cross-model analysis
+- [`sql/001_schema.sql`](sql/001_schema.sql) — normalized PostgreSQL table
+  definitions used by the benchmark
+- [`run.py`](run.py) — creation and verification of the five actor policies,
+  followed by semantic planning, governed execution, and security probes
+- [`golden-questions.json`](golden-questions.json) — the 60 versioned questions,
+  expected outcomes, canonical queries, and result or denial oracles
+
+The complete procedure and recorded outcomes are in
+[`EVALUATION_REPORT.md`](EVALUATION_REPORT.md); the content-safe result payload
+is in [`results/evaluation-summary.json`](results/evaluation-summary.json).
+
 ## Pinned source and transformation
 
 The source is Kaggle's [Employee Performance and Productivity Data](https://www.kaggle.com/datasets/mexwell/employee-performance-and-productivity-data), version 1, under CC0-1.0. `dataset.json` pins the archive and member byte sizes and SHA-256 digests. Before the first download, configure either `KAGGLE_API_TOKEN` or both `KAGGLE_USERNAME` and `KAGGLE_KEY`. Cached archives are accepted only when their pinned size and SHA-256 match. Credentials are read only for the HTTPS request and are never written to the manifest or command output.
