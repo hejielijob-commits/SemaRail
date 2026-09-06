@@ -124,10 +124,24 @@ pnpm build
 
 For a larger, reproducible local validation against 100,000 synthetic employees and five authorization roles, see the [HR enterprise benchmark](benchmarks/hr-enterprise/README.md). It runs separately from CI and requires Docker.
 
-### HR enterprise benchmark assets
+### HR enterprise benchmark: overview and results
 
-The HR benchmark includes the complete semantic layer and its recorded
-evaluation evidence:
+This benchmark models a 100,000-employee company on a reproducible 1.9-million-row
+PostgreSQL corpus. It evaluates 60 fixed Chinese and English questions across
+basic reporting, cross-model analysis, and authorization boundaries for five
+enterprise roles.
+
+- Question and semantic-layer improvements raised the independent Luna Max blind
+  first pass from **26/60 to 51/60**, exceeding the 48/60 target.
+- Analytical questions improved from **3/15 to 13/15**; authorization remained
+  **15/15**.
+- After narrow test-oracle and evaluator corrections, the same optimized answers
+  scored **60/60**. The deterministic SemaRail-to-Wren-to-PostgreSQL regression
+  also passed **60/60**, including all six security probes.
+- DeepSeek Harness was intentionally not tested, so these results do not yet
+  validate plugin installation or Harness context injection.
+
+The checked-in semantic layer and evaluation evidence include:
 
 - [Wren MDL project](benchmarks/hr-enterprise/project/wren_project.yml)
 - [six semantic model definitions](benchmarks/hr-enterprise/project/models/)
