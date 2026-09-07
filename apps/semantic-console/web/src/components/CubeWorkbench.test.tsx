@@ -39,6 +39,30 @@ describe("CubeWorkbench", () => {
     await i18n.changeLanguage("en-US");
   });
 
+  it("paginates 100 cubes without losing the active editor", async () => {
+    const base = makeCube();
+    const cubes = Array.from({ length: 100 }, (_, index) => ({ ...base, name: `cube_${String(index + 1).padStart(3, "0")}`, sourcePath: `cubes/cube_${index + 1}/metadata.yml` }));
+    renderWorkbench({ snapshot: { ...makeSnapshot(), cubes } });
+    expect(await screen.findByText("1-20 of 100")).toBeInTheDocument();
+    expect(document.querySelectorAll(".cube-list-item")).toHaveLength(20);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("21-40 of 100")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Technical name" })).toHaveValue("cube_001");
+  });
+
+  it("paginates a large cube field collection without changing field indexes", async () => {
+    const cube = makeCube();
+    cube.measures = Array.from({ length: 41 }, (_, index) => ({ name: `measure_${String(index + 1).padStart(2, "0")}`, expression: `SUM(value_${index + 1})`, type: "DOUBLE" }));
+    renderWorkbench({ snapshot: { ...makeSnapshot(), cubes: [cube] } });
+    fireEvent.click(screen.getByRole("tab", { name: /Measures/ }));
+    expect(screen.getByText("1-20 of 41")).toBeInTheDocument();
+    expect(document.querySelectorAll(".cube-entry-row")).toHaveLength(20);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("21-40 of 41")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("measure_21")).toBeInTheDocument();
+  });
+
+
   it("renders all cube tabs in the documented order and defaults to basic information", async () => {
     renderWorkbench();
     expect(await screen.findByRole("heading", { name: "Cubes" })).toBeInTheDocument();

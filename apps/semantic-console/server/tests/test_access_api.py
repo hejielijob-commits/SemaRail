@@ -135,6 +135,28 @@ class AccessControlAdminApiTests(unittest.TestCase):
         self.assertEqual(status, 401)
         self.assertEqual(response["code"], "UNAUTHENTICATED")
 
+    def test_audit_route_accepts_a_bounded_limit(self) -> None:
+        for index in range(3):
+            status, _ = self.app.request(
+                "POST",
+                "/api/v1/access/service-accounts",
+                {"name": f"Audit account {index + 1}"},
+                authorization=self.authorization,
+            )
+            self.assertEqual(status, 201)
+
+        status, response = self.app.request(
+            "GET", "/api/v1/access/audit?limit=2", authorization=self.authorization
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(len(response["items"]), 2)
+
+        status, response = self.app.request(
+            "GET", "/api/v1/access/audit?limit=not-a-number", authorization=self.authorization
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(response["code"], "INVALID_REQUEST")
+
     def test_legacy_console_routes_are_fail_closed_and_require_console_admin(self) -> None:
         status, response = self.app.request("GET", "/api/datasources")
         self.assertEqual((status, response["code"]), (401, "UNAUTHENTICATED"))

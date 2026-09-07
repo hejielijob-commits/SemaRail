@@ -49,6 +49,18 @@ describe("ModelEditor", () => {
     await i18n.changeLanguage("en-US");
   });
 
+  it("bounds 100 business models without clearing the active editor", async () => {
+    const base = makeSnapshot();
+    const models = Array.from({ length: 100 }, (_, index) => ({ ...base.models[0]!, name: `model_${String(index + 1).padStart(3, "0")}`, sourcePath: `models/model_${index + 1}/metadata.yml`, displayName: { "zh-CN": `模型 ${index + 1}`, "en-US": `Model ${index + 1}` } }));
+    render(<ModelEditor snapshot={{ ...base, models }} onSave={vi.fn()} onOpenSource={vi.fn()} onLoadDiff={vi.fn()} />);
+    expect(await screen.findByText("1-20 of 100")).toBeInTheDocument();
+    expect(document.querySelectorAll(".model-list-item")).toHaveLength(20);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("21-40 of 100")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Business name" })).toHaveValue("Model 1");
+  });
+
+
   it("edits one visible locale value without dropping the other locale", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     const onOpenSource = vi.fn();
@@ -192,16 +204,16 @@ describe("ModelEditor", () => {
     expect(onSave.mock.calls[0]?.[0]).toMatchObject({ columns: [{ displayName: { "en-US": "Buyer ID", "zh-CN": "客户编号" } }] });
   });
 
-  it("paginates fields at fifteen rows and keeps long technical names contained", async () => {
+  it("paginates fields at twenty rows and keeps long technical names contained", async () => {
     render(<ModelEditor snapshot={makeSnapshot(31)} onSave={vi.fn()} onOpenSource={vi.fn()} onLoadDiff={vi.fn()} />);
 
     fireEvent.click(await screen.findByRole("tab", { name: /Field dictionary/ }));
-    expect(screen.getByText("field_15_with_a_long_technical_name")).toBeInTheDocument();
-    expect(screen.queryByText("field_16_with_a_long_technical_name")).not.toBeInTheDocument();
-    expect(screen.getByText("1-15 of 31")).toBeInTheDocument();
+    expect(screen.getByText("field_20_with_a_long_technical_name")).toBeInTheDocument();
+    expect(screen.queryByText("field_21_with_a_long_technical_name")).not.toBeInTheDocument();
+    expect(screen.getByText("1-20 of 31")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(screen.getByText("field_16_with_a_long_technical_name")).toBeInTheDocument();
+    expect(screen.getByText("field_21_with_a_long_technical_name")).toBeInTheDocument();
     expect(screen.queryByText("field_01_with_a_long_technical_name")).not.toBeInTheDocument();
-    expect(screen.getByText("16-30 of 31")).toBeInTheDocument();
+    expect(screen.getByText("21-31 of 31")).toBeInTheDocument();
   });
 });

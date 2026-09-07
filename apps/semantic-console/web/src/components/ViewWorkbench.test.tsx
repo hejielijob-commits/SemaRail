@@ -43,6 +43,16 @@ function props(overrides: Partial<ViewWorkbenchProps> = {}): ViewWorkbenchProps 
 }
 
 describe("ViewWorkbench", () => {
+  it("paginates a 100-view project while keeping the active definition mounted", () => {
+    const views = Array.from({ length: 100 }, (_, index) => view({ name: `view_${String(index + 1).padStart(3, "0")}`, sourcePath: `views/view_${index + 1}/metadata.yml`, sqlPath: `views/view_${index + 1}/sql.yml` }));
+    render(<ViewWorkbench {...props({ snapshot: snapshot(views) })} />);
+    expect(screen.getByText("1-20 of 100")).toBeInTheDocument();
+    expect(document.querySelectorAll(".view-list-item")).toHaveLength(20);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("21-40 of 100")).toBeInTheDocument();
+    expect(screen.getByLabelText("View SQL")).toBeInTheDocument();
+  });
+
   it("renders the real Wren View contract in English and Chinese", () => {
     const { rerender } = render(<ViewWorkbench {...props()} />);
     expect(screen.getByRole("heading", { name: "Views", level: 1 })).toBeInTheDocument();

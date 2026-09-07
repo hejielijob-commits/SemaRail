@@ -20,7 +20,7 @@ import {
   WarningCircle,
   X,
 } from "@phosphor-icons/react";
-import { Button, Field, InlineNotice, Modal, TextArea, TextInput } from "./ui";
+import { Button, Field, InlineNotice, Modal, Pagination, TextArea, TextInput, usePagination } from "./ui";
 import "./knowledge-workbench.css";
 
 /** The two locales supported by the semantic-console workbenches. */
@@ -304,6 +304,7 @@ export function RuleWorkbench({
       return [rule.name, rule.content, rule.sourcePath, ...(rule.tags ?? [])].join(" ").toLocaleLowerCase().includes(normalized);
     });
   }, [filter, rules, search]);
+  const { pageItems: visibleRules, paginationProps: rulePagination } = usePagination(filteredRules, `${search}|${filter}`);
 
   const reusableTags = useMemo(() => {
     const unique = new Map<string, string>();
@@ -439,7 +440,7 @@ export function RuleWorkbench({
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
     const offset = event.key === "ArrowDown" ? 1 : -1;
-    const next = filteredRules[(index + offset + filteredRules.length) % filteredRules.length];
+    const next = visibleRules[(index + offset + visibleRules.length) % visibleRules.length];
     if (next) selectRule(next);
   }
 
@@ -462,7 +463,7 @@ export function RuleWorkbench({
         <label className="kw-search"><MagnifyingGlass size={16} aria-hidden="true" /><span className="sr-only">{c.search}</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={c.search} aria-label={c.search} /></label>
         <div className="kw-filter" role="group" aria-label={c.filterLabel}>{(["all", "enabled", "disabled"] as RuleFilter[]).map((value) => <button type="button" key={value} className={filter === value ? "kw-filter-active" : ""} aria-pressed={filter === value} onClick={() => setFilter(value)}>{c[value]}</button>)}</div>
         <div className="kw-rule-list" role="list" aria-label={c.listTitle}>
-          {filteredRules.map((rule, index) => { const draft = drafts[rule.id] ?? rule; const active = rule.id === internalSelectedId; return <div className={`kw-rule-row ${active ? "kw-rule-row-active" : ""}`} role="listitem" key={rule.id}>
+          {visibleRules.map((rule, index) => { const draft = drafts[rule.id] ?? rule; const active = rule.id === internalSelectedId; return <div className={`kw-rule-row ${active ? "kw-rule-row-active" : ""}`} role="listitem" key={rule.id}>
             <button type="button" className="kw-rule-select" aria-current={active ? "true" : undefined} onClick={() => selectRule(rule)} onKeyDown={(event) => handleSelectKey(event, index)}>
               <span className="kw-rule-leading"><FileText size={16} weight={active ? "fill" : "regular"} aria-hidden="true" /></span>
               <span className="kw-rule-copy"><strong title={rule.name}>{rule.name}</strong><small>{draft.tags?.join(", ") || c.noTags}</small><span className="kw-rule-meta">{draft.draft || !sameRule(draft, committed[rule.id] ?? rule) ? c.draft : c.published}{formatRuleDate(rule.updatedAt, locale) ? `  ${formatRuleDate(rule.updatedAt, locale)}` : ""}</span></span>
@@ -471,7 +472,7 @@ export function RuleWorkbench({
             <button type="button" role="switch" aria-checked={draft.enabled} aria-label={draft.enabled ? `${c.onLabel}: ${rule.name}` : `${c.offLabel}: ${rule.name}`} className={`kw-rule-toggle ${draft.enabled ? "kw-rule-toggle-on" : ""}`} onClick={(event) => void toggleRule(rule, event)} disabled={readOnly || busyAction === "toggle"}><span aria-hidden="true" /></button>
           </div>; })}
           {filteredRules.length === 0 ? <RuleEmptyState title={rules.length ? c.noMatches : c.noRules} body={rules.length ? c.noMatchesBody : c.noRulesBody} /> : null}
-        </div>
+        </div><Pagination {...rulePagination} />
       </aside>
       <section className="kw-panel kw-rule-editor-panel" aria-label={selected ? `${c.selected}: ${selected.name}` : c.selected}>
         {!selected ? <RuleEmptyState title={c.noRules} body={c.noRulesBody} /> : <>

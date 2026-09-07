@@ -25,7 +25,7 @@ import type {
   ViewValidationResponse,
   ViewWritePayload,
 } from "../types";
-import { Badge, Button, EmptyState, Field, InlineNotice, LoadingRows, Modal, Select, TextArea, TextInput } from "./ui";
+import { Badge, Button, EmptyState, Field, InlineNotice, LoadingRows, Modal, Pagination, Select, TextArea, TextInput, usePagination } from "./ui";
 import "./view-workbench.css";
 
 type Locale = "en-US" | "zh-CN";
@@ -349,6 +349,7 @@ export default function ViewWorkbench({
     if (!needle) return snapshot?.views ?? [];
     return (snapshot?.views ?? []).filter((view) => [view.name, descriptionOf(view), view.statement, ...tagsOf(view)].join(" ").toLocaleLowerCase().includes(needle));
   }, [query, snapshot]);
+  const { pageItems: visibleViews, paginationProps: viewPagination } = usePagination(filtered, query);
 
   const references = useMemo(() => {
     if (!activeView) return [];
@@ -511,13 +512,13 @@ export default function ViewWorkbench({
         <div className="view-list-toolbar"><div><span className="panel-kicker">{c.title}</span><strong>{c.viewCount(filtered.length)}</strong></div><Button variant="ghost" size="sm" icon={Plus} onClick={beginCreate}>{c.newView}</Button></div>
         <label className="view-search"><MagnifyingGlass size={15} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={c.search} aria-label={c.search} /></label>
         <div className="view-list" role="listbox" aria-label={c.title}>
-          {filtered.map((view) => {
+          {visibleViews.map((view) => {
             const current = drafts[view.name] ?? view;
             const dirty = !sameView(current, view);
             return <button type="button" role="option" aria-selected={view.name === activeName} className={`view-list-item ${view.name === activeName ? "view-list-item-active" : ""}`} key={view.name} onClick={() => { setActiveName(view.name); setTab("definition"); }}><span className="view-list-icon"><Table size={17} weight="duotone" /></span><span className="view-list-copy"><strong>{view.name}</strong><small>{descriptionOf(current) || view.sourcePath}</small><em>{current.storage === "sql" ? c.sqlFile : c.metadataFile}</em></span><span className={`view-status-dot ${view.draft || dirty ? "view-status-draft" : ""}`} title={view.draft || dirty ? c.draft : c.tracked} /></button>;
           })}
           {filtered.length === 0 ? <EmptyState icon={MagnifyingGlass} title={c.noMatches} body={c.noMatchesBody} /> : null}
-        </div>
+        </div><Pagination {...viewPagination} />
       </aside>
       <section className="view-editor-main">
         {!activeView ? <section className="panel view-state-panel"><EmptyState icon={Eye} title={c.select} body={c.selectBody} /></section> : <section className="panel view-workspace-panel">
@@ -556,7 +557,7 @@ function DefinitionTab({ view, c, theme, onPatch, onPatchProperties }: { view: V
       <Field label={c.descriptionLabel} hint={c.descriptionHint} htmlFor="view-description"><TextArea id="view-description" rows={3} value={descriptionOf(view)} onChange={(event) => onPatchProperties({ description: event.target.value })} /></Field>
       <Field label={c.tags} hint={c.tagsHint} htmlFor="view-tags"><TextInput id="view-tags" value={tags.join(", ")} onChange={(event) => onPatchProperties({ tags: event.target.value.split(",").map((tag) => tag.trim()).filter(Boolean) })} /></Field>
     </div>
-    <div className="view-sql-section"><div className="view-section-heading"><div><p className="panel-kicker">{c.statement}</p><h3>{c.statement}</h3></div><Badge tone="blue">SQL</Badge></div><p className="view-section-hint">{c.statementHint}</p><div className="view-code-editor"><CodeMirror value={view.statement} height="360px" theme={theme} extensions={[sql()]} onChange={(statement) => onPatch({ statement })} basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: true, autocompletion: true, bracketMatching: true }} aria-label={c.statement} /></div></div>
+    <div className="view-sql-section"><div className="view-section-heading"><div><p className="panel-kicker">{c.statement}</p><h3>{c.statement}</h3></div><Badge tone="blue">SQL</Badge></div><p className="view-section-hint">{c.statementHint}</p><div className="view-code-editor"><CodeMirror value={view.statement} height="280px" theme={theme} extensions={[sql()]} onChange={(statement) => onPatch({ statement })} basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: true, autocompletion: true, bracketMatching: true }} aria-label={c.statement} /></div></div>
   </div>;
 }
 

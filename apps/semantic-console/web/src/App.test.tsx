@@ -97,6 +97,94 @@ describe("Semantic Console interactions", () => {
     expect(screen.getByLabelText(/Host/)).toHaveAttribute("placeholder", "localhost");
   });
 
+  it("shows a healthy locked console without misreporting authenticated endpoints as offline", async () => {
+    const fetchMock = emptyWorkspaceFetch();
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/health")) return Promise.resolve(jsonResponse({ status: "ok" }));
+      if (url.endsWith("/api/datasource-types")) return Promise.resolve(jsonResponse([]));
+      if (["/api/project", "/api/datasources", "/api/project/files", "/api/versions"].some((path) => url.endsWith(path))) return Promise.resolve(jsonResponse({ code: "UNAUTHORIZED", message: "Authentication required" }, 401));
+      return Promise.resolve(jsonResponse({ code: "NOT_FOUND", message: `Unhandled test request: ${url}` }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    expect(await screen.findByText("Console locked")).toBeInTheDocument();
+    expect(await screen.findByText("Connected")).toBeInTheDocument();
+    expect(screen.queryByText("Semantic Console is offline")).not.toBeInTheDocument();
+  });
+
+  it("discards an unsaved datasource draft when creation is cancelled", async () => {
+    const datasource = { id: "warehouse", name: "Warehouse", type: "postgres", connection: {} };
+    const fetchMock = emptyWorkspaceFetch();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/project") && init?.method !== "POST") return Promise.resolve(jsonResponse({ name: "Warehouse project", projectExists: true, activeDatasource: datasource }));
+      if (url.endsWith("/api/datasource-types")) return Promise.resolve(jsonResponse([{ type: "postgres", label: "PostgreSQL", available: true, fields: [] }]));
+      if (url.endsWith("/api/datasources")) return Promise.resolve(jsonResponse([datasource]));
+      return emptyWorkspaceFetch()(input, init);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Data sources" }));
+    await screen.findByRole("heading", { name: "Data sources" });
+    fireEvent.click(screen.getByRole("button", { name: "Add data source" }));
+    expect(await screen.findByRole("heading", { name: "Add data source" })).toBeInTheDocument();
+    expect(screen.getByText("New data source")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText("New data source")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Warehouse" })).toBeInTheDocument();
+  });
+
+  it("deletes a datasource through the existing API after confirmation", async () => {
+    const datasource = { id: "warehouse/a", name: "Warehouse A", type: "postgres", connection: {} };
+    const fetchMock = emptyWorkspaceFetch();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/project") && init?.method !== "POST") return Promise.resolve(jsonResponse({ name: "Warehouse project", projectExists: true, activeDatasource: datasource }));
+      if (url.endsWith("/api/datasource-types")) return Promise.resolve(jsonResponse([{ type: "postgres", label: "PostgreSQL", available: true, fields: [] }]));
+      if (url.endsWith("/api/datasources")) return Promise.resolve(jsonResponse([datasource]));
+      if (url.endsWith("/api/datasources/warehouse%2Fa") && init?.method === "DELETE") return Promise.resolve(jsonResponse({ id: datasource.id, deleted: true }));
+      return emptyWorkspaceFetch()(input, init);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Data sources" }));
+    await screen.findByRole("heading", { name: "Warehouse A" });
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Delete data source" }));
+
+    expect(await screen.findByText("Data source deleted")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input, init]) => String(input).endsWith("/api/datasources/warehouse%2Fa") && init?.method === "DELETE")).toBe(true);
+    expect(screen.getByText("Select a data source")).toBeInTheDocument();
+  });
+
+  it("moves the current marker to the backend replacement after deleting the active datasource", async () => {
+    const primary = { id: "warehouse-a", name: "Warehouse A", type: "postgres", connection: {} };
+    const replacement = { id: "warehouse-b", name: "Warehouse B", type: "postgres", connection: {} };
+    const fetchMock = emptyWorkspaceFetch();
+    fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/project") && init?.method !== "POST") return Promise.resolve(jsonResponse({ name: "Warehouse project", projectExists: true, activeDatasource: primary }));
+      if (url.endsWith("/api/datasource-types")) return Promise.resolve(jsonResponse([{ type: "postgres", label: "PostgreSQL", available: true, fields: [] }]));
+      if (url.endsWith("/api/datasources")) return Promise.resolve(jsonResponse([primary, replacement]));
+      if (url.endsWith("/api/datasources/warehouse-a") && init?.method === "DELETE") return Promise.resolve(jsonResponse({ id: primary.id, deleted: true }));
+      return emptyWorkspaceFetch()(input, init);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Data sources" }));
+    await screen.findByRole("heading", { name: "Warehouse A" });
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Delete data source" }));
+
+    expect(await screen.findByRole("heading", { name: "Warehouse B" })).toBeInTheDocument();
+    expect(screen.getAllByText("Current").length).toBeGreaterThan(0);
+  });
+
   it("loads a real project file and sends its content to the file endpoint", async () => {
     const file = { path: "models/orders/metadata.yml", size: 42, draft: true, revision: "sha256:old" };
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -287,7 +375,7 @@ describe("Semantic Console interactions", () => {
         projectId: "project-1",
         capabilities: { "console:admin": false, "access:admin": true },
       }));
-      if (url.endsWith("/api/v1/access/service-accounts") || url.endsWith("/api/v1/access/users") || url.endsWith("/api/v1/access/policies") || url.endsWith("/api/v1/access/audit")) return Promise.resolve(jsonResponse({ items: [] }));
+      if (url.endsWith("/api/v1/access/service-accounts") || url.endsWith("/api/v1/access/users") || url.endsWith("/api/v1/access/policies") || url.includes("/api/v1/access/audit")) return Promise.resolve(jsonResponse({ items: [] }));
       return emptyWorkspaceFetch()(input, init);
     });
     vi.stubGlobal("fetch", fetchMock);

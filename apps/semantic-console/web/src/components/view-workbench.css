@@ -46,15 +46,21 @@
 
 .view-workbench {
   display: grid;
+  height: var(--workbench-height);
   min-width: 0;
+  min-height: 0;
   grid-template-columns: minmax(250px, 0.58fr) minmax(600px, 1.62fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .view-list-panel {
-  min-height: 670px;
-  padding: 17px 11px;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 17px 11px 0;
 }
 
 .view-list-toolbar {
@@ -109,7 +115,11 @@
 
 .view-list {
   display: grid;
+  min-height: 0;
+  flex: 1;
+  align-content: start;
   gap: 2px;
+  overflow-y: auto;
 }
 
 .view-list-item {
@@ -200,9 +210,13 @@
 .view-editor-main,
 .view-workspace-panel {
   min-width: 0;
+  min-height: 0;
 }
 
 .view-workspace-panel {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -326,7 +340,9 @@
 
 .view-tab-panel {
   min-width: 0;
-  min-height: 510px;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .view-definition-tab {
@@ -706,7 +722,7 @@
 
 @media (max-width: 1180px) {
   .view-workbench {
-    grid-template-columns: minmax(220px, 0.5fr) minmax(520px, 1.5fr);
+    grid-template-columns: minmax(220px, 0.5fr) minmax(0, 1.5fr);
   }
 
   .view-panel-header {
@@ -730,6 +746,7 @@
   }
 
   .view-workbench {
+    height: auto;
     grid-template-columns: minmax(0, 1fr);
   }
 

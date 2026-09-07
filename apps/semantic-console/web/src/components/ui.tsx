@@ -1,11 +1,85 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, CircleNotch, Info, WarningCircle, X } from "@phosphor-icons/react";
+import { CaretLeft, CaretRight, Check, CircleNotch, Info, WarningCircle, X } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
 import { translateLegacy } from "../i18n";
 
 export type IconComponent = Icon;
+
+export const PAGE_SIZE_OPTIONS = [20, 50, 100] as const;
+
+export type PaginationProps = {
+  page: number;
+  pageSize: number;
+  total: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+};
+
+/** Keep long Console collections bounded while preserving controlled selection state. */
+export function usePagination<T>(items: readonly T[], resetKey = "", initialPageSize = PAGE_SIZE_OPTIONS[0]) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(initialPageSize);
+  const pageCount = Math.max(1, Math.ceil(items.length / pageSize));
+
+  useEffect(() => { setPage(1); }, [resetKey]);
+  useEffect(() => { setPage((current) => Math.min(current, pageCount)); }, [pageCount]);
+
+  const pageItems = useMemo(
+    () => items.slice((page - 1) * pageSize, page * pageSize),
+    [items, page, pageSize],
+  );
+
+  return {
+    pageItems,
+    paginationProps: {
+      page,
+      pageSize,
+      total: items.length,
+      onPageChange: setPage,
+      onPageSizeChange: (nextPageSize: number) => { setPageSize(nextPageSize); setPage(1); },
+    } satisfies PaginationProps,
+  };
+}
+
+export function Pagination({ page, pageSize, total, onPageChange, onPageSizeChange }: PaginationProps) {
+  const { t } = useTranslation();
+  if (total <= PAGE_SIZE_OPTIONS[0]) return null;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, total);
+
+  return (
+    <nav className="pagination" aria-label={t("pagination.label")}>
+      <span className="pagination-range" aria-live="polite">{t("pagination.range", { start, end, total })}</span>
+      <label className="pagination-size">
+        <span>{t("pagination.rowsPerPage")}</span>
+        <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))}>
+          {PAGE_SIZE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+      </label>
+      <div className="pagination-pages">
+        <button type="button" className="pagination-button" aria-label={t("pagination.previous")} disabled={page <= 1 || total === 0} onClick={() => onPageChange(Math.max(1, page - 1))}><CaretLeft size={15} /></button>
+        <PageJump page={page} pageCount={pageCount} disabled={total === 0} onPageChange={onPageChange} />
+        <button type="button" className="pagination-button" aria-label={t("pagination.next")} disabled={page >= pageCount || total === 0} onClick={() => onPageChange(Math.min(pageCount, page + 1))}><CaretRight size={15} /></button>
+      </div>
+    </nav>
+  );
+}
+
+function PageJump({ page, pageCount, disabled, onPageChange }: { page: number; pageCount: number; disabled: boolean; onPageChange: (page: number) => void }) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState(String(page));
+  useEffect(() => setDraft(String(page)), [page]);
+  function commit() {
+    const parsed = Number.parseInt(draft, 10);
+    const next = Number.isFinite(parsed) ? Math.min(pageCount, Math.max(1, parsed)) : page;
+    setDraft(String(next));
+    onPageChange(next);
+  }
+  return <label className="pagination-jump"><span>{t("pagination.page")}</span><input type="number" min={1} max={pageCount} value={draft} disabled={disabled} aria-label={t("pagination.jump")} onChange={(event) => setDraft(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commit(); } }} /><span>{t("pagination.of", { count: pageCount })}</span></label>;
+}
 
 function localizeNode(node: ReactNode): ReactNode {
   if (typeof node === "string") return translateLegacy(node);
@@ -92,6 +166,7 @@ export function SectionHeading({ eyebrow, title, description, action }: { eyebro
 
 export function Modal({ open, title, description, onClose, children, footer }: { open: boolean; title: string; description?: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
   const { t } = useTranslation();
+  const titleId = useId();
   const modalRef = useRef<HTMLElement>(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
@@ -116,7 +191,7 @@ export function Modal({ open, title, description, onClose, children, footer }: {
     return () => { window.clearTimeout(timer); document.removeEventListener("keydown", onKeyDown); previous?.focus(); };
   }, [open]);
   if (!open) return null;
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section ref={modalRef} className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div className="modal-header"><div><h2 id="modal-title">{translateLegacy(title)}</h2>{description ? <p>{translateLegacy(description)}</p> : null}</div><button className="icon-button" onClick={onClose} aria-label={t("common.closeDialog")}><X size={18} /></button></div><div className="modal-body">{children}</div>{footer ? <div className="modal-footer">{footer}</div> : null}</section></div>;
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section ref={modalRef} className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId}><div className="modal-header"><div><h2 id={titleId}>{translateLegacy(title)}</h2>{description ? <p>{translateLegacy(description)}</p> : null}</div><button className="icon-button" onClick={onClose} aria-label={t("common.closeDialog")}><X size={18} /></button></div><div className="modal-body">{children}</div>{footer ? <div className="modal-footer">{footer}</div> : null}</section></div>;
 }
 
 export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (value: boolean) => void; label: string }) {

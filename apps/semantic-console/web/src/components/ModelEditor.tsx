@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { BracketsCurly, CaretDown, CaretLeft, CaretRight, Check, Code, Eye, FloppyDisk, Key, MagnifyingGlass, Table, WarningCircle } from "@phosphor-icons/react";
+import { BracketsCurly, CaretDown, Check, Code, Eye, FloppyDisk, Key, MagnifyingGlass, Table, WarningCircle } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 import type { LocalizedText, ProjectDiff, SemanticColumn, SemanticModel, SemanticProjectSnapshot } from "../types";
-import { Badge, Button, EmptyState, Field, Select, TextArea, TextInput, Toggle } from "./ui";
+import { Badge, Button, EmptyState, Field, Pagination, Select, TextArea, TextInput, Toggle, usePagination } from "./ui";
 
 type EditorTab = "details" | "fields" | "source" | "diff";
 type EditorLocale = "zh-CN" | "en-US";
-
-const FIELD_PAGE_SIZE = 15;
 
 function editorLocale(language: string): EditorLocale {
   return language === "zh-CN" ? "zh-CN" : "en-US";
@@ -146,6 +144,7 @@ export function ModelEditor({ snapshot, sourceContent, sourceLoading = false, di
     if (!needle) return models;
     return models.filter((item) => [item.name, item.displayName["zh-CN"], item.displayName["en-US"], item.businessDomain].some((value) => value.toLowerCase().includes(needle)));
   }, [models, query]);
+  const { pageItems: visibleModels, paginationProps: modelPagination } = usePagination(filteredModels, query);
 
   useEffect(() => {
     if (!models.length) {
@@ -297,7 +296,7 @@ export function ModelEditor({ snapshot, sourceContent, sourceLoading = false, di
   return <div className="page model-editor-page">
     <div className="model-editor-heading"><div><p className="eyebrow">{t("model.eyebrow")}</p><h1>{t("model.title")}</h1><p>{t("model.pageDescription")}</p></div><div className="model-heading-meta"><Badge tone="neutral">{t("model.modelCount", { count: snapshot.models.length })}</Badge><Badge tone={snapshot.draftCount ? "amber" : "green"} dot>{snapshot.draftCount ? t("common.draft") : t("common.published")}</Badge></div></div>
     <div className="model-workbench">
-      <aside className="panel model-list-panel"><div className="model-list-toolbar"><div><span className="panel-kicker">{t("model.title")}</span><strong>{t("model.modelCount", { count: filteredModels.length })}</strong></div><div className="model-search"><MagnifyingGlass size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("model.searchPlaceholder")} aria-label={t("model.searchPlaceholder")} /></div></div><div className="model-list">{filteredModels.map((item) => <button type="button" className={`model-list-item ${item.name === activeModel?.name ? "model-list-item-active" : ""}`} key={item.name} onClick={() => selectModel(item.name)}><span className="model-list-icon"><Table size={16} /></span><span className="model-list-copy"><strong>{localizedValue(item.displayName, locale) || item.name}</strong><small>{item.name}</small><em>{item.tableReference.schema ? `${item.tableReference.schema}.` : ""}{item.tableReference.table || t("common.unknown")}</em></span><span className={`model-status-dot ${item.draft ? "model-status-draft" : ""}`} title={item.draft ? t("common.draft") : t("common.tracked")} /></button>)}{filteredModels.length === 0 ? <EmptyState icon={MagnifyingGlass} title={t("model.noModels")} body={t("model.searchPlaceholder")} /> : null}</div></aside>
+      <aside className="panel model-list-panel"><div className="model-list-toolbar"><div><span className="panel-kicker">{t("model.title")}</span><strong>{t("model.modelCount", { count: filteredModels.length })}</strong></div><div className="model-search"><MagnifyingGlass size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("model.searchPlaceholder")} aria-label={t("model.searchPlaceholder")} /></div></div><div className="model-list">{visibleModels.map((item) => <button type="button" className={`model-list-item ${item.name === activeModel?.name ? "model-list-item-active" : ""}`} key={item.name} onClick={() => selectModel(item.name)}><span className="model-list-icon"><Table size={16} /></span><span className="model-list-copy"><strong>{localizedValue(item.displayName, locale) || item.name}</strong><small>{item.name}</small><em>{item.tableReference.schema ? `${item.tableReference.schema}.` : ""}{item.tableReference.table || t("common.unknown")}</em></span><span className={`model-status-dot ${item.draft ? "model-status-draft" : ""}`} title={item.draft ? t("common.draft") : t("common.tracked")} /></button>)}{filteredModels.length === 0 ? <EmptyState icon={MagnifyingGlass} title={t("model.noModels")} body={t("model.searchPlaceholder")} /> : null}</div><Pagination {...modelPagination} /></aside>
       <section className="model-editor-main">
         {activeModel ? <section className="panel model-workspace-panel">
           <div className="model-panel-header"><div><p className="panel-kicker">{activeModel.name}</p><h2>{localizedValue(activeModel.displayName, locale) || activeModel.name}</h2><p>{t("model.modelDetailsHint")}</p></div><div className="model-editor-actions"><Badge tone={activeModel.draft ? "amber" : "neutral"}>{activeModel.draft ? t("common.draft") : t("common.tracked")}</Badge><Button variant="primary" size="sm" icon={FloppyDisk} loading={saving} onClick={() => void save()}>{t("model.saveDraft")}</Button></div></div>
@@ -337,19 +336,12 @@ function WorkspaceTab({ id, active, label, count, icon, onClick }: { id: EditorT
 
 function FieldDictionary({ model, columns, fieldQuery, setFieldQuery, locale, onColumnPatch, onColumnLocalized }: { model: SemanticModel; columns: SemanticColumn[]; fieldQuery: string; setFieldQuery: (value: string) => void; locale: EditorLocale; onColumnPatch: (name: string, patch: Partial<SemanticColumn>) => void; onColumnLocalized: (name: string, field: "displayName" | "description", value: string) => void }) {
   const { t } = useTranslation();
-  const [page, setPage] = useState(1);
   const [expandedFields, setExpandedFields] = useState<Set<string>>(new Set());
-  const pageCount = Math.max(1, Math.ceil(columns.length / FIELD_PAGE_SIZE));
-  const pageColumns = columns.slice((page - 1) * FIELD_PAGE_SIZE, page * FIELD_PAGE_SIZE);
+  const { pageItems: pageColumns, paginationProps: fieldPagination } = usePagination(columns, `${model.name}:${fieldQuery}`);
 
   useEffect(() => {
-    setPage(1);
     setExpandedFields(new Set());
   }, [fieldQuery, model.name]);
-
-  useEffect(() => {
-    setPage((current) => Math.min(current, pageCount));
-  }, [pageCount]);
 
   function toggleField(name: string) {
     setExpandedFields((current) => {
@@ -359,14 +351,7 @@ function FieldDictionary({ model, columns, fieldQuery, setFieldQuery, locale, on
     });
   }
 
-  const rangeStart = columns.length === 0 ? 0 : (page - 1) * FIELD_PAGE_SIZE + 1;
-  const rangeEnd = Math.min(page * FIELD_PAGE_SIZE, columns.length);
-  const range = locale === "zh-CN" ? `${rangeStart}-${rangeEnd} / ${columns.length}` : `${rangeStart}-${rangeEnd} of ${columns.length}`;
-  const previousLabel = locale === "zh-CN" ? "上一页" : "Previous page";
-  const nextLabel = locale === "zh-CN" ? "下一页" : "Next page";
-  const pageLabel = locale === "zh-CN" ? `第 ${page} / ${pageCount} 页` : `Page ${page} of ${pageCount}`;
-
-  return <div className="field-dictionary"><div className="field-dictionary-toolbar"><div><strong>{t("model.fields")}</strong><span>{t("model.fieldCount", { count: model.columns.length })}{columns.length !== model.columns.length ? ` · ${range}` : ""}</span></div><div className="model-search field-search"><MagnifyingGlass size={15} /><input value={fieldQuery} onChange={(event) => setFieldQuery(event.target.value)} placeholder={t("model.fieldSearch")} aria-label={t("model.fieldSearch")} /></div></div>{columns.length === 0 ? <div className="field-table-empty"><EmptyState icon={MagnifyingGlass} title={t("model.noModels")} body={t("model.fieldSearch")} /></div> : <><div className="field-table-wrap"><div className="field-table field-table-head"><span>{t("model.field")}</span><span>{t("model.displayName")}</span><span>{t("model.type")}</span><span>{t("model.role")}</span><span>{t("model.visible")}</span><span aria-hidden="true" /></div>{pageColumns.map((column) => <FieldRow key={column.name} column={column} expanded={expandedFields.has(column.name)} locale={locale} onToggle={() => toggleField(column.name)} onColumnPatch={onColumnPatch} onColumnLocalized={onColumnLocalized} />)}</div><div className="field-pagination"><span>{range}</span><div><button type="button" className="field-page-button" aria-label={previousLabel} disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}><CaretLeft size={15} /></button><span className="field-page-current" aria-live="polite">{pageLabel}</span><button type="button" className="field-page-button" aria-label={nextLabel} disabled={page >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))}><CaretRight size={15} /></button></div></div></>}</div>;
+  return <div className="field-dictionary"><div className="field-dictionary-toolbar"><div><strong>{t("model.fields")}</strong><span>{t("model.fieldCount", { count: model.columns.length })}</span></div><div className="model-search field-search"><MagnifyingGlass size={15} /><input value={fieldQuery} onChange={(event) => setFieldQuery(event.target.value)} placeholder={t("model.fieldSearch")} aria-label={t("model.fieldSearch")} /></div></div>{columns.length === 0 ? <div className="field-table-empty"><EmptyState icon={MagnifyingGlass} title={t("model.noModels")} body={t("model.fieldSearch")} /></div> : <><div className="field-table-wrap"><div className="field-table field-table-head"><span>{t("model.field")}</span><span>{t("model.displayName")}</span><span>{t("model.type")}</span><span>{t("model.role")}</span><span>{t("model.visible")}</span><span aria-hidden="true" /></div>{pageColumns.map((column) => <FieldRow key={column.name} column={column} expanded={expandedFields.has(column.name)} locale={locale} onToggle={() => toggleField(column.name)} onColumnPatch={onColumnPatch} onColumnLocalized={onColumnLocalized} />)}</div><Pagination {...fieldPagination} /></>}</div>;
 }
 
 function FieldRow({ column, expanded, locale, onToggle, onColumnPatch, onColumnLocalized }: { column: SemanticColumn; expanded: boolean; locale: EditorLocale; onToggle: () => void; onColumnPatch: (name: string, patch: Partial<SemanticColumn>) => void; onColumnLocalized: (name: string, field: "displayName" | "description", value: string) => void }) {

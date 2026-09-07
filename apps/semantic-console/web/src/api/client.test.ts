@@ -169,6 +169,26 @@ describe("ApiClient", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/views/daily%2Forders/preview");
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "POST", body: JSON.stringify({ limit: 25, maxBytes: 262144 }) });
   });
+
+  it("requests the bounded audit window and exposes existing update and delete routes", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ items: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient();
+
+    await client.getAccessAudit("access-admin-token");
+    await client.updateSqlCandidate("candidate/a", { sql: "SELECT 1" });
+    await client.resubmitSqlCandidate("candidate/a");
+    await client.deleteDatasource("warehouse/a");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/v1/access/audit?limit=500");
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer access-admin-token" }) }));
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/knowledge/sql-candidates/candidate%2Fa");
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "PUT", body: JSON.stringify({ sql: "SELECT 1" }) });
+    expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/knowledge/sql-candidates/candidate%2Fa/resubmit");
+    expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: "POST", body: "{}" });
+    expect(fetchMock.mock.calls[3]?.[0]).toBe("/api/datasources/warehouse%2Fa");
+    expect(fetchMock.mock.calls[3]?.[1]).toMatchObject({ method: "DELETE" });
+  });
 });
 
 function jsonResponse(body: unknown, status = 200) {

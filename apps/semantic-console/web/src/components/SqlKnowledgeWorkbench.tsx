@@ -18,6 +18,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import type { KnowledgeWorkbenchLocale } from "./RuleWorkbench";
+import { Pagination, usePagination } from "./ui";
 import "./knowledge-workbench.css";
 
 export type SqlKnowledgeStatus = "pending" | "approved" | "rejected";
@@ -92,6 +93,7 @@ export interface SqlKnowledgeWorkbenchProps {
   onValidate?: (candidate: SqlKnowledgeCandidate) => SqlValidation | void | Promise<SqlValidation | void>;
   onApprove?: (candidate: SqlKnowledgeCandidate, sql: string) => void | Promise<void>;
   onReject?: (candidate: SqlKnowledgeCandidate, note: string) => void | Promise<void>;
+  onResubmit?: (candidate: SqlKnowledgeCandidate) => void | Promise<void>;
   onSaveSql?: (candidate: SqlKnowledgeCandidate, sql: string) => void | Promise<void>;
   onRecordQuery?: (query: SqlQueryCapture) => void | Promise<void>;
 }
@@ -143,6 +145,8 @@ type SqlCopy = {
   validationRunning: string;
   approve: string;
   reject: string;
+  resubmit: string;
+  resubmitting: string;
   confirmReject: string;
   cancel: string;
   rejectionReason: string;
@@ -215,6 +219,8 @@ const sqlCopy: Record<KnowledgeWorkbenchLocale, SqlCopy> = {
     validationRunning: "Validation in progress",
     approve: "Approve",
     reject: "Reject",
+    resubmit: "Return to review",
+    resubmitting: "Returning",
     confirmReject: "Confirm rejection",
     cancel: "Cancel",
     rejectionReason: "Review note",
@@ -285,6 +291,8 @@ const sqlCopy: Record<KnowledgeWorkbenchLocale, SqlCopy> = {
     validationRunning: "正在校验",
     approve: "批准",
     reject: "拒绝",
+    resubmit: "重新提交审核",
+    resubmitting: "正在重新提交",
     confirmReject: "确认拒绝",
     cancel: "取消",
     rejectionReason: "审核备注",
@@ -418,6 +426,7 @@ export function SqlKnowledgeWorkbench({
   onValidate,
   onApprove,
   onReject,
+  onResubmit,
   onSaveSql,
   onRecordQuery,
 }: SqlKnowledgeWorkbenchProps) {
@@ -432,7 +441,7 @@ export function SqlKnowledgeWorkbench({
   const [editSql, setEditSql] = useState("");
   const [rejecting, setRejecting] = useState(false);
   const [rejectNote, setRejectNote] = useState("");
-  const [busy, setBusy] = useState<"validate" | "approve" | "reject" | "save" | null>(null);
+  const [busy, setBusy] = useState<"validate" | "approve" | "reject" | "resubmit" | "save" | null>(null);
   const [notice, setNotice] = useState<"approved" | "rejected" | null>(null);
   const [operationError, setOperationError] = useState("");
   const statusTabRefs = useRef<Record<SqlKnowledgeStatus, HTMLButtonElement | null>>({ pending: null, approved: null, rejected: null });
@@ -456,11 +465,12 @@ export function SqlKnowledgeWorkbench({
       return `${candidate.question} ${candidate.queryId ?? ""} ${candidate.sql}`.toLocaleLowerCase().includes(normalized);
     });
   }, [candidates, localStatusMap, search, status]);
+  const { pageItems: pagedCandidates, paginationProps: candidatePagination } = usePagination(visibleCandidates, `${search}|${status}`);
   const selectedCandidate = visibleCandidates.find((candidate) => candidate.id === selectedId) ?? visibleCandidates[0];
   const selectedValidation = selectedCandidate ? validationMap[selectedCandidate.id] ?? selectedCandidate.validation : undefined;
   const selectedSql = selectedCandidate ? localSqlMap[selectedCandidate.id] ?? selectedCandidate.sql : "";
   const validation = validationCopy(selectedValidation, c);
-  const canApprove = selectedCandidate && statusOf(selectedCandidate) === "pending" && selectedValidation?.status === "passed";
+  const canApprove = selectedCandidate && statusOf(selectedCandidate) === "pending" && selectedValidation?.status === "passed" && !editingSql;
 
   function selectCandidate(candidate: SqlKnowledgeCandidate) {
     setSelectedId(candidate.id);
@@ -476,7 +486,7 @@ export function SqlKnowledgeWorkbench({
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
     const offset = event.key === "ArrowDown" ? 1 : -1;
-    const next = visibleCandidates[(index + offset + visibleCandidates.length) % visibleCandidates.length];
+    const next = pagedCandidates[(index + offset + pagedCandidates.length) % pagedCandidates.length];
     if (next) selectCandidate(next);
   }
 
@@ -541,12 +551,28 @@ export function SqlKnowledgeWorkbench({
     }
   }
 
+  async function resubmit() {
+    if (!selectedCandidate || !onResubmit || busy || readOnly) return;
+    setBusy("resubmit");
+    try {
+      await onResubmit({ ...selectedCandidate, sql: selectedSql });
+      setLocalStatusMap((current) => ({ ...current, [selectedCandidate.id]: "pending" }));
+      setStatus("pending");
+      setOperationError("");
+    } catch (caught) {
+      setOperationError(caught instanceof Error ? caught.message : c.errorTitle);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function saveSql() {
     if (!selectedCandidate || !onSaveSql || !editSql.trim() || busy || readOnly) return;
     setBusy("save");
     try {
       await onSaveSql({ ...selectedCandidate, sql: editSql }, editSql);
       setLocalSqlMap((current) => ({ ...current, [selectedCandidate.id]: editSql }));
+      setValidationMap((current) => ({ ...current, [selectedCandidate.id]: { status: "not-run" } }));
       setEditingSql(false);
       setOperationError("");
     } catch (caught) {
@@ -565,9 +591,9 @@ export function SqlKnowledgeWorkbench({
     {error || operationError ? <div className="kw-error" role="alert"><WarningCircle size={18} weight="fill" /><span>{operationError || error || c.errorTitle}</span>{error && onRetry ? <button type="button" className="kw-text-button" onClick={onRetry}><ArrowClockwise size={15} />{c.retry}</button> : null}</div> : null}
     {noticeText ? <div className="kw-notice" role="status"><CheckCircle size={18} weight="fill" /><span>{noticeText}</span><button type="button" className="kw-dismiss" onClick={() => setNotice(null)} aria-label={locale === "zh-CN" ? "关闭提示" : "Dismiss notice"}><X size={15} /></button></div> : null}
     {loading ? <SqlLoadingState label={c.loading} /> : <div className="kw-sql-workbench">
-      <aside className="kw-sql-queue" aria-label={c.queueTitle}><div className="kw-sql-queue-header"><div><h2>{c.queueTitle}</h2><span className="kw-sql-count">{candidates.length}</span></div><p>{c.queueDescription}</p></div><div className="kw-sql-tabs" role="tablist" aria-label={c.queueTitle}>{statusTabs.map(([value, label]) => { const count = candidates.filter((candidate) => statusOf(candidate) === value).length; return <button type="button" role="tab" id={`kw-sql-tab-${value}`} key={value} aria-selected={status === value} aria-controls="kw-sql-queue-panel" tabIndex={status === value ? 0 : -1} ref={(element) => { statusTabRefs.current[value] = element; }} className={status === value ? "kw-sql-tab-active" : ""} onKeyDown={(event) => handleStatusTabKey(event, value)} onClick={() => { setStatus(value); setNotice(null); }}>{label}<span>{count}</span></button>; })}</div><label className="kw-search"><MagnifyingGlass size={16} aria-hidden="true" /><span className="sr-only">{c.search}</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={c.search} aria-label={c.search} /></label><div id="kw-sql-queue-panel" className="kw-sql-list" role="tabpanel" aria-labelledby={`kw-sql-tab-${status}`}><div role="list" aria-label={c.queueTitle}>{visibleCandidates.map((candidate, index) => { const active = candidate.id === selectedId; const candidateStatus = statusOf(candidate); return <div className={`kw-sql-list-row ${active ? "kw-sql-list-row-active" : ""}`} role="listitem" key={candidate.id}><button type="button" className="kw-sql-list-select" aria-current={active ? "true" : undefined} onClick={() => selectCandidate(candidate)} onKeyDown={(event) => handleQueueKey(event, index)}><strong>{candidate.question}</strong><span className="kw-sql-list-meta"><span>{candidate.queryId || candidate.id}</span><span>{formatSqlDate(candidate.submittedAt, locale)}</span></span></button><span className={`kw-status-badge ${statusClass(candidateStatus)}`}>{statusText({ ...candidate, status: candidateStatus }, c)}</span></div>; })}{visibleCandidates.length === 0 ? <SqlEmptyState title={candidates.length ? c.noMatches : c.noCandidates} body={candidates.length ? c.noMatchesBody : c.noCandidatesBody} /> : null}</div></div></aside>
+      <aside className="kw-sql-queue" aria-label={c.queueTitle}><div className="kw-sql-queue-header"><div><h2>{c.queueTitle}</h2><span className="kw-sql-count">{candidates.length}</span></div><p>{c.queueDescription}</p></div><div className="kw-sql-tabs" role="tablist" aria-label={c.queueTitle}>{statusTabs.map(([value, label]) => { const count = candidates.filter((candidate) => statusOf(candidate) === value).length; return <button type="button" role="tab" id={`kw-sql-tab-${value}`} key={value} aria-selected={status === value} aria-controls="kw-sql-queue-panel" tabIndex={status === value ? 0 : -1} ref={(element) => { statusTabRefs.current[value] = element; }} className={status === value ? "kw-sql-tab-active" : ""} onKeyDown={(event) => handleStatusTabKey(event, value)} onClick={() => { setStatus(value); setNotice(null); }}>{label}<span>{count}</span></button>; })}</div><label className="kw-search"><MagnifyingGlass size={16} aria-hidden="true" /><span className="sr-only">{c.search}</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={c.search} aria-label={c.search} /></label><div id="kw-sql-queue-panel" className="kw-sql-list" role="tabpanel" aria-labelledby={`kw-sql-tab-${status}`}><div role="list" aria-label={c.queueTitle}>{pagedCandidates.map((candidate, index) => { const active = candidate.id === selectedId; const candidateStatus = statusOf(candidate); return <div className={`kw-sql-list-row ${active ? "kw-sql-list-row-active" : ""}`} role="listitem" key={candidate.id}><button type="button" className="kw-sql-list-select" aria-current={active ? "true" : undefined} onClick={() => selectCandidate(candidate)} onKeyDown={(event) => handleQueueKey(event, index)}><strong>{candidate.question}</strong><span className="kw-sql-list-meta"><span>{candidate.queryId || candidate.id}</span><span>{formatSqlDate(candidate.submittedAt, locale)}</span></span></button><span className={`kw-status-badge ${statusClass(candidateStatus)}`}>{statusText({ ...candidate, status: candidateStatus }, c)}</span></div>; })}{visibleCandidates.length === 0 ? <SqlEmptyState title={candidates.length ? c.noMatches : c.noCandidates} body={candidates.length ? c.noMatchesBody : c.noCandidatesBody} /> : null}</div></div><Pagination {...candidatePagination} /></aside>
       <section className="kw-sql-detail" aria-label={selectedCandidate ? `${c.detail}: ${selectedCandidate.question}` : c.detail}>
-        {!selectedCandidate ? <SqlEmptyState title={c.noCandidates} body={c.noCandidatesBody} /> : <><div className="kw-sql-detail-header"><div className="kw-sql-detail-title"><span className="kw-panel-kicker">{c.detail}</span><h2>{selectedCandidate.question}</h2><p>{selectedCandidate.queryId ? `${c.queryId}: ${selectedCandidate.queryId}` : c.notAvailable}</p><span className={`kw-status-badge ${statusClass(statusOf(selectedCandidate))}`}>{statusText({ ...selectedCandidate, status: statusOf(selectedCandidate) }, c)}</span></div><div className="kw-sql-detail-actions">{statusOf(selectedCandidate) === "pending" ? <><button type="button" className="kw-sql-review-action" onClick={() => void validate()} disabled={readOnly || !onValidate || Boolean(busy)}>{busy === "validate" ? <CircleNotch className="spin" size={14} /> : <Play size={14} />}{busy === "validate" ? c.validating : c.validate}</button><button type="button" className="kw-sql-review-action kw-sql-review-action-primary" onClick={() => void approve()} disabled={readOnly || !onApprove || !canApprove || Boolean(busy)}><SealCheck size={14} />{c.approve}</button><button type="button" className="kw-sql-review-action kw-sql-review-action-danger" onClick={() => setRejecting(true)} disabled={readOnly || !onReject || Boolean(busy)}><WarningCircle size={14} />{c.reject}</button></> : null}</div></div><div className="kw-sql-detail-body"><section><div className="kw-sql-section-heading"><h3>{c.sql}</h3>{statusOf(selectedCandidate) === "pending" && onSaveSql && !editingSql ? <button type="button" className="kw-sql-edit-toggle" onClick={() => { setEditSql(selectedSql); setEditingSql(true); }} disabled={readOnly || Boolean(busy)}><NotePencil size={14} />{c.editSql}</button> : null}</div>{editingSql ? <><textarea className="kw-sql-edit-area" value={editSql} onChange={(event) => setEditSql(event.target.value)} aria-label={c.sql} disabled={readOnly || busy === "save"} /><div className="kw-sql-edit-actions"><button type="button" className="kw-sql-review-action" onClick={() => { setEditingSql(false); setEditSql(""); }} disabled={Boolean(busy)}>{c.discard}</button><button type="button" className="kw-sql-review-action kw-sql-review-action-primary" onClick={() => void saveSql()} disabled={readOnly || !editSql.trim() || Boolean(busy)}>{busy === "save" ? <CircleNotch className="spin" size={14} /> : <Check size={14} />}{c.saveSql}</button></div></> : <SqlCodeBlock sql={selectedSql} c={c} />}</section><section><div className="kw-sql-section-heading"><h3>{c.source}</h3><small>{selectedCandidate.submittedAt ? `${c.submittedAt}: ${formatSqlDate(selectedCandidate.submittedAt, locale)}` : c.notAvailable}</small></div><SqlStats candidate={selectedCandidate} c={c} /></section><div className={`kw-sql-validation ${validation.className}`} role="status"><CheckCircle size={16} weight="fill" aria-hidden="true" /><span>{validation.label}{selectedValidation?.message && selectedValidation.status !== "passed" ? `: ${selectedValidation.message}` : ""}</span></div><SqlHistory history={selectedCandidate.sqlHistory ?? []} c={c} />{rejecting ? <section className="kw-sql-review-note"><label htmlFor="kw-reject-note">{c.rejectionReason}</label><textarea id="kw-reject-note" value={rejectNote} onChange={(event) => setRejectNote(event.target.value)} placeholder={c.rejectionReasonHint} disabled={readOnly || busy === "reject"} /><div className="kw-sql-edit-actions"><button type="button" className="kw-sql-review-action" onClick={() => { setRejecting(false); setRejectNote(""); }} disabled={Boolean(busy)}>{c.cancel}</button><button type="button" className="kw-sql-review-action kw-sql-review-action-danger" onClick={() => void reject()} disabled={readOnly || !rejectNote.trim() || Boolean(busy)}>{busy === "reject" ? <CircleNotch className="spin" size={14} /> : <WarningCircle size={14} />}{c.confirmReject}</button></div></section> : null}{statusOf(selectedCandidate) === "pending" && !canApprove ? <div className="kw-sql-validation kw-sql-validation-pending"><Info size={16} aria-hidden="true" /><span>{c.passedBeforeApprove}</span></div> : null}{selectedCandidate.reviewNote ? <div className="kw-sql-review-note"><label>{c.reviewNote}</label><p>{selectedCandidate.reviewNote}</p></div> : null}</div></>}
+        {!selectedCandidate ? <SqlEmptyState title={c.noCandidates} body={c.noCandidatesBody} /> : <><div className="kw-sql-detail-header"><div className="kw-sql-detail-title"><span className="kw-panel-kicker">{c.detail}</span><h2>{selectedCandidate.question}</h2><p>{selectedCandidate.queryId ? `${c.queryId}: ${selectedCandidate.queryId}` : c.notAvailable}</p><span className={`kw-status-badge ${statusClass(statusOf(selectedCandidate))}`}>{statusText({ ...selectedCandidate, status: statusOf(selectedCandidate) }, c)}</span></div><div className="kw-sql-detail-actions">{statusOf(selectedCandidate) === "pending" ? <><button type="button" className="kw-sql-review-action" onClick={() => void validate()} disabled={readOnly || !onValidate || Boolean(busy)}>{busy === "validate" ? <CircleNotch className="spin" size={14} /> : <Play size={14} />}{busy === "validate" ? c.validating : c.validate}</button><button type="button" className="kw-sql-review-action kw-sql-review-action-primary" onClick={() => void approve()} disabled={readOnly || !onApprove || !canApprove || Boolean(busy)}><SealCheck size={14} />{c.approve}</button><button type="button" className="kw-sql-review-action kw-sql-review-action-danger" onClick={() => setRejecting(true)} disabled={readOnly || !onReject || Boolean(busy)}><WarningCircle size={14} />{c.reject}</button></> : statusOf(selectedCandidate) === "rejected" && onResubmit ? <button type="button" className="kw-sql-review-action kw-sql-review-action-primary" onClick={() => void resubmit()} disabled={readOnly || Boolean(busy)}>{busy === "resubmit" ? <CircleNotch className="spin" size={14} /> : <ArrowClockwise size={14} />}{busy === "resubmit" ? c.resubmitting : c.resubmit}</button> : null}</div></div><div className="kw-sql-detail-body"><section><div className="kw-sql-section-heading"><h3>{c.sql}</h3>{statusOf(selectedCandidate) === "pending" && onSaveSql && !editingSql ? <button type="button" className="kw-sql-edit-toggle" onClick={() => { setEditSql(selectedSql); setEditingSql(true); }} disabled={readOnly || Boolean(busy)}><NotePencil size={14} />{c.editSql}</button> : null}</div>{editingSql ? <><textarea className="kw-sql-edit-area" value={editSql} onChange={(event) => setEditSql(event.target.value)} aria-label={c.sql} disabled={readOnly || busy === "save"} /><div className="kw-sql-edit-actions"><button type="button" className="kw-sql-review-action" onClick={() => { setEditingSql(false); setEditSql(""); }} disabled={Boolean(busy)}>{c.discard}</button><button type="button" className="kw-sql-review-action kw-sql-review-action-primary" onClick={() => void saveSql()} disabled={readOnly || !editSql.trim() || Boolean(busy)}>{busy === "save" ? <CircleNotch className="spin" size={14} /> : <Check size={14} />}{c.saveSql}</button></div></> : <SqlCodeBlock sql={selectedSql} c={c} />}</section><section><div className="kw-sql-section-heading"><h3>{c.source}</h3><small>{selectedCandidate.submittedAt ? `${c.submittedAt}: ${formatSqlDate(selectedCandidate.submittedAt, locale)}` : c.notAvailable}</small></div><SqlStats candidate={selectedCandidate} c={c} /></section><div className={`kw-sql-validation ${validation.className}`} role="status"><CheckCircle size={16} weight="fill" aria-hidden="true" /><span>{validation.label}{selectedValidation?.message && selectedValidation.status !== "passed" ? `: ${selectedValidation.message}` : ""}</span></div><SqlHistory history={selectedCandidate.sqlHistory ?? []} c={c} />{rejecting ? <section className="kw-sql-review-note"><label htmlFor="kw-reject-note">{c.rejectionReason}</label><textarea id="kw-reject-note" value={rejectNote} onChange={(event) => setRejectNote(event.target.value)} placeholder={c.rejectionReasonHint} disabled={readOnly || busy === "reject"} /><div className="kw-sql-edit-actions"><button type="button" className="kw-sql-review-action" onClick={() => { setRejecting(false); setRejectNote(""); }} disabled={Boolean(busy)}>{c.cancel}</button><button type="button" className="kw-sql-review-action kw-sql-review-action-danger" onClick={() => void reject()} disabled={readOnly || !rejectNote.trim() || Boolean(busy)}>{busy === "reject" ? <CircleNotch className="spin" size={14} /> : <WarningCircle size={14} />}{c.confirmReject}</button></div></section> : null}{statusOf(selectedCandidate) === "pending" && !canApprove ? <div className="kw-sql-validation kw-sql-validation-pending"><Info size={16} aria-hidden="true" /><span>{c.passedBeforeApprove}</span></div> : null}{selectedCandidate.reviewNote ? <div className="kw-sql-review-note"><label>{c.reviewNote}</label><p>{selectedCandidate.reviewNote}</p></div> : null}</div></>}
       </section>
     </div>}
   </div>;

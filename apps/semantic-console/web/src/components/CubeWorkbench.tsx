@@ -15,7 +15,7 @@ import {
   WarningCircle,
   X,
 } from "@phosphor-icons/react";
-import { Badge, Button, EmptyState, Field, InlineNotice, LoadingRows, Modal, Select, TextArea, TextInput } from "./ui";
+import { Badge, Button, EmptyState, Field, InlineNotice, LoadingRows, Modal, Pagination, Select, TextArea, TextInput, usePagination } from "./ui";
 import "./cube-workbench.css";
 
 export type CubeLocale = "zh-CN" | "en-US";
@@ -363,6 +363,7 @@ export default function CubeWorkbench({
     const needle = query.trim().toLowerCase();
     return needle ? cubes.filter((cube) => cube.name.toLowerCase().includes(needle) || cube.baseObject.toLowerCase().includes(needle)) : cubes;
   }, [query, snapshot]);
+  const { pageItems: visibleCubes, paginationProps: cubePagination } = usePagination(filteredCubes, query);
 
   const sourceCube = snapshot?.cubes.find((cube) => cube.name === activeName);
   const activeCube = activeName ? drafts[activeName] ?? sourceCube : undefined;
@@ -504,9 +505,9 @@ export default function CubeWorkbench({
         <div className="cube-list-toolbar"><div><span className="panel-kicker">{t.title}</span><strong>{t.cubeCount(filteredCubes.length)}</strong></div>{onCreate ? <Button variant="ghost" size="sm" icon={Plus} onClick={beginCreate}>{t.createCube}</Button> : null}</div>
         <label className="cube-search"><MagnifyingGlass size={15} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t.search} aria-label={t.search} /></label>
         <div className="cube-list" role="listbox" aria-label={t.title}>
-          {filteredCubes.map((cube) => <button type="button" role="option" aria-selected={cube.name === activeName} className={`cube-list-item ${cube.name === activeName ? "cube-list-item-active" : ""}`} key={cube.name} onClick={() => { setActiveName(cube.name); setTab("details"); setValidation(null); setNotice(null); }}><span className="cube-list-icon"><Cube size={17} weight="duotone" /></span><span className="cube-list-copy"><strong>{cube.name}</strong><small>{cube.baseObject}</small><em>{t.fieldCount(cube.measures.length + cube.dimensions.length + cube.timeDimensions.length)}</em></span><span className={`cube-status-dot ${cube.draft ? "cube-status-draft" : ""}`} title={cube.draft ? t.draft : t.tracked} /></button>)}
+          {visibleCubes.map((cube) => <button type="button" role="option" aria-selected={cube.name === activeName} className={`cube-list-item ${cube.name === activeName ? "cube-list-item-active" : ""}`} key={cube.name} onClick={() => { setActiveName(cube.name); setTab("details"); setValidation(null); setNotice(null); }}><span className="cube-list-icon"><Cube size={17} weight="duotone" /></span><span className="cube-list-copy"><strong>{cube.name}</strong><small>{cube.baseObject}</small><em>{t.fieldCount(cube.measures.length + cube.dimensions.length + cube.timeDimensions.length)}</em></span><span className={`cube-status-dot ${cube.draft ? "cube-status-draft" : ""}`} title={cube.draft ? t.draft : t.tracked} /></button>)}
           {filteredCubes.length === 0 ? <EmptyState icon={MagnifyingGlass} title={t.noMatches} body={t.noMatchesBody} /> : null}
-        </div>
+        </div><Pagination {...cubePagination} />
       </aside>
       <section className="cube-editor-main">
         {!activeCube ? <section className="panel cube-state-panel"><EmptyState icon={Cube} title={t.selectCube} body={t.selectCubeBody} /></section> : <section className="panel cube-workspace-panel">
@@ -559,7 +560,9 @@ function DetailsTab({ cube, baseObjects, t, onChange }: { cube: CubeDefinition; 
 }
 
 function EntriesTab({ collection, entries, title, emptyLabel, addLabel, t, onAdd, onRemove, onChange }: { collection: string; entries: CubeField[]; title: string; emptyLabel: string; addLabel: string; t: Copy; onAdd: () => void; onRemove: (index: number) => void; onChange: (index: number, patch: Partial<CubeField>) => void }) {
-  return <div className="cube-entries-tab"><div className="cube-tab-intro"><div><p className="panel-kicker">{title}</p><h3>{t.fieldCount(entries.length)}</h3></div><Button variant="secondary" size="sm" icon={Plus} onClick={onAdd}>{addLabel}</Button></div>{entries.length === 0 ? <div className="cube-empty-collection"><EmptyState icon={collection === "timeDimensions" ? CheckCircle : Cube} title={t.noEntries(emptyLabel)} body={t.expressionHint} action={<Button variant="ghost" size="sm" icon={Plus} onClick={onAdd}>{addLabel}</Button>} /></div> : <div className="cube-entry-list">{entries.map((entry, index) => <EntryRow key={`${collection}-${index}`} entry={entry} index={index} t={t} onRemove={() => onRemove(index)} onChange={(patch) => onChange(index, patch)} />)}</div>}</div>;
+  const { pageItems, paginationProps } = usePagination(entries, collection);
+  const startIndex = (paginationProps.page - 1) * paginationProps.pageSize;
+  return <div className="cube-entries-tab"><div className="cube-tab-intro"><div><p className="panel-kicker">{title}</p><h3>{t.fieldCount(entries.length)}</h3></div><Button variant="secondary" size="sm" icon={Plus} onClick={onAdd}>{addLabel}</Button></div>{entries.length === 0 ? <div className="cube-empty-collection"><EmptyState icon={collection === "timeDimensions" ? CheckCircle : Cube} title={t.noEntries(emptyLabel)} body={t.expressionHint} action={<Button variant="ghost" size="sm" icon={Plus} onClick={onAdd}>{addLabel}</Button>} /></div> : <><div className="cube-entry-list">{pageItems.map((entry, pageIndex) => { const index = startIndex + pageIndex; return <EntryRow key={`${collection}-${index}`} entry={entry} index={index} t={t} onRemove={() => onRemove(index)} onChange={(patch) => onChange(index, patch)} />; })}</div><Pagination {...paginationProps} /></>}</div>;
 }
 
 function EntryRow({ entry, index, t, onRemove, onChange }: { entry: CubeField; index: number; t: Copy; onRemove: () => void; onChange: (patch: Partial<CubeField>) => void }) {
@@ -569,6 +572,8 @@ function EntryRow({ entry, index, t, onRemove, onChange }: { entry: CubeField; i
 
 function HierarchiesTab({ hierarchies, dimensionNames, t, onChange }: { hierarchies: Record<string, string[]>; dimensionNames: string[]; t: Copy; onChange: (value: Record<string, string[]>) => void }) {
   const entries = Object.entries(hierarchies);
+  const { pageItems, paginationProps } = usePagination(entries);
+  const startIndex = (paginationProps.page - 1) * paginationProps.pageSize;
   function add() {
     let name = "hierarchy";
     let suffix = 1;
@@ -586,7 +591,7 @@ function HierarchiesTab({ hierarchies, dimensionNames, t, onChange }: { hierarch
     delete next[name];
     onChange(next);
   }
-  return <div className="cube-hierarchies-tab"><div className="cube-tab-intro"><div><p className="panel-kicker">{t.hierarchies}</p><h3>{entries.length} {entries.length === 1 ? "hierarchy" : "hierarchies"}</h3></div><Button variant="secondary" size="sm" icon={Plus} onClick={add}>{t.addHierarchy}</Button></div>{entries.length === 0 ? <div className="cube-empty-collection"><EmptyState icon={BracketsCurly} title={t.noHierarchies} body={t.hierarchyLevelsHint} action={<Button variant="ghost" size="sm" icon={Plus} onClick={add}>{t.addHierarchy}</Button>} /></div> : <div className="cube-hierarchy-list">{entries.map(([name, levels], index) => <article className="cube-hierarchy-row" key={`${name}-${index}`}><div className="cube-entry-header"><span className="cube-entry-index">{String(index + 1).padStart(2, "0")}</span><strong>{name || t.hierarchyName}</strong><button type="button" className="cube-remove-button" onClick={() => remove(name)} aria-label={`${t.remove} ${name || t.hierarchyName}`}><Trash size={15} /></button></div><div className="cube-hierarchy-fields"><Field label={t.hierarchyName} htmlFor={`cube-hierarchy-name-${index}`}><TextInput id={`cube-hierarchy-name-${index}`} value={name} onChange={(event) => patch(name, event.target.value, levels)} placeholder="time" /></Field><Field label={t.hierarchyLevels} hint={t.hierarchyLevelsHint} htmlFor={`cube-hierarchy-levels-${index}`}><TextInput id={`cube-hierarchy-levels-${index}`} value={levels.join(", ")} list={`cube-dimension-options-${index}`} onChange={(event) => patch(name, name, event.target.value.split(",").map((level) => level.trim()).filter(Boolean))} placeholder={dimensionNames.slice(0, 2).join(", ") || "order_date"} /><datalist id={`cube-dimension-options-${index}`}>{dimensionNames.map((dimension) => <option value={dimension} key={dimension} />)}</datalist></Field></div></article>)}</div>}</div>;
+  return <div className="cube-hierarchies-tab"><div className="cube-tab-intro"><div><p className="panel-kicker">{t.hierarchies}</p><h3>{entries.length} {entries.length === 1 ? "hierarchy" : "hierarchies"}</h3></div><Button variant="secondary" size="sm" icon={Plus} onClick={add}>{t.addHierarchy}</Button></div>{entries.length === 0 ? <div className="cube-empty-collection"><EmptyState icon={BracketsCurly} title={t.noHierarchies} body={t.hierarchyLevelsHint} action={<Button variant="ghost" size="sm" icon={Plus} onClick={add}>{t.addHierarchy}</Button>} /></div> : <><div className="cube-hierarchy-list">{pageItems.map(([name, levels], pageIndex) => { const index = startIndex + pageIndex; return <article className="cube-hierarchy-row" key={`${name}-${index}`}><div className="cube-entry-header"><span className="cube-entry-index">{String(index + 1).padStart(2, "0")}</span><strong>{name || t.hierarchyName}</strong><button type="button" className="cube-remove-button" onClick={() => remove(name)} aria-label={`${t.remove} ${name || t.hierarchyName}`}><Trash size={15} /></button></div><div className="cube-hierarchy-fields"><Field label={t.hierarchyName} htmlFor={`cube-hierarchy-name-${index}`}><TextInput id={`cube-hierarchy-name-${index}`} value={name} onChange={(event) => patch(name, event.target.value, levels)} placeholder="time" /></Field><Field label={t.hierarchyLevels} hint={t.hierarchyLevelsHint} htmlFor={`cube-hierarchy-levels-${index}`}><TextInput id={`cube-hierarchy-levels-${index}`} value={levels.join(", ")} list={`cube-dimension-options-${index}`} onChange={(event) => patch(name, name, event.target.value.split(",").map((level) => level.trim()).filter(Boolean))} placeholder={dimensionNames.slice(0, 2).join(", ") || "order_date"} /><datalist id={`cube-dimension-options-${index}`}>{dimensionNames.map((dimension) => <option value={dimension} key={dimension} />)}</datalist></Field></div></article>; })}</div><Pagination {...paginationProps} /></>}</div>;
 }
 
 function ValidationSummary({ result }: { result: CubeValidationResult }) {

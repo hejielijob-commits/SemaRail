@@ -198,7 +198,7 @@ export class ApiClient {
   }
 
   getAccessAudit(token: string): Promise<{ items: AccessAuditEvent[] }> {
-    return this.request("/api/v1/access/audit", { headers: this.adminHeaders(token) });
+    return this.request("/api/v1/access/audit?limit=500", { headers: this.adminHeaders(token) });
   }
 
   /** Load the structured business-model projection used by the visual editor. */
@@ -250,6 +250,10 @@ export class ApiClient {
     return this.request(`/api/knowledge/sql-candidates${status ? `?status=${encodeURIComponent(status)}` : ""}`);
   }
 
+  updateSqlCandidate(id: string, payload: { sql: string }): Promise<{ candidate: SqlCandidateRecord }> {
+    return this.request(`/api/knowledge/sql-candidates/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(payload) });
+  }
+
   approveSqlCandidate(id: string, payload: { sql?: string; reviewer?: string; reviewNote?: string } = {}): Promise<{ candidate: SqlCandidateRecord; approved: boolean; path?: string }> {
     return this.request(`/api/knowledge/sql-candidates/${encodeURIComponent(id)}/approve`, { method: "POST", body: JSON.stringify(payload) });
   }
@@ -262,6 +266,10 @@ export class ApiClient {
 
   rejectSqlCandidate(id: string, reviewNote: string): Promise<{ candidate: SqlCandidateRecord; rejected: boolean }> {
     return this.request(`/api/knowledge/sql-candidates/${encodeURIComponent(id)}/reject`, { method: "POST", body: JSON.stringify({ reviewNote }) });
+  }
+
+  resubmitSqlCandidate(id: string): Promise<{ candidate: SqlCandidateRecord; resubmitted: boolean }> {
+    return this.request(`/api/knowledge/sql-candidates/${encodeURIComponent(id)}/resubmit`, { method: "POST", body: "{}" });
   }
 
   getCubes(): Promise<CubeSnapshot> {

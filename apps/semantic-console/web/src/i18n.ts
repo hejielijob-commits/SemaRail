@@ -14,13 +14,17 @@ const resources = {
         yes: "Yes", no: "No", visible: "Visible", hidden: "Hidden", optional: "Optional", required: "Required",
         unknown: "Unknown", none: "None", columns: "columns", files: "files", detected: "detected",
         closeDialog: "Close dialog", switchToDark: "Switch to dark theme", switchToLight: "Switch to light theme",
-        openHistory: "Open version history", signedIn: "Signed in as WS",
+        openHistory: "Open version history", signedIn: "Signed in as {{name}}", localWorkspace: "Local workspace",
+      },
+      pagination: {
+        label: "Pagination", range: "{{start}}-{{end}} of {{total}}", rowsPerPage: "Rows",
+        previous: "Previous page", next: "Next page", page: "Page", jump: "Go to page", of: "of {{count}}",
       },
       nav: {
         workspace: "Workspace", overview: "Overview", datasources: "Data sources", schema: "Schema browser",
         semanticLayer: "Semantic layer", models: "Models", relationships: "Relationships", views: "Views",
         cubes: "Cubes", rules: "Business rules", sqlKnowledge: "SQL knowledge", mcp: "MCP integration", access: "Access control", instructions: "Instructions", mdl: "MDL source", settings: "Settings", helpTitle: "Need a hand?",
-        helpBody: "Read the semantic layer guide", project: "PROJECT", close: "Close navigation", open: "Open navigation",
+        helpBody: "Project-local semantic guidance", project: "PROJECT", close: "Close navigation", open: "Open navigation",
       },
       page: {
         overview: "Overview", datasources: "Data sources", schema: "Schema browser", models: "Models",
@@ -77,13 +81,17 @@ const resources = {
         yes: "是", no: "否", visible: "可见", hidden: "隐藏", optional: "可选", required: "必填",
         unknown: "未知", none: "无", columns: "列", files: "文件", detected: "已检测",
         closeDialog: "关闭对话框", switchToDark: "切换到深色主题", switchToLight: "切换到浅色主题",
-        openHistory: "打开版本历史", signedIn: "当前用户 WS",
+        openHistory: "打开版本历史", signedIn: "当前用户 {{name}}", localWorkspace: "本地工作区",
+      },
+      pagination: {
+        label: "分页", range: "第 {{start}}-{{end}} 条，共 {{total}} 条", rowsPerPage: "每页",
+        previous: "上一页", next: "下一页", page: "第", jump: "跳转到页码", of: "/ {{count}} 页",
       },
       nav: {
         workspace: "工作区", overview: "概览", datasources: "数据源", schema: "Schema 浏览器",
         semanticLayer: "语义层", models: "业务模型", relationships: "关系", views: "视图",
         cubes: "指标立方体", rules: "业务规则", sqlKnowledge: "SQL 知识", mcp: "MCP 集成", access: "访问控制", instructions: "指令", mdl: "MDL 源文件", settings: "设置", helpTitle: "需要帮助？",
-        helpBody: "阅读语义层指南", project: "项目", close: "关闭导航", open: "打开导航",
+        helpBody: "项目内语义治理说明", project: "项目", close: "关闭导航", open: "打开导航",
       },
       page: {
         overview: "概览", datasources: "数据源", schema: "Schema 浏览器", models: "业务模型",

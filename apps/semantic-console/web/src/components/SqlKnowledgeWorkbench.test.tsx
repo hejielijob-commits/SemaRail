@@ -29,6 +29,16 @@ function candidate(overrides: Partial<SqlKnowledgeCandidate> = {}): SqlKnowledge
 }
 
 describe("SqlKnowledgeWorkbench", () => {
+  it("bounds a 200-candidate review queue and preserves the selected detail", async () => {
+    const candidates = Array.from({ length: 200 }, (_, index) => candidate({ id: `candidate-${index + 1}`, queryId: `query-${index + 1}`, question: `Question ${String(index + 1).padStart(3, "0")}` }));
+    render(<SqlKnowledgeWorkbench candidates={candidates} />);
+    expect(await screen.findByText("1-20 of 200")).toBeInTheDocument();
+    expect(document.querySelectorAll(".kw-sql-list-row")).toHaveLength(20);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("21-40 of 200")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Question 001", level: 2 })).toBeInTheDocument();
+  });
+
   it("shows the review queue and the pending candidate detail", async () => {
     render(<SqlKnowledgeWorkbench candidates={[candidate()]} />);
     expect(await screen.findByRole("heading", { name: "SQL knowledge" })).toBeInTheDocument();
@@ -76,14 +86,29 @@ describe("SqlKnowledgeWorkbench", () => {
     await waitFor(() => expect(onReject).toHaveBeenCalledWith(expect.objectContaining({ id: "candidate-1" }), "The metric definition needs to be clarified."));
   });
 
-  it("allows editing SQL only through an explicit save callback", async () => {
+  it("returns a rejected candidate to the existing review queue", async () => {
+    const rejected = candidate({ status: "rejected", reviewNote: "Use the governed net revenue field." });
+    const onResubmit = vi.fn().mockResolvedValue(undefined);
+    render(<SqlKnowledgeWorkbench candidates={[rejected]} onResubmit={onResubmit} />);
+    fireEvent.click(screen.getByRole("tab", { name: /Rejected/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Return to review" }));
+    await waitFor(() => expect(onResubmit).toHaveBeenCalledWith(expect.objectContaining({ id: rejected.id })));
+    expect(screen.getByRole("tab", { name: /Pending/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("invalidates stale validation whenever reviewed SQL is edited", async () => {
     const onSaveSql = vi.fn().mockResolvedValue(undefined);
-    render(<SqlKnowledgeWorkbench candidates={[candidate()]} onSaveSql={onSaveSql} />);
+    render(<SqlKnowledgeWorkbench candidates={[candidate({ validation: { status: "passed" } })]} onSaveSql={onSaveSql} onApprove={vi.fn()} />);
+    const approve = await screen.findByRole("button", { name: "Approve" });
+    expect(approve).toBeEnabled();
     fireEvent.click(await screen.findByRole("button", { name: "Edit SQL" }));
+    expect(approve).toBeDisabled();
     const editor = screen.getByRole("textbox", { name: "SQL" });
     fireEvent.change(editor, { target: { value: "select 1;" } });
     fireEvent.click(screen.getByRole("button", { name: "Save SQL" }));
     await waitFor(() => expect(onSaveSql).toHaveBeenCalledWith(expect.objectContaining({ id: "candidate-1" }), "select 1;"));
+    expect(approve).toBeDisabled();
+    expect(screen.getByText("Validation has not run")).toBeInTheDocument();
   });
 
   it("switches review statuses and keeps each tab count accurate", async () => {

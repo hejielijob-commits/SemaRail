@@ -17,6 +17,15 @@ function rule(overrides: Partial<KnowledgeRule> = {}): KnowledgeRule {
 }
 
 describe("RuleWorkbench", () => {
+  it("bounds a 200-rule enterprise queue to 20 rows per page", async () => {
+    const rules = Array.from({ length: 200 }, (_, index) => rule({ id: `rule-${index + 1}`, name: `Rule ${String(index + 1).padStart(3, "0")}` }));
+    render(<RuleWorkbench rules={rules} />);
+    expect(await screen.findByText("1-20 of 200")).toBeInTheDocument();
+    expect(document.querySelectorAll(".kw-rule-row")).toHaveLength(20);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("21-40 of 200")).toBeInTheDocument();
+  });
+
   it("shows one rule per row and exposes an accessible enable switch", async () => {
     const onToggleRule = vi.fn().mockResolvedValue(undefined);
     render(<RuleWorkbench rules={[rule(), rule({ id: "orders", name: "orders guidance", enabled: false })]} onToggleRule={onToggleRule} />);

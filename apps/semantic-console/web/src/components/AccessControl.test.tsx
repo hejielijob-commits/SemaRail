@@ -10,6 +10,7 @@ vi.mock("../api/client", () => ({
     getUsers: vi.fn(),
     getAccessPolicies: vi.fn(),
     getAccessAudit: vi.fn(),
+    updateServiceAccount: vi.fn(),
     issueServiceAccountKey: vi.fn(),
     updateUser: vi.fn(),
     setUserStatus: vi.fn(),
@@ -59,11 +60,60 @@ describe("AccessControl", () => {
       credential: { id: "credential-1", subjectId: account.id, label: "console", createdAt: "2026-08-30T00:00:00Z" },
     });
     vi.mocked(api.updateUser).mockResolvedValue(employee);
+    vi.mocked(api.updateServiceAccount).mockResolvedValue(account);
     vi.mocked(api.setUserStatus).mockResolvedValue({ ...employee, status: "disabled" });
     vi.mocked(api.bindAccessPolicy).mockResolvedValue({ subjectId: employee.id, policyId: policy.id });
     vi.mocked(api.unbindAccessPolicy).mockResolvedValue({ subjectId: account.id, policyId: policy.id, status: "unbound" });
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn().mockResolvedValue(undefined) } });
   });
+
+  it("paginates a 500-event audit window", async () => {
+    vi.mocked(api.getAccessAudit).mockResolvedValue({ items: Array.from({ length: 500 }, (_, index) => ({ id: `audit-${index + 1}`, organizationId: "org-default", occurredAt: "2026-08-30T00:00:00Z", action: `query.${index + 1}`, decision: "allowed" as const, subjectId: "subject-a", resource: "orders", details: {} })) });
+    render(<AccessControl locale="en-US" />);
+    fireEvent.change(screen.getByLabelText("Administrator token"), { target: { value: adminToken } });
+    fireEvent.click(screen.getByRole("button", { name: "Open access control" }));
+    await screen.findAllByText("Sales agent A");
+    fireEvent.click(screen.getByRole("tab", { name: "Audit" }));
+    expect(screen.getByText("1-20 of 500")).toBeInTheDocument();
+    expect(document.querySelectorAll(".access-audit-table > div")).toHaveLength(21);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("21-40 of 500")).toBeInTheDocument();
+  });
+
+  it("paginates long credential rotation history without hiding revoked keys", async () => {
+    const credentials = Array.from({ length: 41 }, (_, index) => ({
+      id: `credential-${index + 1}`,
+      subjectId: account.id,
+      label: `Key ${String(index + 1).padStart(2, "0")}`,
+      createdAt: "2026-08-30T00:00:00Z",
+      revokedAt: index < 40 ? "2026-08-31T00:00:00Z" : undefined,
+    }));
+    vi.mocked(api.getServiceAccounts).mockResolvedValue({ items: [{ ...account, credentials }] });
+    render(<AccessControl locale="en-US" adminToken={adminToken} />);
+
+    await screen.findAllByText("Sales agent A");
+    expect(screen.getByText("1-20 of 41")).toBeInTheDocument();
+    expect(document.querySelectorAll(".access-credentials article")).toHaveLength(20);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("21-40 of 41")).toBeInTheDocument();
+  });
+
+  it("updates an existing service account through the existing admin endpoint", async () => {
+    render(<AccessControl locale="en-US" />);
+    fireEvent.change(screen.getByLabelText("Administrator token"), { target: { value: adminToken } });
+    fireEvent.click(screen.getByRole("button", { name: "Open access control" }));
+    await screen.findAllByText("Sales agent A");
+
+    fireEvent.change(screen.getAllByLabelText("Account name")[1], { target: { value: "Sales agent North" } });
+    fireEvent.change(screen.getAllByLabelText("Region codes")[1], { target: { value: "CN-JIA, CN-YI" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save account" }));
+
+    await waitFor(() => expect(api.updateServiceAccount).toHaveBeenCalledWith(adminToken, account.id, {
+      name: "Sales agent North",
+      attributes: { regionCodes: ["CN-JIA", "CN-YI"] },
+    }));
+  });
+
 
   it("does not call protected APIs until the administrator token is submitted", async () => {
     render(<AccessControl locale="en-US" />);

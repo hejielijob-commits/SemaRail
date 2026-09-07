@@ -144,7 +144,7 @@ class SemanticConsoleApplication:
         identity_response = self.identity_api.dispatch(method.upper(), parsed.path, query, body, authorization)
         if identity_response is not None:
             return identity_response
-        access_response = self.access_api.dispatch(method.upper(), parsed.path, body, authorization)
+        access_response = self.access_api.dispatch(method.upper(), parsed.path, body, authorization, query)
         if access_response is not None:
             return access_response
         auth: AuthContext | None = None
