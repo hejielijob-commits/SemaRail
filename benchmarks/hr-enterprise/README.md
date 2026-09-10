@@ -4,8 +4,7 @@ This local-only benchmark tests SemaRail against a reproducible enterprise-shape
 
 The completed direct-agent evaluation, methodology, failure routing, and
 content-safe results are published in the
-[`EVALUATION_REPORT.md`](EVALUATION_REPORT.md). DeepSeek Harness remains outside
-the scope of that result.
+[`EVALUATION_REPORT.md`](EVALUATION_REPORT.md).
 
 ## What it exercises
 
@@ -17,7 +16,7 @@ the scope of that result.
 - 60 fixed questions: 40 Chinese and 20 English; 30 basic, 15 analytical, and 15 authorization cases
 - inline result limits, CSV artifact fallback, download authorization, and immediate credential revocation
 
-The deterministic layer sends the checked-in canonical semantic SQL through the real semantic planner, policy engine, and PostgreSQL executor. It must pass all 60 cases and all security probes. The separate model layer evaluates real Harness captures with thresholds of 48/60 on the first pass, 54/60 after at most one repair, and 15/15 authorization denials.
+The deterministic layer sends the checked-in canonical semantic SQL through the real semantic planner, policy engine, and PostgreSQL executor. It must pass all 60 cases and all security probes. The separate model layer evaluates provider-neutral agent captures with thresholds of 48/60 on the first pass, 54/60 after at most one repair, and 15/15 authorization denials.
 
 ## Semantic-layer assets under test
 
@@ -72,19 +71,19 @@ pnpm test:hr-benchmark
 pnpm benchmark:hr:evaluate -- --dry-run
 ```
 
-## Model/Harness evaluation
+## Model-agent evaluation
 
 First create a schema-v2 capture template:
 
 ```powershell
-pnpm benchmark:hr:evaluate -- --make-template .benchmark-data/hr-enterprise/harness-template.json
+pnpm benchmark:hr:evaluate -- --make-template .benchmark-data/hr-enterprise/agent-template.json
 ```
 
-Replace placeholders with a real, provider-neutral Harness run. The evidence envelope records the model provider/id, parameters, the pinned data hash, and one or two attempts per question. Then evaluate it:
+Replace placeholders with a real, provider-neutral agent run. The evidence envelope records the model provider/id, parameters, the pinned data hash, and one or two attempts per question. Then evaluate it:
 
 ```powershell
 pnpm benchmark:hr:evaluate -- `
-  --evidence .benchmark-data/hr-enterprise/harness-evidence.json `
+  --evidence .benchmark-data/hr-enterprise/agent-evidence.json `
   --report .benchmark-data/hr-enterprise/reports/model-evaluation.json
 ```
 

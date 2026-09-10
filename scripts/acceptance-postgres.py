@@ -476,15 +476,24 @@ def _provision_target(args: argparse.Namespace) -> ProvisionedTarget:
             seed_sql = seed_path.read_text(encoding="utf-8")
             phase = "load_seed"
             target.execute(seed_sql)
+            target.execute("CREATE SCHEMA hr")
+            target.execute(
+                "CREATE TABLE hr.compensation (employee_id INTEGER PRIMARY KEY, salary NUMERIC NOT NULL)"
+            )
+            target.execute(
+                "INSERT INTO hr.compensation(employee_id,salary) VALUES (1,120000),(2,95000)"
+            )
             grant_statements = [
                 sql.SQL("CREATE ROLE {} LOGIN PASSWORD {}").format(
                     sql.Identifier(role), sql.Literal(password)
                 ),
                 sql.SQL("REVOKE ALL ON SCHEMA public FROM {}").format(sql.Identifier(role)),
                 sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(sql.Identifier(role)),
+                sql.SQL("GRANT USAGE ON SCHEMA hr TO {}").format(sql.Identifier(role)),
                 sql.SQL("GRANT SELECT ON {}, {}, {}, {}, {} TO {}").format(
                     *(sql.Identifier(table) for table in EXPECTED_TABLES), sql.Identifier(role)
                 ),
+                sql.SQL("GRANT SELECT ON hr.compensation TO {}").format(sql.Identifier(role)),
                 sql.SQL("GRANT CONNECT ON DATABASE {} TO {}").format(
                     sql.Identifier(database), sql.Identifier(role)
                 ),
@@ -623,6 +632,24 @@ def _prepare_project_fixture(project_dir: Path, run_dir: Path) -> Path:
 
     destination = run_dir / "project"
     shutil.copytree(project_dir, destination)
+    compensation = destination / "models" / "compensation"
+    compensation.mkdir(parents=True, exist_ok=True)
+    (compensation / "metadata.yml").write_text(
+        "name: compensation\n"
+        "table_reference:\n"
+        "  schema: hr\n"
+        "  table: compensation\n"
+        "primary_key: employee_id\n"
+        "columns:\n"
+        "  - name: employee_id\n"
+        "    type: INTEGER\n"
+        "    is_primary_key: true\n"
+        "    not_null: true\n"
+        "  - name: salary\n"
+        "    type: DECIMAL(18,2)\n"
+        "    not_null: true\n",
+        encoding="utf-8",
+    )
     return destination.resolve()
 
 
@@ -742,6 +769,82 @@ def _run_bounds_and_policy(client: SidecarClient, project_dir: Path) -> None:
             label,
             {"POLICY_DENIED", "SEMANTIC_ERROR", "INVALID_PARAMS"},
         )
+
+
+def _run_exact_hr_policy_denials(client: SidecarClient, project_dir: Path) -> None:
+    """Exercise exact HR table/column denials in the real Sidecar + PostgreSQL process."""
+
+    database_session = {
+        "schemaVersion": 1,
+        "subjectId": "acceptance-employee",
+        "organizationId": "acceptance-org",
+        "attributes": {"regionCodes": ["east"]},
+        "policyVersions": ["policy-hr:1"],
+    }
+    cases = (
+        (
+            "HR table policy",
+            "SELECT compensation.employee_id FROM compensation",
+            {},
+            "TABLE_PERMISSION_REQUIRED",
+            [{"kind": "table", "name": "hr.compensation"}],
+            ["table:read"],
+        ),
+        (
+            "HR salary column policy",
+            "SELECT compensation.salary FROM compensation",
+            {
+                "hr.compensation": {
+                    "rowFilter": None,
+                    "allowedColumns": ["employee_id"],
+                    "deniedColumns": ["salary"],
+                }
+            },
+            "COLUMN_PERMISSION_REQUIRED",
+            [{"kind": "column", "name": "hr.compensation.salary"}],
+            ["column:read"],
+        ),
+    )
+    for label, semantic_sql, tables, reason_code, resources, permissions in cases:
+        request_id = _request_id()
+        trace_id = "trace-" + uuid.uuid4().hex
+        client.send({
+            "protocolVersion": "2",
+            "id": request_id,
+            "method": "query.run",
+            "traceId": trace_id,
+            "params": {
+                "projectDir": str(project_dir),
+                "question": label,
+                "semanticSql": semantic_sql,
+                "queryId": _request_id(),
+                "authorizationPolicy": {
+                    "schemaVersion": 1,
+                    "defaultEffect": "deny",
+                    "tables": tables,
+                    "policyVersions": ["policy-hr:1"],
+                    "databaseSession": database_session,
+                },
+            },
+        })
+        response = client.recv(request_id, timeout=35)
+        error = response.get("error")
+        if response.get("protocolVersion") != "2" or response.get("ok") is not False or not isinstance(error, Mapping):
+            raise E2EFailure(f"{label} did not return a detailed v2 denial")
+        expected = {
+            "code": "POLICY_DENIED",
+            "phase": "authorization",
+            "reasonCode": reason_code,
+            "resources": resources,
+            "requiredPermissions": permissions,
+            "origin": "semarail-policy",
+            "retryable": False,
+            "traceId": trace_id,
+        }
+        if any(error.get(key) != value for key, value in expected.items()):
+            raise E2EFailure(f"{label} returned the wrong reason, object, permission, or trace")
+        if not isinstance(error.get("suggestion"), str) or not error["suggestion"]:
+            raise E2EFailure(f"{label} omitted remediation guidance")
 
 
 def _mcp_result_payload(result: Any, label: str) -> Mapping[str, Any]:
@@ -903,21 +1006,26 @@ def _run_timeout_and_cancel(client: SidecarClient, project_dir: Path) -> None:
             },
         }
     )
-    # Wren is warmed by the smoke corpus.  Give the worker a brief window to
-    # reach PostgreSQL, then deliver query.cancel over the same framed pipe.
-    time.sleep(0.15)
-    cancel_id = _request_id()
-    client.send(
-        {
-            "protocolVersion": PROTOCOL_VERSION,
-            "id": cancel_id,
-            "method": "query.cancel",
-            "params": {"queryId": query_id},
-        }
-    )
-    cancel = client.recv(cancel_id, timeout=10)
-    cancel_result = _assert_ok(cancel, "cancel probe request")
-    if cancel_result.get("cancelled") is not True:
+    # Planning latency varies by host. Poll for the bounded interval in which
+    # the query becomes active instead of racing one fixed-delay cancel call.
+    cancelled = False
+    for _attempt in range(40):
+        time.sleep(0.05)
+        cancel_id = _request_id()
+        client.send(
+            {
+                "protocolVersion": PROTOCOL_VERSION,
+                "id": cancel_id,
+                "method": "query.cancel",
+                "params": {"queryId": query_id},
+            }
+        )
+        cancel = client.recv(cancel_id, timeout=10)
+        cancel_result = _assert_ok(cancel, "cancel probe request")
+        if cancel_result.get("cancelled") is True:
+            cancelled = True
+            break
+    if not cancelled:
         raise E2EFailure("query.cancel did not report an active query")
     run = client.recv(run_id, timeout=15)
     _assert_rejected(run, "cancelled query", {"CANCELLED", "TIMEOUT"})
@@ -947,6 +1055,81 @@ def _run_read_only_probe(dsn: str) -> None:
             connection.close()
         except Exception:
             pass
+
+
+def _run_database_permission_probe(
+    args: argparse.Namespace,
+    target: ProvisionedTarget,
+    client: SidecarClient,
+    project_dir: Path,
+) -> None:
+    """Prove a real PostgreSQL 42501 becomes a safe detailed v2 error."""
+
+    psycopg, sql = _load_psycopg()
+    try:
+        connection = psycopg.connect(
+            _admin_dsn_for_database(args, target.database), autocommit=True
+        )
+    except Exception as exc:
+        raise E2EFailure("could not connect to install the database permission probe") from exc
+    try:
+        connection.execute(
+            sql.SQL("REVOKE SELECT ON public.products FROM {}").format(
+                sql.Identifier(target.role)
+            )
+        )
+        request_id = "e2e-" + uuid.uuid4().hex
+        trace_id = "trace-" + uuid.uuid4().hex
+        client.send({
+            "protocolVersion": "2",
+            "id": request_id,
+            "method": "query.run",
+            "traceId": trace_id,
+            "params": {
+                "projectDir": str(project_dir),
+                "question": "读取产品类别",
+                "semanticSql": "SELECT products.category FROM products ORDER BY products.category",
+                "queryId": _request_id(),
+            },
+        })
+        response = client.recv(request_id, timeout=35)
+        if response.get("protocolVersion") != "2" or response.get("ok") is not False:
+            raise E2EFailure("database permission probe was unexpectedly accepted")
+        error = response.get("error")
+        if not isinstance(error, Mapping):
+            raise E2EFailure("database permission probe returned no structured error")
+        expected = {
+            "code": "DATABASE_ERROR",
+            "phase": "database",
+            "reasonCode": "DATABASE_PERMISSION_REQUIRED",
+            "origin": "database",
+            "retryable": False,
+            "requiredPermissions": ["database:read"],
+            "traceId": trace_id,
+        }
+        if any(error.get(key) != value for key, value in expected.items()):
+            raise E2EFailure("database permission probe returned incorrect detailed fields")
+        suggestion = error.get("suggestion")
+        if not isinstance(suggestion, str) or "database administrator" not in suggestion:
+            raise E2EFailure("database permission probe omitted its remediation advice")
+        resources = error.get("resources")
+        message = error.get("message")
+        if not isinstance(resources, list) or not isinstance(message, str):
+            raise E2EFailure("database permission probe returned invalid safe details")
+        if resources:
+            if resources != [{"kind": "table", "name": "public.products"}]:
+                raise E2EFailure("database permission probe reported an unverified object")
+        elif "did not identify a specific object" not in message:
+            raise E2EFailure("database permission probe guessed an object the driver did not identify")
+    finally:
+        try:
+            connection.execute(
+                sql.SQL("GRANT SELECT ON public.products TO {}").format(
+                    sql.Identifier(target.role)
+                )
+            )
+        finally:
+            connection.close()
 
 
 def _install_rls_fixture(args: argparse.Namespace, target: ProvisionedTarget) -> None:
@@ -1264,6 +1447,7 @@ def main(argv: Iterable[str] | None = None) -> int:
             raise E2EFailure("Wren example project validation failed")
         _run_smoke_cases(client, runtime_project_dir, smoke)
         _run_bounds_and_policy(client, runtime_project_dir)
+        _run_exact_hr_policy_denials(client, runtime_project_dir)
         _run_governed_mcp_smoke(
             python_path,
             runtime_project_dir,
@@ -1272,6 +1456,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         )
         _run_timeout_and_cancel(client, runtime_project_dir)
         if target is not None:
+            _run_database_permission_probe(args, target, client, runtime_project_dir)
             _install_rls_fixture(args, target)
             _run_rls_identity_probe(client, runtime_project_dir)
             _run_rls_artifact_probe(client, runtime_project_dir, run_dir)
@@ -1286,6 +1471,11 @@ def main(argv: Iterable[str] | None = None) -> int:
         print("  health/project validation/smoke result metadata: passed")
         print("  framed sidecar and governed MCP query paths: passed")
         print("  row bounds/policy/read-only account/timeout/cancel: passed")
+        print("  exact hr.compensation table/salary column pre-execution denials: passed")
+        print(
+            "  PostgreSQL account permission denial/detailed v2 error: "
+            + ("passed" if target is not None else "not modified in existing mode")
+        )
         print(
             "  PostgreSQL transaction context/RLS employee isolation: "
             + ("passed" if target is not None else "not modified in existing mode")

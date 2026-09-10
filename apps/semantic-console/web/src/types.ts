@@ -12,6 +12,8 @@ export type ConsoleSection =
   | "sqlKnowledge"
   | "mcp"
   | "access"
+  | "diagnostics"
+  | "regressionCases"
   | "instructions"
   | "mdl";
 
@@ -45,6 +47,83 @@ export interface McpIntegrationResponse {
     audience: "trusted_local_operator";
     userIsolation: false;
   };
+}
+
+export type FeedbackCategory =
+  | "ambiguity"
+  | "knowledge_gap"
+  | "agent_understanding"
+  | "sql_generation"
+  | "permission_configuration"
+  | "runtime_failure"
+  | "evaluation"
+  | "other";
+
+export type FeedbackStatus = "pending" | "classified" | "located" | "fixed" | "verified" | "closed_no_fix";
+
+export interface DiagnosticFeedback {
+  id: string;
+  diagnosticId: string;
+  traceId: string;
+  queryId?: string | null;
+  originalQueryId?: string | null;
+  datasourceId?: string | null;
+  subjectId: string;
+  credentialId?: string | null;
+  transport: string;
+  method: string;
+  stage: string;
+  semanticVersion?: string | null;
+  durationMs: number;
+  policyVersions: string[];
+  category: FeedbackCategory;
+  description: string;
+  expectedBehavior?: string | null;
+  status: FeedbackStatus;
+  duplicateOf?: string | null;
+  evidence: {
+    source: "server" | "client";
+    question?: string | null;
+    semanticSql?: string | null;
+    nativeSql?: string | null;
+    error?: Record<string, unknown> | null;
+    contentPurgedAt?: string | null;
+  };
+  createdAt: string;
+  diagnosticCreatedAt: string;
+  updatedAt: string;
+  history?: Array<{
+    id: string;
+    actorSubjectId: string;
+    fromStatus?: FeedbackStatus | null;
+    toStatus: FeedbackStatus;
+    note?: string | null;
+    createdAt: string;
+  }>;
+}
+
+export interface RegressionCaseRecord {
+  id: string;
+  feedbackId: string;
+  status: "draft" | "enabled";
+  schemaVersion: 1;
+  kind: "deterministic_sql" | "agent_evidence";
+  question: string;
+  clarificationAnswers?: Record<string, unknown>;
+  role?: string;
+  policyTestConfig?: Record<string, unknown>;
+  semanticVersion?: string;
+  semanticSnapshot?: Record<string, unknown>;
+  testDatasetId?: string;
+  semanticSql?: string;
+  expectedResult?: unknown;
+  expectedError?: Record<string, unknown>;
+}
+
+export interface RegressionCaseExport {
+  schemaVersion: 1;
+  projectId: string;
+  cases: RegressionCaseRecord[];
 }
 
 export interface AccessCredential {
@@ -391,10 +470,23 @@ export interface KnowledgeRuleRecord {
   sourcePath: string;
   scope?: string[];
   tags?: string[];
+  confirmationRule?: QueryConfirmationRule;
   updatedAt?: string;
   draft?: boolean;
   sourceContent?: string;
   diff?: string;
+}
+
+export interface QueryConfirmationRule {
+  kind: "metric" | "timeRange" | "granularity" | "businessDefinition";
+  models: string[];
+  conditionKey: string;
+  required: boolean;
+  allowedValues?: string[];
+  valueType?: "string" | "date" | "dateRange" | "integer";
+  defaultValue?: unknown;
+  requireConfirmation: boolean;
+  prompt: string;
 }
 
 export interface KnowledgeRulesResponse {

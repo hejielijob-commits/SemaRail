@@ -137,8 +137,10 @@ class PresentationExecutor:
         self.rows = rows
         self.returned_rows = len(rows) if returned_rows is None else returned_rows
         self.truncated = truncated
+        self.calls: list[dict[str, Any]] = []
 
     def execute(self, **kwargs: Any) -> dict[str, Any]:
+        self.calls.append(dict(kwargs))
         return {
             "schemaVersion": 1,
             "queryId": kwargs["query_id"],
@@ -525,24 +527,25 @@ class QueryTests(unittest.TestCase):
         class PayrollPlanner:
             def dry_plan(self, _params: dict[str, Any]) -> dict[str, Any]:
                 return {
-                    "nativeSql": "SELECT employee_id FROM public.payroll",
+                    "nativeSql": "SELECT employee_id FROM hr.compensation",
                     "allowedPhysical": {
-                        "tables": [{"schema": "public", "table": "payroll"}],
-                        "schemas": ["public"],
+                        "tables": [{"schema": "hr", "table": "compensation"}],
+                        "schemas": ["hr"],
                         "catalogs": [],
                     },
                 }
 
+        executor = PresentationExecutor([], [])
         service = WrenQueryService(
             PayrollPlanner(),
-            PresentationExecutor([], []),
+            executor,
             connection_resolver=lambda _project, _env: {"connectionUrl": "postgresql://local.invalid/db"},
         )
         with self.assertRaises(Exception) as caught:
             service.run({
                 "projectDir": ".",
                 "question": "Payroll",
-                "semanticSql": "SELECT employee_id FROM public.payroll",
+                "semanticSql": "SELECT employee_id FROM hr.compensation",
                 "queryId": "q-policy-deny",
                 "authorizationPolicy": {
                     "schemaVersion": 1,
@@ -560,6 +563,65 @@ class QueryTests(unittest.TestCase):
             })
         self.assertEqual(getattr(caught.exception, "error").code, POLICY_DENIED)
         self.assertEqual(getattr(caught.exception, "error").phase, "authorization")
+        self.assertEqual(getattr(caught.exception, "error").reason_code, "TABLE_PERMISSION_REQUIRED")
+        self.assertEqual(
+            getattr(caught.exception, "error").resources,
+            ({"kind": "table", "name": "hr.compensation"},),
+        )
+        self.assertEqual(executor.calls, [])
+
+    def test_service_denies_a_physical_column_before_database_execution(self) -> None:
+        class SalaryPlanner:
+            def dry_plan(self, _params: dict[str, Any]) -> dict[str, Any]:
+                return {
+                    "nativeSql": "SELECT salary FROM hr.compensation",
+                    "allowedPhysical": {
+                        "tables": [{"schema": "hr", "table": "compensation"}],
+                        "schemas": ["hr"],
+                        "catalogs": [],
+                    },
+                }
+
+        executor = PresentationExecutor([], [])
+        service = WrenQueryService(
+            SalaryPlanner(),
+            executor,
+            connection_resolver=lambda _project, _env: {"connectionUrl": "postgresql://local.invalid/db"},
+        )
+        with self.assertRaises(Exception) as caught:
+            service.run({
+                "projectDir": ".",
+                "question": "Salary",
+                "semanticSql": "SELECT salary FROM hr.compensation",
+                "queryId": "q-column-policy-deny",
+                "authorizationPolicy": {
+                    "schemaVersion": 1,
+                    "defaultEffect": "deny",
+                    "tables": {
+                        "hr.compensation": {
+                            "rowFilter": None,
+                            "allowedColumns": ["employee_id"],
+                            "deniedColumns": ["salary"],
+                        },
+                    },
+                    "policyVersions": ["pol-hr:1"],
+                    "databaseSession": {
+                        "schemaVersion": 1,
+                        "subjectId": "user-a",
+                        "organizationId": "org-hr",
+                        "attributes": {},
+                        "policyVersions": ["pol-hr:1"],
+                    },
+                },
+            })
+        error = getattr(caught.exception, "error")
+        self.assertEqual(error.code, POLICY_DENIED)
+        self.assertEqual(error.reason_code, "COLUMN_PERMISSION_REQUIRED")
+        self.assertEqual(
+            error.resources,
+            ({"kind": "column", "name": "hr.compensation.salary"},),
+        )
+        self.assertEqual(executor.calls, [])
 
     def test_service_rejects_missing_or_oversized_database_session_fail_closed(self) -> None:
         base_policy = {
@@ -696,7 +758,55 @@ class QueryTests(unittest.TestCase):
             )
         error = caught.exception
         self.assertEqual(getattr(error, "error").code, DATABASE_ERROR)
+        self.assertEqual(getattr(error, "error").reason_code, "INTERNAL_FAILURE")
         self.assertNotIn("super-secret", str(error))
+
+    def test_database_permission_uses_sqlstate_and_only_reports_driver_objects(self) -> None:
+        denied = RuntimeError("unsafe database message")
+        denied.sqlstate = "42501"  # type: ignore[attr-defined]
+        denied.diag = SimpleNamespace(  # type: ignore[attr-defined]
+            schema_name="hr", table_name="compensation", column_name="salary"
+        )
+        connection = FakeConnection([], execute_error=denied)
+        executor = PostgresQueryExecutor(connection_factory=lambda _: connection)
+
+        with self.assertRaises(Exception) as caught:
+            executor.execute(
+                query_id="q-db-permission",
+                semantic_sql="SELECT salary FROM compensation",
+                native_sql="SELECT salary FROM hr.compensation",
+                project_dir=".",
+                connection_info={"connectionUrl": "postgresql://u:p@db/x"},
+                limits=QueryLimits(),
+            )
+
+        error = getattr(caught.exception, "error")
+        self.assertEqual(error.reason_code, "DATABASE_PERMISSION_REQUIRED")
+        self.assertEqual(error.resources, ({"kind": "column", "name": "hr.compensation.salary"},))
+        self.assertEqual(error.required_permissions, ("database:read",))
+        self.assertEqual(error.origin, "database")
+        self.assertFalse(error.retryable)
+        self.assertNotIn("unsafe database message", str(caught.exception))
+
+    def test_connection_failure_is_not_misreported_as_database_permission(self) -> None:
+        failure = RuntimeError("secret host detail")
+        failure.sqlstate = "08006"  # type: ignore[attr-defined]
+        executor = PostgresQueryExecutor(connection_factory=lambda _: (_ for _ in ()).throw(failure))
+
+        with self.assertRaises(Exception) as caught:
+            executor.execute(
+                query_id="q-connection",
+                semantic_sql="SELECT 1",
+                native_sql="SELECT 1",
+                project_dir=".",
+                connection_info={"connectionUrl": "postgresql://u:p@db/x"},
+                limits=QueryLimits(),
+            )
+
+        error = getattr(caught.exception, "error")
+        self.assertEqual(error.reason_code, "CONNECTION_FAILED")
+        self.assertTrue(error.retryable)
+        self.assertNotIn("secret host detail", str(caught.exception))
 
     def test_statement_timeout_maps_to_timeout(self) -> None:
         QueryCanceled = type("QueryCanceled", (RuntimeError,), {})

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_ENDPOINT = 'http://127.0.0.1:48763'
-const VERSION = '0.1.0-alpha.3'
+const VERSION = '0.1.0-alpha.4'
 
 function usage() {
   return [
@@ -29,7 +29,7 @@ function usage() {
     '',
     'Authentication:',
     '  Set SEMARAIL_API_TOKEN to at least 32 characters before start/status.',
-    '  Give Harness a scoped service-account key through SEMARAIL_HARNESS_TOKEN.',
+    '  Give each MCP client its own scoped service-account key.',
   ].join('\n')
 }
 

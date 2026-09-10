@@ -21,6 +21,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { Button, Field, InlineNotice, Modal, Pagination, TextArea, TextInput, usePagination } from "./ui";
+import type { QueryConfirmationRule } from "../types";
 import "./knowledge-workbench.css";
 
 /** The two locales supported by the semantic-console workbenches. */
@@ -35,6 +36,7 @@ export interface KnowledgeRule {
   sourcePath: string;
   scope?: string[];
   tags?: string[];
+  confirmationRule?: QueryConfirmationRule;
   updatedAt?: string;
   draft?: boolean;
   sourceContent?: string;
@@ -220,12 +222,13 @@ function copyRule(rule: KnowledgeRule): KnowledgeRule {
     ...rule,
     scope: rule.scope ? [...rule.scope] : [],
     tags: rule.tags ? [...rule.tags] : [],
+    confirmationRule: rule.confirmationRule ? { ...rule.confirmationRule, models: [...rule.confirmationRule.models], allowedValues: rule.confirmationRule.allowedValues ? [...rule.confirmationRule.allowedValues] : undefined } : undefined,
   };
 }
 
 function sameRule(a: KnowledgeRule | undefined, b: KnowledgeRule | undefined) {
   if (!a || !b) return false;
-  return a.name === b.name && a.content === b.content && a.enabled === b.enabled && JSON.stringify(a.scope ?? []) === JSON.stringify(b.scope ?? []) && JSON.stringify(a.tags ?? []) === JSON.stringify(b.tags ?? []);
+  return a.name === b.name && a.content === b.content && a.enabled === b.enabled && JSON.stringify(a.scope ?? []) === JSON.stringify(b.scope ?? []) && JSON.stringify(a.tags ?? []) === JSON.stringify(b.tags ?? []) && JSON.stringify(a.confirmationRule) === JSON.stringify(b.confirmationRule);
 }
 
 function StatusBadge({ rule, text }: { rule: KnowledgeRule; text: string }) {
@@ -480,6 +483,7 @@ export function RuleWorkbench({
           <div className="kw-tabs" role="tablist" aria-label={`${c.selected} views`}><button type="button" role="tab" id="kw-rule-tab-content" aria-controls="kw-rule-tabpanel" aria-selected={tab === "content"} className={tab === "content" ? "kw-tab-active" : ""} onClick={() => setTab("content")} onKeyDown={(event) => handleTabKey(event, "content")} ref={(element) => { tabRefs.current.content = element; }}>{c.contentTab}</button><button type="button" role="tab" id="kw-rule-tab-source" aria-controls="kw-rule-tabpanel" aria-selected={tab === "source"} className={tab === "source" ? "kw-tab-active" : ""} onClick={() => setTab("source")} onKeyDown={(event) => handleTabKey(event, "source")} ref={(element) => { tabRefs.current.source = element; }}>{c.sourceTab}</button><button type="button" role="tab" id="kw-rule-tab-diff" aria-controls="kw-rule-tabpanel" aria-selected={tab === "diff"} className={tab === "diff" ? "kw-tab-active" : ""} onClick={() => setTab("diff")} onKeyDown={(event) => handleTabKey(event, "diff")} ref={(element) => { tabRefs.current.diff = element; }}>{c.diffTab}{isDirty ? <span className="kw-tab-count" aria-label={c.unsaved}>1</span> : null}</button></div>
           <div className="kw-tab-panel" id="kw-rule-tabpanel" role="tabpanel" aria-labelledby={`kw-rule-tab-${tab}`}>
             {tab === "content" ? <div className="kw-rule-content"><div className="kw-content-heading"><div><h3>{c.contentTitle}</h3><p>{c.contentHint}</p></div><StatusBadge rule={selected} text={selected.enabled ? c.enabled : c.disabled} /></div><div className="kw-form-grid"><label className="kw-field kw-field-wide"><span>{c.nameLabel}</span><input className="input" value={selected.name} onChange={(event) => updateSelected({ name: event.target.value })} disabled={readOnly} /></label><label className="kw-field kw-field-wide"><span>{c.contentLabel}</span><textarea className="input kw-rule-textarea" value={selected.content} onChange={(event) => updateSelected({ content: event.target.value })} disabled={readOnly} /></label><CreatableTagSelect label={c.tagsLabel} values={selected.tags ?? []} options={reusableTags} copy={tagSelectCopy} disabled={readOnly} onChange={(tags) => updateSelected({ tags })} /></div><div className="kw-rule-toggle-row"><div><strong>{selected.enabled ? c.ruleEnabled : c.ruleDisabled}</strong><small>{selected.enabled ? c.enabled : c.disabled}</small></div><button type="button" role="switch" aria-checked={selected.enabled} aria-label={selected.enabled ? `${c.onLabel}: ${selected.name}` : `${c.offLabel}: ${selected.name}`} className={`kw-large-toggle ${selected.enabled ? "kw-large-toggle-on" : ""}`} onClick={(event) => void toggleRule(selected, event)} disabled={readOnly || busyAction === "toggle"}><span aria-hidden="true" /></button></div></div> : null}
+            {tab === "content" ? <ConfirmationRuleEditor locale={locale} value={selected.confirmationRule} disabled={readOnly} onChange={(confirmationRule) => updateSelected({ confirmationRule })} /> : null}
             {tab === "source" ? <div className="kw-source-view"><div className="kw-source-heading"><div><h3>{c.sourceTab}</h3><p>{c.sourceHint}</p></div><code title={selected.sourcePath}>{selected.sourcePath}</code></div>{sourceContent ? <pre className="kw-code"><code>{sourceContent}</code></pre> : <RuleEmptyState title={c.sourceUnavailable} body={c.sourceLabel} icon={<Code size={22} weight="duotone" />} />}</div> : null}
             {tab === "diff" ? <div className="kw-source-view"><div className="kw-source-heading"><div><h3>{c.diffTab}</h3><p>{c.diffHint}</p></div><code title={selected.sourcePath}>{selected.sourcePath}</code></div>{diffContent ? <pre className="kw-code kw-diff-code"><code>{diffContent}</code></pre> : <RuleEmptyState title={c.noDiff} body={c.noDiffBody} icon={<Check size={22} weight="bold" />} />}</div> : null}
           </div>
@@ -487,6 +491,41 @@ export function RuleWorkbench({
       </section>
     </div>}{createModal}{deleteModal}
   </div>;
+}
+
+function confirmationDefaultText(value: unknown) {
+  if (value === undefined || value === null) return "";
+  return Array.isArray(value) ? value.join(", ") : String(value);
+}
+
+function confirmationDefaultValue(text: string, type: QueryConfirmationRule["valueType"]): unknown {
+  const value = text.trim();
+  if (!value) return undefined;
+  if (type === "integer") {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isSafeInteger(parsed) ? parsed : value;
+  }
+  if (type === "dateRange") return value.split(",").map((part) => part.trim()).filter(Boolean);
+  return value;
+}
+
+function ConfirmationRuleEditor({ locale, value, disabled, onChange }: { locale: KnowledgeWorkbenchLocale; value?: QueryConfirmationRule; disabled: boolean; onChange: (value: QueryConfirmationRule | undefined) => void }) {
+  const c = locale === "zh-CN" ? {
+    title: "查询确认规则", body: "由 Core 校验本次查询必须补充或确认的结构化业务条件。", add: "添加确认规则", remove: "移除确认规则", kind: "条件类型", models: "适用模型", modelsHint: "多个模型用英文逗号分隔", key: "条件键", valueType: "值类型", allowed: "允许值", allowedHint: "可选；多个值用英文逗号分隔", defaultValue: "业务默认值", prompt: "追问文案", required: "必填条件", confirm: "必须获得用户确认",
+  } : {
+    title: "Query confirmation rule", body: "Core validates the structured business condition before this query can execute.", add: "Add confirmation rule", remove: "Remove confirmation rule", kind: "Condition kind", models: "Applicable models", modelsHint: "Separate model names with commas", key: "Condition key", valueType: "Value type", allowed: "Allowed values", allowedHint: "Optional; separate values with commas", defaultValue: "Business default", prompt: "Clarification prompt", required: "Required condition", confirm: "Require explicit user confirmation",
+  };
+  if (!value) return <section className="kw-confirmation-rule kw-confirmation-empty"><div><h3>{c.title}</h3><p>{c.body}</p></div><Button size="sm" icon={Plus} disabled={disabled} onClick={() => onChange({ kind: "metric", models: [], conditionKey: "", required: true, valueType: "string", requireConfirmation: true, prompt: "" })}>{c.add}</Button></section>;
+  const patch = (next: Partial<QueryConfirmationRule>) => onChange({ ...value, ...next });
+  return <section className="kw-confirmation-rule"><header><div><h3>{c.title}</h3><p>{c.body}</p></div><Button size="sm" variant="ghost" disabled={disabled} onClick={() => onChange(undefined)}>{c.remove}</Button></header><div className="kw-confirmation-grid">
+    <Field label={c.kind}><select className="input select" aria-label={c.kind} disabled={disabled} value={value.kind} onChange={(event) => patch({ kind: event.target.value as QueryConfirmationRule["kind"] })}><option value="metric">metric</option><option value="timeRange">timeRange</option><option value="granularity">granularity</option><option value="businessDefinition">businessDefinition</option></select></Field>
+    <Field label={c.models} hint={c.modelsHint}><TextInput aria-label={c.models} disabled={disabled} value={value.models.join(", ")} onChange={(event) => patch({ models: event.target.value.split(",").map((item) => item.trim()).filter(Boolean) })} /></Field>
+    <Field label={c.key}><TextInput aria-label={c.key} disabled={disabled} value={value.conditionKey} onChange={(event) => patch({ conditionKey: event.target.value })} /></Field>
+    <Field label={c.valueType}><select className="input select" aria-label={c.valueType} disabled={disabled} value={value.valueType ?? "string"} onChange={(event) => patch({ valueType: event.target.value as QueryConfirmationRule["valueType"] })}><option value="string">string</option><option value="date">date</option><option value="dateRange">dateRange</option><option value="integer">integer</option></select></Field>
+    <Field label={c.allowed} hint={c.allowedHint}><TextInput aria-label={c.allowed} disabled={disabled} value={value.allowedValues?.join(", ") ?? ""} onChange={(event) => { const allowedValues = event.target.value.split(",").map((item) => item.trim()).filter(Boolean); patch({ allowedValues: allowedValues.length ? allowedValues : undefined }); }} /></Field>
+    <Field label={c.defaultValue}><TextInput aria-label={c.defaultValue} disabled={disabled} value={confirmationDefaultText(value.defaultValue)} onChange={(event) => patch({ defaultValue: confirmationDefaultValue(event.target.value, value.valueType) })} /></Field>
+    <Field label={c.prompt}><TextArea aria-label={c.prompt} disabled={disabled} value={value.prompt} onChange={(event) => patch({ prompt: event.target.value })} /></Field>
+  </div><div className="kw-confirmation-checks"><label><input type="checkbox" disabled={disabled} checked={value.required} onChange={(event) => patch({ required: event.target.checked })} />{c.required}</label><label><input type="checkbox" disabled={disabled} checked={value.requireConfirmation} onChange={(event) => patch({ requireConfirmation: event.target.checked })} />{c.confirm}</label></div></section>;
 }
 
 interface TagSelectCopy {

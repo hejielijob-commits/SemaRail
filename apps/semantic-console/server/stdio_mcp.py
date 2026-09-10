@@ -37,12 +37,30 @@ _SECRET_PATTERN = re.compile(
     r"(?i)(?:bearer\s+\S+|sr_(?:session|key)_[A-Za-z0-9._~-]+|"
     r"(?:postgres(?:ql)?|mysql|clickhouse)://\S+)"
 )
+_SAFE_TRACE_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+_DETAILED_REASON_CODES = frozenset({
+    "AUTHENTICATION_EXPIRED", "ACCOUNT_DISABLED", "PROJECT_PERMISSION_REQUIRED",
+    "DATASOURCE_PERMISSION_REQUIRED", "TOOL_PERMISSION_REQUIRED", "TABLE_PERMISSION_REQUIRED",
+    "COLUMN_PERMISSION_REQUIRED", "EXPLICIT_DENIAL", "UNAUTHORIZED", "ROW_ATTRIBUTE_MISSING",
+    "DATABASE_PERMISSION_REQUIRED", "SQL_SAFETY_RESTRICTION", "SEMANTIC_PARSE_FAILED",
+    "QUERY_TIMEOUT", "CONNECTION_FAILED", "UNSUPPORTED_DATASOURCE", "INTERNAL_FAILURE",
+    "CLARIFICATION_REQUIRED",
+})
+_DETAILED_ORIGINS = frozenset({
+    "authentication", "semarail-policy", "query-safety", "semantic-runtime",
+    "database", "transport", "core",
+})
+_DETAILED_RESOURCE_KINDS = frozenset({
+    "project", "datasource", "tool", "table", "column", "attribute",
+})
 
 
 class CoreTransport(Protocol):
     """Minimal authenticated Core RPC behavior used by the MCP tools."""
 
     async def call(self, method: str, params: Mapping[str, Any]) -> dict[str, Any]: ...
+
+    async def submit_feedback(self, payload: Mapping[str, Any]) -> dict[str, Any]: ...
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -138,6 +156,68 @@ def resolve_authentication(
 
 def _safe_error(status: int, payload: Any = None) -> dict[str, Any]:
     error = payload.get("error") if isinstance(payload, Mapping) else None
+    if isinstance(payload, Mapping) and payload.get("protocolVersion") == "2" and isinstance(error, Mapping):
+        expected_fields = {
+            "code", "phase", "message", "retryable", "reasonCode", "resources",
+            "requiredPermissions", "suggestion", "origin", "traceId",
+        }
+        code = error.get("code")
+        phase = error.get("phase")
+        message = error.get("message")
+        reason = error.get("reasonCode")
+        resources = error.get("resources")
+        permissions = error.get("requiredPermissions")
+        suggestion = error.get("suggestion")
+        origin = error.get("origin")
+        trace_id = error.get("traceId")
+        valid_resources = (
+            isinstance(resources, list)
+            and len(resources) <= 32
+            and all(
+                isinstance(item, Mapping)
+                and set(item) == {"kind", "name"}
+                and item.get("kind") in _DETAILED_RESOURCE_KINDS
+                and isinstance(item.get("name"), str)
+                and 1 <= len(item["name"]) <= 512
+                and not _SECRET_PATTERN.search(item["name"])
+                for item in resources
+            )
+        )
+        valid_permissions = (
+            isinstance(permissions, list)
+            and len(permissions) <= 32
+            and all(
+                isinstance(item, str)
+                and 1 <= len(item) <= 256
+                and not _SECRET_PATTERN.search(item)
+                for item in permissions
+            )
+        )
+        if (
+            set(error) == expected_fields
+            and isinstance(code, str) and _SAFE_CODE_PATTERN.fullmatch(code)
+            and isinstance(phase, str) and 1 <= len(phase) <= 64
+            and isinstance(message, str) and 1 <= len(message) <= 500 and not _SECRET_PATTERN.search(message)
+            and type(error.get("retryable")) is bool
+            and reason in _DETAILED_REASON_CODES
+            and valid_resources
+            and valid_permissions
+            and isinstance(suggestion, str) and 1 <= len(suggestion) <= 2_000 and not _SECRET_PATTERN.search(suggestion)
+            and origin in _DETAILED_ORIGINS
+            and isinstance(trace_id, str) and _SAFE_TRACE_PATTERN.fullmatch(trace_id)
+        ):
+            return {
+                "code": code,
+                "phase": phase,
+                "message": message,
+                "retryable": error["retryable"],
+                "reasonCode": reason,
+                "resources": [dict(item) for item in resources],
+                "requiredPermissions": list(permissions),
+                "suggestion": suggestion,
+                "origin": origin,
+                "traceId": trace_id,
+            }
     raw_code = error.get("code") if isinstance(error, Mapping) else None
     code = raw_code if isinstance(raw_code, str) and _SAFE_CODE_PATTERN.fullmatch(raw_code) else "CORE_REQUEST_FAILED"
     if status == 401:
@@ -172,10 +252,62 @@ class CoreHttpTransport:
     async def call(self, method: str, params: Mapping[str, Any]) -> dict[str, Any]:
         return await asyncio.to_thread(self._call_sync, method, params)
 
+    async def submit_feedback(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        return await asyncio.to_thread(self._submit_feedback_sync, payload)
+
+    def _submit_feedback_sync(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        body = json.dumps(
+            dict(payload), ensure_ascii=False, separators=(",", ":")
+        ).encode("utf-8")
+        if len(body) > 128 * 1024:
+            raise ToolError(json.dumps({"code": "INVALID_FEEDBACK", "message": "feedback is too large"}))
+        request = Request(
+            f"{self._endpoint}/api/v1/feedback",
+            data=body,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {self._token}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with self._opener.open(request, timeout=self._timeout_seconds) as response:
+                status = response.status
+                raw = response.read(131_073)
+        except HTTPError as exc:
+            status = exc.code
+            raw = exc.read(131_073)
+        except (OSError, URLError, TimeoutError):
+            raise ToolError(
+                json.dumps({"code": "FEEDBACK_SUBMISSION_FAILED", "message": "feedback could not be saved"})
+            ) from None
+        if len(raw) > 131_072:
+            raise ToolError(json.dumps({"code": "FEEDBACK_SUBMISSION_FAILED", "message": "feedback could not be saved"}))
+        try:
+            result = json.loads(raw)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise ToolError(
+                json.dumps({"code": "FEEDBACK_SUBMISSION_FAILED", "message": "feedback could not be saved"})
+            ) from None
+        if status != 201 or not isinstance(result, Mapping):
+            code = result.get("code") if isinstance(result, Mapping) else None
+            message = result.get("message") if isinstance(result, Mapping) else None
+            safe = {
+                "code": code if isinstance(code, str) and _SAFE_CODE_PATTERN.fullmatch(code) else "FEEDBACK_SUBMISSION_FAILED",
+                "message": message[:500] if isinstance(message, str) and not _SECRET_PATTERN.search(message) else "feedback could not be saved",
+            }
+            raise ToolError(json.dumps(safe, ensure_ascii=False, separators=(",", ":")))
+        if self._token in json.dumps(result, ensure_ascii=False, separators=(",", ":")):
+            raise ToolError(
+                json.dumps({"code": "FEEDBACK_SUBMISSION_FAILED", "message": "feedback could not be saved"})
+            )
+        return dict(result)
+
     def _call_sync(self, method: str, params: Mapping[str, Any]) -> dict[str, Any]:
         request_id = f"stdio-mcp-{uuid.uuid4().hex}"
         body = json.dumps(
-            {"protocolVersion": "1", "id": request_id, "method": method, "params": dict(params)},
+            {"protocolVersion": "2", "id": request_id, "method": method, "params": dict(params)},
             ensure_ascii=False,
             separators=(",", ":"),
         ).encode("utf-8")
@@ -206,7 +338,7 @@ class CoreHttpTransport:
             raise ToolError(json.dumps(_safe_error(status), separators=(",", ":"))) from None
         if status != 200 or not isinstance(payload, Mapping) or payload.get("ok") is not True:
             raise ToolError(json.dumps(_safe_error(status, payload), ensure_ascii=False, separators=(",", ":")))
-        if payload.get("id") != request_id or payload.get("protocolVersion") != "1":
+        if payload.get("id") != request_id or payload.get("protocolVersion") != "2":
             raise ToolError(json.dumps(_safe_error(502), separators=(",", ":")))
         result = payload.get("result")
         if not isinstance(result, Mapping):
@@ -224,6 +356,20 @@ def _readonly(title: str, *, idempotent: bool = True) -> ToolAnnotations:
         idempotentHint=idempotent,
         openWorldHint=False,
     )
+
+
+def _write(title: str) -> ToolAnnotations:
+    return ToolAnnotations(
+        title=title,
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+
+
+def _stateful(title: str) -> ToolAnnotations:
+    return ToolAnnotations(title=title, readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
 
 
 def create_stdio_mcp_server(transport: CoreTransport) -> FastMCP:
@@ -254,11 +400,29 @@ def create_stdio_mcp_server(transport: CoreTransport) -> FastMCP:
     async def semarail_plan_query(semantic_sql: str) -> dict[str, Any]:
         return await transport.call("query.dryPlan", {"semanticSql": semantic_sql})
 
+    @server.tool(annotations=_stateful("Prepare and confirm a SemaRail query"))
+    async def semarail_prepare_query(
+        question: str,
+        semantic_sql: str,
+        conditions: dict[str, Any] | None = None,
+        confirmed_conditions: list[str] | None = None,
+    ) -> dict[str, Any]:
+        return await transport.call(
+            "query.prepare",
+            {
+                "question": question,
+                "semanticSql": semantic_sql,
+                "conditions": conditions or {},
+                "confirmedConditions": confirmed_conditions or [],
+            },
+        )
+
     @server.tool(annotations=_readonly("Run a governed SemaRail query", idempotent=False))
     async def semarail_governed_query(
         question: str,
         semantic_sql: str,
         chart_intent: Literal["auto", "table", "line", "bar", "pie"] = "auto",
+        preparation_id: str | None = None,
     ) -> dict[str, Any]:
         query_id = f"stdio-mcp-query-{uuid.uuid4().hex}"
         try:
@@ -269,6 +433,7 @@ def create_stdio_mcp_server(transport: CoreTransport) -> FastMCP:
                     "semanticSql": semantic_sql,
                     "chartIntent": chart_intent,
                     "queryId": query_id,
+                    **({"preparationId": preparation_id} if preparation_id is not None else {}),
                 },
             )
         except asyncio.CancelledError:
@@ -277,6 +442,33 @@ def create_stdio_mcp_server(transport: CoreTransport) -> FastMCP:
             except Exception:
                 pass
             raise
+
+    @server.tool(annotations=_write("Submit SemaRail query feedback"))
+    async def semarail_submit_feedback(
+        reference: str,
+        idempotency_key: str,
+        category: Literal[
+            "ambiguity", "knowledge_gap", "agent_understanding", "sql_generation",
+            "permission_configuration", "runtime_failure", "evaluation", "other",
+        ],
+        description: str,
+        expected_behavior: str | None = None,
+        question: str | None = None,
+        semantic_sql: str | None = None,
+        native_sql: str | None = None,
+    ) -> dict[str, Any]:
+        return await transport.submit_feedback(
+            {
+                "reference": reference,
+                "idempotencyKey": idempotency_key,
+                "category": category,
+                "description": description,
+                **({"expectedBehavior": expected_behavior} if expected_behavior is not None else {}),
+                **({"question": question} if question is not None else {}),
+                **({"semanticSql": semantic_sql} if semantic_sql is not None else {}),
+                **({"nativeSql": native_sql} if native_sql is not None else {}),
+            }
+        )
 
     # MCP 1.28's FastMCP compatibility default ignores unknown function
     # arguments.  That is unsafe at an authorization boundary: a caller could

@@ -1,13 +1,19 @@
 /** JSON primitives and boundary validation shared by every contract. */
 
-/** The only sidecar protocol version supported by this release. */
-export const PROTOCOL_VERSION = '1' as const
+/** Current public Core RPC protocol version. */
+export const PROTOCOL_VERSION = '2' as const
+
+/** Replay-compatible RPC protocol version used by legacy clients and Sidecar. */
+export const LEGACY_PROTOCOL_VERSION = '1' as const
 
 /** The only Host/Client presentation schema version supported by this release. */
 export const SCHEMA_VERSION = 1 as const
 
 /** Current DataQueryPresentation schema version. v1 remains replay-compatible. */
 export const DATA_QUERY_PRESENTATION_VERSION = 2 as const
+
+/** Detailed-error-only query presentation version. */
+export const DATA_QUERY_DETAILED_ERROR_PRESENTATION_VERSION = 3 as const
 
 /** Maximum rows fetched by one MVP query. */
 export const MAX_QUERY_ROWS = 500 as const

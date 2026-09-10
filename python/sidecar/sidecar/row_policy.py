@@ -15,6 +15,12 @@ from sqlglot.optimizer.scope import traverse_scope
 class RowPolicyError(ValueError):
     """The query or resolved policy cannot be enforced safely."""
 
+    def __init__(self, message: str, *, reason_code: str | None = None, resource_kind: str | None = None, resource_name: str | None = None) -> None:
+        self.reason_code = reason_code
+        self.resource_kind = resource_kind
+        self.resource_name = resource_name
+        super().__init__(message)
+
 
 @dataclass(frozen=True, slots=True)
 class AuthorizedQuery:
@@ -119,9 +125,9 @@ def _is_restricted(rule: Mapping[str, Any]) -> bool:
     return rule.get("allowedColumns") is not None or bool(rule.get("deniedColumns"))
 
 
-def _validate_column(name: str, rules: list[Mapping[str, Any]]) -> None:
+def _validate_column(name: str, rules: list[tuple[str, Mapping[str, Any]]]) -> None:
     normalized_name = name.lower()
-    for rule in rules:
+    for table_name, rule in rules:
         denied = rule.get("deniedColumns", [])
         allowed = rule.get("allowedColumns")
         if not isinstance(denied, list) or any(not isinstance(item, str) for item in denied):
@@ -133,10 +139,10 @@ def _validate_column(name: str, rules: list[Mapping[str, Any]]) -> None:
         if normalized_name in normalized_denied or (
             normalized_allowed is not None and normalized_name not in normalized_allowed
         ):
-            raise RowPolicyError("column is not allowed")
+            raise RowPolicyError("column is not allowed", reason_code="COLUMN_PERMISSION_REQUIRED", resource_kind="column", resource_name=f"{table_name}.{name}")
 
 
-def _validate_columns(statement: exp.Expression, table_rules: Mapping[int, Mapping[str, Any]]) -> None:
+def _validate_columns(statement: exp.Expression, table_rules: Mapping[int, tuple[str, Mapping[str, Any]]]) -> None:
     """Validate columns against sources in each SELECT's lexical scope.
 
     A global alias map is unsafe because a nested query may shadow an outer
@@ -150,15 +156,17 @@ def _validate_columns(statement: exp.Expression, table_rules: Mapping[int, Mappi
             for alias, source in scope.sources.items()
             if isinstance(source, exp.Table) and id(source) in table_rules
         }
-        restricted = {alias: rule for alias, rule in local_rules.items() if _is_restricted(rule)}
+        restricted = {alias: value for alias, value in local_rules.items() if _is_restricted(value[1])}
         if not restricted:
             continue
         if any(isinstance(selection, exp.Star) for selection in getattr(scope.expression, "selects", ())):
-            raise RowPolicyError("wildcard columns are not allowed by column policy")
+            table_name = next(iter(restricted.values()))[0]
+            raise RowPolicyError("wildcard columns are not allowed by column policy", reason_code="COLUMN_PERMISSION_REQUIRED", resource_kind="column", resource_name=f"{table_name}.*")
         for star in scope.stars:
             alias = star.table.lower() if star.table else ""
             if (alias and alias in restricted) or (not alias and restricted):
-                raise RowPolicyError("wildcard columns are not allowed by column policy")
+                table_name = restricted[alias][0] if alias in restricted else next(iter(restricted.values()))[0]
+                raise RowPolicyError("wildcard columns are not allowed by column policy", reason_code="COLUMN_PERMISSION_REQUIRED", resource_kind="column", resource_name=f"{table_name}.*")
         for column in scope.columns:
             name = column.name
             if not name or name == "*":
@@ -191,16 +199,16 @@ def apply_row_policy(sql: str, policy: Mapping[str, Any]) -> AuthorizedQuery:
         raise RowPolicyError("native SQL could not be parsed") from exc
     cte_names = {cte.alias_or_name.lower() for cte in statement.find_all(exp.CTE) if cte.alias_or_name}
     physical_tables = [table for table in statement.find_all(exp.Table) if not _is_cte_reference(table, cte_names)]
-    table_rules: dict[int, Mapping[str, Any]] = {}
+    table_rules: dict[int, tuple[str, Mapping[str, Any]]] = {}
     resolved: list[tuple[exp.Table, str, Mapping[str, Any]]] = []
     for table in physical_tables:
         matched = _rule_for(table, rules)
         if matched is None:
             if policy.get("defaultEffect") == "deny":
-                raise RowPolicyError("table is not allowed")
+                raise RowPolicyError("table is not allowed", reason_code="TABLE_PERMISSION_REQUIRED", resource_kind="table", resource_name=_table_candidates(table)[0])
             continue
         key, rule = matched
-        table_rules[id(table)] = rule
+        table_rules[id(table)] = (key, rule)
         resolved.append((table, key, rule))
     _validate_columns(statement, table_rules)
 

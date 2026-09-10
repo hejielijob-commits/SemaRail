@@ -25,11 +25,12 @@ const required = [
   'python/semantic-console/server/identity.py', 'python/semantic-console/server/identity_api.py',
   'python/semantic-console/server/remote_mcp.py', 'python/semantic-console/server/stdio_mcp.py',
   'python/semantic-console/server/README.md', 'python/semantic-console/server/openapi.json',
-  'semantic-console-web/index.html', 'README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md',
+  'semantic-console-web/index.html', 'semantic-console-web/licenses/react/LICENSE',
+  'README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md',
 ]
 for (const file of required) if (!files.includes(file)) throw new Error(`Core package omitted ${file}`)
 const forbidden = files.filter(file => file.startsWith('lib/client') || file === 'cordis.patch.yml' || file.includes('/tests/'))
-if (forbidden.length) throw new Error(`Core package included Harness/test files: ${forbidden.join(', ')}`)
+if (forbidden.length) throw new Error(`Core package included adapter/test files: ${forbidden.join(', ')}`)
 for (const [file, marker] of [
   ['python/semantic-console/server/access_api.py', 'unbind_policy'],
   ['python/semantic-console/server/app.py', '/api/v1/auth/capabilities'],

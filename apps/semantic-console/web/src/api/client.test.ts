@@ -189,6 +189,31 @@ describe("ApiClient", () => {
     expect(fetchMock.mock.calls[3]?.[0]).toBe("/api/datasources/warehouse%2Fa");
     expect(fetchMock.mock.calls[3]?.[1]).toMatchObject({ method: "DELETE" });
   });
+
+  it("keeps diagnostic filters and opaque feedback references in authenticated REST bodies", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ items: [], nextCursor: null }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient();
+    client.setBearerToken("scoped-token");
+
+    await client.listDiagnosticFeedback({
+      limit: 50,
+      status: "pending",
+      reasonCode: "TABLE_PERMISSION_REQUIRED",
+      createdAfter: "2026-09-01T00:00:00.000Z",
+    });
+    await client.submitFeedback({
+      reference: "opaque-query-id",
+      idempotencyKey: "retry-key",
+      category: "sql_generation",
+      description: "Wrong metric",
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/v1/diagnostics/feedback?limit=50&status=pending&reasonCode=TABLE_PERMISSION_REQUIRED&createdAfter=2026-09-01T00%3A00%3A00.000Z");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/v1/feedback");
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "POST", body: expect.stringContaining("opaque-query-id") });
+    expect(String(fetchMock.mock.calls[1]?.[0])).not.toContain("Wrong metric");
+  });
 });
 
 function jsonResponse(body: unknown, status = 200) {

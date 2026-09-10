@@ -9,7 +9,7 @@ from typing import BinaryIO
 
 from .dispatch import Dispatcher
 from .errors import DATABASE_ERROR, FRAME_TOO_LARGE, RpcError, TRUNCATED_FRAME
-from .protocol import PROTOCOL_VERSION, FramingError, read_frame, write_frame
+from .protocol import LEGACY_PROTOCOL_VERSION, FramingError, read_frame, write_frame
 from .query import MAX_QUERY_CONCURRENCY
 
 
@@ -54,7 +54,7 @@ class JsonRpcServer:
                 # final process-level guard in case an injected dispatcher
                 # violates that contract.
                 response = {
-                    "protocolVersion": PROTOCOL_VERSION,
+                    "protocolVersion": LEGACY_PROTOCOL_VERSION,
                     "id": "",
                     "ok": False,
                     "error": RpcError(
@@ -92,7 +92,7 @@ class JsonRpcServer:
         def concurrency_error(request: dict[str, object]) -> dict[str, object]:
             request_id = request.get("id") if isinstance(request.get("id"), str) else ""
             return {
-                "protocolVersion": PROTOCOL_VERSION,
+                "protocolVersion": LEGACY_PROTOCOL_VERSION,
                 "id": request_id,
                 "ok": False,
                 "error": RpcError(
@@ -134,7 +134,7 @@ class JsonRpcServer:
                         release_run()
                         write_response(
                             {
-                                "protocolVersion": PROTOCOL_VERSION,
+                                "protocolVersion": LEGACY_PROTOCOL_VERSION,
                                 "id": request.get("id")
                                 if isinstance(request.get("id"), str)
                                 else "",
@@ -180,7 +180,7 @@ class JsonRpcServer:
         output_lock: threading.Lock | None = None,
     ) -> None:
         response = {
-            "protocolVersion": PROTOCOL_VERSION,
+            "protocolVersion": LEGACY_PROTOCOL_VERSION,
             "id": "",
             "ok": False,
             "error": RpcError(

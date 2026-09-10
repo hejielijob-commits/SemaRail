@@ -23,7 +23,7 @@ from .errors import (
     UNSUPPORTED_PROTOCOL,
     WREN_UNAVAILABLE,
 )
-from .protocol import PROTOCOL_VERSION
+from .protocol import LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION
 from .query import artifact_request_from_mapping
 from .semantic_policy import filter_semantic_result
 from .sql_policy import SqlPolicyError, validate_semantic_sql
@@ -41,7 +41,7 @@ RPC_METHODS = frozenset(
     }
 )
 _REQUEST_FIELDS = frozenset(
-    {"protocolVersion", "id", "method", "params", "deadlineMs"}
+    {"protocolVersion", "id", "method", "params", "deadlineMs", "traceId"}
 )
 
 
@@ -105,12 +105,14 @@ class SidecarDependencies:
 
 @dataclass(frozen=True, slots=True)
 class RpcRequest:
-    """A validated version-one RPC request."""
+    """A validated legacy or current RPC request."""
 
+    protocol_version: str
     id: str
     method: str
     params: Any
     deadline_ms: int | None = None
+    trace_id: str = ""
 
     @classmethod
     def from_mapping(cls, request: Mapping[str, Any]) -> "RpcRequest":
@@ -129,12 +131,18 @@ class RpcRequest:
                 "request contains unknown fields",
             )
 
-        if request.get("protocolVersion") != PROTOCOL_VERSION:
+        protocol_version = request.get("protocolVersion")
+        if protocol_version not in {LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION}:
             raise RpcFault(
                 UNSUPPORTED_PROTOCOL,
                 "protocol",
-                "protocolVersion must be \"1\"",
+                "protocolVersion is unsupported",
             )
+        if protocol_version == LEGACY_PROTOCOL_VERSION and "traceId" in request:
+            raise RpcFault(INVALID_REQUEST, "protocol", "traceId requires protocolVersion 2")
+        trace_id = request.get("traceId", "")
+        if protocol_version == PROTOCOL_VERSION and (not isinstance(trace_id, str) or not 1 <= len(trace_id) <= 128):
+            raise RpcFault(INVALID_REQUEST, "protocol", "traceId is invalid")
 
         request_id = request.get("id")
         if not isinstance(request_id, str) or not (1 <= len(request_id) <= 128):
@@ -167,10 +175,12 @@ class RpcRequest:
                 )
             deadline_ms = deadline
         return cls(
+            protocol_version=protocol_version,
             id=request_id,
             method=method,
             params=params,
             deadline_ms=deadline_ms,
+            trace_id=trace_id,
         )
 
 
@@ -201,16 +211,16 @@ def _safe_request_id(request: Any) -> str:
     return ""
 
 
-def _response(request_id: str, *, result: Any = None, error: RpcError | None = None) -> dict[str, Any]:
+def _response(request_id: str, *, protocol_version: str = LEGACY_PROTOCOL_VERSION, trace_id: str = "", result: Any = None, error: RpcError | None = None) -> dict[str, Any]:
     response: dict[str, Any] = {
-        "protocolVersion": PROTOCOL_VERSION,
+        "protocolVersion": protocol_version,
         "id": request_id,
         "ok": error is None,
     }
     if error is None:
         response["result"] = result
     else:
-        response["error"] = error.normalized().as_dict()
+        response["error"] = error.normalized().as_dict(protocol_version=protocol_version, trace_id=trace_id)
     return response
 
 
@@ -229,7 +239,7 @@ def _ensure_json_safe(value: Any) -> Any:
 
 
 class Dispatcher:
-    """Dispatch version-one requests without importing Wren at module load."""
+    """Dispatch supported protocol requests without importing Wren at module load."""
 
     def __init__(
         self,
@@ -288,9 +298,13 @@ class Dispatcher:
                     "dispatch",
                     "method is not supported",
                 )
-            return _response(parsed.id, result=_ensure_json_safe(result))
+            if parsed.method == "health" and isinstance(result, Mapping):
+                result = {**result, "protocolVersion": parsed.protocol_version}
+            return _response(parsed.id, protocol_version=parsed.protocol_version, trace_id=parsed.trace_id, result=_ensure_json_safe(result))
         except RpcFault as fault:
-            return _response(request_id, error=fault.error)
+            response_version = request.get("protocolVersion") if isinstance(request, Mapping) and request.get("protocolVersion") in {LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION} else LEGACY_PROTOCOL_VERSION
+            response_trace = request.get("traceId", "") if isinstance(request, Mapping) else ""
+            return _response(request_id, protocol_version=response_version, trace_id=response_trace, error=fault.error)
         except Exception:
             # The exception is intentionally not sent to the caller or logger:
             # it may contain a DSN, credential, SQL fragment, or path.

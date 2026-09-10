@@ -11,6 +11,7 @@ import {
   _string,
   _version,
   DATA_QUERY_PRESENTATION_VERSION,
+  DATA_QUERY_DETAILED_ERROR_PRESENTATION_VERSION,
   isJsonSafeScalar,
   MAX_ARTIFACT_BYTES,
   MAX_ARTIFACT_PREVIEW_ROWS,
@@ -23,7 +24,14 @@ import {
   type JsonSafeScalar,
   type JsonSchema,
 } from './json.js'
-import { ERROR_JSON_SCHEMA, _parseError, type DataAgentError } from './errors.js'
+import {
+  ERROR_JSON_SCHEMA,
+  ERROR_V2_JSON_SCHEMA,
+  _parseError,
+  _parseErrorV2,
+  type DataAgentError,
+  type DataAgentErrorV2,
+} from './errors.js'
 import { CHART_SPEC_V1_JSON_SCHEMA, parseChartSpecV1, type ChartSpecV1 } from './chart.js'
 import { parseSqlHistoryReference, type SqlHistoryReference } from './context.js'
 import { _schema, type ContractSchema } from './schema.js'
@@ -36,6 +44,9 @@ export interface DataQueryInput {
   readonly question: string
   readonly semanticSql: string
   readonly chartIntent?: ChartIntent
+  readonly preparationId?: string
+  /** Prior owned query identifier when this execution retries the same question. */
+  readonly retryOfQueryId?: string
 }
 
 /** Result column shown in a presentation. */
@@ -174,6 +185,21 @@ export interface DataQueryErrorPresentationV2 {
 /** Union of successful and failed v2 query presentations. */
 export type DataQueryPresentationV2 = DataQuerySuccessPresentationV2 | DataQueryErrorPresentationV2
 
+/** Detailed failed result presentation emitted by a v2 public RPC client. */
+export interface DataQueryErrorPresentationV3 {
+  readonly schemaVersion: typeof DATA_QUERY_DETAILED_ERROR_PRESENTATION_VERSION
+  readonly queryId: string
+  readonly status: 'error'
+  readonly semanticSql: string
+  readonly question?: string
+  readonly sqlHistory?: readonly SqlHistoryReference[]
+  readonly nativeSql?: string
+  readonly columns: readonly DataQueryColumn[]
+  readonly previewRows: readonly Readonly<Record<string, JsonSafeScalar>>[]
+  readonly stats: DataQueryStatsV2
+  readonly error: DataAgentErrorV2
+}
+
 /** Backwards-compatible success alias spanning both presentation versions. */
 export type DataQuerySuccessPresentation = DataQuerySuccessPresentationV1 | DataQuerySuccessPresentationV2
 
@@ -181,7 +207,7 @@ export type DataQuerySuccessPresentation = DataQuerySuccessPresentationV1 | Data
 export type DataQueryErrorPresentation = DataQueryErrorPresentationV1 | DataQueryErrorPresentationV2
 
 /** Union of v1 and v2 query presentations accepted at the boundary. */
-export type DataQueryPresentation = DataQueryPresentationV1 | DataQueryPresentationV2
+export type DataQueryPresentation = DataQueryPresentationV1 | DataQueryPresentationV2 | DataQueryErrorPresentationV3
 
 /** Alias for consumers that call the presentation a result. */
 export type DataQueryResult = DataQueryPresentation
@@ -189,12 +215,16 @@ export type DataQueryResult = DataQueryPresentation
 /** Parse DataQueryInput. */
 export function parseDataQueryInput(value: unknown): DataQueryInput {
   const object = _record(value, 'dataQueryInput')
-  _keys(object, ['question', 'semanticSql', 'chartIntent'], 'dataQueryInput')
+  _keys(object, ['question', 'semanticSql', 'chartIntent', 'preparationId', 'retryOfQueryId'], 'dataQueryInput')
   const chartIntent = _optional(object, 'chartIntent')
+  const preparationId = _optional(object, 'preparationId')
+  const retryOfQueryId = _optional(object, 'retryOfQueryId')
   return {
     question: _string(_required(object, 'question', 'dataQueryInput'), 'dataQueryInput.question', 1, 16_000),
     semanticSql: _string(_required(object, 'semanticSql', 'dataQueryInput'), 'dataQueryInput.semanticSql', 1, 64_000),
     ...(chartIntent === undefined ? {} : { chartIntent: _enum(chartIntent, ['auto', 'table', 'line', 'bar', 'pie'] as const, 'dataQueryInput.chartIntent') }),
+    ...(preparationId === undefined ? {} : { preparationId: _string(preparationId, 'dataQueryInput.preparationId', 1, 128) }),
+    ...(retryOfQueryId === undefined ? {} : { retryOfQueryId: _string(retryOfQueryId, 'dataQueryInput.retryOfQueryId', 1, 128) }),
   }
 }
 
@@ -412,11 +442,31 @@ export function parseDataQueryPresentationV2(value: unknown): DataQueryPresentat
   }
 }
 
+/** Parse the detailed v3 error presentation. */
+export function parseDataQueryErrorPresentationV3(value: unknown): DataQueryErrorPresentationV3 {
+  const object = _record(value, 'dataQueryPresentation')
+  _keys(object, ['schemaVersion', 'queryId', 'status', 'semanticSql', 'question', 'sqlHistory', 'nativeSql', 'columns', 'previewRows', 'stats', 'error'], 'dataQueryPresentation')
+  _version(_required(object, 'schemaVersion', 'dataQueryPresentation'), DATA_QUERY_DETAILED_ERROR_PRESENTATION_VERSION, 'dataQueryPresentation.schemaVersion')
+  if (_required(object, 'status', 'dataQueryPresentation') !== 'error') _fail('dataQueryPresentation.status', 'expected error')
+  const { parsedColumns, previewRows } = parseColumnsAndPreview(object)
+  const stats = parseStatsV2(_required(object, 'stats', 'dataQueryPresentation'), 'dataQueryPresentation.stats')
+  if (stats.previewedRows !== previewRows.length) _fail('dataQueryPresentation.stats.previewedRows', 'must equal previewRows.length')
+  if (previewRows.length > stats.returnedRows) _fail('dataQueryPresentation.previewRows', 'cannot contain more rows than returnedRows')
+  return {
+    schemaVersion: DATA_QUERY_DETAILED_ERROR_PRESENTATION_VERSION,
+    ...parseCommonPresentationFields(object, parsedColumns, previewRows),
+    status: 'error',
+    stats,
+    error: _parseErrorV2(_required(object, 'error', 'dataQueryPresentation'), 'dataQueryPresentation.error'),
+  }
+}
+
 /** Parse either the replay-compatible v1 or current v2 presentation. */
 export function parseDataQueryPresentation(value: unknown): DataQueryPresentation {
   const object = _record(value, 'dataQueryPresentation')
   if (object.schemaVersion === SCHEMA_VERSION) return parseDataQueryPresentationV1(value)
   if (object.schemaVersion === DATA_QUERY_PRESENTATION_VERSION) return parseDataQueryPresentationV2(value)
+  if (object.schemaVersion === DATA_QUERY_DETAILED_ERROR_PRESENTATION_VERSION) return parseDataQueryErrorPresentationV3(value)
   return _fail('dataQueryPresentation.schemaVersion', `unsupported version; expected ${JSON.stringify(DATA_QUERY_PRESENTATION_VERSION)}`, 'UNSUPPORTED_VERSION')
 }
 
@@ -427,6 +477,8 @@ export const DATA_QUERY_INPUT_JSON_SCHEMA: JsonSchema = {
     question: { type: 'string', minLength: 1, maxLength: 16_000 },
     semanticSql: { type: 'string', minLength: 1, maxLength: 64_000 },
     chartIntent: { enum: ['auto', 'table', 'line', 'bar', 'pie'] },
+    preparationId: { type: 'string', minLength: 1, maxLength: 128 },
+    retryOfQueryId: { type: 'string', minLength: 1, maxLength: 128 },
   },
 }
 
@@ -530,11 +582,30 @@ export const DATA_QUERY_PRESENTATION_V2_JSON_SCHEMA: JsonSchema = {
   ],
 }
 
+/** JSON Schema for the detailed v3 error presentation. */
+export const DATA_QUERY_PRESENTATION_V3_JSON_SCHEMA: JsonSchema = {
+  ...DATA_QUERY_PRESENTATION_BASE_JSON_SCHEMA,
+  required: [...(DATA_QUERY_PRESENTATION_BASE_JSON_SCHEMA.required ?? []), 'error'],
+  properties: {
+    schemaVersion: { const: DATA_QUERY_DETAILED_ERROR_PRESENTATION_VERSION },
+    queryId: { type: 'string', minLength: 1, maxLength: 128 },
+    status: { const: 'error' },
+    semanticSql: { type: 'string', minLength: 1 },
+    question: { type: 'string', minLength: 1 },
+    sqlHistory: { type: 'array', maxItems: 5 },
+    nativeSql: { type: 'string' },
+    columns: { type: 'array' },
+    previewRows: { type: 'array', maxItems: MAX_PREVIEW_ROWS },
+    stats: dataQueryStatsV2JsonSchema(MAX_PREVIEW_ROWS),
+    error: ERROR_V2_JSON_SCHEMA,
+  },
+}
+
 /** JSON Schema for both accepted DataQueryPresentation versions. */
 export const DATA_QUERY_PRESENTATION_JSON_SCHEMA: JsonSchema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   type: 'object',
-  anyOf: [DATA_QUERY_PRESENTATION_V1_JSON_SCHEMA, DATA_QUERY_PRESENTATION_V2_JSON_SCHEMA],
+  anyOf: [DATA_QUERY_PRESENTATION_V1_JSON_SCHEMA, DATA_QUERY_PRESENTATION_V2_JSON_SCHEMA, DATA_QUERY_PRESENTATION_V3_JSON_SCHEMA],
 }
 
 /** DataQuery input parser/schema pair. */
@@ -546,6 +617,9 @@ export const dataQueryPresentationV1Schema: ContractSchema<DataQueryPresentation
 /** DataQuery v2 presentation parser/schema pair. */
 export const dataQueryPresentationV2Schema: ContractSchema<DataQueryPresentationV2> = _schema(DATA_QUERY_PRESENTATION_V2_JSON_SCHEMA, parseDataQueryPresentationV2)
 
+/** DataQuery v3 detailed error parser/schema pair. */
+export const dataQueryPresentationV3Schema: ContractSchema<DataQueryErrorPresentationV3> = _schema(DATA_QUERY_PRESENTATION_V3_JSON_SCHEMA, parseDataQueryErrorPresentationV3)
+
 /** DataQuery presentation parser/schema pair accepting v1 and v2. */
 export const dataQueryPresentationSchema: ContractSchema<DataQueryPresentation> = _schema(DATA_QUERY_PRESENTATION_JSON_SCHEMA, parseDataQueryPresentation)
 
@@ -553,10 +627,12 @@ export const dataQueryPresentationSchema: ContractSchema<DataQueryPresentation> 
 export const DataQueryInputSchema = dataQueryInputSchema
 export const DataQueryPresentationV1Schema = dataQueryPresentationV1Schema
 export const DataQueryPresentationV2Schema = dataQueryPresentationV2Schema
+export const DataQueryPresentationV3Schema = dataQueryPresentationV3Schema
 export const DataQueryPresentationSchema = dataQueryPresentationSchema
 
 /** Type guards for query contracts. */
 export const isDataQueryInput = (value: unknown): value is DataQueryInput => dataQueryInputSchema.check(value)
 export const isDataQueryPresentationV1 = (value: unknown): value is DataQueryPresentationV1 => dataQueryPresentationV1Schema.check(value)
 export const isDataQueryPresentationV2 = (value: unknown): value is DataQueryPresentationV2 => dataQueryPresentationV2Schema.check(value)
+export const isDataQueryPresentationV3 = (value: unknown): value is DataQueryErrorPresentationV3 => dataQueryPresentationV3Schema.check(value)
 export const isDataQueryPresentation = (value: unknown): value is DataQueryPresentation => dataQueryPresentationSchema.check(value)

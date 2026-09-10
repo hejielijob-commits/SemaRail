@@ -10,7 +10,8 @@ from typing import Any, BinaryIO
 from .errors import FRAME_TOO_LARGE, PROTOCOL_ERROR, TRUNCATED_FRAME
 
 
-PROTOCOL_VERSION = "1"
+PROTOCOL_VERSION = "2"
+LEGACY_PROTOCOL_VERSION = "1"
 LENGTH_PREFIX_BYTES = 4
 # The sidecar itself does not create large result previews yet. A bounded
 # frame prevents an accidental or hostile length prefix from allocating
@@ -151,4 +152,3 @@ encode_message = encode_frame
 decode_message = decode_frame
 read_message = read_frame
 write_message = write_frame
-

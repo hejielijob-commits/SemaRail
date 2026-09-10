@@ -217,5 +217,48 @@ class KnowledgeGovernanceTests(unittest.TestCase):
         self.assertEqual(stored["customMetadata"], {"owner": "analytics"})
 
 
+    def test_structured_query_confirmation_rule_is_validated_and_versioned_with_project(self):
+        service = self.service()
+        created = service.create_rule(
+            {
+                "title": "Revenue time range",
+                "content": "Confirm the reporting period before querying revenue.",
+                "confirmationRule": {
+                    "kind": "timeRange",
+                    "models": ["Sales"],
+                    "conditionKey": "timeRange",
+                    "required": True,
+                    "valueType": "dateRange",
+                    "requireConfirmation": True,
+                    "prompt": "Which reporting period should I use?",
+                },
+            }
+        )
+
+        rule = created["rule"]
+        self.assertEqual(rule["confirmationRule"]["conditionKey"], "timeRange")
+        self.assertTrue(rule["confirmationRule"]["requireConfirmation"])
+        with self.assertRaises(ApiServiceError):
+            service.update_rule(
+                rule["id"],
+                {"confirmationRule": {"kind": "unknown", "models": ["Sales"]}},
+            )
+        with self.assertRaises(ApiServiceError):
+            service.create_rule(
+                {
+                    "title": "Invalid default",
+                    "content": "Invalid dates must not be published.",
+                    "confirmationRule": {
+                        "kind": "timeRange",
+                        "models": ["Sales"],
+                        "conditionKey": "timeRange",
+                        "valueType": "dateRange",
+                        "defaultValue": {"start": "2026-02-30", "end": "2026-01-01"},
+                        "prompt": "Which reporting period?",
+                    },
+                }
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

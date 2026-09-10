@@ -80,7 +80,7 @@ class RuntimeMcpBridge:
         status, response = await asyncio.to_thread(
             self.gateway.dispatch,
             {
-                "protocolVersion": "1",
+                "protocolVersion": "2",
                 "id": request_id,
                 "method": method,
                 "params": dict(params),
@@ -103,6 +103,21 @@ class RuntimeMcpBridge:
             raise ToolError("SemaRail operation returned an invalid result")
         return dict(result)
 
+    async def submit_feedback(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        access = get_access_token()
+        if access is None or not access.token:
+            raise ToolError("authentication is required")
+        status, response = await asyncio.to_thread(
+            self.gateway.submit_feedback, dict(payload), f"Bearer {access.token}"
+        )
+        if status != 201:
+            safe = {
+                "code": response.get("code", "FEEDBACK_SUBMISSION_FAILED"),
+                "message": response.get("message", "feedback could not be saved"),
+            }
+            raise ToolError(json.dumps(safe, ensure_ascii=False, separators=(",", ":")))
+        return response
+
 
 def _readonly(title: str, *, idempotent: bool = True) -> ToolAnnotations:
     return ToolAnnotations(
@@ -112,6 +127,20 @@ def _readonly(title: str, *, idempotent: bool = True) -> ToolAnnotations:
         idempotentHint=idempotent,
         openWorldHint=False,
     )
+
+
+def _write(title: str) -> ToolAnnotations:
+    return ToolAnnotations(
+        title=title,
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+
+
+def _stateful(title: str) -> ToolAnnotations:
+    return ToolAnnotations(title=title, readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
 
 
 def create_remote_mcp_server(
@@ -242,11 +271,29 @@ def create_remote_mcp_server(
     async def semarail_plan_query(semantic_sql: str) -> dict[str, Any]:
         return await bridge.call("query.dryPlan", {"semanticSql": semantic_sql})
 
+    @server.tool(annotations=_stateful("Prepare and confirm a SemaRail query"))
+    async def semarail_prepare_query(
+        question: str,
+        semantic_sql: str,
+        conditions: dict[str, Any] | None = None,
+        confirmed_conditions: list[str] | None = None,
+    ) -> dict[str, Any]:
+        return await bridge.call(
+            "query.prepare",
+            {
+                "question": question,
+                "semanticSql": semantic_sql,
+                "conditions": conditions or {},
+                "confirmedConditions": confirmed_conditions or [],
+            },
+        )
+
     @server.tool(annotations=_readonly("Run a governed SemaRail query", idempotent=False))
     async def semarail_governed_query(
         question: str,
         semantic_sql: str,
         chart_intent: Literal["auto", "table", "line", "bar", "pie"] = "auto",
+        preparation_id: str | None = None,
     ) -> dict[str, Any]:
         query_id = f"remote-mcp-query-{uuid.uuid4().hex}"
         try:
@@ -257,6 +304,7 @@ def create_remote_mcp_server(
                     "semanticSql": semantic_sql,
                     "chartIntent": chart_intent,
                     "queryId": query_id,
+                    **({"preparationId": preparation_id} if preparation_id is not None else {}),
                 },
             )
         except asyncio.CancelledError:
@@ -265,6 +313,35 @@ def create_remote_mcp_server(
             except Exception:
                 pass
             raise
+
+    @server.tool(annotations=_write("Submit SemaRail query feedback"))
+    async def semarail_submit_feedback(
+        reference: str,
+        idempotency_key: str,
+        category: Literal[
+            "ambiguity", "knowledge_gap", "agent_understanding", "sql_generation",
+            "permission_configuration", "runtime_failure", "evaluation", "other",
+        ],
+        description: str,
+        expected_behavior: str | None = None,
+        question: str | None = None,
+        semantic_sql: str | None = None,
+        native_sql: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist explicit user feedback for a caller-owned query or trace."""
+
+        return await bridge.submit_feedback(
+            {
+                "reference": reference,
+                "idempotencyKey": idempotency_key,
+                "category": category,
+                "description": description,
+                **({"expectedBehavior": expected_behavior} if expected_behavior is not None else {}),
+                **({"question": question} if question is not None else {}),
+                **({"semanticSql": semantic_sql} if semantic_sql is not None else {}),
+                **({"nativeSql": native_sql} if native_sql is not None else {}),
+            }
+        )
 
     # MCP 1.28's compatibility mode otherwise ignores unknown arguments.
     # Reject them so a caller cannot believe it supplied a Subject, policy,

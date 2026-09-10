@@ -2,7 +2,7 @@
 
 The Console keeps credentials in a project-scoped state directory under the
 current OS user's home.  The query sidecar reads only the active profile at
-execution time, so changing a connection does not require a Harness restart.
+execution time, so changing a connection does not require an agent restart.
 Nothing from this module is copied into RPC results or diagnostics.
 """
 

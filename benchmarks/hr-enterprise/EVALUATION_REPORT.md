@@ -88,7 +88,7 @@ The optimized first pass left nine apparent failures:
 | Test-set error | 1 | `manager-count` said "current" while the old oracle included resigned employees | Align the oracle with the stated question |
 | Unclear requirement | 1 | `education-count` omitted ordering and tie-break behavior | State ordering and tie-break explicitly |
 | Missing knowledge | 0 | No optimized residual supported this diagnosis | No residual-driven change |
-| Skill contract error | 0 | No direct-agent evidence implicated Harness context assembly | Deferred to Harness testing |
+| Skill contract error | 0 | No direct-agent evidence implicated context assembly | Deferred to provider/model testing |
 | Table/data problem | 0 | Deterministic execution remained 60/60 | No data correction |
 
 Evaluator tolerance remains fail-closed. Only aliases and safe extra columns
@@ -122,12 +122,11 @@ Git.
   local summary files, so this report preserves those stage totals but does not
   claim immutable per-case artifacts for them.
 - This run validates direct Codex Luna Max agents and the SemaRail execution
-  path. **DeepSeek Harness was deliberately not tested**, so these results do not
-  establish plugin installation, Harness context injection, or DeepSeek model
-  behavior.
+  path. No agent-specific UI plugin or hosted model was tested, so these results
+  do not establish third-party plugin installation or model behavior.
 
 ## Reproduction
 
 See [`README.md`](README.md) for pinned dataset preparation, deterministic
-execution, evaluator commands, cleanup, and the provider-neutral Harness capture
+execution, evaluator commands, cleanup, and the provider-neutral agent capture
 format.

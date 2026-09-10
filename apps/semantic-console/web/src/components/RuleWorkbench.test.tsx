@@ -66,6 +66,17 @@ describe("RuleWorkbench", () => {
     await waitFor(() => expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ content: "Use the approved net revenue metric." }), "publish"));
   });
 
+  it("edits a structured query confirmation rule without flattening its values into prose", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<RuleWorkbench rules={[rule({ confirmationRule: { kind: "granularity", models: ["orders"], conditionKey: "grain", required: true, allowedValues: ["day", "month"], valueType: "string", requireConfirmation: true, prompt: "Choose a reporting grain" } })]} onSave={onSave} />);
+
+    fireEvent.change(await screen.findByRole("textbox", { name: "Applicable models" }), { target: { value: "orders, customers" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Clarification prompt" }), { target: { value: "Choose day or month" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ confirmationRule: expect.objectContaining({ models: ["orders", "customers"], allowedValues: ["day", "month"], prompt: "Choose day or month", requireConfirmation: true }) }), "draft"));
+  });
+
   it("discards local edits back to the committed rule", async () => {
     const onDiscard = vi.fn();
     render(<RuleWorkbench rules={[rule()]} onDiscard={onDiscard} />);

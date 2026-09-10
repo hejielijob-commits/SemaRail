@@ -198,7 +198,9 @@ class SemanticConsoleService:
                 "semarail_list_models",
                 "semarail_get_context",
                 "semarail_plan_query",
+                "semarail_prepare_query",
                 "semarail_governed_query",
+                "semarail_submit_feedback",
             ],
             "clientConfig": client_config,
             "trustedLocalOperator": {

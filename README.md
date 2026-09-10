@@ -9,9 +9,9 @@
 
 SemaRail turns database schemas, business definitions, relationships, rules, and reviewed SQL into a semantic context that AI agents can use consistently. It provides a visual Semantic Console for managing that context, a stable MCP interface for agent integration, and a governed query boundary for read-only data access.
 
-SemaRail is agent-neutral. Any MCP-capable client can use its semantic tools. It also provides a dedicated, independently installable DeepSeek Harness plugin that connects Harness to SemaRail Core, turning it into a governed Data Agent with native Chart, Table, and SQL views.
+SemaRail is agent-neutral. Any MCP-capable client can use its semantic tools through the authenticated HTTP endpoint or stdio bridge.
 
-> **Status:** Alpha. APIs, configuration, and storage formats may change before the first stable release. Core and Harness plugin tarballs can be built from source; npm and PyPI packages are not published yet.
+> **Status:** Alpha. APIs, configuration, and storage formats may change before the first stable release. The Core tarball can be built from source; npm and PyPI packages are not published yet.
 
 ![SemaRail Semantic Console overview](docs/images/semantic-console-overview.png)
 
@@ -25,7 +25,9 @@ SemaRail is agent-neutral. Any MCP-capable client can use its semantic tools. It
 - **Common database metadata** — test connections, browse schemas, and import models from PostgreSQL, MySQL, SQLite, ClickHouse, and DuckDB.
 - **Versioned semantic projects** — validate drafts, inspect generated source and diffs, publish revisions, and roll back changes.
 - **Bilingual metadata** — maintain English and Simplified Chinese display names without changing stable technical identifiers.
-- **DeepSeek Harness Data Agent** — install the optional thin Host/Client plugin to give Harness SemaRail semantic context, governed querying, cancellation, and durable Chart, Table, and SQL results.
+- **Actionable query diagnostics** — carry a Core trace across policy, planning, and execution, preserve versioned detailed errors, and retain bounded redacted failure evidence for 30 days without storing result rows.
+- **Explicit feedback and regression review** — submit caller-owned feedback from MCP or a Console link, classify it in the Console, and export only reviewed reproducible regression cases.
+- **Business-condition clarification** — publish structured metric, time-range, grain, and business-definition confirmation rules; required conditions block execution until `semarail_prepare_query` returns ready.
 
 ### Datasource management
 
@@ -52,15 +54,16 @@ see [CHANGELOG.md](CHANGELOG.md).
 
 | Date | Status | Milestone |
 | --- | --- | --- |
-| 2026-08-30 | Completed | Established the SemaRail brand, Semantic Console, stable semantic MCP contract, and separate Core/DeepSeek Harness plugin packages. |
+| 2026-08-30 | Completed | Established the SemaRail brand, Semantic Console, and stable semantic MCP contract. |
 | 2026-08-31 | Completed | Added DingTalk and OIDC employee sign-in, revocable sessions, trusted subject attributes, and administrator-managed account access. |
 | 2026-09-01 | Completed | Added project-, datasource-, table-, column-, and row-scoped authorization with immediate policy and credential revocation. |
 | 2026-09-02 | Completed | Added multi-user authenticated MCP, PostgreSQL-backed access-control storage, transaction-local subject context, and PostgreSQL RLS isolation. |
 | 2026-09-03 | Completed | Hardened permission-control acceptance with real PostgreSQL 17 tests, first-request MCP query startup, clean Linux CI builds, and A/B employee row-isolation verification. |
 | 2026-09-04 | Completed | Added bounded query-result delivery: up to 50 rows and 128 KiB inline, otherwise a revocable 15-minute CSV artifact with a 20-row Agent preview and 16 MiB ceiling. |
+| 2026-09-10 | Completed | Added versioned detailed query errors and traces, independent 30-day diagnostics, explicit feedback and reviewed regression cases, and Core-enforced query clarification rules. |
 | Next | Planned | Extend governed query execution beyond PostgreSQL while preserving the same policy, limits, audit, and cancellation contract. |
 | Next | Planned | Add a managed CSV/Excel ingestion workflow backed by DuckDB, without exposing uploaded files or local paths to Agents. |
-| Later | Planned | Publish versioned SemaRail Core and DeepSeek Harness plugin packages after the alpha installation and upgrade flow is stable. |
+| Later | Planned | Publish versioned SemaRail Core packages after the alpha installation and upgrade flow is stable. |
 
 ## Tech stack
 
@@ -71,7 +74,6 @@ see [CHANGELOG.md](CHANGELOG.md).
 - `sqlglot` for structural SQL validation
 - PostgreSQL for governed query execution
 - PostgreSQL, MySQL, SQLite, ClickHouse, and DuckDB drivers for Console metadata workflows
-- Apache ECharts for conversation-native charts
 
 ## Quick start
 
@@ -82,28 +84,17 @@ Requirements:
 - Node.js `^22.19.0 || >=24`
 - Python `>=3.11`
 
-Until the split packages are published, build both local tarballs from the repository:
+Until the package is published, build the local Core tarball from the repository:
 
 ```powershell
 pnpm install
-pnpm package:split
-npm install --global .\dist\hejielijob-semarail-core-0.1.0-alpha.3.tgz
+pnpm package:core
+npm install --global .\dist\hejielijob-semarail-core-0.1.0-alpha.4.tgz
 $env:SEMARAIL_API_TOKEN = semarail token create
 semarail start --project C:\path\to\semantic-project
 ```
 
 The Core process owns the semantic project, database credentials, execution limits, Semantic Console, and MCP servers. Open [http://127.0.0.1:48763](http://127.0.0.1:48763) after it starts. Keep `SEMARAIL_API_TOKEN` private: it is the local bootstrap-administrator credential used to create narrower, revocable service-account keys.
-
-### Optional DeepSeek Harness plugin
-
-In Access Control, create a dedicated Harness service account, bind only the required project/table/row policy, and issue a one-time `sr_live_...` key. Provide that scoped key—not the bootstrap token—to Harness:
-
-```powershell
-$env:SEMARAIL_HARNESS_TOKEN = "<scoped sr_live_... key>"
-dsh plugin --profile web add .\dist\hejielijob-dsh-semarail-plugin-0.1.0-alpha.3.tgz
-```
-
-The plugin connects to `http://127.0.0.1:48763` by default. It no longer embeds or starts Python, the Semantic Console, or the semantic runtime.
 
 ### Run from source
 
@@ -172,13 +163,15 @@ Open [http://127.0.0.1:48763](http://127.0.0.1:48763). The server binds to loopb
 ## Use SemaRail with MCP agents
 
 The default multi-user integration is SemaRail's authenticated Streamable HTTP
-MCP endpoint. It exposes the same five stable tools to any MCP-capable Agent:
+MCP endpoint. It exposes the same seven stable tools to any MCP-capable Agent:
 
 - `semarail_validate_project`
 - `semarail_list_models`
 - `semarail_get_context`
 - `semarail_plan_query`
+- `semarail_prepare_query`
 - `semarail_governed_query`
+- `semarail_submit_feedback`
 
 ![SemaRail MCP integration](docs/images/mcp-integration.png)
 
@@ -230,6 +223,23 @@ remains 500 rows and the CSV ceiling is 16 MiB; this is not a bulk-export API.
 Administrators may set `SEMARAIL_ARTIFACT_TTL_SECONDS` to a value from 60 to
 86400 seconds; the default is 900 seconds and MCP callers cannot override it.
 
+After generating candidate semantic SQL, an Agent calls `semarail_prepare_query`
+with extracted business conditions. Core applies the rules published for the
+referenced models and returns `ready`, `needs_clarification`, or `blocked`.
+Required or explicitly confirmable conditions cannot be bypassed by calling the
+query endpoint directly, including through an older client. Open-ended language
+interpretation and answer extraction remain Agent responsibilities; Core validates
+the structured conditions and one-query preparation record.
+
+`semarail_submit_feedback` is explicitly declared as a write operation. It accepts
+only a query or trace owned by the current caller and supports idempotent retries.
+Failures are captured automatically with bounded redacted question/SQL evidence;
+successful executions retain metadata only unless the user submits feedback. No
+result rows or full Agent conversation are stored. Administrators can classify
+issues, advance their workflow, link duplicates, create reviewed regression cases,
+and export versioned JSON from the Console's **Issues & feedback** and
+**Regression cases** pages.
+
 ### Service accounts, employees, and row permissions (alpha)
 
 SemaRail Core includes a local management API for service accounts and externally authenticated employees, one-time API-key issuance, key rotation/revocation, short-lived employee sessions, versioned policy bindings, and audit events. Policies can restrict tool scopes, projects, physical tables, columns, query limits, and rows derived from trusted subject attributes. Mandatory row predicates are injected with bound database parameters before execution; missing or malformed permissions fail closed.
@@ -267,65 +277,8 @@ Run MCP acceptance tests with:
 
 ```powershell
 pnpm acceptance:mcp
-pnpm acceptance:split
+pnpm acceptance:core
 ```
-
-## DeepSeek Harness plugin
-
-SemaRail includes an optional thin DeepSeek Harness plugin for users who want the semantic layer in the Harness conversation UI. The plugin connects to an independently running SemaRail Core; the Semantic Console and MCP servers do not require DeepSeek Harness.
-
-The plugin provides:
-
-- A Host plugin that connects to SemaRail Core for semantic context, governed PostgreSQL execution, and cancellation.
-- A Client plugin that renders durable Chart, Table, and SQL views from `tool/result.meta`.
-- A shortcut from Harness to the local Semantic Console.
-- Compatibility with DeepSeek Harness `>=0.1.0-rc.10 <0.2.0`.
-
-### Install the Harness plugin from source
-
-The recommended integration is the thin `@hejielijob/dsh-semarail-plugin` package. It depends on a separately running SemaRail Core through the authenticated, versioned HTTP v1 boundary. Build both unpublished packages locally:
-
-```powershell
-pnpm install
-pnpm package:split
-```
-
-Install the generated package with the same one-command Harness flow used by registry plugins:
-
-```powershell
-dsh plugin --profile web add .\dist\hejielijob-dsh-semarail-plugin-0.1.0-alpha.3.tgz
-```
-
-You can also download the `.tgz` from a future GitHub Release and pass its local path or HTTPS URL to the same command. Once the package is published to npm, installation will reduce to:
-
-```powershell
-dsh plugin --profile web add @hejielijob/dsh-semarail-plugin
-```
-
-The former `@hejielijob/dsh-wren-data-agent` all-in-one package remains as a legacy compatibility artifact for now. Do not enable both packages in the same Harness profile. See [the migration guide](docs/deepseek-harness-plugin.md).
-
-Verify both package boundaries with:
-
-```powershell
-pnpm --filter @hejielijob/semarail-core test
-pnpm --filter @hejielijob/dsh-semarail-plugin test
-```
-
-### Configure the Harness Host
-
-The plugin accepts only connection settings; project paths, credentials, and execution limits stay in Core:
-
-```yaml
-- id: semarail-harness-host
-  config:
-    semarailEndpoint: http://127.0.0.1:48763
-    authTokenEnv: SEMARAIL_HARNESS_TOKEN
-    timeoutMs: 30000
-```
-
-Set `SEMARAIL_DATABASE_URL` only in the Core process environment when governed PostgreSQL execution is required. The Harness plugin never receives the DSN. Never expose the Core bootstrap `SEMARAIL_API_TOKEN` to Harness or another Agent: it is limited to Console administration, recovery, and the read-only Core health check; semantic/query runtime methods and MCP boundaries reject it. Use a managed `sr_live_...` key or employee session instead.
-
-The Client opens the Semantic Console at `http://127.0.0.1:48763` by default. An embedding can pass `semanticConsoleUrl` to the exported view/link props or set `localStorage['semarail.semantic-console-url']`; only credential-free absolute HTTP(S) URLs are accepted. The former `dsh-wren-data-agent.semantic-console-url` key is read only as a migration fallback.
 
 ## Security model
 
@@ -346,14 +299,10 @@ All model-generated SQL is treated as untrusted input.
 | --- | --- |
 | `apps/semantic-console` | Local Python server and React Semantic Console. |
 | `python/sidecar` | Semantic planning, SQL policy/execution, framed RPC, and MCP servers. |
-| `packages/contract` | Shared Host, Client, and Sidecar contracts. |
-| `packages/host` | Shared Harness Host adapters, tool registration, and legacy bundle support. |
-| `packages/client` | DeepSeek Harness Chart, Table, SQL, and Console views. |
+| `packages/contract` | Shared versioned Core, MCP, and Console contracts. |
 | `packages/core` | Independently installable SemaRail Core CLI/runtime distribution. |
-| `packages/dsh-plugin` | Thin DeepSeek Harness Host/Client adapter. |
-| `packages/bundle` | Legacy all-in-one DeepSeek Harness compatibility bundle. |
 | `examples/wren-postgres` | Deterministic sales project and golden-question corpus. |
-| `scripts` | Packaging, acceptance, replay, and evaluation gates. |
+| `scripts` | Packaging, acceptance, and evaluation gates. |
 
 ## Development
 
@@ -361,20 +310,23 @@ All model-generated SQL is treated as untrusted input.
 pnpm typecheck
 pnpm test
 pnpm build
-pnpm acceptance:split
+pnpm acceptance:core
 pnpm acceptance:mcp
 ```
 
 Additional integration gates:
 
 ```powershell
-pnpm acceptance
 # Run the real PostgreSQL 17/RLS gate. It requires administrator settings and
 # creates, then cleans, isolated test database/role fixtures.
 pnpm acceptance:postgres
+# Run the PostgreSQL control-store, diagnostics, feedback, regression, and
+# clarification gate. The administrator URL is read only from this environment
+# variable; the script creates and removes one isolated database.
+$env:SEMARAIL_ACCEPTANCE_ADMIN_DATABASE_URL = "<PostgreSQL administrator URL>"
+pnpm acceptance:control-postgres
 # Preview the PostgreSQL acceptance prerequisites without changing the database.
 & .\.venv\Scripts\python.exe scripts\acceptance-postgres.py --dry-run
-pnpm acceptance:replay --dry-run
 pnpm evaluate:golden --self-test
 ```
 
@@ -383,10 +335,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Report sec
 ## Current scope
 
 - SemaRail's semantic MCP interface can use datasources supported by the configured semantic profile.
-- Governed query execution through MCP or DeepSeek Harness is currently PostgreSQL-only.
+- Governed query execution through MCP is currently PostgreSQL-only.
 - The Semantic Console supports PostgreSQL, MySQL, SQLite, ClickHouse, and DuckDB connection testing, schema browsing, and model import.
 - The current semantic runtime does not support View-to-View references; nested View dependencies are rejected before execution.
-- Browser hard-refresh rendering remains a separate real-Client acceptance step beyond the API-only replay gate.
 
 ## Upstream foundation
 
@@ -401,6 +352,7 @@ This repository is released under the [MIT License](LICENSE), copyright © 2026 
 Third-party components retain their own licenses:
 
 - `wrenai==0.13.2` identifies itself as Apache-2.0 and is maintained by the [WrenAI project](https://github.com/Canner/WrenAI).
-- The Client bundles Apache ECharts `5.6.0`; its Apache-2.0 `LICENSE` and `NOTICE` are shipped in `packages/client/licenses/echarts`.
+- The Semantic Console bundles its browser dependencies; their license files
+  are staged under `semantic-console-web/licenses` in the Core artifact.
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the dependency and artifact attribution inventory.

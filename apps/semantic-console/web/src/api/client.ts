@@ -39,6 +39,11 @@ import type {
   AccessPolicy,
   AccessAuditEvent,
   IssuedApiKey,
+  DiagnosticFeedback,
+  FeedbackCategory,
+  FeedbackStatus,
+  RegressionCaseExport,
+  RegressionCaseRecord,
 } from "../types";
 
 export class ApiClientError extends Error {
@@ -199,6 +204,67 @@ export class ApiClient {
 
   getAccessAudit(token: string): Promise<{ items: AccessAuditEvent[] }> {
     return this.request("/api/v1/access/audit?limit=500", { headers: this.adminHeaders(token) });
+  }
+
+  /** Submit explicit feedback for a query owned by the authenticated caller. */
+  submitFeedback(payload: {
+    reference: string;
+    idempotencyKey: string;
+    category: FeedbackCategory;
+    description: string;
+    expectedBehavior?: string;
+    question?: string;
+    semanticSql?: string;
+    nativeSql?: string;
+  }): Promise<{ feedbackId: string; diagnosticId: string; status: FeedbackStatus; duplicate: boolean }> {
+    return this.request("/api/v1/feedback", { method: "POST", body: JSON.stringify(payload) });
+  }
+
+  listDiagnosticFeedback(filters: {
+    limit?: number;
+    cursor?: string;
+    category?: FeedbackCategory | "";
+    status?: FeedbackStatus | "";
+    source?: string;
+    datasourceId?: string;
+    reasonCode?: string;
+    createdAfter?: string;
+    createdBefore?: string;
+  } = {}): Promise<{ items: DiagnosticFeedback[]; nextCursor?: string | null }> {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== "") query.set(key, String(value));
+    }
+    const suffix = query.size ? `?${query.toString()}` : "";
+    return this.request(`/api/v1/diagnostics/feedback${suffix}`);
+  }
+
+  getDiagnosticFeedback(id: string): Promise<DiagnosticFeedback> {
+    return this.request(`/api/v1/diagnostics/feedback/${encodeURIComponent(id)}`);
+  }
+
+  updateDiagnosticFeedback(id: string, payload: {
+    status: FeedbackStatus;
+    category?: FeedbackCategory;
+    duplicateOf?: string;
+    note?: string;
+  }): Promise<DiagnosticFeedback> {
+    return this.request(`/api/v1/diagnostics/feedback/${encodeURIComponent(id)}`, {
+      method: "PUT", body: JSON.stringify(payload),
+    });
+  }
+
+  createRegressionCase(feedbackId: string, payload: {
+    case: Omit<RegressionCaseRecord, "id" | "feedbackId" | "status" | "schemaVersion">;
+    enable: boolean;
+  }): Promise<{ id: string; status: "draft" | "enabled"; case: Omit<RegressionCaseRecord, "id" | "feedbackId" | "status"> }> {
+    return this.request(`/api/v1/diagnostics/feedback/${encodeURIComponent(feedbackId)}/regression-cases`, {
+      method: "POST", body: JSON.stringify(payload),
+    });
+  }
+
+  exportRegressionCases(): Promise<RegressionCaseExport> {
+    return this.request("/api/v1/diagnostics/regression-cases/export");
   }
 
   /** Load the structured business-model projection used by the visual editor. */

@@ -118,10 +118,14 @@ class RowPolicyTests(unittest.TestCase):
             )
 
     def test_unlisted_table_denied_column_wildcard_and_missing_attribute_fail_closed(self) -> None:
-        with self.assertRaises(RowPolicyError):
+        with self.assertRaises(RowPolicyError) as table_error:
             apply_row_policy("SELECT amount FROM public.payroll", region_policy("CN-JIA"))
-        with self.assertRaises(RowPolicyError):
+        self.assertEqual(table_error.exception.reason_code, "TABLE_PERMISSION_REQUIRED")
+        self.assertEqual(table_error.exception.resource_name, "public.payroll")
+        with self.assertRaises(RowPolicyError) as column_error:
             apply_row_policy("SELECT customer_phone FROM public.sales", region_policy("CN-JIA"))
+        self.assertEqual(column_error.exception.reason_code, "COLUMN_PERMISSION_REQUIRED")
+        self.assertEqual(column_error.exception.resource_name, "public.sales.customer_phone")
         with self.assertRaises(RowPolicyError):
             apply_row_policy("SELECT * FROM public.sales", region_policy("CN-JIA"))
         malformed = region_policy("CN-JIA")

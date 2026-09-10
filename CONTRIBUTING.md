@@ -7,7 +7,7 @@ Thank you for helping improve SemaRail. The project is currently alpha, so focus
 - Search existing issues before opening a new one.
 - Use an issue to discuss large API, protocol, storage-format, or architecture changes before implementation.
 - Report vulnerabilities through the private process in [SECURITY.md](SECURITY.md).
-- Keep changes inside this repository. The sibling DeepSeek Harness and WrenAI repositories are read-only API references for this project.
+- Keep changes inside this repository. The sibling WrenAI repository is a read-only API reference for this project.
 
 ## Development setup
 
@@ -37,7 +37,7 @@ py -3.11 -m venv .venv
 - Keep Python compatible with 3.11+ and type process boundaries.
 - Treat model-generated SQL as untrusted and keep credentials out of Client payloads, tool output, fixtures, and logs.
 - Add focused tests for behavioral changes.
-- Add a durable replay fixture or snapshot for replay-visible Client changes.
+- Add focused reconstruction tests for changes to durable protocol payloads.
 - Update README, security notes, or `CHANGELOG.md` when behavior visible to users changes.
 
 ## Verification
@@ -54,8 +54,8 @@ pnpm build
 For packaging or integration changes, also run:
 
 ```powershell
-pnpm acceptance
-pnpm acceptance:replay --dry-run
+pnpm acceptance:core
+pnpm acceptance:mcp
 ```
 
 The real PostgreSQL gate requires an explicitly configured test database; see the README before running it.

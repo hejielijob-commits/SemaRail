@@ -39,6 +39,39 @@ class FakeContextProvider:
 
 
 class DispatchTests(unittest.TestCase):
+    def test_v2_error_preserves_structured_reason_object_and_trace(self) -> None:
+        def denied(_params: object) -> object:
+            raise RpcFault(
+                "POLICY_DENIED",
+                "authorization",
+                "query denied by data access policy",
+                reason_code="COLUMN_PERMISSION_REQUIRED",
+                resources=[{"kind": "column", "name": "hr.compensation.salary"}],
+                required_permissions=["column:read"],
+                suggestion="Remove the field or ask an administrator to update the column access policy.",
+                origin="semarail-policy",
+            )
+
+        response = Dispatcher(query_runner=denied).dispatch({
+            "protocolVersion": "2",
+            "traceId": "trace-column-1",
+            "id": "query-v2",
+            "method": "query.run",
+            "params": {
+                "projectDir": ".",
+                "question": "Salary",
+                "semanticSql": "SELECT salary FROM compensation",
+                "queryId": "q-column-1",
+            },
+        })
+
+        self.assertFalse(response["ok"])
+        self.assertEqual(response["protocolVersion"], "2")
+        self.assertEqual(response["error"]["reasonCode"], "COLUMN_PERMISSION_REQUIRED")
+        self.assertEqual(response["error"]["resources"], [{"kind": "column", "name": "hr.compensation.salary"}])
+        self.assertEqual(response["error"]["requiredPermissions"], ["column:read"])
+        self.assertEqual(response["error"]["traceId"], "trace-column-1")
+
     def test_restricted_semantic_output_hides_denied_tables_columns_and_sql_plan(self) -> None:
         class Provider:
             def describe(self, _params: object) -> dict[str, object]:
@@ -228,14 +261,25 @@ class DispatchTests(unittest.TestCase):
         })
 
     def test_protocol_and_request_validation_fail_closed(self) -> None:
-        unsupported = Dispatcher().dispatch({
+        current = Dispatcher().dispatch({
             "protocolVersion": "2",
             "id": "req-2",
             "method": "health",
             "params": {},
+            "traceId": "trace-sidecar-2",
+        })
+        self.assertTrue(current["ok"])
+        self.assertEqual(current["protocolVersion"], "2")
+        self.assertEqual(current["result"]["protocolVersion"], "2")
+
+        unsupported = Dispatcher().dispatch({
+            "protocolVersion": "3",
+            "id": "req-3",
+            "method": "health",
+            "params": {},
         })
         self.assertEqual(unsupported["error"]["code"], "UNSUPPORTED_PROTOCOL")
-        self.assertEqual(unsupported["id"], "req-2")
+        self.assertEqual(unsupported["id"], "req-3")
 
         missing_id = Dispatcher().dispatch({
             "protocolVersion": "1",

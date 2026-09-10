@@ -1062,11 +1062,20 @@ class WrenQueryService:
                 query_parameters = authorized.parameters
                 applied_tables = authorized.applied_tables
             except (RowPolicyError, SqlPolicyError) as exc:
+                reason_code = getattr(exc, "reason_code", None)
+                resource_kind = getattr(exc, "resource_kind", None)
+                resource_name = getattr(exc, "resource_name", None)
+                resources = ([{"kind": resource_kind, "name": resource_name}] if isinstance(resource_kind, str) and isinstance(resource_name, str) else [])
                 raise RpcFault(
                     POLICY_DENIED,
                     "authorization",
                     "query denied by data access policy",
                     retryable=False,
+                    reason_code=reason_code,
+                    resources=resources,
+                    required_permissions=(["column:read"] if reason_code == "COLUMN_PERMISSION_REQUIRED" else ["table:read"] if reason_code == "TABLE_PERMISSION_REQUIRED" else []),
+                    suggestion=("Remove the field or ask an administrator to update the column access policy." if reason_code == "COLUMN_PERMISSION_REQUIRED" else "Ask an administrator to update the table access policy." if reason_code == "TABLE_PERMISSION_REQUIRED" else None),
+                    origin="semarail-policy",
                 ) from exc
         env_name = params.get("databaseDsnEnv", "SEMARAIL_DATABASE_URL")
         if (
@@ -1197,6 +1206,9 @@ class PsycopgQueryExecutor:
                 "concurrency",
                 "query concurrency limit reached",
                 retryable=True,
+                reason_code="INTERNAL_FAILURE",
+                suggestion="Wait for an active query to finish before retrying.",
+                origin="core",
             )
 
         started = time.monotonic()
@@ -1214,15 +1226,13 @@ class PsycopgQueryExecutor:
                 "database",
                 "PostgreSQL driver is unavailable",
                 retryable=True,
+                reason_code="CONNECTION_FAILED",
+                suggestion="Install the packaged PostgreSQL runtime dependencies.",
+                origin="transport",
             ) from exc
         except Exception as exc:
             self._slots.release()
-            raise RpcFault(
-                DATABASE_ERROR,
-                "database",
-                "database connection failed",
-                retryable=True,
-            ) from exc
+            raise _database_fault(exc, connection=True) from exc
 
         try:
             with self._lock:
@@ -1322,12 +1332,7 @@ class PsycopgQueryExecutor:
                     "query timed out",
                     retryable=True,
                 ) from exc
-            raise RpcFault(
-                DATABASE_ERROR,
-                "database",
-                "database query failed",
-                retryable=False,
-            ) from exc
+            raise _database_fault(exc) from exc
         finally:
             if deadline_timer is not None:
                 deadline_timer.cancel()
@@ -1729,6 +1734,56 @@ def _is_timeout_exception(exc: BaseException) -> bool:
     name = type(exc).__name__.lower()
     module = type(exc).__module__.lower()
     return "timeout" in name or "querycanceled" in name and "psycopg" in module
+
+
+def _database_fault(exc: BaseException, *, connection: bool = False) -> RpcFault:
+    """Classify driver failures from structured attributes without parsing text."""
+
+    sqlstate = getattr(exc, "sqlstate", None)
+    if sqlstate == "42501":
+        diag = getattr(exc, "diag", None)
+        schema = getattr(diag, "schema_name", None)
+        table = getattr(diag, "table_name", None)
+        column = getattr(diag, "column_name", None)
+        identifier = re.compile(r"[A-Za-z_][A-Za-z0-9_$]{0,62}\Z")
+        parts = [part for part in (schema, table, column) if isinstance(part, str)]
+        resources: list[dict[str, str]] = []
+        if parts and all(identifier.fullmatch(part) for part in parts):
+            resources.append({
+                "kind": "column" if column else "table",
+                "name": ".".join(parts),
+            })
+        object_note = f' for "{resources[0]["name"]}"' if resources else "; the database did not identify a specific object"
+        return RpcFault(
+            DATABASE_ERROR,
+            "database",
+            f"The SemaRail database account lacks the required read permission{object_note}.",
+            retryable=False,
+            reason_code="DATABASE_PERMISSION_REQUIRED",
+            resources=resources,
+            required_permissions=("database:read",),
+            suggestion="Ask the database administrator to grant the runtime account the required read permission.",
+            origin="database",
+        )
+    if connection or (isinstance(sqlstate, str) and sqlstate.startswith("08")):
+        return RpcFault(
+            DATABASE_ERROR,
+            "database",
+            "The configured database connection could not be established.",
+            retryable=True,
+            reason_code="CONNECTION_FAILED",
+            suggestion="Check datasource availability and the server-side connection configuration.",
+            origin="database",
+        )
+    return RpcFault(
+        DATABASE_ERROR,
+        "database",
+        "The database query failed without a safely identifiable permission cause.",
+        retryable=False,
+        reason_code="INTERNAL_FAILURE",
+        suggestion="Use the trace identifier to inspect the server-side database failure.",
+        origin="database",
+    )
 
 
 class EnvPsycopgExecutor(PsycopgQueryExecutor):

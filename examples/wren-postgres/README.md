@@ -23,12 +23,12 @@ wren context build --project .
 
 `golden-questions.json` is the acceptance corpus. Phase 0 requires the four
 marked smoke cases to cover aggregation, date grain, relationship joins, and
-null handling. Phase 3 evaluates all twenty questions through the Harness
+null handling. Phase 3 evaluates all twenty questions through an MCP-capable
 agent and records first-pass and at-most-one-repair outcomes. Each question's
 oracle fixes the expected output aliases, core semantic models, numeric
 tolerance, and deterministic seed rows. `${FIXTURE_DATE}` placeholders refer
 to the PostgreSQL `CURRENT_DATE` observed for that seeded run. See
-`scripts/evaluate-golden.py` for the normalized real-Harness capture contract;
+`scripts/evaluate-golden.py` for the normalized provider-neutral capture contract;
 its synthetic self-test proves evaluator behavior only, not agent accuracy.
 
 ## Real PostgreSQL acceptance gate

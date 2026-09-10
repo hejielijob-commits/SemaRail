@@ -27,7 +27,7 @@ class AccessControlAdminApi:
         self.policy_engine = policy_engine or PolicyEngine()
         self.project_id = project_id
 
-    def dispatch(self, method: str, path: str, body: Any, authorization: str | None) -> tuple[int, dict[str, Any]] | None:
+    def dispatch(self, method: str, path: str, body: Any, authorization: str | None, query: Mapping[str, Any] | None = None) -> tuple[int, dict[str, Any]] | None:
         if not path.startswith("/api/v1/access/"):
             return None
         try:
@@ -39,7 +39,7 @@ class AccessControlAdminApi:
             if not decision.allowed:
                 self.store.record_audit(action="access.admin", decision="denied", auth=auth, resource=path)
                 return 403, {"code": "FORBIDDEN", "message": "administrator permission is required"}
-            result = self._admin_dispatch(method, path, body, auth)
+            result = self._admin_dispatch(method, path, body, auth, query or {})
             self.store.record_audit(action=f"access.{method.lower()}", decision="allowed", auth=auth, resource=path)
             return result
         except AccessControlError as exc:
@@ -48,7 +48,7 @@ class AccessControlAdminApi:
             return 400, {"code": "INVALID_POLICY", "message": "policy document is invalid"}
 
     def _admin_dispatch(
-        self, method: str, path: str, body: Any, auth: AuthContext
+        self, method: str, path: str, body: Any, auth: AuthContext, query: Mapping[str, Any]
     ) -> tuple[int, dict[str, Any]]:
         payload = body if isinstance(body, Mapping) else {}
         organization_scope = None if auth.subject.id == BOOTSTRAP_SUBJECT_ID else auth.subject.organization_id
@@ -129,7 +129,11 @@ class AccessControlAdminApi:
             self.store.unbind_policy(subject_id, policy_id)
             return 200, {"subjectId": subject_id, "policyId": policy_id, "status": "unbound"}
         if method == "GET" and path == "/api/v1/access/audit":
-            return 200, {"items": self._filter_organization(self.store.list_audit(), organization_scope)}
+            try:
+                limit = int(query.get("limit", 100))
+            except (TypeError, ValueError):
+                raise AccessControlError("INVALID_REQUEST", "limit must be an integer", status=400)
+            return 200, {"items": self._filter_organization(self.store.list_audit(limit=limit), organization_scope)}
         return 404, {"code": "NOT_FOUND", "message": "access-control endpoint was not found"}
 
     @staticmethod

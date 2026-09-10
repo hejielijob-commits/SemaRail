@@ -2,7 +2,7 @@
 
 Wren's native MCP server remains the semantic discovery/planning interface.
 This server adds one governed execution tool that reuses the exact service
-and PostgreSQL policy boundary used by the DeepSeek Harness sidecar.
+and PostgreSQL policy boundary used by SemaRail Core.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ _ENV_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,127}\Z")
 
 
 class GovernedQueryService(Protocol):
-    """Host-neutral query service shared with the framed Harness sidecar."""
+    """Transport-neutral query service shared by SemaRail MCP entry points."""
 
     def run(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Plan and execute one bounded query."""

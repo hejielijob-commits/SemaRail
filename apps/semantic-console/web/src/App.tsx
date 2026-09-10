@@ -52,6 +52,7 @@ import SqlKnowledgeWorkbench, { type SqlKnowledgeCandidate, type SqlValidation }
 import CubeWorkbench, { type CubeDefinition } from "./components/CubeWorkbench";
 import McpIntegration from "./components/McpIntegration";
 import AccessControl from "./components/AccessControl";
+import DiagnosticsWorkbench from "./components/DiagnosticsWorkbench";
 
 const ViewWorkbench = lazy(() => import("./components/ViewWorkbench"));
 
@@ -59,6 +60,7 @@ type Notice = { tone: "info" | "success" | "warning" | "error"; title: string; b
 
 const navGroups: { labelKey: string; items: { id: ConsoleSection; labelKey: string; icon: typeof House; count?: string }[] }[] = [
   { labelKey: "nav.workspace", items: [{ id: "overview", labelKey: "nav.overview", icon: House }, { id: "datasources", labelKey: "nav.datasources", icon: Database }, { id: "schema", labelKey: "nav.schema", icon: Table }, { id: "mcp", labelKey: "nav.mcp", icon: Plug }, { id: "access", labelKey: "nav.access", icon: ShieldCheck }] },
+  { labelKey: "nav.quality", items: [{ id: "diagnostics", labelKey: "nav.diagnostics", icon: WarningCircle }, { id: "regressionCases", labelKey: "nav.regressionCases", icon: CheckCircle }] },
   { labelKey: "nav.semanticLayer", items: [{ id: "models", labelKey: "nav.models", icon: Cube }, { id: "relationships", labelKey: "nav.relationships", icon: ShareNetwork }, { id: "views", labelKey: "nav.views", icon: Eye }, { id: "cubes", labelKey: "nav.cubes", icon: Stack }, { id: "rules", labelKey: "nav.rules", icon: BookOpenText }, { id: "sqlKnowledge", labelKey: "nav.sqlKnowledge", icon: Code }, { id: "mdl", labelKey: "nav.mdl", icon: BracketsCurly }] },
 ];
 
@@ -112,7 +114,7 @@ function semanticRelationships(value: RelationshipGraphRelationship[]): Semantic
 function knowledgeRules(snapshot: KnowledgeRulesResponse | null): KnowledgeRule[] {
   return (snapshot?.rules ?? []).map((rule) => ({
     id: rule.id, name: rule.title, content: rule.content, enabled: rule.enabled,
-    sourcePath: rule.sourcePath, scope: rule.scope, tags: rule.tags,
+    sourcePath: rule.sourcePath, scope: rule.scope, tags: rule.tags, confirmationRule: rule.confirmationRule,
     updatedAt: rule.updatedAt, draft: rule.draft, sourceContent: rule.sourceContent, diff: rule.diff,
   }));
 }
@@ -135,8 +137,9 @@ function knowledgeCandidates(snapshot: SqlCandidatesResponse | null): SqlKnowled
 
 function App() {
   const { t, i18n: activeI18n } = useTranslation();
+  const feedbackReference = useMemo(() => new URLSearchParams(window.location.search).get("feedback")?.trim() ?? "", []);
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("semantic-console-theme") as Theme) || "light");
-  const [section, setSection] = useState<ConsoleSection>("overview");
+  const [section, setSection] = useState<ConsoleSection>(() => feedbackReference ? "diagnostics" : "overview");
   const [project, setProject] = useState<ProjectSummary>({});
   const [datasourceTypes, setDatasourceTypes] = useState<DatasourceType[]>([]);
   const [datasources, setDatasources] = useState<Datasource[]>([]);
@@ -351,13 +354,14 @@ function App() {
       const result = await api.getCapabilities(token);
       const consoleAdmin = result.capabilities["console:admin"];
       const accessAdmin = result.capabilities["access:admin"];
-      if (!consoleAdmin && !accessAdmin) throw new Error("This identity has no Console capability for the current project.");
+      if (!consoleAdmin && !accessAdmin && !feedbackReference) throw new Error("This identity has no Console capability for the current project.");
       api.setBearerToken(token);
       setConsoleSession({ token, subjectName: result.subject.name, consoleAdmin, accessAdmin });
       setConsoleTokenInput("");
       setShowConsoleUnlock(false);
+      if (feedbackReference) setSection("diagnostics");
       if (consoleAdmin) await refreshWorkspace();
-      else setSection("access");
+      else if (!feedbackReference) setSection("access");
     } catch (error) {
       setConsoleAuthError(error instanceof Error ? error.message : "Authentication failed.");
     }
@@ -451,7 +455,7 @@ function App() {
   async function saveRule(rule: KnowledgeRule, action: RuleSaveAction) {
     const result = await api.updateRule(rule.id, {
       title: rule.name, content: rule.content, enabled: rule.enabled,
-      scope: rule.scope, tags: rule.tags, expectedRevision: rulesSnapshot?.revision,
+      scope: rule.scope, tags: rule.tags, confirmationRule: rule.confirmationRule, expectedRevision: rulesSnapshot?.revision,
     });
     setRulesSnapshot((current) => current ? { ...current, revision: result.revision, rules: result.rules } : current);
     markSaved();
@@ -750,6 +754,8 @@ function App() {
           {section === "sqlKnowledge" ? <SqlKnowledgeWorkbench candidates={knowledgeCandidates(sqlCandidates)} loading={sqlLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onRetry={() => void loadSqlCandidates()} onValidate={validateCandidate} onApprove={approveCandidate} onReject={rejectCandidate} onResubmit={resubmitCandidate} onSaveSql={saveSqlCandidate} /> : null}
           {section === "mcp" ? <McpIntegration integration={mcpIntegration} loading={mcpLoading} error={mcpError} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onRetry={() => void loadMcpIntegration()} /> : null}
           {section === "access" ? <AccessControl locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} adminToken={consoleSession?.accessAdmin ? consoleSession.token : ""} activeDatasourceId={project.activeDatasource?.id ?? ""} /> : null}
+          {section === "diagnostics" ? <DiagnosticsWorkbench locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} mode="diagnostics" authToken={consoleSession?.token ?? ""} adminToken={consoleSession?.consoleAdmin ? consoleSession.token : ""} feedbackReference={feedbackReference} /> : null}
+          {section === "regressionCases" ? <DiagnosticsWorkbench locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} mode="regressionCases" authToken={consoleSession?.token ?? ""} adminToken={consoleSession?.consoleAdmin ? consoleSession.token : ""} /> : null}
           {section === "instructions" ? <InstructionsPage value={instructions} onChange={setInstructions} onSave={() => { const path = files.find((file) => isInstructionFile(file.path))?.path; if (path) void handleSaveFile(path, instructions); else setNotice({ tone: "error", title: "Draft save failed", body: "The project API did not return an instructions file." }); }} savedAt={draftSavedAt} loading={fileLoading} /> : null}
           {section === "mdl" ? <MdlPage value={mdlSource} onChange={setMdlSource} files={files} selectedFile={selectedFilePath} onSelectFile={(path: string) => void loadProjectFile(path)} onSave={(path?: string) => void handleSaveFile(path ?? selectedFilePath, mdlSource)} onImportProject={handleImportProject} savedAt={draftSavedAt} loading={fileLoading} /> : null}
         </>}
@@ -763,7 +769,7 @@ function App() {
   </div>;
 }
 
-function pageTitle(section: ConsoleSection, t: (key: string) => string) { return t(({ overview: "page.overview", datasources: "page.datasources", schema: "page.schema", models: "page.models", relationships: "page.relationships", views: "page.views", cubes: "page.cubes", rules: "page.rules", sqlKnowledge: "page.sqlKnowledge", mcp: "page.mcp", access: "page.access", instructions: "page.instructions", mdl: "page.mdl" })[section]); }
+function pageTitle(section: ConsoleSection, t: (key: string) => string) { return t(({ overview: "page.overview", datasources: "page.datasources", schema: "page.schema", models: "page.models", relationships: "page.relationships", views: "page.views", cubes: "page.cubes", rules: "page.rules", sqlKnowledge: "page.sqlKnowledge", mcp: "page.mcp", access: "page.access", diagnostics: "page.diagnostics", regressionCases: "page.regressionCases", instructions: "page.instructions", mdl: "page.mdl" })[section]); }
 
 function Sidebar({ projectName, section, onNavigate, open, onClose }: { projectName: string; section: ConsoleSection; onNavigate: (section: ConsoleSection) => void; open: boolean; onClose: () => void }) {
   const { t } = useTranslation();

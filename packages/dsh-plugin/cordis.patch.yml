@@ -1,4 +1,0 @@
-# Thin Harness adapter. SemaRail Core runs as an independent service.
-- insert:
-    - id: semarail-harness-host
-      name: '@hejielijob/dsh-semarail-plugin'

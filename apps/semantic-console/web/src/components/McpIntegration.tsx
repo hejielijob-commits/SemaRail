@@ -8,7 +8,7 @@ type Locale = "en-US" | "zh-CN";
 
 const copy = {
   "en-US": {
-    eyebrow: "Agent access", title: "MCP integration", description: "Connect any MCP-capable agent through SemaRail's authenticated, policy-enforced remote boundary. DeepSeek Harness remains an optional plugin.",
+    eyebrow: "Agent access", title: "MCP integration", description: "Connect any MCP-capable agent through SemaRail's authenticated, policy-enforced remote boundary.",
     remote: "Authenticated remote MCP", semantic: "Semantic context", governed: "Governed query", ready: "Ready to configure", setup: "Setup required", configured: "Endpoint configured", defaulted: "Using loopback default",
     remoteBody: "One Streamable HTTP endpoint exposes semantic context and governed query tools. Every request is resolved against the current subject and policy.",
     copied: "Copied", config: "MCP client configuration", configBody: "Set SEMARAIL_TOKEN in the MCP client's private environment, then adapt only the client-specific wrapper if needed.", copyConfig: "Copy configuration", copyUrl: "Copy endpoint",
@@ -19,7 +19,7 @@ const copy = {
     serviceAccount: "Service-account key", employeeSession: "Employee login session", localTitle: "Trusted local operator compatibility", localSummary: "Show stdio compatibility notes", localBody: "Direct stdio runs with local operator trust. It does not provide per-user identity or isolation and must not be exposed as a shared employee access path.",
   },
   "zh-CN": {
-    eyebrow: "Agent 接入", title: "MCP 集成", description: "通过 SemaRail 经过认证并执行权限策略的远程边界，将当前语义项目提供给任何支持 MCP 的 Agent；DeepSeek Harness 仅作为可选插件。",
+    eyebrow: "Agent 接入", title: "MCP 集成", description: "通过 SemaRail 经过认证并执行权限策略的远程边界，将当前语义项目提供给任何支持 MCP 的 Agent。",
     remote: "认证远程 MCP", semantic: "语义上下文", governed: "受控查询", ready: "可以配置", setup: "需要配置", configured: "端点已配置", defaulted: "使用本机默认地址",
     remoteBody: "一个 Streamable HTTP 端点同时提供语义上下文和受控查询工具；每个请求都会根据当前主体和最新策略进行鉴权。",
     copied: "已复制", config: "MCP 客户端配置", configBody: "在 MCP 客户端的私有环境中设置 SEMARAIL_TOKEN；如客户端格式不同，只需调整最外层结构。", copyConfig: "复制配置", copyUrl: "复制端点",

@@ -1,5 +1,5 @@
 {
-  "name": "@hejielijob/dsh-wren-data-agent-workspace",
+  "name": "@hejielijob/semarail-workspace",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,13 +12,12 @@
     "test": "pnpm -r --if-present test && pnpm run test:sidecar && pnpm run test:semantic-console",
     "test:sidecar": "node scripts/test-sidecar.mjs",
     "test:semantic-console": "node scripts/test-semantic-console.mjs",
-    "typecheck": "pnpm --filter @hejielijob/dsh-wren-data-agent-contract build && pnpm -r --if-present typecheck",
+    "typecheck": "pnpm --filter @hejielijob/semarail-contract build && pnpm -r --if-present typecheck",
     "lint": "pnpm -r --if-present lint",
-    "acceptance": "pwsh -NoLogo -NoProfile -File scripts/acceptance.ps1",
     "acceptance:mcp": "node scripts/run-wren-mcp-acceptance.mjs",
-    "acceptance:split": "pnpm --filter @hejielijob/semarail-core build && node scripts/acceptance-split.mjs",
+    "acceptance:core": "pnpm --filter @hejielijob/semarail-core test",
     "acceptance:postgres": "pwsh -NoLogo -NoProfile -File scripts/acceptance-postgres.ps1",
-    "acceptance:replay": "node scripts/acceptance-replay.mjs",
+    "acceptance:control-postgres": "pwsh -NoLogo -NoProfile -File scripts/acceptance-control-postgres.ps1",
     "evaluate:golden": "pwsh -NoLogo -NoProfile -File scripts/evaluate-golden.ps1",
     "benchmark:hr:prepare": "pwsh -NoLogo -NoProfile -File scripts/hr-benchmark.ps1 prepare",
     "benchmark:hr": "pwsh -NoLogo -NoProfile -File scripts/hr-benchmark.ps1 run",
@@ -26,9 +25,6 @@
     "benchmark:hr:clean": "pwsh -NoLogo -NoProfile -File scripts/hr-benchmark.ps1 clean",
     "test:hr-benchmark": "pwsh -NoLogo -NoProfile -File scripts/hr-benchmark.ps1 test",
     "probe:sidecar": "node scripts/probe-sidecar.mjs",
-    "package:plugin": "node scripts/package-plugin.mjs",
-    "package:core": "node scripts/package-distribution.mjs core",
-    "package:harness-plugin": "node scripts/package-distribution.mjs dsh-plugin",
-    "package:split": "pnpm run package:core && pnpm run package:harness-plugin"
+    "package:core": "node scripts/package-distribution.mjs"
   }
 }

@@ -69,7 +69,7 @@ export interface SqlKnowledgeCandidate {
   validation?: SqlValidation;
 }
 
-/** A live Harness query preview shown before a user submits it for review. */
+/** A live agent-query preview shown before a user submits it for review. */
 export interface SqlQueryCapture {
   queryId: string;
   question: string;
@@ -599,7 +599,7 @@ export function SqlKnowledgeWorkbench({
   </div>;
 }
 
-/** Compact alias for Harness result-tab integrations. */
+/** Compact alias for result integrations. */
 export function SqlQueryKnowledgePanel(props: { query: SqlQueryCapture; locale?: KnowledgeWorkbenchLocale; readOnly?: boolean; onRecordQuery?: (query: SqlQueryCapture) => void | Promise<void> }) {
   const c = sqlCopy[props.locale ?? "en-US"];
   return <QueryCaptureCard query={props.query} c={c} readOnly={props.readOnly ?? false} onRecordQuery={props.onRecordQuery} />;

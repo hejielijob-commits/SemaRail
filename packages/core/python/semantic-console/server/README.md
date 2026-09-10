@@ -35,6 +35,11 @@ The primary routes are:
 | --- | --- |
 | `GET /api/health` | Core process and semantic-runtime readiness |
 | `POST /api/v1/runtime/rpc` | Authenticated, versioned agent runtime handshake/context/query/cancel boundary |
+| `POST /api/v1/feedback` | Idempotent caller-owned explicit query feedback submission |
+| `GET /api/v1/diagnostics/feedback` | Project-administrator issue queue with server-side filters and cursor pagination |
+| `GET/PUT /api/v1/diagnostics/feedback/{id}` | Diagnostic evidence, classification, workflow history, and duplicate linkage |
+| `POST /api/v1/diagnostics/feedback/{id}/regression-cases` | Create a reviewed deterministic SQL or external Agent-evidence regression case |
+| `GET /api/v1/diagnostics/regression-cases/export` | Export enabled project cases as versioned JSON without executing them |
 | `GET /api/v1/artifacts/{id}/download?token=...` | Core-owned, short-lived query artifact download (`attachment`, `no-store`; invalid token is 404 and expired token is 410) |
 | `GET /api/v1/auth/providers` | Public list of configured identity provider ids and labels |
 | `POST /api/v1/auth/device/start` | Create a bounded one-time browser/device login transaction |
@@ -78,9 +83,13 @@ The primary routes are:
 | `GET /api/versions` | Published snapshot list |
 | `POST /api/versions/{id}/rollback` | Validate and restore a snapshot |
 
-`POST /api/v1/runtime/rpc` requires `Authorization: Bearer <token>`. Set a token of at least 32 characters in `SEMARAIL_API_TOKEN` before starting Core. The public request cannot select a project, send database credentials, choose a Subject, supply an authorization policy, or override query limits; those values are resolved by Core. The currently supported v1 methods are `health`, `project.validate`, `project.describe`, `context.ask`, `query.dryPlan`, `query.run`, and `query.cancel`. The authenticated Streamable HTTP MCP endpoint and `semarail mcp bridge` both enter this same boundary. Direct `semarail-mcp` and `semarail-query-mcp` processes are trusted-local compatibility tools and are not a per-user authorization boundary. Identity-provider configuration and employee CLI login are documented in `docs/access-control.md` at the repository root.
+`POST /api/v1/runtime/rpc` requires `Authorization: Bearer <token>`. Set a token of at least 32 characters in `SEMARAIL_API_TOKEN` before starting Core. The public request cannot select a project, send database credentials, choose a Subject, supply an authorization policy, or override query limits; those values are resolved by Core. Protocol v1 remains accepted for existing clients; v2 carries Core-owned trace identifiers and structured error details. Supported methods are `health`, `project.validate`, `project.describe`, `context.ask`, `query.dryPlan`, `query.prepare`, `query.run`, and `query.cancel`. Both the authenticated Streamable HTTP MCP endpoint and `semarail mcp bridge` request v2 and enter this same boundary. Direct `semarail-mcp` and `semarail-query-mcp` processes are trusted-local compatibility tools and are not a per-user authorization boundary. Identity-provider configuration and employee CLI login are documented in `docs/access-control.md` at the repository root.
 
 The bootstrap administrator token is accepted by the Console management APIs and the read-only Core health check, but intentionally rejected by semantic/query runtime methods, remote MCP, and the authenticated stdio bridge. Create a scoped service-account key or use an employee session for Agent access. Configure `SEMARAIL_REMOTE_MCP_URL` when the public MCP endpoint differs from the loopback default; the value must be an HTTP(S) URL without embedded credentials, query parameters, or fragments.
+
+`POST /api/v1/feedback` and the write-declared `semarail_submit_feedback` MCP tool submit explicit feedback for a query or trace owned by the authenticated caller. Use a stable idempotency key when retrying. Query failures are captured automatically in independent diagnostic tables; successful queries retain metadata only until explicit feedback supplies bounded question/SQL evidence. Diagnostic bodies are redacted and expire after 30 days. Project administrators manage feedback through `/api/v1/diagnostics/feedback` and export reviewed cases from `/api/v1/diagnostics/regression-cases/export`.
+
+`query.prepare` and `semarail_prepare_query` validate Agent-extracted metric, time-range, grain, and business-definition conditions against the currently published rules. A ready preparation is bound to the caller, project, SQL, conditions, and rule versions for 30 minutes. When applicable required conditions are missing or unconfirmed, `query.run` returns clarification-required without entering the Sidecar; an old v1 caller cannot bypass the guard. Natural-language ambiguity recognition and answer extraction remain Agent responsibilities.
 
 ### Query artifacts
 

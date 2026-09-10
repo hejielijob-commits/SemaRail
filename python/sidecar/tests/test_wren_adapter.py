@@ -40,7 +40,7 @@ class WrenAdapterTests(unittest.TestCase):
         health = adapter.health()
         self.assertEqual(health, {
             "status": "ok",
-            "protocolVersion": "1",
+            "protocolVersion": "2",
             "wrenAvailable": True,
             "wrenVersion": "0.13.2",
         })

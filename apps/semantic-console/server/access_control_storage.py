@@ -65,6 +65,22 @@ class _PsycopgConnection:
         return self._connection.execute(sql, params)
 
 
+def _is_safe_application_error(exc: Exception) -> bool:
+    """Recognize the server's stable, credential-free domain errors.
+
+    Diagnostics and query-preparation stores intentionally share this
+    transaction adapter without depending on the access-control module. Their
+    errors expose the same safe public shape and must not be mistaken for a
+    PostgreSQL driver failure when raised from inside a transaction.
+    """
+
+    return (
+        isinstance(getattr(exc, "code", None), str)
+        and isinstance(getattr(exc, "safe_message", None), str)
+        and isinstance(getattr(exc, "status", None), int)
+    )
+
+
 def _postgres_sql(statement: str) -> str:
     """Translate the repository's static DB-API SQLite statements safely.
 
@@ -157,6 +173,8 @@ class PostgreSQLAccessControlStore(AccessControlStore):
             except AccessControlError:
                 raise
             except Exception as exc:
+                if _is_safe_application_error(exc):
+                    raise
                 raise AccessControlError(
                     "STORE_UNAVAILABLE", "PostgreSQL access-control storage operation failed", status=503
                 ) from exc

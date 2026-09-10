@@ -135,6 +135,9 @@ class RemoteMcpTests(unittest.TestCase):
         employee = self.gateway.access_control.upsert_external_user(
             provider="dingtalk", external_subject="mcp-employee", name="MCP employee"
         )
+        employee = self.gateway.access_control.update_user(
+            employee.id, attributes={"regionCodes": ["CN-JIA"]}
+        )
         self.gateway.access_control.bind_policy(employee.id, self.policy["id"])
         employee_session = self.gateway.access_control.issue_session(employee.id)
 
@@ -201,7 +204,9 @@ class RemoteMcpTests(unittest.TestCase):
                                     "semarail_list_models",
                                     "semarail_get_context",
                                     "semarail_plan_query",
+                                    "semarail_prepare_query",
                                     "semarail_governed_query",
+                                    "semarail_submit_feedback",
                                 ],
                             )
                             forbidden = {
@@ -213,6 +218,11 @@ class RemoteMcpTests(unittest.TestCase):
                                     set(tool.inputSchema.get("properties", {})) & forbidden
                                 )
                                 self.assertFalse(tool.inputSchema.get("additionalProperties", True))
+                            feedback_tool = next(
+                                tool for tool in tools.tools if tool.name == "semarail_submit_feedback"
+                            )
+                            self.assertFalse(feedback_tool.annotations.readOnlyHint)
+                            self.assertTrue(feedback_tool.annotations.idempotentHint)
                             calls_before_spoof = len(self.dispatcher.requests)
                             spoofed = await session.call_tool(
                                 "semarail_get_context",
@@ -249,6 +259,13 @@ class RemoteMcpTests(unittest.TestCase):
                                 {"question": "Revenue?", "semantic_sql": "SELECT amount FROM sales"},
                             )
                             self.assertTrue(denied.isError)
+                            denial_text = " ".join(
+                                str(getattr(content, "text", "")) for content in denied.content
+                            )
+                            self.assertIn("TOOL_PERMISSION_REQUIRED", denial_text)
+                            self.assertIn("query.run", denial_text)
+                            self.assertIn("semarail-policy", denial_text)
+                            self.assertIn("trace-", denial_text)
 
         asyncio.run(exercise())
         by_method = {request["method"]: request for request in self.dispatcher.requests}

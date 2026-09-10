@@ -25,6 +25,7 @@ import os
 import re
 import threading
 from collections.abc import Mapping
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -237,6 +238,82 @@ def _json_document(value: Mapping[str, Any]) -> str:
     if len(encoded.encode("utf-8")) > _MAX_METADATA_BYTES:
         raise ProjectError("FILE_TOO_LARGE", "knowledge metadata exceeds the permitted length")
     return encoded
+
+
+def _valid_confirmation_value(value: Any, allowed_values: Any, value_type: Any) -> bool:
+    if isinstance(allowed_values, list):
+        return isinstance(value, str) and value in allowed_values
+    if value_type == "integer":
+        return type(value) is int and -(2**63) <= value <= 2**63 - 1
+    if value_type == "date":
+        if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            return False
+        try:
+            date.fromisoformat(value)
+        except ValueError:
+            return False
+        return True
+    if value_type == "dateRange":
+        if not isinstance(value, Mapping) or set(value) != {"start", "end"}:
+            return False
+        try:
+            start = date.fromisoformat(value["start"])
+            end = date.fromisoformat(value["end"])
+        except (TypeError, ValueError):
+            return False
+        return start <= end
+    return isinstance(value, str) and 0 < len(value) <= 1_000
+
+
+def _confirmation_rule(value: Any) -> dict[str, Any]:
+    """Validate the first-version structured query-confirmation rule."""
+
+    if not isinstance(value, Mapping):
+        raise ProjectError("INVALID_KNOWLEDGE", "confirmationRule must be an object")
+    allowed = {
+        "kind", "models", "conditionKey", "required", "allowedValues",
+        "valueType", "defaultValue", "requireConfirmation", "prompt",
+    }
+    if set(value) - allowed:
+        raise ProjectError("INVALID_KNOWLEDGE", "confirmationRule contains unsupported fields")
+    kind = value.get("kind")
+    if kind not in {"metric", "timeRange", "granularity", "businessDefinition"}:
+        raise ProjectError("INVALID_KNOWLEDGE", "confirmationRule kind is invalid")
+    models = value.get("models")
+    if (
+        not isinstance(models, list) or not 1 <= len(models) <= 64
+        or any(not isinstance(item, str) or not 1 <= len(item) <= 160 for item in models)
+    ):
+        raise ProjectError("INVALID_KNOWLEDGE", "confirmationRule models are invalid")
+    condition_key = value.get("conditionKey")
+    if not isinstance(condition_key, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]{0,127}", condition_key):
+        raise ProjectError("INVALID_KNOWLEDGE", "confirmationRule conditionKey is invalid")
+    for key in ("required", "requireConfirmation"):
+        if key in value and type(value[key]) is not bool:
+            raise ProjectError("INVALID_KNOWLEDGE", f"confirmationRule {key} must be a boolean")
+    allowed_values = value.get("allowedValues")
+    value_type = value.get("valueType")
+    if allowed_values is not None and (
+        not isinstance(allowed_values, list) or not 1 <= len(allowed_values) <= 64
+        or any(not isinstance(item, str) or not 1 <= len(item) <= 256 for item in allowed_values)
+    ):
+        raise ProjectError("INVALID_KNOWLEDGE", "confirmationRule allowedValues are invalid")
+    if value_type is not None and value_type not in {"string", "date", "dateRange", "integer"}:
+        raise ProjectError("INVALID_KNOWLEDGE", "confirmationRule valueType is invalid")
+    if allowed_values is None and value_type is None:
+        raise ProjectError("INVALID_KNOWLEDGE", "confirmationRule requires allowedValues or valueType")
+    if "defaultValue" in value and not _valid_confirmation_value(
+        value["defaultValue"], allowed_values, value_type
+    ):
+        raise ProjectError("INVALID_KNOWLEDGE", "confirmationRule defaultValue is invalid")
+    prompt = value.get("prompt")
+    if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 500:
+        raise ProjectError("INVALID_KNOWLEDGE", "confirmationRule prompt is invalid")
+    result = _safe_json(dict(value), path="rule.confirmationRule")
+    assert isinstance(result, dict)
+    result.setdefault("required", True)
+    result.setdefault("requireConfirmation", False)
+    return result
 
 
 class RuleStore:
@@ -509,6 +586,8 @@ class RuleStore:
         for key in ("description", "tags", "scope"):
             if key in payload:
                 record[key] = _safe_json(payload[key], path=f"rule.{key}")
+        if "confirmationRule" in payload:
+            record["confirmationRule"] = _confirmation_rule(payload["confirmationRule"])
         index["schemaVersion"] = KNOWLEDGE_SCHEMA_VERSION
         self._replace_record(index, record)
         files: dict[str, str | None] = {}
@@ -545,6 +624,8 @@ class RuleStore:
         for key in ("description", "tags", "scope"):
             if key in payload:
                 record[key] = _safe_json(payload[key], path=f"rule.{key}")
+        if "confirmationRule" in payload:
+            record["confirmationRule"] = _confirmation_rule(payload["confirmationRule"])
         record["content"] = content
         record["updatedAt"] = utc_now()
         if "enabled" in payload:
@@ -737,8 +818,8 @@ class SqlCandidateStore:
 
     @staticmethod
     def _history(payload: Mapping[str, Any]) -> list[dict[str, str]]:
-        # ``sqlHistory`` is the presentation contract used by the Harness
-        # client; the other spellings keep the queue compatible with early
+        # ``sqlHistory`` is the presentation contract used by agent clients;
+        # the other spellings keep the queue compatible with early
         # console builds and direct API callers.
         for key in ("sqlHistory", "historySqlRefs", "historySql", "usedHistorySql", "usedHistorySqlRefs"):
             if key in payload:

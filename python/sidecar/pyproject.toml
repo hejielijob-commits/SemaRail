@@ -24,7 +24,7 @@ mcp = ["wrenai[mcp]==0.13.2", "mcp[cli]==1.28.1"]
 
 [project.scripts]
 # SemaRail-owned commands. The DSH-prefixed entries remain compatibility
-# aliases for the legacy all-in-one Harness package.
+# aliases retained for compatibility with earlier local package layouts.
 semarail-sidecar = "sidecar.main:main"
 dsh-wren-sidecar = "sidecar.main:main"
 dsh-data-agent-mcp = "sidecar.mcp_gateway:main"

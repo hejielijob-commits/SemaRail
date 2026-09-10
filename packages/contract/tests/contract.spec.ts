@@ -17,6 +17,8 @@ import {
   parseSemanticContext,
   safeParseDataQueryInput,
   safeParseDataQueryPresentationV2,
+  parseFeedbackSubmissionRequest,
+  parseFeedbackSubmissionResponse,
 } from '../src/index.js'
 
 const column = { name: 'total', type: 'DECIMAL(18,2)', semanticRole: 'measure' as const }
@@ -39,11 +41,92 @@ describe('versioned RPC contracts', () => {
     expect(parseRpcRequest({ protocolVersion: '1', id: '2', method: 'project.validate', params: {} }).method).toBe('project.validate')
     expect(() => parseRpcRequest({ protocolVersion: '1', id: '1', method: 'health', params: {}, extra: true })).toThrow(ContractValidationError)
     expect(parseRpcResponse({ protocolVersion: '1', id: '1', ok: true, result: { ready: true } })).toMatchObject({ ok: true })
-    expect(() => parseRpcResponse({ protocolVersion: '2', id: '1', ok: true, result: null })).toThrow(/unsupported version/)
+    expect(() => parseRpcResponse({ protocolVersion: '3', id: '1', ok: true, result: null })).toThrow(/unsupported version/)
     expect(parseRpcResponse({
       protocolVersion: '1', id: 'python-1', ok: false,
       error: { code: 'PROJECT_VALIDATION_FAILED', phase: 'project.validate', message: 'project validation failed', retryable: false },
     })).toMatchObject({ ok: false, error: { code: 'PROJECT_VALIDATION_FAILED' } })
+    expect(parseRpcResponse({
+      protocolVersion: '2', id: 'python-2', ok: false,
+      error: {
+        code: 'POLICY_DENIED', phase: 'authorization', message: 'salary read denied', retryable: false,
+        reasonCode: 'COLUMN_PERMISSION_REQUIRED',
+        resources: [{ kind: 'column', name: 'hr.compensation.salary' }],
+        requiredPermissions: ['column:read'],
+        suggestion: 'Remove the field or ask an administrator to update the column policy.',
+        origin: 'semarail-policy', traceId: 'trace-1',
+      },
+    })).toMatchObject({
+      protocolVersion: '2', ok: false,
+      error: { reasonCode: 'COLUMN_PERMISSION_REQUIRED', traceId: 'trace-1' },
+    })
+    expect(parseRpcResponse({
+      protocolVersion: '2', id: 'missing-attribute', ok: false,
+      error: {
+        code: 'POLICY_DENIED', phase: 'authorization', message: 'trusted attribute missing', retryable: false,
+        reasonCode: 'ROW_ATTRIBUTE_MISSING',
+        resources: [{ kind: 'attribute', name: 'regionCodes' }],
+        requiredPermissions: ['subject.attribute:regionCodes'],
+        suggestion: 'Ask an administrator to set the trusted identity attribute.',
+        origin: 'semarail-policy', traceId: 'trace-attribute',
+      },
+    })).toMatchObject({ error: { resources: [{ kind: 'attribute', name: 'regionCodes' }] } })
+    expect(() => parseRpcResponse({
+      protocolVersion: '2', id: 'bad-v2', ok: false,
+      error: { code: 'POLICY_DENIED', phase: 'authorization', message: 'denied', retryable: false },
+    })).toThrow(/field is required/)
+  })
+})
+
+describe('data query input contract', () => {
+  it('accepts a bounded retry reference and remains strict about unknown fields', () => {
+    const parsed = safeParseDataQueryInput({
+      question: 'Retry salary analysis',
+      semanticSql: 'SELECT SUM(salary) FROM hr.compensation',
+      retryOfQueryId: 'query-original',
+    })
+    expect(parsed).toMatchObject({ success: true, data: { retryOfQueryId: 'query-original' } })
+    expect(safeParseDataQueryInput({
+      question: 'Retry salary analysis', semanticSql: 'SELECT 1', retryOfQueryId: '',
+    }).success).toBe(false)
+    expect(safeParseDataQueryInput({
+      question: 'Retry salary analysis', semanticSql: 'SELECT 1', retryOfQueryId: 'x'.repeat(129),
+    }).success).toBe(false)
+    expect(safeParseDataQueryInput({
+      question: 'Retry salary analysis', semanticSql: 'SELECT 1', originalQueryId: 'query-original',
+    }).success).toBe(false)
+  })
+})
+
+describe('agent feedback contract', () => {
+  it('accepts bounded evidence and rejects unknown fields and future versions', () => {
+    const request = parseFeedbackSubmissionRequest({
+      schemaVersion: 1,
+      reference: 'query-1',
+      idempotencyKey: 'attempt-1',
+      category: 'sql_generation',
+      description: 'The grouping is wrong.',
+      question: 'Revenue by region',
+      semanticSql: 'SELECT region, SUM(revenue) FROM orders GROUP BY region',
+    })
+    expect(request).toMatchObject({ reference: 'query-1', category: 'sql_generation' })
+    expect(() => parseFeedbackSubmissionRequest({ ...request, bearerToken: 'secret' })).toThrow(/unknown field/)
+    expect(() => parseFeedbackSubmissionRequest({ ...request, schemaVersion: 2 })).toThrow(/expected 1/)
+    expect(() => parseFeedbackSubmissionRequest({ ...request, description: 'x'.repeat(8_001) })).toThrow(/at most 8000/)
+  })
+
+  it('strictly parses accepted and rejected Host receipts', () => {
+    expect(parseFeedbackSubmissionResponse({
+      schemaVersion: 1, status: 'accepted', feedbackId: 'fb-1', diagnosticId: 'diag-1',
+      workflowStatus: 'pending', duplicate: false,
+    })).toMatchObject({ status: 'accepted', feedbackId: 'fb-1' })
+    expect(parseFeedbackSubmissionResponse({
+      schemaVersion: 1, status: 'rejected', code: 'TIMEOUT', message: 'Retry later.', retryable: true,
+    })).toMatchObject({ status: 'rejected', retryable: true })
+    expect(() => parseFeedbackSubmissionResponse({
+      schemaVersion: 1, status: 'accepted', feedbackId: 'fb-1', diagnosticId: 'diag-1',
+      workflowStatus: 'pending', duplicate: false, token: 'forbidden',
+    })).toThrow(/unknown field/)
   })
 })
 

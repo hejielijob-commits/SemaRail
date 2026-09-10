@@ -23,6 +23,7 @@ try:  # Package import when started with ``python -m server``.
     from .access_api import AccessControlAdminApi
     from .artifact_store import ArtifactDownload, ArtifactError
     from .identity_api import IdentityApi
+    from .diagnostics_api import DiagnosticsApi
     from .service import SemanticConsoleService
     from .project import ProjectStore
     from .runtime_rpc import RuntimeRpcGateway
@@ -31,6 +32,7 @@ except ImportError:  # Direct ``python app.py`` / test loading by file path.
     from access_api import AccessControlAdminApi  # type: ignore[no-redef]
     from artifact_store import ArtifactDownload, ArtifactError  # type: ignore[no-redef]
     from identity_api import IdentityApi  # type: ignore[no-redef]
+    from diagnostics_api import DiagnosticsApi  # type: ignore[no-redef]
     from service import SemanticConsoleService  # type: ignore[no-redef]
     from project import ProjectStore  # type: ignore[no-redef]
     from runtime_rpc import RuntimeRpcGateway  # type: ignore[no-redef]
@@ -84,6 +86,7 @@ class SemanticConsoleApplication:
         runtime_rpc: RuntimeRpcGateway | None = None,
         access_api: AccessControlAdminApi | None = None,
         identity_api: IdentityApi | None = None,
+        diagnostics_api: DiagnosticsApi | None = None,
     ) -> None:
         self.service = service or SemanticConsoleService()
         self.static_dir = Path(static_dir).expanduser().resolve() if static_dir else None
@@ -95,6 +98,12 @@ class SemanticConsoleApplication:
             project_id=project_id,
         )
         self.identity_api = identity_api or IdentityApi(self.runtime_rpc.access_control)
+        self.diagnostics_api = diagnostics_api or DiagnosticsApi(
+            self.runtime_rpc.diagnostics,
+            self.runtime_rpc.access_control,
+            self.runtime_rpc.policy_engine,
+            project_id=project_id,
+        )
 
     def request(
         self,
@@ -144,9 +153,14 @@ class SemanticConsoleApplication:
         identity_response = self.identity_api.dispatch(method.upper(), parsed.path, query, body, authorization)
         if identity_response is not None:
             return identity_response
-        access_response = self.access_api.dispatch(method.upper(), parsed.path, body, authorization)
+        access_response = self.access_api.dispatch(method.upper(), parsed.path, body, authorization, query)
         if access_response is not None:
             return access_response
+        diagnostics_response = self.diagnostics_api.dispatch(
+            method.upper(), parsed.path, query, body, authorization
+        )
+        if diagnostics_response is not None:
+            return diagnostics_response
         auth: AuthContext | None = None
         normalized_method = method.upper()
         if parsed.path.startswith("/api/") and (normalized_method, parsed.path) not in _PUBLIC_CONSOLE_ROUTES:
@@ -220,6 +234,7 @@ def create_app(
     runtime_rpc: RuntimeRpcGateway | None = None,
     access_api: AccessControlAdminApi | None = None,
     identity_api: IdentityApi | None = None,
+    diagnostics_api: DiagnosticsApi | None = None,
 ) -> SemanticConsoleApplication:
     """Create an embeddable Semantic Console application."""
 
@@ -229,6 +244,7 @@ def create_app(
         runtime_rpc=runtime_rpc,
         access_api=access_api,
         identity_api=identity_api,
+        diagnostics_api=diagnostics_api,
     )
 
 

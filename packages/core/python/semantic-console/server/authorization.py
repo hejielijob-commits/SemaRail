@@ -17,6 +17,14 @@ class PolicyError(Exception):
     """Invalid or insufficient policy data."""
 
 
+class MissingSubjectAttribute(PolicyError):
+    """A trusted subject attribute required by a row rule is absent."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        super().__init__("required subject attribute is missing")
+
+
 @dataclass(frozen=True)
 class PolicyDecision:
     allowed: bool
@@ -39,6 +47,7 @@ _METHOD_SCOPE = {
     "context.ask": "semantic:read",
     "query.dryPlan": "query:plan",
     "query.run": "query:execute",
+    "query.prepare": "query:plan",
     "query.cancel": "query:cancel",
 }
 _ALLOWED_OPERATORS = {"eq", "in"}
@@ -194,7 +203,7 @@ def _resolve_subject_value(subject: Subject, path: Any) -> Any:
     if isinstance(path, str) and path.startswith(prefix):
         key = path[len(prefix):]
         if not key or "." in key or key not in subject.attributes:
-            raise PolicyError("required subject attribute is missing")
+            raise MissingSubjectAttribute(key)
         return subject.attributes[key]
     raise PolicyError("valueFrom is not an allowed subject path")
 
@@ -324,6 +333,7 @@ class PolicyEngine:
         *,
         project_id: str | None = None,
         datasource_id: str | None = None,
+        raise_missing_attribute: bool = False,
     ) -> PolicyDecision:
         if subject.id == BOOTSTRAP_SUBJECT_ID:
             return PolicyDecision(True, "bootstrap administrator")
@@ -398,6 +408,10 @@ class PolicyEngine:
                 denied_columns=tuple(sorted(denied)),
                 limits=_limits([item[0] for item in matching]),
             )
+        except MissingSubjectAttribute:
+            if raise_missing_attribute:
+                raise
+            return PolicyDecision(False, "policy evaluation failed closed")
         except PolicyError:
             return PolicyDecision(False, "policy evaluation failed closed")
 
@@ -473,7 +487,12 @@ class PolicyEngine:
             compiled: dict[str, Any] = {}
             for table in sorted(table_names):
                 decision = self.authorize_table(
-                    subject, table, policies, project_id=project_id, datasource_id=datasource_id
+                    subject,
+                    table,
+                    policies,
+                    project_id=project_id,
+                    datasource_id=datasource_id,
+                    raise_missing_attribute=True,
                 )
                 if not decision.allowed:
                     continue
@@ -538,6 +557,8 @@ class PolicyEngine:
                     "policyVersions": policy_versions,
                 },
             }
+        except MissingSubjectAttribute:
+            raise
         except (PolicyError, TypeError, ValueError) as exc:
             raise PolicyError("data policy compilation failed") from exc
 
@@ -562,4 +583,4 @@ class PolicyEngine:
         return tuple(item[1] for item in items)
 
 
-__all__ = ["PolicyDecision", "PolicyEngine", "PolicyError", "scope_for_method", "validate_policy_document"]
+__all__ = ["MissingSubjectAttribute", "PolicyDecision", "PolicyEngine", "PolicyError", "scope_for_method", "validate_policy_document"]

@@ -35,6 +35,10 @@ class RecordingTransport:
         self.calls.append((method, dict(params)))
         return {"schemaVersion": 1, "method": method}
 
+    async def submit_feedback(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        self.calls.append(("feedback.submit", dict(payload)))
+        return {"feedbackId": "fb_test", "status": "pending"}
+
 
 class _CoreHandler(BaseHTTPRequestHandler):
     requests: list[dict[str, Any]] = []
@@ -48,16 +52,19 @@ class _CoreHandler(BaseHTTPRequestHandler):
         type(self).requests.append(
             {"path": self.path, "authorization": self.headers.get("Authorization"), "body": body}
         )
-        if type(self).response_status == 200:
+        if self.path == "/api/v1/feedback" and type(self).response_status in {200, 201}:
+            type(self).response_status = 201
+            payload = {"feedbackId": "fb_http", "diagnosticId": "diag_http", "status": "pending"}
+        elif type(self).response_status == 200:
             payload = {
-                "protocolVersion": "1",
+                "protocolVersion": body["protocolVersion"],
                 "id": body["id"],
                 "ok": True,
                 "result": type(self).response_result or {"schemaVersion": 1, "method": body["method"]},
             }
         else:
             payload = {
-                "protocolVersion": "1",
+                "protocolVersion": body["protocolVersion"],
                 "id": body["id"],
                 "ok": False,
                 "error": type(self).response_error or {"code": "FORBIDDEN", "message": "denied"},
@@ -90,7 +97,7 @@ class StdioMcpTests(unittest.TestCase):
         self.server.server_close()
         self.thread.join(timeout=3)
 
-    def test_exposes_only_five_stable_policy_neutral_tools(self) -> None:
+    def test_exposes_stable_policy_neutral_tools_and_marks_feedback_as_write(self) -> None:
         transport = RecordingTransport()
         server = create_stdio_mcp_server(transport)
         tools = asyncio.run(server.list_tools())
@@ -101,7 +108,9 @@ class StdioMcpTests(unittest.TestCase):
                 "semarail_list_models",
                 "semarail_get_context",
                 "semarail_plan_query",
+                "semarail_prepare_query",
                 "semarail_governed_query",
+                "semarail_submit_feedback",
             ],
         )
         forbidden = {
@@ -118,6 +127,9 @@ class StdioMcpTests(unittest.TestCase):
             properties = set(tool.inputSchema.get("properties", {}))
             self.assertFalse(properties & forbidden)
             self.assertFalse(tool.inputSchema.get("additionalProperties", True))
+        feedback_tool = next(tool for tool in tools if tool.name == "semarail_submit_feedback")
+        self.assertFalse(feedback_tool.annotations.readOnlyHint)
+        self.assertTrue(feedback_tool.annotations.idempotentHint)
 
         asyncio.run(server.call_tool("semarail_get_context", {"question": "Revenue?"}))
         asyncio.run(
@@ -155,7 +167,30 @@ class StdioMcpTests(unittest.TestCase):
             {key for key in request["body"] if key not in {"id"}},
             {"protocolVersion", "method", "params"},
         )
+        self.assertEqual(request["body"]["protocolVersion"], "2")
         self.assertNotIn(token, str(result))
+
+    def test_detailed_core_error_is_preserved_for_mcp(self) -> None:
+        token = "sr_key_" + "a" * 40
+        _CoreHandler.response_status = 403
+        expected = {
+            "code": "POLICY_DENIED",
+            "phase": "authorization",
+            "message": "Cannot read hr.compensation.salary.",
+            "retryable": False,
+            "reasonCode": "COLUMN_PERMISSION_REQUIRED",
+            "resources": [{"kind": "column", "name": "hr.compensation.salary"}],
+            "requiredPermissions": ["column:read"],
+            "suggestion": "Remove the field or ask an administrator to update the column access policy.",
+            "origin": "semarail-policy",
+            "traceId": "trace-column-1",
+        }
+        _CoreHandler.response_error = expected
+
+        with self.assertRaises(ToolError) as caught:
+            asyncio.run(CoreHttpTransport(self.endpoint, token).call("query.run", {}))
+
+        self.assertEqual(json.loads(str(caught.exception)), expected)
 
     def test_official_mcp_client_talks_stdio_while_bridge_calls_core(self) -> None:
         token = "sr_live_" + "e" * 24 + "_" + "f" * 32
@@ -179,11 +214,30 @@ class StdioMcpTests(unittest.TestCase):
                     return [tool.name for tool in tools.tools], called
 
         tools, called = asyncio.run(exercise())
-        self.assertEqual(len(tools), 5)
+        self.assertEqual(len(tools), 7)
         self.assertFalse(called.isError)
         self.assertEqual(_CoreHandler.requests[-1]["authorization"], f"Bearer {token}")
         self.assertEqual(_CoreHandler.requests[-1]["body"]["method"], "context.ask")
         self.assertNotIn(token, str(called))
+
+    def test_feedback_transport_uses_authenticated_http_endpoint(self) -> None:
+        token = "sr_key_" + "a" * 40
+        _CoreHandler.response_status = 201
+        transport = CoreHttpTransport(self.endpoint, token)
+        result = asyncio.run(
+            transport.submit_feedback(
+                {
+                    "reference": "query-1",
+                    "idempotencyKey": "attempt-1",
+                    "category": "other",
+                    "description": "incorrect result",
+                }
+            )
+        )
+
+        self.assertEqual(result["feedbackId"], "fb_http")
+        self.assertEqual(_CoreHandler.requests[-1]["path"], "/api/v1/feedback")
+        self.assertEqual(_CoreHandler.requests[-1]["authorization"], f"Bearer {token}")
 
     def test_official_stdio_client_receives_v2_artifact_without_embedding_csv(self) -> None:
         token = "sr_live_" + "1" * 24 + "_" + "2" * 32

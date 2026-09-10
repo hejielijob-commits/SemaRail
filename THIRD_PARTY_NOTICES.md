@@ -65,20 +65,14 @@ integration. These packages declare MIT licenses in their package metadata.
 The exact versions are locked by `pnpm-lock.yaml` and their package license
 files must remain available when a built Console artifact is redistributed.
 
-The Client artifact bundles Apache ECharts `5.6.0`. Its Apache license and
-notice are kept in:
-
-- [`packages/client/licenses/echarts/LICENSE`](packages/client/licenses/echarts/LICENSE)
-- [`packages/client/licenses/echarts/NOTICE`](packages/client/licenses/echarts/NOTICE)
-
-The Host staging step copies the web runtime license files into
+The Core staging step copies the web runtime license files into
 `semantic-console-web/licenses/` in the generated package artifact. Do not
-remove those files when packaging or redistributing the Host artifact.
+remove those files when packaging or redistributing the Core artifact.
 
 ## Attribution boundary
 
-SemaRail's own code, API contracts, MCP facade, policy layer, Console, and
-Harness adapter are project-owned work under the repository MIT License. The
+SemaRail's own code, API contracts, MCP facade, policy layer, and Console are
+project-owned work under the repository MIT License. The
 WrenAI runtime is an upstream dependency and semantic foundation under Apache
 License 2.0; the two licenses apply to their respective works. Product names,
 logos, and trademarks are not granted by an open-source license.

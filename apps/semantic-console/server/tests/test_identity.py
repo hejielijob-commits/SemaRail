@@ -551,7 +551,8 @@ class IdentityTests(unittest.TestCase):
         self.assertEqual((status, disabled["status"]), (200, "disabled"))
         with self.assertRaises(AccessControlError) as rejected:
             self.store.authenticate(f"Bearer {session['accessToken']}")
-        self.assertEqual(rejected.exception.code, "UNAUTHENTICATED")
+        self.assertEqual(rejected.exception.code, "SUBJECT_DISABLED")
+        self.assertEqual(rejected.exception.safe_message, "subject is disabled")
         self.store.set_subject_status(user.id, "active")
         with self.assertRaises(AccessControlError) as still_revoked:
             self.store.authenticate(f"Bearer {session['accessToken']}")

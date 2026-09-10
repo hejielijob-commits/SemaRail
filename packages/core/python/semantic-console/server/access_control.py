@@ -901,12 +901,16 @@ class AccessControlStore:
                     "JOIN subjects s ON s.id=x.subject_id WHERE x.id=?",
                     (session_id,),
                 ).fetchone()
-                if row is None or row["revoked_at"] is not None or row["status"] != "active":
+                if row is None:
+                    raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
+                if not secrets.compare_digest(self._derive(secret, bytes(row["salt"])), bytes(row["secret_hash"])):
+                    raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
+                if row["status"] != "active":
+                    raise AccessControlError("SUBJECT_DISABLED", "subject is disabled", status=403)
+                if row["revoked_at"] is not None:
                     raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
                 expiry = _parse_timestamp(str(row["expires_at"]))
                 if expiry is None or expiry <= self.clock().astimezone(UTC):
-                    raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
-                if not secrets.compare_digest(self._derive(secret, bytes(row["salt"])), bytes(row["secret_hash"])):
                     raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
                 connection.execute("UPDATE sessions SET last_used_at=? WHERE id=?", (_timestamp(self.clock()), session_id))
             subject = Subject(
@@ -923,12 +927,16 @@ class AccessControlStore:
                 "SELECT c.*,s.organization_id,s.kind,s.name,s.status,s.attributes_json FROM credentials c JOIN subjects s ON s.id=c.subject_id WHERE c.id=?",
                 (credential_id,),
             ).fetchone()
-            if row is None or row["revoked_at"] is not None or row["status"] != "active":
+            if row is None:
+                raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
+            if not secrets.compare_digest(self._derive(secret, bytes(row["salt"])), bytes(row["secret_hash"])):
+                raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
+            if row["status"] != "active":
+                raise AccessControlError("SUBJECT_DISABLED", "subject is disabled", status=403)
+            if row["revoked_at"] is not None:
                 raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
             expiry = _parse_timestamp(row["expires_at"])
             if expiry is not None and expiry <= self.clock().astimezone(UTC):
-                raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
-            if not secrets.compare_digest(self._derive(secret, bytes(row["salt"])), bytes(row["secret_hash"])):
                 raise AccessControlError("UNAUTHENTICATED", "authentication is required", status=401)
             connection.execute("UPDATE credentials SET last_used_at=? WHERE id=?", (_timestamp(self.clock()), credential_id))
         subject = Subject(

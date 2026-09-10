@@ -11,18 +11,15 @@ Superseded by [0004](0004-stable-semarail-semantic-mcp.md).
 
 ## Context
 
-The first SemaRail experience was packaged for DeepSeek Harness. WrenAI
-0.13.2 also provides a native Model Context Protocol (MCP) server over stdio or
-Streamable HTTP. Reimplementing its schema, context, planning, knowledge,
-resource, and prompt tools in the Harness plugin would create two incompatible
-agent APIs.
+WrenAI 0.13.2 provides a native Model Context Protocol (MCP) server over stdio
+or Streamable HTTP. Reimplementing its schema, context, planning, knowledge,
+resource, and prompt tools for each agent would create incompatible agent APIs.
 
 ## Decision
 
 Wren's native MCP server is the standard agent-neutral interface to the semantic
-layer. Any MCP-capable agent can use it without installing DeepSeek Harness.
-The DeepSeek Harness bundle remains an optional enhanced adapter for durable
-Chart/Table/SQL conversation views and the stricter SemaRail query boundary.
+layer. Any MCP-capable agent can use it without installing a client-specific
+adapter.
 
 SemaRail will not duplicate the complete upstream MCP tool surface. The Semantic Console
 remains a separate local management plane; datasource credentials, project
@@ -42,9 +39,9 @@ added.
   the official Python MCP client.
 - At the time of this decision, other agents used the upstream MCP server. This
   is no longer the supported shared deployment boundary.
-- Harness continues to provide the current governed PostgreSQL execution and
-  conversation-native presentation path.
+- Core provides governed PostgreSQL execution through its authenticated MCP
+  boundary.
 - MySQL support in the Semantic Console remains metadata, connection testing,
   schema browsing, and model import; it is not yet SemaRail governed query execution.
-- The host-neutral governed query service is shared by Harness and the thin SemaRail
-  MCP adapter without replacing Wren's native semantic tools.
+- The governed query service is shared by Core's MCP transports without
+  replacing Wren's native semantic tools.

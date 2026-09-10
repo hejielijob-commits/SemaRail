@@ -6,8 +6,7 @@ All notable user-visible changes to this project are documented here. The format
 
 ### Added
 
-- Independently installable `@hejielijob/semarail-core` and thin
-  `@hejielijob/dsh-semarail-plugin` distributions.
+- Independently installable `@hejielijob/semarail-core` distribution.
 - An authenticated, versioned HTTP v1 boundary for Core handshake, semantic
   context, governed query execution, and cancellation.
 - PostgreSQL, MySQL, SQLite, ClickHouse, and DuckDB Console adapters for
@@ -32,19 +31,14 @@ All notable user-visible changes to this project are documented here. The format
 
 ### Changed
 
-- DeepSeek Harness now connects to an independently running SemaRail Core;
-  project selection, credentials, Python lifecycle, and policy limits no longer
-  live in the recommended Harness plugin.
-- The original `@hejielijob/dsh-wren-data-agent` package remains available as a
-  legacy all-in-one compatibility artifact during migration.
+- Removed the deferred agent-specific adapter packages and their installation,
+  replay, and packaging gates. Agent integrations now use the stable MCP
+  boundary; future UI plugins belong in separate repositories.
 - User-facing Console, documentation, API, and GitHub template copy now uses
-  SemaRail naming consistently; obsolete Harness screenshots were removed.
+  SemaRail naming consistently.
 - The Semantic Console browser override now uses
   `semarail.semantic-console-url` while reading the previous key as a migration
   fallback.
-- DeepSeek Harness now reads a dedicated, scoped service-account key from
-  `SEMARAIL_HARNESS_TOKEN`; the Core bootstrap administrator token is no longer
-  the adapter default.
 - Console project administration and access-control administration use
   independent capabilities, and policy unbinding or employee disablement takes
   effect on the next request without reviving old sessions.
@@ -80,7 +74,6 @@ All notable user-visible changes to this project are documented here. The format
 
 ### Added
 
-- Initial DeepSeek Harness Host, Client, Contract, and Bundle packages.
 - Governed PostgreSQL query sidecar and conversation-native result views.
 - Local SemaRail Semantic Console for semantic project management.
 - MySQL datasource metadata, connection testing, schema browsing, and model import in the Semantic Console.
@@ -93,19 +86,15 @@ All notable user-visible changes to this project are documented here. The format
   stdio commands, a secret-free client configuration, and explicit MySQL scope.
 - A stable, read-only SemaRail semantic MCP contract for project validation,
   model discovery, context retrieval, and dry query planning.
-- A single-tarball DeepSeek Harness distribution and `pnpm package:plugin`
-  command for local or GitHub Release installation.
-- Automatic, versioned private Python runtime initialization for the Harness
-  Sidecar and Semantic Console, with concurrent-start locking and safe errors.
+- Automatic, versioned private Python runtime initialization for Core with
+  concurrent-start locking and safe errors.
 
 ### Changed
 
 - Renamed the GitHub repository to `SemaRail` to match the independent project branding.
 - Renamed the product and management interface to SemaRail, with WrenAI attribution isolated to the README's upstream-foundation and license sections.
 - Datasource selection now shows only drivers configured in the running Python environment.
-- Positioned DeepSeek Harness as an optional adapter while using SemaRail MCP servers as the standard integration for other agents.
+- Positioned SemaRail MCP servers as the standard integration for agents.
 - Replaced the `semarail-mcp` upstream-proxy behavior with a thin SemaRail-owned
   `SemanticService`; it continues to use WrenAI project structures directly and
   does not introduce an intermediate semantic format.
-- Collapsed the Harness distribution boundary from four separately installed
-  workspace packages to one dual-face Host and Client Bundle.

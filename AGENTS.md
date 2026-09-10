@@ -1,17 +1,13 @@
 # Repository instructions
 
-This repository is an out-of-tree DeepSeek Harness plugin. Never modify files
-under the sibling `../deepseek-harness` or `../WrenAI` repositories as part of
-this project. Read them only as version-pinned API references.
+This repository contains the standalone SemaRail Core, Semantic Console, MCP
+servers, and database adapters. Optional agent integrations belong in separate
+plugin repositories and are outside this project's current scope.
 
 ## Architecture constraints
 
-- Target DeepSeek Harness `>=0.1.0-rc.10 <0.2.0` and Wren `0.13.2`. Compile
-  and accept against the current Desktop runtime (`0.1.1-rc.2`) while keeping
-  the public peer range compatible with rc.10.
-- Integrate through `dsh.bundle`, `cordis.patch.yml`, Cordis plugins, registered
-  tools, `tool/result.meta`, and keyed Client tool views.
-- Do not add custom Harness session events for the MVP.
+- Target Wren `0.13.2` and keep agent integrations behind the stable MCP and
+  Core HTTP boundaries.
 - Treat all model-generated SQL as untrusted input.
 - Keep protocol and presentation payloads JSON-safe and versioned. Unknown
   protocol or schema versions fail closed.

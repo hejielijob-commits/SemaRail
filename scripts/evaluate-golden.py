@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Evaluate real Harness golden-question evidence for AC02.
+"""Evaluate real agent golden-question evidence for AC02.
 
 This program does not invoke a model and never synthesizes an acceptance
-claim.  It consumes normalized captures produced by a real Harness/model run,
+claim.  It consumes normalized captures produced by a real agent/model run,
 validates the one-context / first-query / at-most-one-repair protocol, checks
 both SQL statements with the production AST policy, and compares bounded real
 query results with the deterministic PostgreSQL fixture oracles.
@@ -885,7 +885,7 @@ def make_template(path: Path, questions: Sequence[Mapping[str, Any]]) -> None:
     for question in questions:
         records.append({
             "schemaVersion": 1,
-            "runId": "REPLACE_WITH_REAL_HARNESS_RUN_ID",
+            "runId": "REPLACE_WITH_REAL_AGENT_RUN_ID",
             "questionId": question["id"],
             "attempt": 1,
             "fixtureDate": "REPLACE_WITH_POSTGRES_CURRENT_DATE",
@@ -896,7 +896,7 @@ def make_template(path: Path, questions: Sequence[Mapping[str, Any]]) -> None:
         })
     envelope = {
         "schemaVersion": 1,
-        "instructions": "Replace every placeholder with one real Harness capture. Append attempt=2 only after a retryable SEMANTIC_ERROR; reuse context callIndex and set repairOfAttempt=1 plus repairReasonCode.",
+        "instructions": "Replace every placeholder with one real agent capture. Append attempt=2 only after a retryable SEMANTIC_ERROR; reuse context callIndex and set repairOfAttempt=1 plus repairReasonCode.",
         "records": records,
     }
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -904,7 +904,7 @@ def make_template(path: Path, questions: Sequence[Mapping[str, Any]]) -> None:
 
 
 def make_template_v2(path: Path, config: CorpusConfig) -> None:
-    """Write a secret-free v2 Harness capture envelope."""
+    """Write a secret-free v2 agent capture envelope."""
 
     if path.exists() or config.data_sha256 is None:
         raise EvidenceError("capture template destination already exists or corpus is incomplete")
@@ -912,7 +912,7 @@ def make_template_v2(path: Path, config: CorpusConfig) -> None:
     for question in config.questions:
         records.append({
             "schemaVersion": 1,
-            "runId": "REPLACE_WITH_REAL_HARNESS_RUN_ID",
+            "runId": "REPLACE_WITH_REAL_AGENT_RUN_ID",
             "questionId": question["id"],
             "attempt": 1,
             "fixtureDate": "2024-09-01",
@@ -933,7 +933,7 @@ def make_template_v2(path: Path, config: CorpusConfig) -> None:
             "parameters": {},
         },
         "instructions": (
-            "Replace placeholders with one real Harness run. Add attempt=2 only after a "
+            "Replace placeholders with one real agent run. Add attempt=2 only after a "
             "retryable SEMANTIC_ERROR; authorization denials must never be retried."
         ),
         "records": records,
@@ -1120,10 +1120,10 @@ def self_test_v2(config: CorpusConfig, corpus_raw: bytes) -> None:
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Evaluate AC02 against real normalized Harness evidence")
+    parser = argparse.ArgumentParser(description="Evaluate AC02 against real normalized agent evidence")
     parser.add_argument("--corpus", type=Path, default=CORPUS_DEFAULT)
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--evidence", type=Path, help="real JSON/JSONL Harness capture")
+    mode.add_argument("--evidence", type=Path, help="real JSON/JSONL agent capture")
     mode.add_argument("--make-template", type=Path, help="write a capture template; does not evaluate AC02")
     mode.add_argument("--dry-run", action="store_true", help="validate corpus and prerequisites only")
     mode.add_argument("--self-test", action="store_true", help="test evaluator logic with synthetic data; does not verify AC02")
