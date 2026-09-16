@@ -386,6 +386,49 @@ class AccessControlAdminApiTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(response["code"], "INVALID_POLICY")
 
+    def test_management_api_creates_and_updates_version_two_permission_lookup_policy(self) -> None:
+        document = {
+            "schemaVersion": 2,
+            "datasourceId": "source-a",
+            "projects": ["access-api"],
+            "tools": ["query:execute"],
+            "tables": {
+                "public.sales": {
+                    "effect": "allow",
+                    "tenantField": "organization_id",
+                    "rows": [{
+                        "field": "employee_id",
+                        "operator": "permissionLookup",
+                        "valueFrom": "subject.attributes.employeeId",
+                        "lookup": {
+                            "table": "auth.employee_permission",
+                            "principalField": "employee",
+                            "targetField": "subordinate",
+                            "organizationField": "organization_id",
+                        },
+                        "includeSelf": False,
+                    }],
+                }
+            },
+        }
+
+        status, created = self.app.request(
+            "POST", "/api/v1/access/policies",
+            {"name": "employee lookup", "document": document},
+            authorization=self.authorization,
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(created["document"]["schemaVersion"], 2)
+
+        document["tables"]["public.sales"]["rows"][0]["includeSelf"] = True
+        status, updated = self.app.request(
+            "PUT", f"/api/v1/access/policies/{created['id']}",
+            {"document": document},
+            authorization=self.authorization,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(updated["version"], 2)
+        self.assertTrue(updated["document"]["tables"]["public.sales"]["rows"][0]["includeSelf"])
 
 if __name__ == "__main__":
     unittest.main()

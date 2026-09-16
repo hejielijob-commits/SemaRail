@@ -51,6 +51,12 @@ _METHOD_SCOPE = {
     "query.cancel": "query:cancel",
 }
 _ALLOWED_OPERATORS = {"eq", "in"}
+_PERMISSION_LOOKUP_OPERATOR = "permissionLookup"
+_PERMISSION_LOOKUP_FIELDS = {"field", "operator", "valueFrom", "lookup", "includeSelf"}
+_PERMISSION_LOOKUP_REQUIRED_FIELDS = {"field", "operator", "valueFrom", "lookup"}
+_PERMISSION_LOOKUP_CONFIG_FIELDS = {
+    "table", "principalField", "targetField", "organizationField",
+}
 _LIMIT_FIELDS = {"maxRows", "previewRows", "maxPreviewBytes", "timeoutMs"}
 _DOCUMENT_FIELDS = {"schemaVersion", "projects", "tools", "denyTools", "limits", "tables", "datasourceId"}
 _TABLE_RULE_FIELDS = {"effect", "tenantField", "rows", "columns", "datasourceId"}
@@ -72,6 +78,13 @@ def _identifier(value: Any, *, wildcard: bool = False) -> bool:
     return isinstance(value, str) and bool(value) and all(
         part and part.replace("_", "").isalnum() for part in value.split(".")
     )
+
+
+def _sql_identifier(value: Any, *, qualified_parts: int = 1) -> bool:
+    if not isinstance(value, str):
+        return False
+    parts = value.split(".")
+    return len(parts) == qualified_parts and all(_database_attribute_name(part) for part in parts)
 
 
 def _datasource_identifier(value: Any) -> bool:
@@ -121,12 +134,72 @@ def _row_attribute_names(rule: Mapping[str, Any]) -> set[str]:
     return names
 
 
+def _contains_permission_lookup(value: Any) -> bool:
+    """Whether one compiled row-filter tree contains a lookup predicate."""
+
+    if not isinstance(value, Mapping):
+        return False
+    if value.get("operator") == _PERMISSION_LOOKUP_OPERATOR:
+        return True
+    conditions = value.get("conditions")
+    return isinstance(conditions, list) and any(
+        _contains_permission_lookup(item) for item in conditions
+    )
+
+
+def _valid_subject_path(source: Any) -> bool:
+    return source in {"subject.id", "subject.organizationId"} or (
+        isinstance(source, str)
+        and source.startswith("subject.attributes.")
+        and _identifier(source.removeprefix("subject.attributes."))
+        and "." not in source.removeprefix("subject.attributes.")
+    )
+
+
+def _validate_row_condition(condition: Any, *, schema_version: int) -> None:
+    if not isinstance(condition, Mapping):
+        raise PolicyError("row condition is invalid")
+    operator = condition.get("operator")
+    if operator in _ALLOWED_OPERATORS:
+        if set(condition) != {"field", "operator", "valueFrom"}:
+            raise PolicyError("row condition is invalid")
+    elif operator == _PERMISSION_LOOKUP_OPERATOR and schema_version == 2:
+        if (
+            not _PERMISSION_LOOKUP_REQUIRED_FIELDS.issubset(condition)
+            or set(condition) - _PERMISSION_LOOKUP_FIELDS
+            or ("includeSelf" in condition and type(condition.get("includeSelf")) is not bool)
+        ):
+            raise PolicyError("permission lookup condition is invalid")
+        lookup = condition.get("lookup")
+        if not isinstance(lookup, Mapping) or set(lookup) != _PERMISSION_LOOKUP_CONFIG_FIELDS:
+            raise PolicyError("permission lookup configuration is invalid")
+        table = lookup.get("table")
+        if not _sql_identifier(table, qualified_parts=2):
+            raise PolicyError("permission lookup table must be schema-qualified")
+        if any(
+            not _sql_identifier(lookup.get(field))
+            for field in ("principalField", "targetField", "organizationField")
+        ):
+            raise PolicyError("permission lookup field is invalid")
+    else:
+        raise PolicyError("row condition is invalid")
+    if operator == _PERMISSION_LOOKUP_OPERATOR:
+        valid_field = _sql_identifier(condition.get("field"))
+    else:
+        valid_field = _identifier(condition.get("field"))
+    if not valid_field:
+        raise PolicyError("row condition is invalid")
+    if not _valid_subject_path(condition.get("valueFrom")):
+        raise PolicyError("valueFrom is not an allowed subject path")
+
+
 def validate_policy_document(document: Any) -> Mapping[str, Any]:
-    """Statically validate a version-one policy before it is persisted."""
+    """Statically validate a supported policy before it is persisted."""
 
     if not isinstance(document, Mapping) or set(document) - _DOCUMENT_FIELDS:
         raise PolicyError("policy document has unknown fields")
-    if document.get("schemaVersion") != 1:
+    schema_version = document.get("schemaVersion")
+    if type(schema_version) is not int or schema_version not in {1, 2}:
         raise PolicyError("policy schema version is unsupported")
     datasource_id = document.get("datasourceId")
     if datasource_id is not None and not _datasource_identifier(datasource_id):
@@ -159,18 +232,7 @@ def validate_policy_document(document: Any) -> Mapping[str, Any]:
         if not isinstance(rows, list):
             raise PolicyError("rows must be an array")
         for condition in rows:
-            if not isinstance(condition, Mapping) or set(condition) != {"field", "operator", "valueFrom"}:
-                raise PolicyError("row condition is invalid")
-            if not _identifier(condition.get("field")) or condition.get("operator") not in _ALLOWED_OPERATORS:
-                raise PolicyError("row condition is invalid")
-            source = condition.get("valueFrom")
-            if source not in {"subject.id", "subject.organizationId"} and not (
-                isinstance(source, str)
-                and source.startswith("subject.attributes.")
-                and _identifier(source.removeprefix("subject.attributes."))
-                and "." not in source.removeprefix("subject.attributes.")
-            ):
-                raise PolicyError("valueFrom is not an allowed subject path")
+            _validate_row_condition(condition, schema_version=int(schema_version))
         columns = rule.get("columns", {})
         if not isinstance(columns, Mapping) or set(columns) - {"allow", "deny"}:
             raise PolicyError("columns must be an object")
@@ -209,15 +271,39 @@ def _resolve_subject_value(subject: Subject, path: Any) -> Any:
 
 
 def _normalize_condition(condition: Any, subject: Subject) -> dict[str, Any]:
-    if not isinstance(condition, Mapping) or set(condition) != {"field", "operator", "valueFrom"}:
+    if not isinstance(condition, Mapping):
         raise PolicyError("row condition is invalid")
     field = condition.get("field")
     operator = condition.get("operator")
     if not isinstance(field, str) or not field or not all(part.replace("_", "").isalnum() for part in field.split(".")):
         raise PolicyError("row field is invalid")
-    if operator not in _ALLOWED_OPERATORS:
+    if operator not in _ALLOWED_OPERATORS | {_PERMISSION_LOOKUP_OPERATOR}:
         raise PolicyError("row operator is unsupported")
     value = _resolve_subject_value(subject, condition.get("valueFrom"))
+    if operator == _PERMISSION_LOOKUP_OPERATOR:
+        if (
+            set(condition) - _PERMISSION_LOOKUP_FIELDS
+            or not _PERMISSION_LOOKUP_REQUIRED_FIELDS.issubset(condition)
+            or isinstance(value, (list, tuple))
+            or type(value) not in {str, int}
+            or (isinstance(value, str) and (not value or len(value) > 1_024))
+        ):
+            raise PolicyError("permission lookup resolved to an invalid principal")
+        lookup = condition.get("lookup")
+        if not isinstance(lookup, Mapping) or set(lookup) != _PERMISSION_LOOKUP_CONFIG_FIELDS:
+            raise PolicyError("permission lookup configuration is invalid")
+        if not isinstance(subject.organization_id, str) or not subject.organization_id:
+            raise PolicyError("permission lookup organization is invalid")
+        return {
+            "field": field,
+            "operator": operator,
+            "values": [value],
+            "lookup": dict(lookup),
+            "organizationValue": subject.organization_id,
+            "includeSelf": bool(condition.get("includeSelf", False)),
+        }
+    if set(condition) != {"field", "operator", "valueFrom"}:
+        raise PolicyError("row condition is invalid")
     values = list(value) if isinstance(value, (list, tuple)) else [value]
     if not values or any(
         not isinstance(item, (str, int, float, bool))
@@ -334,6 +420,7 @@ class PolicyEngine:
         project_id: str | None = None,
         datasource_id: str | None = None,
         raise_missing_attribute: bool = False,
+        raise_policy_error: bool = False,
     ) -> PolicyDecision:
         if subject.id == BOOTSTRAP_SUBJECT_ID:
             return PolicyDecision(True, "bootstrap administrator")
@@ -413,6 +500,8 @@ class PolicyEngine:
                 raise
             return PolicyDecision(False, "policy evaluation failed closed")
         except PolicyError:
+            if raise_policy_error:
+                raise
             return PolicyDecision(False, "policy evaluation failed closed")
 
     def allowed_values(self, decision: PolicyDecision, field: str) -> tuple[Any, ...]:
@@ -430,7 +519,12 @@ class PolicyEngine:
             conditions = scope.get("conditions")
             if not isinstance(conditions, list):
                 return ()
-            matching = [item for item in conditions if isinstance(item, Mapping) and item.get("field") == field]
+            matching = [
+                item for item in conditions
+                if isinstance(item, Mapping)
+                and item.get("field") == field
+                and item.get("operator") in _ALLOWED_OPERATORS
+            ]
             if not matching:
                 return ()
             for item in matching:
@@ -493,6 +587,7 @@ class PolicyEngine:
                     project_id=project_id,
                     datasource_id=datasource_id,
                     raise_missing_attribute=True,
+                    raise_policy_error=True,
                 )
                 if not decision.allowed:
                     continue
@@ -544,8 +639,13 @@ class PolicyEngine:
                 allow_nan=False,
             ).encode("utf-8")) > _MAX_DATABASE_SESSION_BYTES:
                 raise PolicyError("database session is too large")
+            execution_schema_version = 2 if any(
+                _contains_permission_lookup(rule.get("rowFilter"))
+                for rule in compiled.values()
+                if isinstance(rule, Mapping)
+            ) else 1
             return {
-                "schemaVersion": 1,
+                "schemaVersion": execution_schema_version,
                 "defaultEffect": "deny",
                 "tables": compiled,
                 "policyVersions": policy_versions,

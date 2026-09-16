@@ -168,6 +168,55 @@ class DispatchTests(unittest.TestCase):
         self.assertFalse(missing["ok"])
         self.assertEqual(missing["error"]["code"], "POLICY_DENIED")
 
+    def test_restricted_semantic_dry_plan_accepts_v2_permission_lookup_policy(self) -> None:
+        class Planner:
+            @staticmethod
+            def dry_plan(_: object) -> dict[str, object]:
+                return {
+                    "semanticSql": "SELECT employee_id FROM employees",
+                    "nativeSql": "SELECT employee_id FROM public.employees",
+                    "projectRevision": "sha256:test",
+                    "allowedPhysical": {
+                        "catalogs": [],
+                        "schemas": ["public"],
+                        "tables": [{"schema": "public", "table": "employees"}],
+                    },
+                }
+
+        policy = {
+            "schemaVersion": 2,
+            "defaultEffect": "deny",
+            "tables": {
+                "public.employees": {
+                    "rowFilter": {
+                        "field": "employee_id",
+                        "operator": "permissionLookup",
+                        "values": ["user-a"],
+                        "lookup": {
+                            "table": "auth.employee_permissions",
+                            "principalField": "principal_id",
+                            "targetField": "employee_id",
+                            "organizationField": "organization_id",
+                        },
+                        "organizationValue": "org-sales",
+                    },
+                    "allowedColumns": ["employee_id"],
+                    "deniedColumns": [],
+                },
+            },
+            "policyVersions": ["pol-employee:2"],
+        }
+        response = Dispatcher(query_planner=Planner()).dispatch(request(
+            "query.dryPlan",
+            {
+                "projectDir": "project",
+                "semanticSql": "SELECT employee_id FROM employees",
+                "authorizationPolicy": policy,
+            },
+        ))
+        self.assertTrue(response["ok"])
+        self.assertEqual(response["result"]["allowedPhysical"]["tables"], [{"schema": "public", "table": "employees"}])
+
     def test_restricted_model_without_physical_table_uses_unique_policy_suffix(self) -> None:
         class Provider:
             @staticmethod

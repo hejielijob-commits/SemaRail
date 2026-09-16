@@ -23,6 +23,8 @@ All notable user-visible changes to this project are documented here. The format
   acceptance scenario proving that two identities see disjoint regional rows.
 - Metadata-only runtime audit details for transport, authentication method,
   datasource, query id, policy tables, and policy versions.
+- Policy schema v2 non-recursive `permissionLookup` row controls backed by a
+  tenant-scoped mapping table in the active PostgreSQL datasource.
 - Versioned query-result delivery that keeps small results inline and streams
   larger results to short-lived CSV artifacts with a bounded Agent preview.
 - Core HTTP and remote MCP artifact download routes with token hashing,

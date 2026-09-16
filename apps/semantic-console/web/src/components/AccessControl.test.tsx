@@ -11,6 +11,7 @@ vi.mock("../api/client", () => ({
     getAccessPolicies: vi.fn(),
     getAccessAudit: vi.fn(),
     updateServiceAccount: vi.fn(),
+    createServiceAccount: vi.fn(),
     issueServiceAccountKey: vi.fn(),
     updateUser: vi.fn(),
     setUserStatus: vi.fn(),
@@ -114,6 +115,41 @@ describe("AccessControl", () => {
     }));
   });
 
+  it("creates a service account with a trusted employee ID", async () => {
+    vi.mocked(api.createServiceAccount).mockResolvedValue({ ...account, id: "subject-new" });
+    render(<AccessControl locale="en-US" adminToken={adminToken} />);
+    await screen.findAllByText("Sales agent A");
+
+    const employeeIdFields = screen.getAllByLabelText("Employee ID");
+    fireEvent.change(employeeIdFields[0], { target: { value: "EMP-NEW" } });
+    fireEvent.change(screen.getAllByLabelText("Account name")[0], { target: { value: "New sales agent" } });
+    fireEvent.change(screen.getAllByLabelText("Region codes")[0], { target: { value: "CN-YI" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    await waitFor(() => expect(api.createServiceAccount).toHaveBeenCalledWith(adminToken, {
+      name: "New sales agent",
+      attributes: { regionCodes: ["CN-YI"], employeeId: "EMP-NEW" },
+    }));
+  });
+
+  it("updates a service account employee ID without dropping other trusted attributes", async () => {
+    const existing = { ...account, attributes: { regionCodes: ["CN-JIA"], employeeId: "EMP-OLD", costCenter: "sales" } };
+    vi.mocked(api.getServiceAccounts).mockResolvedValue({ items: [existing] });
+    vi.mocked(api.updateServiceAccount).mockResolvedValue(existing);
+    render(<AccessControl locale="en-US" adminToken={adminToken} />);
+    await screen.findAllByText("Sales agent A");
+
+    const employeeIdFields = screen.getAllByLabelText("Employee ID");
+    expect(employeeIdFields[1]).toHaveValue("EMP-OLD");
+    fireEvent.change(employeeIdFields[1], { target: { value: "EMP-NEW" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save account" }));
+
+    await waitFor(() => expect(api.updateServiceAccount).toHaveBeenCalledWith(adminToken, account.id, {
+      name: account.name,
+      attributes: { regionCodes: ["CN-JIA"], employeeId: "EMP-NEW", costCenter: "sales" },
+    }));
+  });
+
 
   it("does not call protected APIs until the administrator token is submitted", async () => {
     render(<AccessControl locale="en-US" />);
@@ -147,11 +183,30 @@ describe("AccessControl", () => {
     expect(screen.getAllByText(/dingtalk/).length).toBeGreaterThan(0);
     const regions = screen.getByLabelText("Region codes");
     expect(regions).toHaveValue("CN-JIA");
+    expect(screen.getByLabelText("Employee ID")).toHaveValue("");
     fireEvent.change(regions, { target: { value: "CN-YI,CN-BEI" } });
     fireEvent.click(screen.getByRole("button", { name: "Save access attributes" }));
 
     await waitFor(() => expect(api.updateUser).toHaveBeenCalledWith(adminToken, employee.id, {
       attributes: { regionCodes: ["CN-YI", "CN-BEI"] },
+    }));
+  });
+
+  it("updates a user employee ID while preserving existing trusted attributes", async () => {
+    const existing = { ...employee, attributes: { regionCodes: ["CN-JIA"], costCenter: "sales" } };
+    vi.mocked(api.getUsers).mockResolvedValue({ items: [existing] });
+    vi.mocked(api.updateUser).mockResolvedValue(existing);
+    render(<AccessControl locale="en-US" adminToken={adminToken} />);
+    await screen.findAllByText("Sales agent A");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Employees" }));
+    const employeeIdField = await screen.findByLabelText("Employee ID");
+    expect(employeeIdField).toHaveValue("");
+    fireEvent.change(employeeIdField, { target: { value: "EMP-USER" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save access attributes" }));
+
+    await waitFor(() => expect(api.updateUser).toHaveBeenCalledWith(adminToken, employee.id, {
+      attributes: { regionCodes: ["CN-JIA"], costCenter: "sales", employeeId: "EMP-USER" },
     }));
   });
 
@@ -204,9 +259,16 @@ describe("AccessControl", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Policies" }));
     fireEvent.click(screen.getAllByRole("button", { name: "Create policy" })[0]);
 
-    expect(JSON.parse((screen.getByLabelText("Policy document (JSON)") as HTMLTextAreaElement).value)).toMatchObject({
-      schemaVersion: 1,
+    const document = JSON.parse((screen.getByLabelText("Policy document (JSON)") as HTMLTextAreaElement).value);
+    expect(document).toMatchObject({
+      schemaVersion: 2,
       datasourceId: "datasource-sales",
+    });
+    expect(document.tables["public.sales"].rows[0]).toMatchObject({
+      field: "employee_id",
+      operator: "permissionLookup",
+      valueFrom: "subject.attributes.employeeId",
+      includeSelf: false,
     });
   });
 });

@@ -891,6 +891,65 @@ class RuntimeRpcTests(unittest.TestCase):
         self.assertEqual(denied["error"]["code"], "FORBIDDEN")
         self.assertEqual(self.gateway.access_control.list_audit()[0]["policyVersion"], f"{policy['id']}:2")
 
+    def test_permission_lookup_policy_reaches_sidecar_and_audit_without_principal_values(self) -> None:
+        account = self.gateway.access_control.create_service_account(
+            "Manager Agent", attributes={"employeeId": "A", "privateProfile": "never-forward"}
+        )
+        policy = self.gateway.access_control.create_policy(
+            "Manager lookup",
+            {
+                "schemaVersion": 2,
+                "datasourceId": self.datasource_id,
+                "projects": ["runtime-test"],
+                "tools": ["query:execute"],
+                "tables": {
+                    "public.sales": {
+                        "effect": "allow",
+                        "tenantField": "organization_id",
+                        "rows": [{
+                            "field": "employee_id",
+                            "operator": "permissionLookup",
+                            "valueFrom": "subject.attributes.employeeId",
+                            "lookup": {
+                                "table": "auth.employee_permission",
+                                "principalField": "employee",
+                                "targetField": "subordinate",
+                                "organizationField": "organization_id",
+                            },
+                            "includeSelf": False,
+                        }],
+                    }
+                },
+            },
+        )
+        self.gateway.access_control.bind_policy(account.id, policy["id"])
+        key = self.gateway.access_control.issue_api_key(account.id)
+
+        status, response = self.gateway.dispatch(
+            {
+                "protocolVersion": "2",
+                "id": "lookup-query",
+                "method": "query.run",
+                "params": {
+                    "question": "Visible sales",
+                    "semanticSql": "SELECT employee_id FROM sales",
+                    "queryId": "lookup-q-1",
+                },
+            },
+            authorization=f"Bearer {key['apiKey']}",
+        )
+
+        self.assertEqual(status, 200)
+        self.assertTrue(response["ok"])
+        compiled = self.dispatcher.requests[-1]["params"]["authorizationPolicy"]
+        self.assertEqual(compiled["schemaVersion"], 2)
+        self.assertEqual(compiled["databaseSession"]["attributes"], {"employeeId": "A"})
+        audit = self.gateway.access_control.list_audit()[0]
+        self.assertEqual(audit["details"]["policyLookupTables"], ["auth.employee_permission"])
+        self.assertNotIn("employeeId", str(audit["details"]))
+        self.assertNotIn("organizationValue", str(audit["details"]))
+        self.assertNotIn("privateProfile", str(compiled))
+
     def test_unbound_service_account_is_forbidden(self) -> None:
         account = self.gateway.access_control.create_service_account("No policy")
         issued = self.gateway.access_control.issue_api_key(account.id)

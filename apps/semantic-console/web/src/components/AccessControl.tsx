@@ -12,27 +12,27 @@ const copy = {
   "en-US": {
     eyebrow: "Security", title: "Access control", description: "Manage agent identities, API keys, policy bindings, and authorization audit events.",
     locked: "Administrator authentication required", lockedBody: "Enter the bootstrap administrator token. It remains only in this page's memory and is never saved by the browser.", token: "Administrator token", unlock: "Open access control",
-    accounts: "Service accounts", employees: "Employees", policies: "Policies", audit: "Audit", refresh: "Refresh", create: "Create account", accountName: "Account name", regions: "Region codes", regionsHint: "Comma-separated trusted attributes, for example CN-JIA,CN-YI.",
+    accounts: "Service accounts", employees: "Employees", policies: "Policies", audit: "Audit", refresh: "Refresh", create: "Create account", accountName: "Account name", employeeId: "Employee ID", employeeIdHint: "Administrator-controlled trusted identity used by permission policies. It is never copied from an external profile.", regions: "Region codes", regionsHint: "Comma-separated trusted attributes, for example CN-JIA,CN-YI.",
     active: "Active", disabled: "Disabled", noAccounts: "No service accounts", noAccountsBody: "Create a non-human identity before connecting an agent.", credentials: "API keys", noKeys: "No API keys issued", issue: "Issue key", rotate: "Rotate", revoke: "Revoke", enable: "Enable", disable: "Disable", saveAccount: "Save account",
     bind: "Bind policy", unbind: "Unbind", choosePolicy: "Choose a policy", bound: "Bound policies", shownOnce: "Copy this key now", shownOnceBody: "SemaRail stores only its hash. Closing this notice permanently hides the plaintext.", copied: "Copied", closeKey: "I saved the key",
-    policyName: "Policy name", policyDocument: "Policy document (JSON)", createPolicy: "Create policy", savePolicy: "Save policy", version: "Version", invalidJson: "Policy document must be valid JSON.", noPolicies: "No policies", noPoliciesBody: "Create a version-one policy, then bind it to a service account.",
+    policyName: "Policy name", policyDocument: "Policy document (JSON)", createPolicy: "Create policy", savePolicy: "Save policy", version: "Version", invalidJson: "Policy document must be valid JSON.", noPolicies: "No policies", noPoliciesBody: "Create a policy, then bind it to a service account.",
     noEmployees: "No employees have signed in", noEmployeesBody: "An employee appears here after completing OIDC or DingTalk authorization.", identity: "External identity", saveAccess: "Save access attributes", employeeNumber: "Employee number",
     event: "Event", actor: "Actor", decision: "Decision", resource: "Resource", copyKey: "Copy", noAudit: "No audit events", noAuditBody: "Authenticated operations will appear here without query data or credentials.", authFailed: "Access control could not be opened", operationFailed: "Operation failed",
   },
   "zh-CN": {
     eyebrow: "安全", title: "访问控制", description: "管理 Agent 身份、API Key、策略绑定和授权审计事件。",
     locked: "需要管理员认证", lockedBody: "输入启动时使用的管理员 Token。它只保存在当前页面内存中，浏览器不会保存。", token: "管理员 Token", unlock: "进入访问控制",
-    accounts: "服务账号", employees: "员工", policies: "权限策略", audit: "审计", refresh: "刷新", create: "创建账号", accountName: "账号名称", regions: "地区代码", regionsHint: "受信任属性，使用英文逗号分隔，例如 CN-JIA,CN-YI。",
+    accounts: "服务账号", employees: "员工", policies: "权限策略", audit: "审计", refresh: "刷新", create: "创建账号", accountName: "账号名称", employeeId: "员工 ID", employeeIdHint: "由管理员维护、供权限策略使用的可信身份标识，不会从外部身份资料自动复制。", regions: "地区代码", regionsHint: "受信任属性，使用英文逗号分隔，例如 CN-JIA,CN-YI。",
     active: "启用", disabled: "停用", noAccounts: "暂无服务账号", noAccountsBody: "为 Agent 创建一个非人类身份后再进行连接。", credentials: "API Key", noKeys: "尚未签发 API Key", issue: "签发密钥", rotate: "轮换", revoke: "撤销", enable: "启用", disable: "停用", saveAccount: "保存账号",
     bind: "绑定策略", unbind: "解绑", choosePolicy: "选择策略", bound: "已绑定策略", shownOnce: "请立即复制该密钥", shownOnceBody: "SemaRail 只保存哈希；关闭提示后将无法再次查看明文。", copied: "已复制", closeKey: "我已保存密钥",
-    policyName: "策略名称", policyDocument: "策略文档（JSON）", createPolicy: "创建策略", savePolicy: "保存策略", version: "版本", invalidJson: "策略文档必须是有效 JSON。", noPolicies: "暂无策略", noPoliciesBody: "创建 v1 策略，然后将其绑定到服务账号。",
+    policyName: "策略名称", policyDocument: "策略文档（JSON）", createPolicy: "创建策略", savePolicy: "保存策略", version: "版本", invalidJson: "策略文档必须是有效 JSON。", noPolicies: "暂无策略", noPoliciesBody: "创建策略，然后将其绑定到服务账号。",
     noEmployees: "暂无员工登录", noEmployeesBody: "员工完成 OIDC 或钉钉授权后会显示在这里。", identity: "外部身份", saveAccess: "保存访问属性", employeeNumber: "工号",
     event: "事件", actor: "主体", decision: "决策", resource: "资源", copyKey: "复制", noAudit: "暂无审计事件", noAuditBody: "认证后的操作会显示在这里，但不会记录查询数据或凭据。", authFailed: "无法进入访问控制", operationFailed: "操作失败",
   },
 } as const;
 
 const policyTemplate = (datasourceId = "") => JSON.stringify({
-  schemaVersion: 1,
+  schemaVersion: 2,
   ...(datasourceId ? { datasourceId } : {}),
   projects: ["sales-project"],
   tools: ["project:validate", "semantic:read", "query:plan", "query:execute", "query:cancel"],
@@ -40,11 +40,36 @@ const policyTemplate = (datasourceId = "") => JSON.stringify({
   tables: {
     "public.sales": {
       effect: "allow",
-      rows: [{ field: "region_code", operator: "in", valueFrom: "subject.attributes.regionCodes" }],
-      columns: { allow: ["order_id", "region_code", "amount"], deny: [] },
+      tenantField: "organization_id",
+      rows: [{
+        field: "employee_id",
+        operator: "permissionLookup",
+        valueFrom: "subject.attributes.employeeId",
+        lookup: {
+          table: "auth.employee_permission",
+          principalField: "employee",
+          targetField: "subordinate",
+          organizationField: "organization_id",
+        },
+        includeSelf: false,
+      }],
+      columns: { allow: ["order_id", "organization_id", "employee_id", "region_code", "amount"], deny: [] },
     },
   },
 }, null, 2);
+
+function textAttribute(attributes: Record<string, unknown>, name: string) {
+  const value = attributes[name];
+  return typeof value === "string" ? value : "";
+}
+
+function withEmployeeId(attributes: Record<string, unknown>, input: string) {
+  const next = { ...attributes };
+  const employeeId = input.trim();
+  if (employeeId) next.employeeId = employeeId;
+  else delete next.employeeId;
+  return next;
+}
 
 function formatDate(value: string | null | undefined, locale: Locale) {
   if (!value) return "—";
@@ -72,11 +97,14 @@ export default function AccessControl({ locale, onAuthenticated, adminToken = ""
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [accountName, setAccountName] = useState("");
+  const [accountEmployeeId, setAccountEmployeeId] = useState("");
   const [regions, setRegions] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedAccountName, setSelectedAccountName] = useState("");
+  const [selectedAccountEmployeeId, setSelectedAccountEmployeeId] = useState("");
   const [selectedAccountRegions, setSelectedAccountRegions] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
   const [employeeRegions, setEmployeeRegions] = useState("");
   const [employeePolicyId, setEmployeePolicyId] = useState("");
   const [bindingPolicyId, setBindingPolicyId] = useState("");
@@ -99,14 +127,16 @@ export default function AccessControl({ locale, onAuthenticated, adminToken = ""
 
   useEffect(() => {
     setSelectedAccountName(selected?.name ?? "");
+    setSelectedAccountEmployeeId(textAttribute(selected?.attributes ?? {}, "employeeId"));
     const values = selected?.attributes.regionCodes;
     setSelectedAccountRegions(Array.isArray(values) ? values.filter((item): item is string => typeof item === "string").join(",") : "");
-  }, [selected?.id, selected?.name, selected?.attributes.regionCodes]);
+  }, [selected?.id, selected?.name, selected?.attributes]);
 
   useEffect(() => {
+    setEmployeeId(textAttribute(selectedUser?.attributes ?? {}, "employeeId"));
     const values = selectedUser?.attributes.regionCodes;
     setEmployeeRegions(Array.isArray(values) ? values.filter((item): item is string => typeof item === "string").join(",") : "");
-  }, [selectedUser?.id, selectedUser?.attributes.regionCodes]);
+  }, [selectedUser?.id, selectedUser?.attributes]);
 
   useEffect(() => {
     if (adminToken) void loadAll(adminToken);
@@ -142,8 +172,8 @@ export default function AccessControl({ locale, onAuthenticated, adminToken = ""
     event.preventDefault();
     const regionCodes = regions.split(",").map((item) => item.trim()).filter(Boolean);
     await act(async () => {
-      const account = await api.createServiceAccount(token, { name: accountName, attributes: { regionCodes } });
-      setSelectedId(account.id); setAccountName(""); setRegions("");
+      const account = await api.createServiceAccount(token, { name: accountName.trim(), attributes: withEmployeeId({ regionCodes }, accountEmployeeId) });
+      setSelectedId(account.id); setAccountName(""); setAccountEmployeeId(""); setRegions("");
     });
   }
 
@@ -188,12 +218,12 @@ export default function AccessControl({ locale, onAuthenticated, adminToken = ""
     <div className="access-tabs" role="tablist">{(["accounts", "employees", "policies", "audit"] as Tab[]).map((item) => <button key={item} role="tab" aria-selected={tab === item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{c[item]}</button>)}</div>
     {busy && !accounts.length && !policies.length ? <div className="panel"><LoadingRows /></div> : null}
     {tab === "accounts" ? <div className="access-account-layout">
-      <section className="panel access-list"><form className="access-create" onSubmit={(event) => void createAccount(event)}><Field label={c.accountName} htmlFor="access-create-account-name"><TextInput id="access-create-account-name" required value={accountName} onChange={(event) => setAccountName(event.target.value)} /></Field><Field label={c.regions} hint={c.regionsHint} htmlFor="access-create-regions"><TextInput id="access-create-regions" value={regions} onChange={(event) => setRegions(event.target.value)} /></Field><Button type="submit" variant="primary" icon={Plus} loading={busy} disabled={!accountName.trim()}>{c.create}</Button></form><div className="access-list-items">{visibleAccounts.map((account) => <button key={account.id} className={selected?.id === account.id ? "active" : ""} onClick={() => setSelectedId(account.id)}><span><UsersThree size={17} /><strong>{account.name}</strong></span><Badge tone={account.status === "active" ? "green" : "amber"} dot>{account.status === "active" ? c.active : c.disabled}</Badge><small>{account.attributes.regionCodes instanceof Array ? account.attributes.regionCodes.join(" · ") : "—"}</small></button>)}</div>{!accounts.length ? <EmptyState icon={UsersThree} title={c.noAccounts} body={c.noAccountsBody} /> : <Pagination {...accountPagination} />}</section>
-      {selected ? <section className="panel access-detail"><header><div><p className="panel-kicker">{selected.type}</p><h2>{selected.name}</h2><code>{selected.id}</code></div><Button size="sm" variant={selected.status === "active" ? "danger" : "secondary"} onClick={() => void act(() => api.setServiceAccountStatus(token, selected.id, selected.status === "active" ? "disabled" : "active"))}>{selected.status === "active" ? c.disable : c.enable}</Button></header><div className="access-account-fields"><Field label={c.accountName} htmlFor="access-edit-account-name"><TextInput id="access-edit-account-name" value={selectedAccountName} onChange={(event) => setSelectedAccountName(event.target.value)} /></Field><Field label={c.regions} hint={c.regionsHint} htmlFor="access-edit-regions"><TextInput id="access-edit-regions" value={selectedAccountRegions} onChange={(event) => setSelectedAccountRegions(event.target.value)} /></Field><Button size="sm" variant="primary" disabled={!selectedAccountName.trim()} onClick={() => void act(() => api.updateServiceAccount(token, selected.id, { name: selectedAccountName.trim(), attributes: { ...selected.attributes, regionCodes: selectedAccountRegions.split(",").map((item) => item.trim()).filter(Boolean) } }))}>{c.saveAccount}</Button></div><div className="access-bind"><div><strong>{c.bound}</strong><BoundPolicies ids={selected.policyIds} policies={policies} unbindLabel={c.unbind} onUnbind={(id) => void act(() => api.unbindAccessPolicy(token, selected.id, id))} /></div><Select value={bindingPolicyId} onChange={(event) => setBindingPolicyId(event.target.value)}><option value="">{c.choosePolicy}</option>{availablePolicies.map((policy) => <option key={policy.id} value={policy.id}>{policy.name}</option>)}</Select><Button size="sm" disabled={!bindingPolicyId} onClick={() => void act(async () => { await api.bindAccessPolicy(token, selected.id, bindingPolicyId); setBindingPolicyId(""); })}>{c.bind}</Button></div><div className="access-credential-heading"><h3>{c.credentials}</h3><Button size="sm" icon={Key} onClick={() => void showIssued(() => api.issueServiceAccountKey(token, selected.id, "console"))}>{c.issue}</Button></div>{selected.credentials.length ? <div className="access-credentials">{visibleCredentials.map((credential) => <article key={credential.id} className={credential.revokedAt ? "revoked" : ""}><div><strong>{credential.label}</strong><code>{credential.id}</code><small>{formatDate(credential.lastUsedAt ?? credential.createdAt, locale)}</small></div>{!credential.revokedAt ? <span><Button size="sm" variant="ghost" onClick={() => void showIssued(() => api.rotateCredential(token, credential.id))}>{c.rotate}</Button><Button size="sm" variant="danger" onClick={() => void act(() => api.revokeCredential(token, credential.id))}>{c.revoke}</Button></span> : <Badge tone="red">{c.revoke}</Badge>}</article>)}</div> : <p className="access-muted">{c.noKeys}</p>}<Pagination {...credentialPagination} /></section> : null}
+      <section className="panel access-list"><form className="access-create" onSubmit={(event) => void createAccount(event)}><Field label={c.accountName} htmlFor="access-create-account-name"><TextInput id="access-create-account-name" required value={accountName} onChange={(event) => setAccountName(event.target.value)} /></Field><Field label={c.employeeId} hint={c.employeeIdHint} htmlFor="access-create-employee-id"><TextInput id="access-create-employee-id" value={accountEmployeeId} onChange={(event) => setAccountEmployeeId(event.target.value)} /></Field><Field label={c.regions} hint={c.regionsHint} htmlFor="access-create-regions"><TextInput id="access-create-regions" value={regions} onChange={(event) => setRegions(event.target.value)} /></Field><Button type="submit" variant="primary" icon={Plus} loading={busy} disabled={!accountName.trim()}>{c.create}</Button></form><div className="access-list-items">{visibleAccounts.map((account) => <button key={account.id} className={selected?.id === account.id ? "active" : ""} onClick={() => setSelectedId(account.id)}><span><UsersThree size={17} /><strong>{account.name}</strong></span><Badge tone={account.status === "active" ? "green" : "amber"} dot>{account.status === "active" ? c.active : c.disabled}</Badge><small>{account.attributes.regionCodes instanceof Array ? account.attributes.regionCodes.join(" · ") : "—"}</small></button>)}</div>{!accounts.length ? <EmptyState icon={UsersThree} title={c.noAccounts} body={c.noAccountsBody} /> : <Pagination {...accountPagination} />}</section>
+      {selected ? <section className="panel access-detail"><header><div><p className="panel-kicker">{selected.type}</p><h2>{selected.name}</h2><code>{selected.id}</code></div><Button size="sm" variant={selected.status === "active" ? "danger" : "secondary"} onClick={() => void act(() => api.setServiceAccountStatus(token, selected.id, selected.status === "active" ? "disabled" : "active"))}>{selected.status === "active" ? c.disable : c.enable}</Button></header><div className="access-account-fields"><Field label={c.accountName} htmlFor="access-edit-account-name"><TextInput id="access-edit-account-name" value={selectedAccountName} onChange={(event) => setSelectedAccountName(event.target.value)} /></Field><Field label={c.employeeId} hint={c.employeeIdHint} htmlFor="access-edit-employee-id"><TextInput id="access-edit-employee-id" value={selectedAccountEmployeeId} onChange={(event) => setSelectedAccountEmployeeId(event.target.value)} /></Field><Field label={c.regions} hint={c.regionsHint} htmlFor="access-edit-regions"><TextInput id="access-edit-regions" value={selectedAccountRegions} onChange={(event) => setSelectedAccountRegions(event.target.value)} /></Field><Button size="sm" variant="primary" disabled={!selectedAccountName.trim()} onClick={() => void act(() => api.updateServiceAccount(token, selected.id, { name: selectedAccountName.trim(), attributes: withEmployeeId({ ...selected.attributes, regionCodes: selectedAccountRegions.split(",").map((item) => item.trim()).filter(Boolean) }, selectedAccountEmployeeId) }))}>{c.saveAccount}</Button></div><div className="access-bind"><div><strong>{c.bound}</strong><BoundPolicies ids={selected.policyIds} policies={policies} unbindLabel={c.unbind} onUnbind={(id) => void act(() => api.unbindAccessPolicy(token, selected.id, id))} /></div><Select value={bindingPolicyId} onChange={(event) => setBindingPolicyId(event.target.value)}><option value="">{c.choosePolicy}</option>{availablePolicies.map((policy) => <option key={policy.id} value={policy.id}>{policy.name}</option>)}</Select><Button size="sm" disabled={!bindingPolicyId} onClick={() => void act(async () => { await api.bindAccessPolicy(token, selected.id, bindingPolicyId); setBindingPolicyId(""); })}>{c.bind}</Button></div><div className="access-credential-heading"><h3>{c.credentials}</h3><Button size="sm" icon={Key} onClick={() => void showIssued(() => api.issueServiceAccountKey(token, selected.id, "console"))}>{c.issue}</Button></div>{selected.credentials.length ? <div className="access-credentials">{visibleCredentials.map((credential) => <article key={credential.id} className={credential.revokedAt ? "revoked" : ""}><div><strong>{credential.label}</strong><code>{credential.id}</code><small>{formatDate(credential.lastUsedAt ?? credential.createdAt, locale)}</small></div>{!credential.revokedAt ? <span><Button size="sm" variant="ghost" onClick={() => void showIssued(() => api.rotateCredential(token, credential.id))}>{c.rotate}</Button><Button size="sm" variant="danger" onClick={() => void act(() => api.revokeCredential(token, credential.id))}>{c.revoke}</Button></span> : <Badge tone="red">{c.revoke}</Badge>}</article>)}</div> : <p className="access-muted">{c.noKeys}</p>}<Pagination {...credentialPagination} /></section> : null}
     </div> : null}
     {tab === "employees" ? <div className="access-account-layout">
       <section className="panel access-list"><div className="access-list-items access-list-items-flush">{visibleUsers.map((user) => { const identity = user.identities[0]; return <button key={user.id} className={selectedUser?.id === user.id ? "active" : ""} onClick={() => setSelectedUserId(user.id)}><span><UsersThree size={17} /><strong>{user.name}</strong></span><Badge tone={user.status === "active" ? "green" : "amber"} dot>{user.status === "active" ? c.active : c.disabled}</Badge><small>{identity ? `${identity.provider} · ${String(identity.profile.employeeNumber ?? identity.externalSubject)}` : "—"}</small></button>; })}</div>{!users.length ? <EmptyState icon={UsersThree} title={c.noEmployees} body={c.noEmployeesBody} /> : <Pagination {...userPagination} />}</section>
-      {selectedUser ? <section className="panel access-detail"><header><div><p className="panel-kicker">{selectedUser.type}</p><h2>{selectedUser.name}</h2><code>{selectedUser.id}</code></div><Button size="sm" variant={selectedUser.status === "active" ? "danger" : "secondary"} onClick={() => void act(() => api.setUserStatus(token, selectedUser.id, selectedUser.status === "active" ? "disabled" : "active"))}>{selectedUser.status === "active" ? c.disable : c.enable}</Button></header><div className="access-employee-identity"><strong>{c.identity}</strong>{selectedUser.identities.map((identity) => <span key={`${identity.provider}:${identity.externalSubject}`}><Badge tone="blue">{identity.provider}</Badge><code>{String(identity.profile.employeeNumber ?? identity.externalSubject)}</code><small>{formatDate(identity.lastLoginAt, locale)}</small></span>)}</div><div className="access-employee-policy"><Field label={c.regions} hint={c.regionsHint} htmlFor="employee-region-codes"><TextInput id="employee-region-codes" value={employeeRegions} onChange={(event) => setEmployeeRegions(event.target.value)} /></Field><Button size="sm" variant="primary" onClick={() => void act(() => api.updateUser(token, selectedUser.id, { attributes: { ...selectedUser.attributes, regionCodes: employeeRegions.split(",").map((item) => item.trim()).filter(Boolean) } }))}>{c.saveAccess}</Button></div><div className="access-bind"><div><strong>{c.bound}</strong><BoundPolicies ids={selectedUser.policyIds} policies={policies} unbindLabel={c.unbind} onUnbind={(id) => void act(() => api.unbindAccessPolicy(token, selectedUser.id, id))} /></div><Select value={employeePolicyId} onChange={(event) => setEmployeePolicyId(event.target.value)}><option value="">{c.choosePolicy}</option>{availableEmployeePolicies.map((policy) => <option key={policy.id} value={policy.id}>{policy.name}</option>)}</Select><Button size="sm" disabled={!employeePolicyId} onClick={() => void act(async () => { await api.bindAccessPolicy(token, selectedUser.id, employeePolicyId); setEmployeePolicyId(""); })}>{c.bind}</Button></div></section> : null}
+      {selectedUser ? <section className="panel access-detail"><header><div><p className="panel-kicker">{selectedUser.type}</p><h2>{selectedUser.name}</h2><code>{selectedUser.id}</code></div><Button size="sm" variant={selectedUser.status === "active" ? "danger" : "secondary"} onClick={() => void act(() => api.setUserStatus(token, selectedUser.id, selectedUser.status === "active" ? "disabled" : "active"))}>{selectedUser.status === "active" ? c.disable : c.enable}</Button></header><div className="access-employee-identity"><strong>{c.identity}</strong>{selectedUser.identities.map((identity) => <span key={`${identity.provider}:${identity.externalSubject}`}><Badge tone="blue">{identity.provider}</Badge><code>{String(identity.profile.employeeNumber ?? identity.externalSubject)}</code><small>{formatDate(identity.lastLoginAt, locale)}</small></span>)}</div><div className="access-employee-policy"><Field label={c.employeeId} hint={c.employeeIdHint} htmlFor="employee-id"><TextInput id="employee-id" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)} /></Field><Field label={c.regions} hint={c.regionsHint} htmlFor="employee-region-codes"><TextInput id="employee-region-codes" value={employeeRegions} onChange={(event) => setEmployeeRegions(event.target.value)} /></Field><Button size="sm" variant="primary" onClick={() => void act(() => api.updateUser(token, selectedUser.id, { attributes: withEmployeeId({ ...selectedUser.attributes, regionCodes: employeeRegions.split(",").map((item) => item.trim()).filter(Boolean) }, employeeId) }))}>{c.saveAccess}</Button></div><div className="access-bind"><div><strong>{c.bound}</strong><BoundPolicies ids={selectedUser.policyIds} policies={policies} unbindLabel={c.unbind} onUnbind={(id) => void act(() => api.unbindAccessPolicy(token, selectedUser.id, id))} /></div><Select value={employeePolicyId} onChange={(event) => setEmployeePolicyId(event.target.value)}><option value="">{c.choosePolicy}</option>{availableEmployeePolicies.map((policy) => <option key={policy.id} value={policy.id}>{policy.name}</option>)}</Select><Button size="sm" disabled={!employeePolicyId} onClick={() => void act(async () => { await api.bindAccessPolicy(token, selectedUser.id, employeePolicyId); setEmployeePolicyId(""); })}>{c.bind}</Button></div></section> : null}
     </div> : null}
     {tab === "policies" ? <div className="access-policy-layout"><section className="panel access-policy-list"><Button size="sm" icon={Plus} onClick={() => { setPolicyId(""); setPolicyJson(policyTemplate(activeDatasourceId)); }}>{c.createPolicy}</Button><div className="access-policy-items">{visiblePolicies.map((policy) => <button key={policy.id} className={policyId === policy.id ? "active" : ""} onClick={() => editPolicy(policy.id)}><strong>{policy.name}</strong><span>{c.version} {policy.version}</span></button>)}</div>{!policies.length ? <EmptyState icon={ShieldCheck} title={c.noPolicies} body={c.noPoliciesBody} /> : <Pagination {...policyPagination} />}</section><form className="panel access-policy-editor" onSubmit={(event) => void savePolicy(event)}>{!selectedPolicy ? <Field label={c.policyName} htmlFor="access-policy-name"><TextInput id="access-policy-name" required value={policyName} onChange={(event) => setPolicyName(event.target.value)} /></Field> : <div className="access-policy-title"><h2>{selectedPolicy.name}</h2><Badge tone="blue">v{selectedPolicy.version}</Badge></div>}<Field label={c.policyDocument} htmlFor="access-policy-document"><TextArea id="access-policy-document" spellCheck={false} value={policyJson} onChange={(event) => setPolicyJson(event.target.value)} /></Field><Button type="submit" variant="primary" loading={busy} disabled={!selectedPolicy && !policyName.trim()}>{selectedPolicy ? c.savePolicy : c.createPolicy}</Button></form></div> : null}
     {tab === "audit" ? <section className="panel access-audit">{audit.length ? <><div className="access-audit-scroll"><div className="access-audit-table"><div className="head"><span>{c.event}</span><span>{c.actor}</span><span>{c.decision}</span><span>{c.resource}</span></div>{visibleAudit.map((event) => <div key={event.id}><span><strong>{event.action}</strong><small>{formatDate(event.occurredAt, locale)}</small></span><code>{event.subjectId ?? "—"}</code><Badge tone={event.decision === "allowed" ? "green" : event.decision === "denied" ? "red" : "amber"}>{event.decision}</Badge><span>{event.resource ?? "—"}</span></div>)}</div></div><Pagination {...auditPagination} /></> : <EmptyState icon={WarningCircle} title={c.noAudit} body={c.noAuditBody} />}</section> : null}

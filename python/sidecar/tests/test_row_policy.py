@@ -29,7 +29,111 @@ def region_policy(region: str) -> dict:
     }
 
 
+def permission_policy(*, include_self: bool | None = None, schema_version: int = 2) -> dict:
+    condition = {
+        "field": "employee_id",
+        "operator": "permissionLookup",
+        "values": ["user-a"],
+        "lookup": {
+            "table": "auth.employee_permissions",
+            "principalField": "principal_id",
+            "targetField": "employee_id",
+            "organizationField": "organization_id",
+        },
+        "organizationValue": "org-sales",
+    }
+    if include_self is not None:
+        condition["includeSelf"] = include_self
+    return {
+        "schemaVersion": schema_version,
+        "defaultEffect": "deny",
+        "policyVersions": ["pol-sales:2"],
+        "tables": {
+            "public.employees": {
+                "rowFilter": condition,
+                "allowedColumns": ["employee_id", "region_code"],
+                "deniedColumns": [],
+            },
+        },
+    }
+
+
 class RowPolicyTests(unittest.TestCase):
+    def test_permission_lookup_is_parameterized_tenant_scoped_and_non_recursive(self) -> None:
+        query = apply_row_policy(
+            "SELECT e.employee_id FROM public.employees e",
+            permission_policy(),
+        )
+        self.assertIn(
+            "EXISTS(SELECT 1 FROM auth.employee_permissions AS __srp_lookup_0",
+            query.sql,
+        )
+        self.assertIn("__srp_lookup_0.principal_id = %(srp_0)s", query.sql)
+        self.assertIn("__srp_lookup_0.organization_id = %(srp_1)s", query.sql)
+        self.assertIn("__srp_lookup_0.employee_id = __srp_source_0.employee_id", query.sql)
+        self.assertNotIn("user-a", query.sql)
+        self.assertNotIn("org-sales", query.sql)
+        self.assertEqual(query.parameters, {"srp_0": "user-a", "srp_1": "org-sales"})
+        self.assertEqual(query.applied_tables, ("public.employees",))
+        self.assertEqual(len(query.lookup_tables), 1)
+        self.assertEqual(query.lookup_tables[0].normalized(), (None, "auth", "employee_permissions"))
+        # The lookup relation is generated after the source walk and is not
+        # recursively wrapped even when it is itself policy-addressable.
+        self.assertEqual(query.sql.count("FROM auth.employee_permissions"), 1)
+        self.assertNotIn("SELECT * FROM auth.employee_permissions", query.sql)
+
+    def test_permission_lookup_defaults_to_excluding_self_and_can_include_self(self) -> None:
+        without_self = apply_row_policy(
+            "SELECT employee_id FROM public.employees",
+            permission_policy(),
+        )
+        self.assertNotIn(" OR __srp_source_0.employee_id =", without_self.sql)
+
+        with_self = apply_row_policy(
+            "SELECT employee_id FROM public.employees",
+            permission_policy(include_self=True),
+        )
+        self.assertIn(" OR __srp_source_0.employee_id = %(srp_0)s", with_self.sql)
+        self.assertEqual(with_self.parameters, without_self.parameters)
+
+    def test_permission_lookup_alias_avoids_user_aliases_across_join_and_cte(self) -> None:
+        policy = permission_policy()
+        policy["tables"]["public.employee_assignments"] = {
+            "rowFilter": {
+                "op": "and",
+                "conditions": [
+                    {
+                        "field": "employee_id",
+                        "operator": "permissionLookup",
+                        "values": ["user-a"],
+                        "lookup": policy["tables"]["public.employees"]["rowFilter"]["lookup"],
+                        "organizationValue": "org-sales",
+                    },
+                    {"field": "region_code", "operator": "eq", "values": ["CN-JIA"]},
+                ],
+            },
+            "allowedColumns": ["employee_id", "region_code"],
+            "deniedColumns": [],
+        }
+        query = apply_row_policy(
+            "WITH employee_rows AS ("
+            "SELECT e.employee_id FROM public.employees AS __srp_lookup_0) "
+            "SELECT employee_rows.employee_id FROM employee_rows "
+            "JOIN public.employee_assignments AS __srp_source_0 "
+            "ON employee_rows.employee_id = __srp_source_0.employee_id",
+            policy,
+        )
+        self.assertIn("FROM auth.employee_permissions AS __srp_lookup_1", query.sql)
+        self.assertIn("FROM auth.employee_permissions AS __srp_lookup_2", query.sql)
+        self.assertIn("AS __srp_source_1", query.sql)
+        self.assertIn("AS __srp_source_2", query.sql)
+        self.assertEqual(query.sql.count("FROM auth.employee_permissions"), 2)
+        self.assertEqual(set(query.applied_tables), {"public.employees", "public.employee_assignments"})
+
+    def test_permission_lookup_is_v2_only(self) -> None:
+        with self.assertRaises(RowPolicyError):
+            apply_row_policy("SELECT employee_id FROM public.employees", permission_policy(schema_version=1))
+
     def test_user_a_and_b_compile_to_different_bound_region_values(self) -> None:
         sql = "SELECT sales.region_code, SUM(sales.amount) AS revenue FROM public.sales GROUP BY sales.region_code"
         query_a = apply_row_policy(sql, region_policy("CN-JIA"))

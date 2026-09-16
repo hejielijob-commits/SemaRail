@@ -24,7 +24,7 @@
 .access-detail > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
 .access-detail h2 { margin: 2px 0 4px; font-size: 20px; }
 .access-detail code, .access-credentials code, .access-audit code { color: var(--muted); font-size: 9px; }
-.access-account-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 10px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.access-account-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; gap: 10px; padding: 16px 0; border-bottom: 1px solid var(--border); }
 .access-bind { display: grid; grid-template-columns: minmax(0, 1fr) 190px auto; align-items: end; gap: 10px; padding: 16px 0; border-bottom: 1px solid var(--border); }
 .access-bind > div { display: grid; gap: 5px; }
 .access-bind strong, .access-credential-heading h3 { font-size: 11px; }
@@ -38,7 +38,7 @@
 .access-employee-identity > strong { font-size: 11px; }
 .access-employee-identity > span { display: flex; align-items: center; gap: 8px; }
 .access-employee-identity small { color: var(--muted); font-size: 9px; }
-.access-employee-policy { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.access-employee-policy { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; align-items: end; gap: 10px; padding: 16px 0; border-bottom: 1px solid var(--border); }
 .access-credentials { display: grid; gap: 7px; }
 .access-credentials article { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
 .access-credentials article.revoked { opacity: .55; }
@@ -64,6 +64,6 @@
 .access-audit-table > div > span:first-child { display: grid; gap: 2px; }
 .access-audit-table small { color: var(--muted); font-size: 9px; }
 .access-audit-table .head { min-height: 34px; color: var(--muted); font-size: 9px; font-weight: 700; text-transform: uppercase; }
-@media (max-width: 1100px) { .access-bind, .access-account-fields { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .access-bind, .access-account-fields, .access-employee-policy { grid-template-columns: 1fr; } }
 @media (max-width: 900px) { .access-account-layout, .access-policy-layout { height: auto; grid-template-columns: 1fr; } .access-list { max-height: 480px; } }
 @media (max-width: 600px) { .access-lock { grid-template-columns: 1fr; } .access-lock form { align-items: stretch; flex-direction: column; } .access-detail > header { flex-direction: column; } }

@@ -375,7 +375,7 @@ def _check_functions(statement: exp.Expression) -> None:
         # sqlglot models boolean connectors (AND/OR) as Func subclasses for
         # inheritance purposes, but they are operators, not callable database
         # functions and therefore must not be looked up in the function list.
-        if isinstance(function, (exp.Connector, exp.Case, exp.If, exp.Explode, exp.Unnest)):
+        if isinstance(function, (exp.Connector, exp.Case, exp.If, exp.Explode, exp.Unnest, exp.Exists)):
             continue
         name = _function_name(function)
         if name in DANGEROUS_FUNCTIONS or name not in SAFE_FUNCTIONS:
@@ -386,7 +386,7 @@ def _check_dangerous_functions(statement: exp.Expression) -> None:
     """Reject known side-effecting/resource functions before semantic planning."""
 
     for function in statement.find_all(exp.Func):
-        if isinstance(function, (exp.Connector, exp.Case, exp.If, exp.Explode, exp.Unnest)):
+        if isinstance(function, (exp.Connector, exp.Case, exp.If, exp.Explode, exp.Unnest, exp.Exists)):
             continue
         if _function_name(function) in DANGEROUS_FUNCTIONS:
             raise SqlPolicyError("query contains a denied function")

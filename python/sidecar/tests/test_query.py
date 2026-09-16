@@ -523,6 +523,110 @@ class QueryTests(unittest.TestCase):
         })
         self.assertNotIn("CN-JIA", json.dumps(result))
 
+    def test_service_expands_only_rewritten_allowlist_for_permission_lookup(self) -> None:
+        original_sql = "SELECT e.employee_id FROM public.employees e"
+        seen: dict[str, Any] = {}
+
+        class PermissionPlanner:
+            def __init__(self, native_sql: str = original_sql) -> None:
+                self.native_sql = native_sql
+
+            def dry_plan(self, _params: dict[str, Any]) -> dict[str, Any]:
+                return {
+                    "nativeSql": self.native_sql,
+                    "allowedPhysical": {
+                        "tables": [{"schema": "public", "table": "employees"}],
+                        "schemas": ["public"],
+                        "catalogs": [],
+                    },
+                }
+
+        class RecordingExecutor:
+            def __init__(self) -> None:
+                self.calls: list[dict[str, Any]] = []
+
+            def execute(self, **kwargs: Any) -> dict[str, Any]:
+                self.calls.append(dict(kwargs))
+                seen.update(kwargs)
+                return {
+                    "schemaVersion": 1,
+                    "queryId": kwargs["query_id"],
+                    "status": "success",
+                    "semanticSql": kwargs["semantic_sql"],
+                    "nativeSql": kwargs["native_sql"],
+                    "columns": [],
+                    "previewRows": [],
+                    "stats": {"returnedRows": 0, "durationMs": 1, "truncated": False},
+                }
+
+            def cancel(self, _query_id: str) -> bool:
+                return False
+
+        policy = {
+            "schemaVersion": 2,
+            "defaultEffect": "deny",
+            "policyVersions": ["pol-employee:2"],
+            "databaseSession": {
+                "schemaVersion": 1,
+                "subjectId": "user-a",
+                "organizationId": "org-sales",
+                "attributes": {},
+                "policyVersions": ["pol-employee:2"],
+            },
+            "tables": {
+                "public.employees": {
+                    "rowFilter": {
+                        "field": "employee_id",
+                        "operator": "permissionLookup",
+                        "values": ["user-a"],
+                        "lookup": {
+                            "table": "auth.employee_permissions",
+                            "principalField": "principal_id",
+                            "targetField": "employee_id",
+                            "organizationField": "organization_id",
+                        },
+                        "organizationValue": "org-sales",
+                    },
+                    "allowedColumns": ["employee_id"],
+                    "deniedColumns": [],
+                },
+            },
+        }
+        service = WrenQueryService(
+            PermissionPlanner(),
+            RecordingExecutor(),
+            connection_resolver=lambda _project, _env: {"connectionUrl": "postgresql://local.invalid/db"},
+        )
+
+        result = service.run({
+            "projectDir": ".",
+            "question": "Employees",
+            "semanticSql": original_sql,
+            "queryId": "q-permission-lookup",
+            "authorizationPolicy": policy,
+        })
+        self.assertIn("FROM auth.employee_permissions", seen["native_sql"])
+        self.assertEqual(seen["query_parameters"], {"srp_0": "user-a", "srp_1": "org-sales"})
+        self.assertEqual(result["nativeSql"], original_sql)
+
+        # The generated lookup allowlist must not authorize direct user SQL.
+        direct_executor = RecordingExecutor()
+        direct_service = WrenQueryService(
+            PermissionPlanner("SELECT principal_id FROM auth.employee_permissions"),
+            direct_executor,
+            connection_resolver=lambda _project, _env: {"connectionUrl": "postgresql://local.invalid/db"},
+        )
+        with self.assertRaises(Exception) as caught:
+            direct_service.run({
+                "projectDir": ".",
+                "question": "Permissions",
+                "semanticSql": "SELECT principal_id FROM auth.employee_permissions",
+                "queryId": "q-direct-lookup",
+                "authorizationPolicy": policy,
+            })
+        self.assertEqual(getattr(caught.exception, "error").code, POLICY_DENIED)
+        self.assertEqual(direct_executor.calls, [])
+
     def test_service_denies_a_physical_table_missing_from_data_policy(self) -> None:
         class PayrollPlanner:
             def dry_plan(self, _params: dict[str, Any]) -> dict[str, Any]:

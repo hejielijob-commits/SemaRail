@@ -93,6 +93,33 @@ class QueryPlanner(Protocol):
         """Return native SQL plus the MDL-derived physical allowlist."""
 
 
+def _rewritten_allowlist(
+    allowed_physical: PhysicalAllowlist | Mapping[str, Any] | None,
+    lookup_tables: Iterable[PhysicalTable],
+) -> PhysicalAllowlist | Mapping[str, Any] | None:
+    """Extend only the post-policy SQL check with generated lookup tables.
+
+    The original native SQL is validated before row-policy compilation.  A
+    lookup relation therefore enters this allowlist only because the sidecar
+    generated it from a validated policy leaf; it cannot grant the user
+    direct access to that relation.
+    """
+
+    generated = frozenset(lookup_tables)
+    if not generated:
+        return allowed_physical
+    if allowed_physical is None:
+        # Injected planner seams may omit an MDL allowlist.  Preserve that
+        # compatibility behavior while retaining the AST checks.
+        return None
+    base = (
+        allowed_physical
+        if isinstance(allowed_physical, PhysicalAllowlist)
+        else physical_allowlist_from_dict(allowed_physical)
+    )
+    return PhysicalAllowlist(frozenset(base.tables | generated))
+
+
 class DatabaseExecutor(Protocol):
     """Database execution seam; implementations must return JSON-safe data."""
 
@@ -1058,7 +1085,13 @@ class WrenQueryService:
             try:
                 database_session = _database_session(authorization_policy)
                 authorized = apply_row_policy(native_sql, authorization_policy)
-                execution_sql = validate_native_sql(authorized.sql, allowed_physical=allowed_physical)
+                execution_sql = validate_native_sql(
+                    authorized.sql,
+                    allowed_physical=_rewritten_allowlist(
+                        allowed_physical,
+                        authorized.lookup_tables,
+                    ),
+                )
                 query_parameters = authorized.parameters
                 applied_tables = authorized.applied_tables
             except (RowPolicyError, SqlPolicyError) as exc:

@@ -3,7 +3,12 @@
 
 The normal mode provisions an isolated database and login using an existing
 administrator connection, loads ``examples/wren-postgres/seed.sql``, and
-then drives the real framed sidecar process as the generated read-only login.
+adds the isolated ``hr.compensation`` plus ``auth.employee_permission``
+permission-lookup fixture before driving the real framed sidecar process as the
+generated read-only login.  The lookup fixture is tenant-scoped and
+pre-expanded; the acceptance query proves that mapping updates are visible on
+the next request.  Existing mode has no managed fixture and reports this
+permission-lookup coverage as skipped.
 No database server is downloaded or started by this script.  Credentials are
 accepted only through environment variables, kept in memory, and never
 written to reports, command lines, or diagnostics.
@@ -478,10 +483,46 @@ def _provision_target(args: argparse.Namespace) -> ProvisionedTarget:
             target.execute(seed_sql)
             target.execute("CREATE SCHEMA hr")
             target.execute(
-                "CREATE TABLE hr.compensation (employee_id INTEGER PRIMARY KEY, salary NUMERIC NOT NULL)"
+                "CREATE TABLE hr.compensation (employee_id TEXT PRIMARY KEY, salary NUMERIC NOT NULL)"
             )
             target.execute(
-                "INSERT INTO hr.compensation(employee_id,salary) VALUES (1,120000),(2,95000)"
+                "INSERT INTO hr.compensation(employee_id,salary) VALUES "
+                "('EMP-001',120000),('EMP-002',95000),('EMP-003',88000)"
+            )
+            # Keep the lookup relation deliberately boring: it is a
+            # tenant-qualified, pre-expanded edge list.  The acceptance
+            # policy must not rely on a recursive CTE or a transitive
+            # expansion performed by PostgreSQL.
+            target.execute("CREATE SCHEMA auth")
+            target.execute("REVOKE ALL ON SCHEMA auth FROM PUBLIC")
+            target.execute(
+                "CREATE TABLE auth.employee_permission ("
+                "organization_id TEXT NOT NULL, "
+                "employee TEXT NOT NULL, "
+                "subordinate TEXT NOT NULL, "
+                "PRIMARY KEY (organization_id, employee, subordinate)"
+                ")"
+            )
+            target.execute(
+                "CREATE INDEX employee_permission_lookup_idx ON "
+                "auth.employee_permission (organization_id, employee, subordinate)"
+            )
+            target.execute(
+                "INSERT INTO auth.employee_permission(organization_id,employee,subordinate) "
+                "VALUES "
+                "(%s,%s,%s),(%s,%s,%s),(%s,%s,%s),(%s,%s,%s),(%s,%s,%s)",
+                (
+                    "org-sales", "EMP-MANAGER", "EMP-001",
+                    "org-sales", "EMP-MANAGER", "EMP-002",
+                    "org-sales", "EMP-ANALYST", "EMP-002",
+                    # A chained edge must not be followed transitively:
+                    # EMP-MANAGER is intentionally not granted EMP-003 via
+                    # EMP-001.
+                    "org-sales", "EMP-001", "EMP-003",
+                    # This row is intentionally in a different tenant.  A
+                    # sales request for EMP-MANAGER must never see EMP-003.
+                    "org-other", "EMP-MANAGER", "EMP-003",
+                ),
             )
             grant_statements = [
                 sql.SQL("CREATE ROLE {} LOGIN PASSWORD {}").format(
@@ -490,10 +531,13 @@ def _provision_target(args: argparse.Namespace) -> ProvisionedTarget:
                 sql.SQL("REVOKE ALL ON SCHEMA public FROM {}").format(sql.Identifier(role)),
                 sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(sql.Identifier(role)),
                 sql.SQL("GRANT USAGE ON SCHEMA hr TO {}").format(sql.Identifier(role)),
+                sql.SQL("GRANT USAGE ON SCHEMA auth TO {}").format(sql.Identifier(role)),
                 sql.SQL("GRANT SELECT ON {}, {}, {}, {}, {} TO {}").format(
                     *(sql.Identifier(table) for table in EXPECTED_TABLES), sql.Identifier(role)
                 ),
                 sql.SQL("GRANT SELECT ON hr.compensation TO {}").format(sql.Identifier(role)),
+                sql.SQL("REVOKE ALL ON auth.employee_permission FROM PUBLIC"),
+                sql.SQL("GRANT SELECT ON auth.employee_permission TO {}").format(sql.Identifier(role)),
                 sql.SQL("GRANT CONNECT ON DATABASE {} TO {}").format(
                     sql.Identifier(database), sql.Identifier(role)
                 ),
@@ -642,7 +686,7 @@ def _prepare_project_fixture(project_dir: Path, run_dir: Path) -> Path:
         "primary_key: employee_id\n"
         "columns:\n"
         "  - name: employee_id\n"
-        "    type: INTEGER\n"
+        "    type: VARCHAR\n"
         "    is_primary_key: true\n"
         "    not_null: true\n"
         "  - name: salary\n"
@@ -1132,6 +1176,233 @@ def _run_database_permission_probe(
             connection.close()
 
 
+def _run_permission_lookup_probe(
+    args: argparse.Namespace,
+    target: ProvisionedTarget,
+    client: SidecarClient,
+    project_dir: Path,
+) -> None:
+    """Exercise tenant-bound, pre-expanded permission lookup rows end to end."""
+
+    psycopg, _sql = _load_psycopg()
+    semantic_sql = (
+        "SELECT compensation.employee_id FROM compensation "
+        "ORDER BY compensation.employee_id"
+    )
+    lookup_name = "auth.employee_permission"
+    policy_version = "postgres-permission-lookup-e2e:2"
+    reported_native_sql: str | None = None
+
+    def run(
+        label: str,
+        subject_id: str,
+        employee_id: str,
+        organization_id: str,
+        expected_ids: list[str],
+    ) -> None:
+        nonlocal reported_native_sql
+        policy = {
+            "schemaVersion": 2,
+            "defaultEffect": "deny",
+            "tables": {
+                "hr.compensation": {
+                    "rowFilter": {
+                        "field": "employee_id",
+                        "operator": "permissionLookup",
+                        "values": [employee_id],
+                        "lookup": {
+                            "table": lookup_name,
+                            "principalField": "employee",
+                            "targetField": "subordinate",
+                            "organizationField": "organization_id",
+                        },
+                        "organizationValue": organization_id,
+                        "includeSelf": False,
+                    },
+                    "allowedColumns": ["employee_id"],
+                    "deniedColumns": [],
+                }
+            },
+            "policyVersions": [policy_version],
+            "databaseSession": {
+                "schemaVersion": 1,
+                "subjectId": subject_id,
+                "organizationId": organization_id,
+                "attributes": {"employeeId": employee_id},
+                "policyVersions": [policy_version],
+            },
+        }
+        request_id = _request_id()
+        trace_id = "trace-" + uuid.uuid4().hex
+        client.send(
+            {
+                "protocolVersion": "2",
+                "id": request_id,
+                "method": "query.run",
+                "traceId": trace_id,
+                "params": {
+                    "projectDir": str(project_dir),
+                    "question": "列出当前员工可见的员工编号",
+                    "semanticSql": semantic_sql,
+                    "queryId": _request_id(),
+                    "authorizationPolicy": policy,
+                },
+            }
+        )
+        response = client.recv(request_id, timeout=35)
+        if (
+            response.get("protocolVersion") != "2"
+            or response.get("id") != request_id
+            or response.get("ok") is not True
+        ):
+            error = response.get("error")
+            code = error.get("code") if isinstance(error, Mapping) else "unknown"
+            raise E2EFailure(f"{label} failed with sidecar error {code}")
+        result = response.get("result")
+        if not isinstance(result, Mapping):
+            raise E2EFailure(f"{label} returned no result object")
+        if result.get("schemaVersion") != 1 or result.get("status") != "success":
+            raise E2EFailure(f"{label} returned an invalid presentation")
+        columns = result.get("columns")
+        if (
+            not isinstance(columns, list)
+            or [
+                column.get("name")
+                for column in columns
+                if isinstance(column, Mapping)
+            ]
+            != ["employee_id"]
+        ):
+            raise E2EFailure(f"{label} returned unexpected columns")
+        rows = result.get("previewRows")
+        if not isinstance(rows, list):
+            raise E2EFailure(f"{label} returned invalid rows")
+        actual_ids: list[str] = []
+        for row in rows:
+            if not isinstance(row, Mapping) or set(row) != {"employee_id"}:
+                raise E2EFailure(f"{label} returned an invalid row shape")
+            value = row.get("employee_id")
+            if not isinstance(value, str):
+                raise E2EFailure(f"{label} returned a non-text employee identifier")
+            actual_ids.append(value)
+        if actual_ids != expected_ids:
+            raise E2EFailure(f"{label} returned rows outside the permission mapping")
+        stats = result.get("stats")
+        if (
+            not isinstance(stats, Mapping)
+            or stats.get("returnedRows") != len(expected_ids)
+            or stats.get("truncated") is not False
+        ):
+            raise E2EFailure(f"{label} returned incorrect row statistics")
+        authorization = result.get("authorization")
+        if (
+            not isinstance(authorization, Mapping)
+            or authorization.get("rowPolicyApplied") is not True
+            or authorization.get("tableCount") != 1
+            or authorization.get("policyVersions") != [policy_version]
+        ):
+            raise E2EFailure(f"{label} omitted safe policy application metadata")
+        native_sql = result.get("nativeSql")
+        if not isinstance(native_sql, str) or not native_sql.strip():
+            raise E2EFailure(f"{label} returned no native SQL metadata")
+        if reported_native_sql is None:
+            reported_native_sql = native_sql
+        elif native_sql != reported_native_sql:
+            raise E2EFailure(f"{label} exposed a policy-dependent native SQL rewrite")
+        response_text = json.dumps(response, ensure_ascii=False, separators=(",", ":"))
+        if any(
+            secret in response_text
+            for secret in (
+                lookup_name,
+                employee_id,
+                organization_id,
+                "srp_",
+                "rewrittenSql",
+                "executionSql",
+                "queryParameters",
+            )
+        ):
+            raise E2EFailure(f"{label} exposed lookup SQL or bound policy values")
+        if any(
+            key in result
+            for key in ("parameters", "queryParameters", "rewrittenSql", "executionSql")
+        ):
+            raise E2EFailure(f"{label} exposed execution parameters or rewritten SQL")
+        if lookup_name in native_sql or "srp_" in native_sql:
+            raise E2EFailure(f"{label} returned policy-generated SQL")
+
+    # The first two principals have different direct, pre-expanded scopes in
+    # the sales tenant.  The fixture also contains EMP-001 -> EMP-003, but
+    # manager must not inherit that chained target.  The same manager
+    # principal in another tenant sees only that tenant's direct target,
+    # proving the organization predicate is part of the lookup rather than a
+    # client-side filter.
+    run(
+        "permissionLookup manager/sales",
+        "subject-manager-sales",
+        "EMP-MANAGER",
+        "org-sales",
+        ["EMP-001", "EMP-002"],
+    )
+    run(
+        "permissionLookup analyst/sales",
+        "subject-analyst-sales",
+        "EMP-ANALYST",
+        "org-sales",
+        ["EMP-002"],
+    )
+    run(
+        "permissionLookup empty/sales",
+        "subject-empty-sales",
+        "EMP-NONE",
+        "org-sales",
+        [],
+    )
+    run(
+        "permissionLookup manager/other tenant",
+        "subject-manager-other",
+        "EMP-MANAGER",
+        "org-other",
+        ["EMP-003"],
+    )
+
+    try:
+        connection = psycopg.connect(
+            _admin_dsn_for_database(args, target.database), autocommit=True
+        )
+    except Exception as exc:
+        raise E2EFailure("could not connect to update the permission lookup fixture") from exc
+    try:
+        connection.execute(
+            "DELETE FROM auth.employee_permission "
+            "WHERE organization_id = %s AND employee = %s AND subordinate = %s",
+            ("org-sales", "EMP-MANAGER", "EMP-001"),
+        )
+        connection.execute(
+            "INSERT INTO auth.employee_permission(organization_id,employee,subordinate) "
+            "VALUES (%s,%s,%s)",
+            ("org-sales", "EMP-MANAGER", "EMP-003"),
+        )
+    except Exception as exc:
+        raise E2EFailure("permission lookup fixture update failed") from exc
+    finally:
+        try:
+            connection.close()
+        except Exception:
+            pass
+
+    # Each Sidecar execution opens a fresh transaction/connection.  This
+    # immediately-following query must observe the changed mapping row; no
+    # lookup result or policy-generated SQL is cached by the acceptance path.
+    run(
+        "permissionLookup manager/sales after update",
+        "subject-manager-sales",
+        "EMP-MANAGER",
+        "org-sales",
+        ["EMP-002", "EMP-003"],
+    )
+
+
 def _install_rls_fixture(args: argparse.Namespace, target: ProvisionedTarget) -> None:
     """Enable one representative native RLS policy in the isolated fixture."""
 
@@ -1357,6 +1628,11 @@ def _dry_run(args: argparse.Namespace, project_dir: Path, python_path: Path) -> 
         "dsnSource": dsn_source,
         "sidecar": "python -m sidecar",
         "databaseProvisioning": args.mode == "provision",
+        "permissionLookup": (
+            "provision-fixture coverage enabled"
+            if args.mode == "provision"
+            else "skipped (existing mode has no provisioned fixture)"
+        ),
         "passwordHandling": "environment-only/in-memory",
         "networkProvisioning": False,
     }
@@ -1457,6 +1733,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         _run_timeout_and_cancel(client, runtime_project_dir)
         if target is not None:
             _run_database_permission_probe(args, target, client, runtime_project_dir)
+            _run_permission_lookup_probe(args, target, client, runtime_project_dir)
             _install_rls_fixture(args, target)
             _run_rls_identity_probe(client, runtime_project_dir)
             _run_rls_artifact_probe(client, runtime_project_dir, run_dir)
@@ -1475,6 +1752,10 @@ def main(argv: Iterable[str] | None = None) -> int:
         print(
             "  PostgreSQL account permission denial/detailed v2 error: "
             + ("passed" if target is not None else "not modified in existing mode")
+        )
+        print(
+            "  PostgreSQL permissionLookup tenant/principal/update isolation: "
+            + ("passed" if target is not None else "skipped (existing mode has no provisioned fixture)")
         )
         print(
             "  PostgreSQL transaction context/RLS employee isolation: "

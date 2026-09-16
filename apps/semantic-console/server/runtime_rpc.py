@@ -138,6 +138,24 @@ def _request_id(value: Any) -> str:
     return ""
 
 
+def _permission_lookup_tables(value: Any) -> set[str]:
+    """Collect lookup table identifiers without retaining resolved principals."""
+
+    if not isinstance(value, Mapping):
+        return set()
+    tables: set[str] = set()
+    if value.get("operator") == "permissionLookup":
+        lookup = value.get("lookup")
+        table = lookup.get("table") if isinstance(lookup, Mapping) else None
+        if isinstance(table, str) and 1 <= len(table) <= 512:
+            tables.add(table)
+    conditions = value.get("conditions")
+    if isinstance(conditions, list):
+        for item in conditions:
+            tables.update(_permission_lookup_tables(item))
+    return tables
+
+
 def _public_response(response: Mapping[str, Any], protocol_version: str, trace_id: str) -> dict[str, Any]:
     """Project a legacy Sidecar envelope into the requested public version."""
 
@@ -1148,6 +1166,7 @@ class RuntimeRpcGateway:
         safe_query_id = query_id[:128] if isinstance(query_id, str) else None
         policy_versions = list(decision.policy_versions)
         policy_tables: list[str] = []
+        policy_lookup_tables: list[str] = []
         if compiled_policy is not None:
             raw_versions = compiled_policy.get("policyVersions")
             if isinstance(raw_versions, list) and all(isinstance(item, str) for item in raw_versions):
@@ -1158,11 +1177,18 @@ class RuntimeRpcGateway:
             raw_tables = compiled_policy.get("tables")
             if isinstance(raw_tables, Mapping):
                 policy_tables = sorted(str(item) for item in raw_tables)[:1_000]
+                policy_lookup_tables = sorted({
+                    table
+                    for rule in raw_tables.values()
+                    if isinstance(rule, Mapping)
+                    for table in _permission_lookup_tables(rule.get("rowFilter"))
+                })[:1_000]
         details: dict[str, Any] = {
             "requestId": request_id,
             "transport": safe_transport,
             "authenticationMethod": auth.method,
             "policyTables": policy_tables,
+            "policyLookupTables": policy_lookup_tables,
             "policyVersions": policy_versions,
         }
         if datasource_id is not None:

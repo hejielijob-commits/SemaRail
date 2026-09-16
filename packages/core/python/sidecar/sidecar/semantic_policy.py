@@ -37,7 +37,11 @@ def filter_semantic_result(method: str, result: Any, policy: Mapping[str, Any]) 
 
 
 def _rules(policy: Mapping[str, Any]) -> tuple[dict[str, Mapping[str, Any]], bool]:
-    if policy.get("schemaVersion") != 1 or policy.get("defaultEffect") not in {"allow", "deny"}:
+    if (
+        type(policy.get("schemaVersion")) is not int
+        or policy.get("schemaVersion") not in {1, 2}
+        or policy.get("defaultEffect") not in {"allow", "deny"}
+    ):
         raise _denied()
     raw_rules = policy.get("tables")
     if not isinstance(raw_rules, Mapping) or len(raw_rules) > _MAX_TABLES:

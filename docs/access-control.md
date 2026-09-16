@@ -71,6 +71,57 @@ If employee A has `{"regionCodes":["CN-JIA"]}` and employee B has
 bound parameters. Updating either employee's attributes or the bound policy takes
 effect on its next request.
 
+## Permission mapping tables
+
+Schema-version-2 policies can derive a row predicate from a pre-expanded
+permission mapping table in the active PostgreSQL datasource. The Subject's
+trusted `employeeId` is the principal; the mapping table lists every target the
+principal may read. Resolution is deliberately non-recursive: if A may read B
+and C, the table must contain both `A -> B` and `A -> C`.
+
+```json
+{
+  "schemaVersion": 2,
+  "datasourceId": "server-issued-datasource-id",
+  "projects": ["hr-project"],
+  "tools": ["semantic:read", "query:plan", "query:execute"],
+  "tables": {
+    "public.employee_facts": {
+      "effect": "allow",
+      "tenantField": "organization_id",
+      "rows": [{
+        "field": "employee_id",
+        "operator": "permissionLookup",
+        "valueFrom": "subject.attributes.employeeId",
+        "lookup": {
+          "table": "auth.employee_permission",
+          "principalField": "employee",
+          "targetField": "subordinate",
+          "organizationField": "organization_id"
+        },
+        "includeSelf": false
+      }]
+    }
+  }
+}
+```
+
+Core compiles the trusted employee and organization values, then the Sidecar
+injects a parameterized `EXISTS` against the mapping table inside every protected
+physical-table wrapper. The lookup table must be written as `schema.table` and
+must be in the same datasource as the protected table. It is an internal policy
+dependency: naming it in a lookup does not grant the Agent permission to query
+it directly. `includeSelf` defaults to `false`; set it to `true`, or insert an
+explicit `A -> A` mapping, to permit the principal's own row.
+
+The mapping table must include an organization column, and deployments should
+index `(organization_id, employee, subordinate)`. Updating mapping rows affects
+the next query because SemaRail does not cache lookup results. A missing mapping
+returns no rows; an unavailable or malformed lookup source fails closed without
+falling back to an unfiltered query. Provider profile employee numbers remain
+display metadata—an administrator must explicitly save the trusted
+`attributes.employeeId` used by the policy.
+
 ## Employee sign-in
 
 Identity providers are server-side configuration. Keep `clientSecret` in a

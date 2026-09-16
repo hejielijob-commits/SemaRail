@@ -244,6 +244,19 @@ and export versioned JSON from the Console's **Issues & feedback** and
 
 SemaRail Core includes a local management API for service accounts and externally authenticated employees, one-time API-key issuance, key rotation/revocation, short-lived employee sessions, versioned policy bindings, and audit events. Policies can restrict tool scopes, projects, physical tables, columns, query limits, and rows derived from trusted subject attributes. Mandatory row predicates are injected with bound database parameters before execution; missing or malformed permissions fail closed.
 
+Policy schema version 2 can also filter business rows through a pre-expanded,
+tenant-scoped employee permission table in the active PostgreSQL datasource.
+The lookup is non-recursive, parameterized, evaluated on every query, and does
+not grant the Agent direct access to the permission table. See
+[Access control](docs/access-control.md#permission-mapping-tables).
+
+For example, if the mapping contains `A -> B` and `B -> C`, A can read B but
+does not inherit access to C. Add `A -> C` explicitly when A should see both.
+The trusted `attributes.employeeId` value is maintained by an administrator in
+**Access control**; an identity provider's displayed employee number is not
+promoted automatically. PostgreSQL profiles must retain their password (or use
+an equivalent server-side secret source) so Core can reconnect after startup.
+
 For example, two agents can run the same sales query while account A is restricted to region `CN-JIA` and account B to `CN-YI`. Updating the account attributes or policy is effective on the next request. See [Access control (alpha)](docs/access-control.md) and [the architecture decision](docs/decisions/0005-enterprise-identity-and-data-authorization.md).
 
 Employees can sign in through a configured DingTalk or generic OIDC provider with `semarail auth login --provider <id>`. The browser callback never receives a SemaRail bearer token; the initiating CLI exchanges a one-time device code for a bounded session and then enters the same Subject/PolicyEngine path as an API key. New employees have no data policy until an administrator assigns trusted attributes and a policy in **Access control**. See [Access control (alpha)](docs/access-control.md) for provider configuration and security boundaries.
@@ -318,7 +331,9 @@ Additional integration gates:
 
 ```powershell
 # Run the real PostgreSQL 17/RLS gate. It requires administrator settings and
-# creates, then cleans, isolated test database/role fixtures.
+# creates, then cleans, isolated test database/role fixtures. The gate also
+# verifies permissionLookup principals, tenants, non-recursive mappings, and
+# immediate visibility of mapping-table updates through the framed Sidecar.
 pnpm acceptance:postgres
 # Run the PostgreSQL control-store, diagnostics, feedback, regression, and
 # clarification gate. The administrator URL is read only from this environment

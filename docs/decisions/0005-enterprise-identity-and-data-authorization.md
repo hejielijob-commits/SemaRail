@@ -43,6 +43,15 @@ resources. Table rules can allow or deny columns and derive row predicates only
 from trusted subject fields. Unknown fields, missing subject attributes,
 unsupported operations, and unlisted tables fail closed. Explicit denies win.
 
+Policy schema version 2 additionally supports a non-recursive
+`permissionLookup` row condition. An administrator names one schema-qualified
+mapping table in the active PostgreSQL datasource and its principal, target, and
+organization columns. Core resolves a single trusted Subject principal and the
+current organization; the Sidecar injects a parameterized, tenant-bound `EXISTS`
+for every protected physical-table occurrence. Mapping rows must already contain
+the complete effective scope. Lookup dependencies do not become Agent-readable
+resources, and schema-version-1 policies retain their original behavior.
+
 For governed queries, SemaRail parses the planned SQL, verifies the physical
 object allowlist, wraps every protected physical table with an inner filtered
 subquery, and passes row values as database parameters. The mandatory inner

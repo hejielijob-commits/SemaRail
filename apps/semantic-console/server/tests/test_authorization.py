@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from server.access_control import Subject
-from server.authorization import PolicyEngine
+from server.authorization import MissingSubjectAttribute, PolicyEngine, PolicyError, validate_policy_document
 
 
 DATASOURCE_A = "datasource-a"
@@ -32,6 +32,39 @@ def policy(policy_id: str, region_attribute: str = "regionCodes") -> dict:
                 }
             },
             "limits": {"maxRows": 500, "timeoutMs": 10000},
+        },
+    }
+
+
+def permission_lookup_policy(policy_id: str = "pol-lookup", *, include_self: bool = False) -> dict:
+    return {
+        "id": policy_id,
+        "organizationId": "org-sales",
+        "name": policy_id,
+        "version": 1,
+        "document": {
+            "schemaVersion": 2,
+            "datasourceId": DATASOURCE_A,
+            "projects": ["sales"],
+            "tools": ["query:execute"],
+            "tables": {
+                "sales.orders": {
+                    "effect": "allow",
+                    "tenantField": "organization_id",
+                    "rows": [{
+                        "field": "employee_id",
+                        "operator": "permissionLookup",
+                        "valueFrom": "subject.attributes.employeeId",
+                        "lookup": {
+                            "table": "auth.employee_permission",
+                            "principalField": "employee",
+                            "targetField": "subordinate",
+                            "organizationField": "organization_id",
+                        },
+                        "includeSelf": include_self,
+                    }],
+                }
+            },
         },
     }
 
@@ -218,6 +251,90 @@ class PolicyEngineTests(unittest.TestCase):
                 self.user_a, "sales.orders", [bound], datasource_id=DATASOURCE_A
             ).allowed
         )
+
+    def test_version_two_permission_lookup_compiles_trusted_principal_and_tenant(self) -> None:
+        subject = Subject(
+            "user-a", "org-sales", "user", "A",
+            {"employeeId": "A", "apiSecret": "must-not-cross"},
+        )
+
+        compiled = self.engine.compile_data_policy(
+            subject,
+            [permission_lookup_policy(include_self=True)],
+            project_id="sales",
+            datasource_id=DATASOURCE_A,
+        )
+
+        self.assertEqual(compiled["schemaVersion"], 2)
+        lookup = compiled["tables"]["sales.orders"]["rowFilter"]["conditions"][0]["conditions"][1]
+        self.assertEqual(lookup, {
+            "field": "employee_id",
+            "operator": "permissionLookup",
+            "values": ["A"],
+            "lookup": {
+                "table": "auth.employee_permission",
+                "principalField": "employee",
+                "targetField": "subordinate",
+                "organizationField": "organization_id",
+            },
+            "organizationValue": "org-sales",
+            "includeSelf": True,
+        })
+        self.assertEqual(compiled["databaseSession"]["attributes"], {"employeeId": "A"})
+        self.assertNotIn("apiSecret", str(compiled))
+
+    def test_permission_lookup_requires_v2_and_strict_schema_qualified_configuration(self) -> None:
+        document = permission_lookup_policy()["document"]
+        validate_policy_document(document)
+
+        legacy = {**document, "schemaVersion": 1}
+        with self.assertRaises(PolicyError):
+            validate_policy_document(legacy)
+
+        for field, value in (
+            ("table", "employee_permission"),
+            ("principalField", "employee.name"),
+            ("targetField", ""),
+            ("organizationField", "organization-id"),
+        ):
+            with self.subTest(field=field):
+                malformed = permission_lookup_policy()["document"]
+                malformed["tables"]["sales.orders"]["rows"][0]["lookup"][field] = value
+                with self.assertRaises(PolicyError):
+                    validate_policy_document(malformed)
+
+        malformed = permission_lookup_policy()["document"]
+        malformed["tables"]["sales.orders"]["rows"][0]["field"] = "employee.id"
+        with self.assertRaises(PolicyError):
+            validate_policy_document(malformed)
+
+    def test_permission_lookup_missing_or_non_scalar_employee_id_fails_closed(self) -> None:
+        missing = Subject("user-c", "org-sales", "user", "C", {})
+        decision = self.engine.authorize_table(
+            missing, "sales.orders", [permission_lookup_policy()], datasource_id=DATASOURCE_A
+        )
+        self.assertFalse(decision.allowed)
+        with self.assertRaises(MissingSubjectAttribute):
+            self.engine.compile_data_policy(
+                missing, [permission_lookup_policy()], datasource_id=DATASOURCE_A
+            )
+
+        multiple = Subject(
+            "user-d", "org-sales", "user", "D", {"employeeId": ["A", "B"]}
+        )
+        with self.assertRaisesRegex(PolicyError, "data policy compilation failed"):
+            self.engine.compile_data_policy(
+                multiple, [permission_lookup_policy()], datasource_id=DATASOURCE_A
+            )
+
+    def test_permission_lookup_principal_is_not_reported_as_an_allowed_target_value(self) -> None:
+        subject = Subject("user-a", "org-sales", "user", "A", {"employeeId": "A"})
+        decision = self.engine.authorize_table(
+            subject, "sales.orders", [permission_lookup_policy()], datasource_id=DATASOURCE_A
+        )
+
+        self.assertTrue(decision.allowed)
+        self.assertEqual(self.engine.allowed_values(decision, "employee_id"), ())
 
 
 if __name__ == "__main__":
