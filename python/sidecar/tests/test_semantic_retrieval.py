@@ -316,6 +316,33 @@ class HybridRetrievalTests(unittest.TestCase):
             self.assertTrue(reopened.status().stale_reason.startswith("active_pointer_unreadable:"))
             self.assertEqual(reopened.search("anything").hits, ())
 
+    def test_invalid_active_pointer_stays_fail_closed_until_reactivated(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            index = HybridSemanticRetriever(
+                embedder=DeterministicEmbedder(), storage_path=root
+            )
+            index.build(documents(), revision="r1")
+            index.activate("r1")
+            (root / "active.json").write_text(
+                '{"revision":"r1","partition":"partition-wrong.json"}',
+                encoding="utf-8",
+            )
+
+            reopened = HybridSemanticRetriever(
+                embedder=DeterministicEmbedder(), storage_path=root
+            )
+            self.assertEqual(reopened.status().stale_reason, "active_pointer_invalid")
+            self.assertEqual(reopened.search("revenue").hits, ())
+
+            reopened.build(documents("r2"), revision="r2")
+            self.assertEqual(reopened.status().stale_reason, "active_pointer_invalid")
+            self.assertEqual(reopened.search("revenue").hits, ())
+
+            reopened.activate("r2")
+            self.assertEqual(reopened.status().state, "active")
+            self.assertEqual(reopened.search("revenue")[0].document.id, "metric:revenue")
+
     def test_sentence_transformer_missing_dependency_is_explicitly_degraded(self) -> None:
         index = HybridSemanticRetriever(
             embedder=SentenceTransformerEmbedder(

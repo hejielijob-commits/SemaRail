@@ -941,6 +941,19 @@ class HybridSemanticRetriever:
                 0,
                 self._pointer_error or "revision_mismatch",
             )
+        if requested == active and self._pointer_error:
+            return RetrievalIndexStatus(
+                "stale",
+                self._backend_for(partition),
+                requested,
+                active,
+                built,
+                0,
+                self._pointer_error,
+                partition.degraded_reason,
+                partition.embedding_available,
+                **_partition_status_metadata(partition),
+            )
         compatible, compatibility_reason = self._partition_compatible(partition)
         if active != requested:
             return RetrievalIndexStatus(
@@ -1085,10 +1098,9 @@ class HybridSemanticRetriever:
             build_duration_ms=round((time.perf_counter() - build_started) * 1_000, 3),
             embedding_dimension=(len(next(iter(vectors.values()))) if vectors else _provider_status(self.embedder).dimension),
         )
-        self._revisions[revision] = partition
-        self._pointer_error = None
         if self.storage_path is not None:
             self._persist_partition(partition)
+        self._revisions[revision] = partition
         return self.status(revision)
 
     def activate(self, revision: str) -> RetrievalIndexStatus:
@@ -1103,6 +1115,7 @@ class HybridSemanticRetriever:
             self._write_active_pointer(selected)
         self._active_revision = selected
         self._active_partition_file = self._partition_filename(selected)
+        self._pointer_error = None
         return self.status(selected)
 
     def remove_revision(self, revision: str) -> bool:
