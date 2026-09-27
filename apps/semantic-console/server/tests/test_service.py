@@ -9,9 +9,12 @@ from unittest.mock import patch
 import yaml
 
 from server.app import create_app
-from server.project import ProjectError, ProjectStore
+from server.project import ProjectError, ProjectStore, _file_digest
 from server.runtime_rpc import RuntimeRpcGateway
 from server.service import ApiServiceError, SemanticConsoleService
+from sidecar.semantic_index import project_revision
+from sidecar.semantic_retrieval import HybridSemanticRetriever
+from sidecar.wren_adapter import _project_revision
 
 
 class FakeValidator:
@@ -69,6 +72,34 @@ class SemanticConsoleServiceTests(unittest.TestCase):
         project.mkdir()
         (project / "wren_project.yml").write_text("schema_version: 5\nname: demo\ndata_source: postgres\n", encoding="utf-8")
         return ProjectStore(project, state_dir=self.tmp_path / "state", validator=validator or FakeValidator())
+
+    def test_publisher_and_runtime_share_project_revision_algorithm(self):
+        store = self.make_project()
+        project = store.project_dir
+        source = project / "models" / "large" / "metadata.yml"
+        source.parent.mkdir(parents=True)
+        source.write_bytes(b"name: large\n# " + b"x" * (1024 * 1024 + 17))
+        target = project / "target" / "mdl.json"
+        target.parent.mkdir()
+        target.write_text('{"models": []}', encoding="utf-8")
+
+        published_revision = _file_digest(project, exclude=store.state_dir)
+        self.assertEqual(_project_revision(project), published_revision)
+        self.assertEqual(project_revision(project), published_revision)
+
+    def test_published_index_is_readable_at_runtime_revision(self):
+        with patch.dict("os.environ", {"SEMARAIL_EMBEDDING_PROVIDER": "none"}):
+            store = self.make_project()
+            published = store.publish(label="revisioned-index")
+
+        revision = published["version"]["revision"]
+        reopened = HybridSemanticRetriever(
+            embedder=None, storage_path=store.state_dir / "semantic-index"
+        )
+        self.assertEqual(_project_revision(store.project_dir), revision)
+        self.assertEqual(reopened.active_revision, revision)
+        self.assertEqual(reopened.status(revision).state, "degraded")
+        self.assertEqual(reopened.search("demo", revision=revision).status.revision, revision)
 
     def test_datasource_is_redacted_and_survives_restart(self):
         store = self.make_project()
