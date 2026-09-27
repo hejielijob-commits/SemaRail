@@ -450,8 +450,11 @@ class Dispatcher:
                 retryable=True,
             )
         try:
+            ask_v2_internal = getattr(provider, "_ask_v2_with_catalog", None)
             ask_v2 = getattr(provider, "ask_v2", None)
-            if callable(ask_v2):
+            if callable(ask_v2_internal):
+                result = ask_v2_internal(object_params)
+            elif callable(ask_v2):
                 result = ask_v2(object_params)
             elif callable(provider):
                 result = provider(object_params)

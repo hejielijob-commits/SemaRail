@@ -145,7 +145,12 @@ class SemanticService:
                 "Context API v2 is unavailable",
                 retryable=True,
             )
-        result = dict(value)
+        # MCP reaches this service without the RPC Dispatcher. Apply the same
+        # public Context v2 projection here so alternate runtimes cannot
+        # return physical table fields or private authorization metadata.
+        from .dispatch import _coerce_context_v2
+
+        result = _coerce_context_v2(value, budgets or {})
         try:
             encoded = json.dumps(result, ensure_ascii=False, allow_nan=False).encode("utf-8")
         except (TypeError, ValueError, UnicodeError) as exc:

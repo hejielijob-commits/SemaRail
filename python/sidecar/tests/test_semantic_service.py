@@ -54,6 +54,25 @@ class FakeRuntime:
 
 
 class SemanticServiceTests(unittest.TestCase):
+    def test_context_v2_service_never_returns_private_catalog_or_physical_table(self) -> None:
+        class Runtime(FakeRuntime):
+            def ask_v2(self, params: Mapping[str, Any]) -> dict[str, Any]:
+                return {
+                    "schemaVersion": 2, "projectRevision": "sha256:test",
+                    "schema": {"models": [{
+                        "name": "orders", "table": "physical_orders",
+                        "columns": [{"name": "order_id", "type": "BIGINT"}],
+                    }]},
+                    "relationships": [], "metrics": [], "rules": [],
+                    "sqlExamples": [], "views": [],
+                    "_authorizationCatalog": [{"name": "orders", "table": "physical_orders"}],
+                }
+
+        with tempfile.TemporaryDirectory() as directory:
+            result = SemanticService(directory, runtime=Runtime()).get_context_v2("orders")
+        self.assertNotIn("_authorizationCatalog", result)
+        self.assertNotIn("physical_orders", json.dumps(result))
+
     def test_pins_project_and_passes_existing_runtime_structures_through(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory).resolve()

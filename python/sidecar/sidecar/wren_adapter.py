@@ -350,6 +350,24 @@ class LazyWrenAdapter:
     def ask_v2(self, params: Mapping[str, Any]) -> dict[str, Any]:
         """Retrieve a bounded, revision-matched Context API v2 response."""
 
+        response = self._ask_v2_with_catalog(params)
+        # The full MDL source catalog is strictly an internal authorization
+        # input. Direct adapter users (including SemanticService/MCP) receive
+        # the public Context shape, never physical table identifiers.
+        policy = params.get("authorizationPolicy")
+        if isinstance(policy, Mapping):
+            from .semantic_policy import filter_semantic_result
+
+            response = filter_semantic_result(
+                "context.ask", response, policy,
+                context_catalog=response.get("_authorizationCatalog"),
+            )
+        response.pop("_authorizationCatalog", None)
+        return response
+
+    def _ask_v2_with_catalog(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Internal Dispatcher seam carrying the private authorization catalog."""
+
         if not _environment_enabled("SEMARAIL_CONTEXT_V2_ENABLED", default=True):
             raise RpcFault(
                 WREN_UNAVAILABLE,

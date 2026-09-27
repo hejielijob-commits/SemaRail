@@ -43,11 +43,21 @@ class WrenAdapterTests(unittest.TestCase):
                 },
                 "traceId": "physical-source",
             })
+            direct = adapter.ask_v2({
+                "projectDir": str(project), "question": "orders", "contextVersion": 2,
+                "authorizationPolicy": {
+                    "schemaVersion": 1, "defaultEffect": "deny",
+                    "tables": {"public.orders": {"allowedColumns": ["order_id"], "deniedColumns": []}},
+                },
+            })
         self.assertTrue(response["ok"])
         result = response["result"]
         self.assertEqual(result["schema"]["models"], [])
         self.assertGreater(result["retrievalSummary"]["filteredCount"], 0)
         self.assertNotIn("private_orders", str(result))
+        self.assertEqual(direct["schema"]["models"], [])
+        self.assertNotIn("_authorizationCatalog", direct)
+        self.assertNotIn("private_orders", str(direct))
 
     def test_context_v2_keeps_all_composite_primary_key_columns(self) -> None:
         manifest = {
@@ -138,6 +148,7 @@ class WrenAdapterTests(unittest.TestCase):
         manifest = {
             "models": [{
                 "name": "orders",
+                "tableReference": {"table": "physical_orders"},
                 "columns": [
                     {"name": "order_id", "type": "BIGINT"},
                     {"name": "ordered_at", "type": "TIMESTAMP"},
@@ -186,6 +197,8 @@ class WrenAdapterTests(unittest.TestCase):
             })
 
         self.assertEqual(result["schemaVersion"], 2)
+        self.assertNotIn("_authorizationCatalog", result)
+        self.assertNotIn("physical_orders", str(result))
         self.assertEqual(result["indexStatus"]["status"], "ready")
         self.assertEqual(result["indexStatus"]["backend"], "hybrid")
         self.assertEqual(result["indexStatus"]["embeddingModelId"], "v1")
