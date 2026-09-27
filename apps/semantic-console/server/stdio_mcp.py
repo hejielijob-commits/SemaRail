@@ -393,8 +393,31 @@ def create_stdio_mcp_server(transport: CoreTransport) -> FastMCP:
         return await transport.call("project.describe", {})
 
     @server.tool(annotations=_readonly("Get SemaRail semantic context"))
-    async def semarail_get_context(question: str) -> dict[str, Any]:
-        return await transport.call("context.ask", {"question": question})
+    async def semarail_get_context(
+        question: str,
+        context_version: int | None = None,
+        budgets: dict[str, Any] | None = None,
+        include_retrieval_trace: bool = False,
+    ) -> dict[str, Any]:
+        """Return bounded context with explicit evidence roles.
+
+        Treat v2 schema/relationships/metrics as published facts, mandatory
+        rules as constraints, other rules as guidance, and SQL examples only
+        as references to adapt and re-plan. Retrieval trace is diagnostic
+        selection evidence and must not become query or answer content.
+        """
+        params: dict[str, Any] = {"question": question}
+        if context_version is not None:
+            params["contextVersion"] = context_version
+        if budgets is not None:
+            params["budgets"] = budgets
+        result = await transport.call("context.ask", params)
+        if include_retrieval_trace:
+            return result
+        agent_context = dict(result)
+        agent_context.pop("retrievalTrace", None)
+        agent_context.pop("retrievalSummary", None)
+        return agent_context
 
     @server.tool(annotations=_readonly("Plan a SemaRail semantic query"))
     async def semarail_plan_query(semantic_sql: str) -> dict[str, Any]:

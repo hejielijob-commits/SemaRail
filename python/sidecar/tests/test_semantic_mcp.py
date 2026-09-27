@@ -30,6 +30,18 @@ class FakeSemanticService:
         self.calls.append(("context", question))
         return {"schemaVersion": 1, "models": [{"name": "orders"}]}
 
+    def get_context_v2(
+        self, question: str, budgets: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        del budgets
+        self.calls.append(("context-v2", question))
+        return {
+            "schemaVersion": 2,
+            "schema": {"models": []},
+            "retrievalSummary": {"candidateCount": 1, "filteredCount": 0, "selectedCount": 1, "latencyMs": 1.0},
+            "retrievalTrace": [{"documentId": "model:orders"}],
+        }
+
     def plan_query(self, semantic_sql: str) -> dict[str, Any]:
         self.calls.append(("plan", semantic_sql))
         return {
@@ -123,6 +135,37 @@ class SemanticMcpTests(unittest.TestCase):
         self.assertNotIn(secret, message)
         self.assertNotIn("secret business question", message)
         self.assertNotIn("C:/private/project", message)
+
+    def test_context_v2_hides_retrieval_trace_from_agent_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            server = create_semantic_mcp_server(
+                project=directory,
+                semantic_service=FakeSemanticService(),
+            )
+            _content, default_context = asyncio.run(
+                server.call_tool(
+                    "semarail_get_context",
+                    {"question": "Orders?", "context_version": 2},
+                )
+            )
+            _content, diagnostic_context = asyncio.run(
+                server.call_tool(
+                    "semarail_get_context",
+                    {
+                        "question": "Orders?",
+                        "context_version": 2,
+                        "include_retrieval_trace": True,
+                    },
+                )
+            )
+
+        self.assertNotIn("retrievalTrace", default_context)
+        self.assertNotIn("retrievalSummary", default_context)
+        self.assertEqual(
+            diagnostic_context["retrievalTrace"],
+            [{"documentId": "model:orders"}],
+        )
+        self.assertEqual(diagnostic_context["retrievalSummary"]["candidateCount"], 1)
 
     def test_rpc_fault_is_a_stable_redacted_tool_error(self) -> None:
         class DeniedService(FakeSemanticService):

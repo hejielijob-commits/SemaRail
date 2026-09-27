@@ -9,7 +9,7 @@ from unittest.mock import patch
 import yaml
 
 from server.app import create_app
-from server.project import ProjectStore
+from server.project import ProjectError, ProjectStore
 from server.runtime_rpc import RuntimeRpcGateway
 from server.service import ApiServiceError, SemanticConsoleService
 
@@ -125,6 +125,168 @@ class SemanticConsoleServiceTests(unittest.TestCase):
         versions = service.versions()
         service.rollback(versions[-1]["id"])
         self.assertIn("orders", (self.tmp_path / "project/models/orders/metadata.yml").read_text(encoding="utf-8"))
+
+    def test_publish_stages_index_before_source_swap_and_activates_revision(self):
+        events: list[tuple[str, str]] = []
+
+        class Lifecycle:
+            def stage(self, manifest, project_dir, revision):
+                self.assert_stage = (project_dir / "wren_project.yml").is_file()
+                events.append(("stage", revision))
+
+            def activate(self, revision):
+                events.append(("activate", revision))
+
+        project = self.tmp_path / "indexed-project"
+        project.mkdir()
+        (project / "wren_project.yml").write_text(
+            "schema_version: 5\nname: demo\ndata_source: postgres\n", encoding="utf-8"
+        )
+        lifecycle = Lifecycle()
+        store = ProjectStore(
+            project,
+            state_dir=self.tmp_path / "indexed-state",
+            validator=FakeValidator(),
+            semantic_index_lifecycle=lifecycle,
+        )
+        published = store.publish(label="indexed")
+        self.assertTrue(lifecycle.assert_stage)
+        self.assertEqual([name for name, _ in events], ["stage", "activate"])
+        self.assertEqual(events[0][1], published["version"]["revision"])
+        self.assertEqual(events[1][1], published["version"]["revision"])
+
+    def test_rollback_rebuilds_and_activates_the_snapshot_index_revision(self):
+        events: list[tuple[str, str]] = []
+
+        class Lifecycle:
+            def stage(self, _manifest, _project_dir, revision):
+                events.append(("stage", revision))
+
+            def activate(self, revision):
+                events.append(("activate", revision))
+
+        project = self.tmp_path / "rollback-index-project"
+        project.mkdir()
+        (project / "wren_project.yml").write_text(
+            "schema_version: 5\nname: first\ndata_source: postgres\n",
+            encoding="utf-8",
+        )
+        store = ProjectStore(
+            project,
+            state_dir=self.tmp_path / "rollback-index-state",
+            validator=FakeValidator(),
+            semantic_index_lifecycle=Lifecycle(),
+        )
+        first = store.publish(label="first")
+        store.put_file(
+            "wren_project.yml",
+            "schema_version: 5\nname: second\ndata_source: postgres\n",
+        )
+        store.publish(label="second")
+        events.clear()
+
+        rolled_back = store.rollback(first["version"]["id"])
+
+        self.assertEqual(
+            events,
+            [
+                ("stage", first["version"]["revision"]),
+                ("activate", first["version"]["revision"]),
+            ],
+        )
+        self.assertEqual(
+            rolled_back["version"]["revision"],
+            first["version"]["revision"],
+        )
+
+    def test_index_activation_failure_restores_source_and_keeps_draft(self):
+        class Lifecycle:
+            def stage(self, _manifest, _project_dir, _revision):
+                return None
+
+            def activate(self, _revision):
+                raise RuntimeError("simulated atomic pointer failure")
+
+        project = self.tmp_path / "failed-index-project"
+        project.mkdir()
+        original = "schema_version: 5\nname: before\ndata_source: postgres\n"
+        changed = "schema_version: 5\nname: after\ndata_source: postgres\n"
+        (project / "wren_project.yml").write_text(original, encoding="utf-8")
+        store = ProjectStore(
+            project,
+            state_dir=self.tmp_path / "failed-index-state",
+            validator=FakeValidator(),
+            semantic_index_lifecycle=Lifecycle(),
+        )
+        store.put_file("wren_project.yml", changed)
+
+        with self.assertRaisesRegex(ProjectError, "project could not be published") as caught:
+            store.publish(label="must-fail")
+
+        self.assertEqual(caught.exception.code, "PUBLISH_FAILED")
+        self.assertEqual((project / "wren_project.yml").read_text(encoding="utf-8"), original)
+        self.assertEqual(store.read_file("wren_project.yml")["content"], changed)
+        self.assertEqual(store.versions(), [])
+
+    def test_admin_can_view_and_rebuild_published_semantic_index(self):
+        events: list[tuple[str, str, str]] = []
+
+        class Lifecycle:
+            active: str | None = None
+
+            def stage(self, _manifest, project_dir, revision):
+                name = yaml.safe_load((project_dir / "wren_project.yml").read_text(encoding="utf-8"))["name"]
+                events.append(("stage", revision, name))
+
+            def activate(self, revision):
+                self.active = revision
+                events.append(("activate", revision, ""))
+
+            def status(self, revision=None):
+                return {
+                    "status": "ready" if self.active == revision else "stale",
+                    "activeRevision": self.active,
+                    "indexedRevision": revision,
+                    "documentCount": 7,
+                    "backend": "hybrid",
+                    "embeddingModelId": "multilingual-test",
+                    "embeddingModelVersion": "v1",
+                    "embeddingDimension": 384,
+                    "indexBuildVersion": 1,
+                    "lastBuildAt": "2026-09-18T00:00:00Z",
+                    "buildDurationMs": 12.5,
+                    "storagePath": "must-not-leak",
+                }
+
+        project = self.tmp_path / "rebuild-index-project"
+        project.mkdir()
+        (project / "wren_project.yml").write_text(
+            "schema_version: 5\nname: published\ndata_source: postgres\n", encoding="utf-8"
+        )
+        lifecycle = Lifecycle()
+        store = ProjectStore(
+            project,
+            state_dir=self.tmp_path / "rebuild-index-state",
+            validator=FakeValidator(),
+            semantic_index_lifecycle=lifecycle,
+        )
+        store.put_file(
+            "wren_project.yml",
+            "schema_version: 5\nname: draft\ndata_source: postgres\n",
+        )
+        service = SemanticConsoleService(store)
+
+        status_code, rebuilt = service.dispatch(
+            "POST", "/api/project/semantic-index/rebuild"
+        )
+        read_code, status = service.dispatch("GET", "/api/project/semantic-index")
+
+        self.assertEqual((status_code, read_code), (200, 200))
+        self.assertEqual(events[0][2], "published")
+        self.assertEqual(rebuilt["embeddingDimension"], 384)
+        self.assertEqual(status["documentCount"], 7)
+        self.assertNotIn("storagePath", status)
+        self.assertEqual(store.read_file("wren_project.yml")["content"].splitlines()[1], "name: draft")
 
     def test_secret_content_and_traversal_are_rejected(self):
         service = SemanticConsoleService(self.make_project())

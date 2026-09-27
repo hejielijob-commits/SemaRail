@@ -106,6 +106,64 @@ class SemanticService:
             },
         )
 
+    def get_context_v2(
+        self,
+        question: str,
+        budgets: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Return the partitioned Context API v2 through an adapter seam.
+
+        The semantic index implementation may expose ``ask_v2`` on the
+        runtime.  Until then this method intentionally fails closed instead
+        of pretending that a v1 full-manifest response is a v2 retrieval.
+        """
+
+        question = _required_text(question, "question", MAX_QUESTION_CHARS)
+        params: dict[str, Any] = {
+            **self._project_params(),
+            "question": question,
+            "contextVersion": 2,
+        }
+        if budgets is not None:
+            params["budgets"] = budgets
+        ask_v2 = getattr(self.runtime, "ask_v2", None)
+        try:
+            value = ask_v2(params) if callable(ask_v2) else self.runtime.ask(params)
+        except RpcFault:
+            raise
+        except Exception as exc:
+            raise RpcFault(
+                INTERNAL_ERROR,
+                "context.ask",
+                "semantic service returned an invalid result",
+                retryable=False,
+            ) from exc
+        if not isinstance(value, Mapping) or value.get("schemaVersion") != 2:
+            raise RpcFault(
+                INTERNAL_ERROR,
+                "context.ask",
+                "Context API v2 is unavailable",
+                retryable=True,
+            )
+        result = dict(value)
+        try:
+            encoded = json.dumps(result, ensure_ascii=False, allow_nan=False).encode("utf-8")
+        except (TypeError, ValueError, UnicodeError) as exc:
+            raise RpcFault(
+                INTERNAL_ERROR,
+                "context.ask",
+                "semantic service returned an invalid result",
+                retryable=False,
+            ) from exc
+        if len(encoded) > MAX_SEMANTIC_RESULT_BYTES:
+            raise RpcFault(
+                INTERNAL_ERROR,
+                "context.ask",
+                "semantic service returned an oversized result",
+                retryable=False,
+            )
+        return result
+
     def plan_query(self, semantic_sql: str) -> dict[str, Any]:
         """Dry-plan one read-only semantic query without database access."""
 

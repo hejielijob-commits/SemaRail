@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import math
 from collections.abc import Callable, Mapping
@@ -43,6 +44,25 @@ RPC_METHODS = frozenset(
 _REQUEST_FIELDS = frozenset(
     {"protocolVersion", "id", "method", "params", "deadlineMs", "traceId"}
 )
+
+# Context API v2 is deliberately an opt-in request shape.  The legacy
+# ``context.ask`` shape remains exactly ``projectDir`` + ``question`` so old
+# clients and replay fixtures keep receiving the v1 context unchanged.
+_CONTEXT_V2_VERSION = 2
+_CONTEXT_V2_SECTIONS = ("schema", "relationships", "metrics", "rules", "sqlExamples", "views")
+_CONTEXT_V2_DEFAULT_BUDGETS: dict[str, Any] = {
+    "topK": {
+        "schema": 15,
+        "relationships": 8,
+        "metrics": 8,
+        "rules": 8,
+        "sqlExamples": 3,
+        "views": 3,
+    },
+    "maxBytes": 65_536,
+    "maxTokens": 16_384,
+    "maxRelationshipDepth": 2,
+}
 
 
 class ProjectValidator(Protocol):
@@ -377,6 +397,8 @@ class Dispatcher:
             ) from exc
 
     def _context_ask(self, params: Any) -> Any:
+        if isinstance(params, Mapping) and "contextVersion" in params:
+            return self._context_ask_v2(params)
         object_params, authorization_policy = _semantic_params(
             params,
             method="context.ask",
@@ -402,6 +424,54 @@ class Dispatcher:
             raise
         except Exception as exc:
             self.logger.error("semantic context lookup failed")
+            raise RpcFault(
+                SEMANTIC_ERROR,
+                "context.ask",
+                "semantic context lookup failed",
+                retryable=False,
+            ) from exc
+
+    def _context_ask_v2(self, params: Any) -> Any:
+        """Dispatch the opt-in partitioned Context API v2.
+
+        Adapters may implement ``ask_v2`` as a native retrieval seam.  Until
+        that is available, a v1-shaped adapter result is converted into the
+        bounded v2 partitions here; this keeps transport and authorization
+        behavior stable while the index implementation evolves independently.
+        """
+
+        object_params, authorization_policy, budgets = _semantic_v2_params(params)
+        provider = self.dependencies.context_provider
+        if provider is None:
+            raise RpcFault(
+                WREN_UNAVAILABLE,
+                "context.ask",
+                "SemaRail context provider is unavailable",
+                retryable=True,
+            )
+        try:
+            ask_v2 = getattr(provider, "ask_v2", None)
+            if callable(ask_v2):
+                result = ask_v2(object_params)
+            elif callable(provider):
+                result = provider(object_params)
+            else:
+                result = provider.ask(object_params)
+            # Oversample/normalize first, then apply the structural policy
+            # projection, and only then spend the caller's context budget.
+            # This prevents denied records from consuming the visible quota.
+            partitioned = _coerce_context_v2(result, budgets, apply_budget=False)
+            catalog = result.get("_authorizationCatalog") if isinstance(result, Mapping) else None
+            filtered = (
+                filter_semantic_result("context.ask", partitioned, authorization_policy, context_catalog=catalog)
+                if authorization_policy is not None
+                else partitioned
+            )
+            return _apply_context_v2_budgets(filtered) if isinstance(filtered, dict) else filtered
+        except RpcFault:
+            raise
+        except Exception as exc:
+            self.logger.error("semantic context v2 lookup failed")
             raise RpcFault(
                 SEMANTIC_ERROR,
                 "context.ask",
@@ -574,6 +644,356 @@ def _semantic_params(
     if policy is not None and not isinstance(policy, Mapping):
         raise RpcFault(INVALID_PARAMS, "validation", "authorizationPolicy is invalid")
     return ({key: params[key] for key in fields}, cast(Mapping[str, Any] | None, policy))
+
+
+def _semantic_v2_params(
+    params: Any,
+) -> tuple[Mapping[str, Any], Mapping[str, Any] | None, dict[str, Any]]:
+    """Validate the versioned v2 context call and return adapter-safe params."""
+
+    allowed = {"projectDir", "question", "contextVersion", "budgets", "authorizationPolicy"}
+    if not isinstance(params, Mapping) or set(params) - allowed:
+        raise RpcFault(INVALID_PARAMS, "validation", "context.ask v2 params are invalid")
+    if set(params) & {"projectDir", "question", "contextVersion"} != {"projectDir", "question", "contextVersion"}:
+        raise RpcFault(INVALID_PARAMS, "validation", "context.ask v2 params are invalid")
+    version = params.get("contextVersion")
+    if type(version) is not int or version != _CONTEXT_V2_VERSION:
+        raise RpcFault(UNSUPPORTED_PROTOCOL, "validation", "contextVersion is unsupported")
+    _required_string(params, "projectDir", maximum=32_768)
+    _required_string(params, "question", maximum=16_000)
+    budgets = _validate_context_v2_budgets(params.get("budgets"))
+    policy = params.get("authorizationPolicy")
+    if policy is not None and not isinstance(policy, Mapping):
+        raise RpcFault(INVALID_PARAMS, "validation", "authorizationPolicy is invalid")
+    adapter_params: dict[str, Any] = {
+        "projectDir": params["projectDir"],
+        "question": params["question"],
+        "contextVersion": _CONTEXT_V2_VERSION,
+    }
+    # The in-process retrieval backend needs the compiled, secret-free policy
+    # to exclude denied documents before exact/lexical/vector scoring.  The
+    # response is still projected again below as a defence-in-depth boundary.
+    if policy is not None:
+        adapter_params["authorizationPolicy"] = policy
+    if "budgets" in params:
+        adapter_params["budgets"] = budgets
+    return adapter_params, cast(Mapping[str, Any] | None, policy), budgets
+
+
+def _validate_context_v2_budgets(value: Any) -> dict[str, Any]:
+    """Validate bounded v2 budgets and merge deterministic defaults."""
+
+    defaults = {
+        "topK": dict(_CONTEXT_V2_DEFAULT_BUDGETS["topK"]),
+        "maxBytes": _CONTEXT_V2_DEFAULT_BUDGETS["maxBytes"],
+        "maxTokens": _CONTEXT_V2_DEFAULT_BUDGETS["maxTokens"],
+        "maxRelationshipDepth": _CONTEXT_V2_DEFAULT_BUDGETS["maxRelationshipDepth"],
+    }
+    if value is None:
+        return defaults
+    if not isinstance(value, Mapping):
+        raise RpcFault(INVALID_PARAMS, "validation", "budgets must be an object")
+    allowed = {"topK", "maxBytes", "maxTokens", "maxRelationshipDepth"}
+    if set(value) - allowed:
+        raise RpcFault(INVALID_PARAMS, "validation", "budgets contains unknown fields")
+    raw_top_k = value.get("topK")
+    if raw_top_k is not None:
+        if not isinstance(raw_top_k, Mapping) or set(raw_top_k) - set(_CONTEXT_V2_SECTIONS):
+            raise RpcFault(INVALID_PARAMS, "validation", "budgets.topK is invalid")
+        for section, raw_limit in raw_top_k.items():
+            if type(raw_limit) is not int or raw_limit < 0 or raw_limit > 1_000:
+                raise RpcFault(INVALID_PARAMS, "validation", "budgets.topK is invalid")
+            defaults["topK"][section] = raw_limit
+    for field, maximum in (("maxBytes", 4 * 1024 * 1024), ("maxTokens", 256_000), ("maxRelationshipDepth", 8)):
+        raw = value.get(field)
+        if raw is not None:
+            if type(raw) is not int or raw < 1 or raw > maximum:
+                raise RpcFault(INVALID_PARAMS, "validation", f"budgets.{field} is invalid")
+            defaults[field] = raw
+    return defaults
+
+
+def _coerce_context_v2(
+    result: Any,
+    budgets: Mapping[str, Any],
+    *,
+    apply_budget: bool = True,
+) -> dict[str, Any]:
+    """Normalize a native v2 or legacy adapter result into the v2 wire shape."""
+
+    if not isinstance(result, Mapping):
+        raise RpcFault(SEMANTIC_ERROR, "context.ask", "semantic context lookup failed")
+    source_version = result.get("schemaVersion")
+    if source_version not in {1, _CONTEXT_V2_VERSION}:
+        raise RpcFault(UNSUPPORTED_PROTOCOL, "context.ask", "semantic context schemaVersion is unsupported")
+    revision = result.get("projectRevision")
+    if not isinstance(revision, str) or not revision:
+        raise RpcFault(SEMANTIC_ERROR, "context.ask", "semantic context lookup failed")
+
+    raw_schema = result.get("schema")
+    if isinstance(raw_schema, Mapping):
+        raw_models = raw_schema.get("models", [])
+    else:
+        raw_models = result.get("models", [])
+    if not isinstance(raw_models, list):
+        raw_models = []
+
+    rules = _context_v2_rules(result, revision)
+    sql_examples = _context_v2_sql_examples(result)
+    raw_index_status = result.get("indexStatus")
+    index_status = _safe_context_v2_index_status(raw_index_status, revision)
+    trace = _safe_context_v2_trace(result.get("retrievalTrace"), revision)
+    normalized_budgets = _validate_context_v2_budgets(budgets)
+    output: dict[str, Any] = {
+        "schemaVersion": _CONTEXT_V2_VERSION,
+        "projectRevision": revision,
+        "schema": {"models": _context_v2_models(raw_models)},
+        "relationships": _context_v2_records(result.get("relationships"), ("name", "models", "joinType", "condition", "description")),
+        "metrics": _context_v2_metrics(result.get("metrics")),
+        "rules": rules,
+        "sqlExamples": sql_examples,
+        "views": _context_v2_records(result.get("views"), ("name", "statement", "description", "referencedModels", "referencedColumns")),
+        "budgets": normalized_budgets,
+        "indexStatus": index_status,
+        "retrievalSummary": _safe_context_v2_summary(result.get("retrievalSummary")),
+        "retrievalTrace": trace,
+    }
+    return _apply_context_v2_budgets(output) if apply_budget else output
+
+
+def _context_v2_records(value: Any, allowed: tuple[str, ...]) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [
+        {key: item[key] for key in allowed if key in item}
+        for item in value
+        if isinstance(item, Mapping)
+    ]
+
+
+def _context_v2_metrics(value: Any) -> list[dict[str, Any]]:
+    records = _context_v2_records(
+        value,
+        (
+            "name", "kind", "expression", "type", "model", "cube", "baseObject",
+            "description", "properties", "referencedModels", "referencedColumns",
+        ),
+    )
+    # Normalize legacy metric providers into the v2 discriminated shape.
+    for record in records:
+        record.setdefault("kind", "measure")
+    return records
+
+
+def _context_v2_models(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    models: list[dict[str, Any]] = []
+    # Context v2 is a semantic projection. Physical table names never cross
+    # this boundary, even if a legacy/native provider includes one.
+    model_keys = ("name", "description", "columns", "primaryKey", "properties")
+    column_keys = ("name", "type", "description", "isCalculated", "notNull", "isPrimaryKey", "semanticRole", "expression", "properties")
+    for item in value:
+        if not isinstance(item, Mapping):
+            continue
+        model = {key: item[key] for key in model_keys if key in item}
+        columns = item.get("columns")
+        if isinstance(columns, list):
+            model["columns"] = [
+                {key: column[key] for key in column_keys if key in column}
+                for column in columns
+                if isinstance(column, Mapping)
+            ]
+        models.append(model)
+    return models
+
+
+def _context_v2_rules(result: Mapping[str, Any], revision: str) -> list[dict[str, Any]]:
+    raw = result.get("rules")
+    if isinstance(raw, list):
+        allowed = (
+            "id", "text", "referencedModels", "referencedColumns", "sourcePath",
+            "ruleType", "priority", "mandatory", "effectiveFrom", "allowedRoles",
+        )
+        return [{key: item[key] for key in allowed if key in item} for item in raw if isinstance(item, Mapping)]
+    # Legacy Wren returns unstructured knowledge strings. They are retained for
+    # unrestricted callers, but the restricted projection will drop them
+    # because there are no explicit model/column bindings to prove safety.
+    knowledge = result.get("knowledge")
+    if not isinstance(knowledge, list):
+        return []
+    rules: list[dict[str, Any]] = []
+    for index, item in enumerate(knowledge):
+        if not isinstance(item, str) or not item.strip():
+            continue
+        identity = hashlib.sha256(f"{revision}:rule:{index}:{item}".encode("utf-8")).hexdigest()[:24]
+        rules.append({
+            "id": f"rule:{identity}",
+            "text": item,
+            "referencedModels": [],
+            "referencedColumns": [],
+        })
+    return rules
+
+
+def _context_v2_sql_examples(result: Mapping[str, Any]) -> list[dict[str, Any]]:
+    raw = result.get("sqlExamples")
+    if isinstance(raw, list):
+        return [dict(item) for item in raw if isinstance(item, Mapping)]
+    history = result.get("sqlHistory")
+    if not isinstance(history, list):
+        return []
+    examples: list[dict[str, Any]] = []
+    for item in history:
+        if not isinstance(item, Mapping):
+            continue
+        example = {
+            key: item[key]
+            for key in (
+                "id", "question", "sql", "sourcePath", "language", "tags",
+                "reviewed", "dataSource", "roles", "version",
+                "referencedModels", "referencedColumns",
+            )
+            if key in item
+        }
+        example.setdefault("referencedModels", [])
+        example.setdefault("referencedColumns", [])
+        if all(isinstance(example.get(key), str) and example[key] for key in ("id", "question", "sql")):
+            examples.append(example)
+    return examples
+
+
+def _safe_context_v2_index_status(value: Any, revision: str) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        return {"status": "unavailable", "backend": "none", "staleReason": "backendUnavailable"}
+    status = value.get("status", value.get("indexStatus"))
+    status = {"active": "ready", "staged": "building"}.get(status, status)
+    if status not in {"ready", "missing", "stale", "building", "unavailable", "degraded"}:
+        status = "unavailable"
+    result: dict[str, Any] = {"status": status}
+    for key in ("activeRevision", "indexedRevision"):
+        raw = value.get(key)
+        if isinstance(raw, str) and 1 <= len(raw) <= 256:
+            result[key] = raw
+    document_count = value.get("documentCount")
+    if type(document_count) is int and 0 <= document_count <= 10_000_000:
+        result["documentCount"] = document_count
+    for key in ("embeddingModelId", "embeddingModelVersion", "lastBuildAt"):
+        raw = value.get(key)
+        if isinstance(raw, str) and 1 <= len(raw) <= (64 if key == "lastBuildAt" else 256):
+            result[key] = raw
+    for key in ("embeddingDimension", "indexBuildVersion"):
+        raw = value.get(key)
+        if type(raw) is int and 0 <= raw <= 1_000_000:
+            result[key] = raw
+    duration = value.get("buildDurationMs")
+    if isinstance(duration, (int, float)) and not isinstance(duration, bool) and math.isfinite(duration) and 0 <= duration <= 86_400_000:
+        result["buildDurationMs"] = float(duration)
+    backend = value.get("backend")
+    if backend in {"vector", "lexical", "hybrid", "none"}:
+        result["backend"] = backend
+    stale_reason = value.get("staleReason")
+    stale_reason = {
+        "revision_mismatch": "revisionMismatch",
+        "revision_not_active": "unknown",
+        "revision_not_built": "missing",
+        "no_revision": "missing",
+        "embedding_config_mismatch": "backendUnavailable",
+        "embedding_dimension_mismatch": "backendUnavailable",
+        "corrupt_active_pointer": "buildFailed",
+        "corrupt_partition": "buildFailed",
+        "active_partition_missing": "buildFailed",
+        "active_pointer_invalid": "buildFailed",
+    }.get(stale_reason, stale_reason)
+    if isinstance(stale_reason, str) and stale_reason.startswith("active_pointer_unreadable:"):
+        stale_reason = "buildFailed"
+    if stale_reason in {"missing", "revisionMismatch", "backendUnavailable", "buildFailed", "unknown"}:
+        result["staleReason"] = stale_reason
+    result.setdefault("backend", "none")
+    if status == "stale":
+        result.setdefault("staleReason", "revisionMismatch" if result.get("indexedRevision") not in {None, revision} else "unknown")
+    return result
+
+
+def _safe_context_v2_trace(value: Any, revision: str) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    safe: list[dict[str, Any]] = []
+    allowed_sources = set(_CONTEXT_V2_SECTIONS)
+    allowed_types = {"exact", "lexical", "vector", "graph", "ruleBinding", "fallback"}
+    allowed_reasons = {"exactMatch", "lexicalMatch", "vectorMatch", "graphExpansion", "ruleBinding", "fallback", "permissionFiltered", "budgetLimited"}
+    for item in value[:2_000]:
+        if not isinstance(item, Mapping) or item.get("source") not in allowed_sources or item.get("retrievalType") not in allowed_types:
+            continue
+        trace: dict[str, Any] = {
+            "source": item["source"],
+            "retrievalType": item["retrievalType"],
+            "reasonCode": item.get("reasonCode") if item.get("reasonCode") in allowed_reasons else "fallback",
+            "projectRevision": revision,
+            "authorizationFiltered": bool(item.get("authorizationFiltered", False)),
+        }
+        document_id = item.get("documentId")
+        if isinstance(document_id, str) and 1 <= len(document_id) <= 512:
+            trace["documentId"] = document_id
+        relevance = item.get("relevance")
+        if isinstance(relevance, (int, float)) and not isinstance(relevance, bool) and 0 <= relevance <= 1:
+            trace["relevance"] = float(relevance)
+        if isinstance(item.get("selected"), bool):
+            trace["selected"] = item["selected"]
+        safe.append(trace)
+    return safe
+
+
+def _safe_context_v2_summary(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        return {"candidateCount": 0, "filteredCount": 0, "selectedCount": 0, "latencyMs": 0.0}
+    summary: dict[str, Any] = {}
+    for key in ("candidateCount", "filteredCount", "selectedCount"):
+        raw = value.get(key)
+        summary[key] = raw if type(raw) is int and 0 <= raw <= 10_000_000 else 0
+    latency = value.get("latencyMs")
+    summary["latencyMs"] = (
+        float(latency)
+        if isinstance(latency, (int, float)) and not isinstance(latency, bool)
+        and math.isfinite(latency) and 0 <= latency <= 86_400_000
+        else 0.0
+    )
+    fallback = value.get("fallbackReason")
+    if fallback in {"embeddingUnavailable", "vectorSearchFailed", "indexDegraded"}:
+        summary["fallbackReason"] = fallback
+    return summary
+
+
+def _apply_context_v2_budgets(value: dict[str, Any]) -> dict[str, Any]:
+    """Apply per-section and aggregate budgets with stable tail truncation."""
+
+    budgets = value["budgets"]
+    top_k = budgets["topK"]
+    schema = value["schema"]
+    if isinstance(schema, Mapping) and isinstance(schema.get("models"), list):
+        schema["models"] = schema["models"][: top_k["schema"]]
+    for section in ("relationships", "metrics", "rules", "sqlExamples", "views"):
+        items = value.get(section)
+        if isinstance(items, list):
+            value[section] = items[: top_k[section]]
+
+    def encoded_size() -> tuple[int, int]:
+        encoded = json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        return len(encoded), max(1, (len(encoded) + 3) // 4)
+
+    max_bytes, max_tokens = budgets["maxBytes"], budgets["maxTokens"]
+    # Drop optional results in a deterministic order until both aggregate caps
+    # hold. The schema itself is retained as long as possible.
+    for section in ("sqlExamples", "rules", "metrics", "relationships", "views"):
+        while True:
+            size, tokens = encoded_size()
+            items = value.get(section)
+            if size <= max_bytes and tokens <= max_tokens:
+                return value
+            if not isinstance(items, list) or not items:
+                break
+            items.pop()
+    return value
 
 
 def _filter_semantic_response(method: str, result: Any, policy: Mapping[str, Any] | None) -> Any:

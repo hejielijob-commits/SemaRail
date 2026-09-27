@@ -95,6 +95,98 @@ class DiagnosticStoreTests(unittest.TestCase):
         self.assertEqual(item["error"]["message"], "database rejected [REDACTED]")
         self.assertEqual(item["error"]["nested"]["dsn"], "[REDACTED]")
 
+    def test_query_and_feedback_link_to_the_latest_owned_context_retrieval(self) -> None:
+        self.diagnostics.record_execution(
+            auth=self.auth,
+            project_id="hr-project",
+            trace_id="trace-context",
+            query_id=None,
+            datasource_id="hr-datasource",
+            transport="core-http",
+            method="context.ask",
+            status="success",
+            stage="complete",
+            question="show current headcount",
+        )
+        self.diagnostics.record_execution(
+            auth=self.auth,
+            project_id="hr-project",
+            trace_id="trace-query",
+            query_id="query-linked",
+            datasource_id="hr-datasource",
+            transport="core-http",
+            method="query.run",
+            status="failure",
+            stage="execution",
+            question="show current headcount",
+            error={"message": "query failed"},
+        )
+
+        diagnostics = self.diagnostics.list_diagnostics(
+            organization_id=self.auth.subject.organization_id,
+            project_id="hr-project",
+        )["items"]
+        query = next(item for item in diagnostics if item["traceId"] == "trace-query")
+        self.assertEqual(query["retrievalTraceId"], "trace-context")
+        feedback = self.diagnostics.list_feedback(
+            organization_id=self.auth.subject.organization_id,
+            project_id="hr-project",
+        )["items"][0]
+        self.assertEqual(feedback["retrievalTraceId"], "trace-context")
+
+    def test_admin_retrieval_explanation_is_bounded_and_project_scoped(self) -> None:
+        explanation = {
+            "schemaVersion": 1,
+            "selectedCount": 0,
+            "anomalies": ["ZERO_RECALL"],
+            "retrievalTrace": [],
+        }
+        self.diagnostics.record_execution(
+            auth=self.auth,
+            project_id="hr-project",
+            trace_id="trace-retrieval-explanation",
+            query_id=None,
+            datasource_id="hr-datasource",
+            transport="core-http",
+            method="context.ask",
+            status="success",
+            stage="complete",
+            semantic_version="semantic-v3",
+            retrieval_explanation=explanation,
+        )
+
+        result = self.diagnostics.retrieval_explanation(
+            "trace-retrieval-explanation",
+            organization_id=self.auth.subject.organization_id,
+            project_id="hr-project",
+        )
+
+        self.assertEqual(result["explanation"]["anomalies"], ["ZERO_RECALL"])
+        self.assertEqual(result["explanation"]["retrievalTrace"], [])
+        self.assertEqual(result["explanation"]["selectedCount"], 0)
+        with self.assertRaises(DiagnosticError) as missing:
+            self.diagnostics.retrieval_explanation(
+                "trace-retrieval-explanation",
+                organization_id=self.auth.subject.organization_id,
+                project_id="other-project",
+            )
+        self.assertEqual(missing.exception.code, "RETRIEVAL_TRACE_NOT_FOUND")
+
+        with self.assertRaises(DiagnosticError) as unsafe:
+            self.diagnostics.record_execution(
+                auth=self.auth,
+                project_id="hr-project",
+                trace_id="trace-unsafe-explanation",
+                query_id=None,
+                datasource_id="hr-datasource",
+                transport="core-http",
+                method="context.ask",
+                status="success",
+                stage="complete",
+                retrieval_explanation={"schemaVersion": 1, "question": "secret"},
+            )
+        self.assertEqual(unsafe.exception.code, "INVALID_DIAGNOSTIC")
+
     def test_feedback_time_filter_is_server_side_and_validated(self) -> None:
         self._record(trace_id="trace-before")
         boundary = self.now + timedelta(hours=1)
@@ -302,7 +394,10 @@ class DiagnosticStoreTests(unittest.TestCase):
                 "SELECT version FROM diagnostic_schema_migrations ORDER BY version"
             ).fetchall()]
         self.assertIn("original_query_id", columns)
-        self.assertEqual(versions, [1, 2, 3, 4])
+        self.assertIn("question_hash", columns)
+        self.assertIn("retrieval_trace_id", columns)
+        self.assertIn("retrieval_explanation_json", columns)
+        self.assertEqual(versions, [1, 2, 3, 4, 5, 6])
 
     def test_cleanup_removes_content_but_preserves_metadata(self) -> None:
         self._record()

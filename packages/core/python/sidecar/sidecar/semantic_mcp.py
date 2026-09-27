@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
-from .errors import INTERNAL_ERROR, RpcError, RpcFault
+from .errors import INTERNAL_ERROR, INVALID_PARAMS, RpcError, RpcFault
 from .semantic_service import SemanticService
 
 
@@ -31,6 +31,8 @@ class SemanticMcpService(Protocol):
     def list_models(self) -> dict[str, Any]: ...
 
     def get_context(self, question: str) -> dict[str, Any]: ...
+
+    def get_context_v2(self, question: str, budgets: dict[str, Any] | None = None) -> dict[str, Any]: ...
 
     def plan_query(self, semantic_sql: str) -> dict[str, Any]: ...
 
@@ -128,14 +130,45 @@ def create_semantic_mcp_server(
         )
 
     @server.tool(annotations=_annotations("Get SemaRail semantic context"))
-    async def semarail_get_context(question: str) -> dict[str, Any]:
-        """Return bounded semantic context for the exact user question."""
+    async def semarail_get_context(
+        question: str,
+        context_version: int | None = None,
+        budgets: dict[str, Any] | None = None,
+        include_retrieval_trace: bool = False,
+    ) -> dict[str, Any]:
+        """Return bounded semantic context for the exact user question.
 
-        return await _invoke(
-            lambda: service.get_context(question),
+        For Context v2, schema, relationships, and metrics are authoritative
+        published facts. Mandatory rules are constraints; other rules are
+        business guidance. SQL examples are reviewed references to adapt and
+        re-plan, never instructions to execute verbatim. Retrieval relevance
+        is selection evidence, not semantic truth, and retrievalTrace is
+        diagnostic metadata that must not enter a query or answer.
+        """
+        if context_version is None or context_version == 1:
+            if budgets is not None:
+                raise _tool_error(RpcError(INVALID_PARAMS, "validation", "budgets requires context version 2", False))
+            return await _invoke(
+                lambda: service.get_context(question),
+                phase="context.ask",
+                logger=logger,
+            )
+        if context_version != 2:
+            raise _tool_error(RpcError(INVALID_PARAMS, "validation", "context version is unsupported", False))
+        get_context_v2 = getattr(service, "get_context_v2", None)
+        if not callable(get_context_v2):
+            raise _tool_error(RpcError(INTERNAL_ERROR, "context.ask", "Context API v2 is unavailable", True))
+        result = await _invoke(
+            lambda: get_context_v2(question, budgets),
             phase="context.ask",
             logger=logger,
         )
+        if include_retrieval_trace:
+            return result
+        agent_context = dict(result)
+        agent_context.pop("retrievalTrace", None)
+        agent_context.pop("retrievalSummary", None)
+        return agent_context
 
     @server.tool(annotations=_annotations("Plan a SemaRail semantic query"))
     async def semarail_plan_query(semantic_sql: str) -> dict[str, Any]:

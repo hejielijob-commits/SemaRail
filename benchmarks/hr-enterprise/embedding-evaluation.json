@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "corpusId": "semarail-hr-embedding-language-v1",
+  "questions": [
+    {"id": "en-employees", "language": "en", "question": "employee workforce records", "requiredIds": ["model:employees"]},
+    {"id": "en-departments", "language": "en", "question": "department directory", "requiredIds": ["model:departments"]},
+    {"id": "en-salary", "language": "en", "question": "monthly employee salary", "requiredIds": ["column:compensation_history.monthly_salary"]},
+    {"id": "en-performance", "language": "en", "question": "employee performance rating", "requiredIds": ["column:performance_reviews.performance_score"]},
+    {"id": "en-sick", "language": "en", "question": "monthly employee sick leave days", "requiredIds": ["column:attendance_monthly.sick_days"]},
+    {"id": "en-region", "language": "en", "question": "English region name", "requiredIds": ["column:regions.region_name_en"]},
+
+    {"id": "zh-employees", "language": "zh-CN", "question": "员工主数据", "requiredIds": ["model:employees"]},
+    {"id": "zh-departments", "language": "zh-CN", "question": "部门目录", "requiredIds": ["model:departments"]},
+    {"id": "zh-salary", "language": "zh-CN", "question": "员工当前月薪", "requiredIds": ["column:compensation_history.monthly_salary"]},
+    {"id": "zh-performance", "language": "zh-CN", "question": "员工绩效评分", "requiredIds": ["column:performance_reviews.performance_score"]},
+    {"id": "zh-sick", "language": "zh-CN", "question": "员工月度病假天数", "requiredIds": ["column:attendance_monthly.sick_days"]},
+    {"id": "zh-region", "language": "zh-CN", "question": "区域中文名称", "requiredIds": ["column:regions.region_name_zh"]},
+
+    {"id": "mixed-employees", "language": "mixed", "question": "employee 员工主数据", "requiredIds": ["model:employees"]},
+    {"id": "mixed-departments", "language": "mixed", "question": "department 部门目录", "requiredIds": ["model:departments"]},
+    {"id": "mixed-salary", "language": "mixed", "question": "employee 当前 monthly salary", "requiredIds": ["column:compensation_history.monthly_salary"]},
+    {"id": "mixed-performance", "language": "mixed", "question": "performance 绩效评分", "requiredIds": ["column:performance_reviews.performance_score"]},
+    {"id": "mixed-overtime", "language": "mixed", "question": "attendance 加班 hours", "requiredIds": ["column:attendance_monthly.overtime_hours"]},
+    {"id": "mixed-region", "language": "mixed", "question": "region 中文名称", "requiredIds": ["column:regions.region_name_zh"]}
+  ]
+}

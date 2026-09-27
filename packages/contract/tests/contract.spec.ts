@@ -15,6 +15,9 @@ import {
   parseRpcRequest,
   parseRpcResponse,
   parseSemanticContext,
+  parseSemanticContextV2,
+  parseSemanticContextV2Input,
+  safeParseSemanticContextV2,
   safeParseDataQueryInput,
   safeParseDataQueryPresentationV2,
   parseFeedbackSubmissionRequest,
@@ -144,6 +147,79 @@ describe('semantic context and ChartSpecV1', () => {
     }).sqlHistory?.[0]?.sourcePath).toBe('knowledge/sql/revenue.md')
     expect(parseChartSpecV1({ version: 1, type: 'line', x: 'day', y: ['total'], tooltip: true }).tooltip).toBe(true)
     expect(() => parseChartSpecV1({ version: 2, type: 'line', x: 'day', y: ['total'], tooltip: true })).toThrow(/unsupported version/)
+  })
+})
+
+describe('partitioned semantic Context API v2', () => {
+  const contextV2 = {
+    schemaVersion: 2,
+    projectRevision: 'rev-2',
+    schema: { models: [{ name: 'orders', columns: [{ name: 'order_id', type: 'INTEGER' }] }] },
+    relationships: [],
+    metrics: [{ name: 'order_count', expression: 'COUNT(*)', type: 'INTEGER', model: 'orders', referencedModels: ['orders'], referencedColumns: [] }],
+    rules: [{ id: 'rule:grain', text: 'Use order grain.', referencedModels: ['orders'], referencedColumns: ['orders.order_id'], effectiveFrom: '2026-01-01', allowedRoles: ['analyst'] }],
+    sqlExamples: [{ id: 'sql:orders', question: 'Orders?', sql: 'SELECT order_id FROM orders', referencedModels: ['orders'], referencedColumns: ['orders.order_id'], dataSource: 'warehouse', roles: ['analyst'], version: 'v2' }],
+    views: [],
+    budgets: { topK: { schema: 5, rules: 2 }, maxBytes: 131072, maxTokens: 32768, maxRelationshipDepth: 2 },
+    indexStatus: { status: 'ready', backend: 'hybrid' },
+    retrievalSummary: { candidateCount: 12, filteredCount: 2, selectedCount: 7, latencyMs: 8.5 },
+    retrievalTrace: [{ documentId: 'column:orders.revenue', source: 'schema', retrievalType: 'vector', relevance: 0.8, reasonCode: 'vectorMatch', projectRevision: 'rev-2', authorizationFiltered: false }],
+  } as const
+
+  it('requires an explicit v2 input version and rejects unknown fields', () => {
+    expect(parseSemanticContextV2Input({ contextVersion: 2, question: 'Orders?', budgets: { topK: { schema: 5 } } })).toMatchObject({ contextVersion: 2 })
+    expect(() => parseSemanticContextV2Input({ contextVersion: 2, question: 'Orders?', unsupported: true })).toThrow(/unknown field/)
+    expect(() => parseSemanticContextV2Input({ contextVersion: 1, question: 'Orders?' })).toThrow(/unsupported version/)
+  })
+
+  it('parses all bounded partitions and fails closed on trace text', () => {
+    expect(parseSemanticContextV2(contextV2).sqlExamples[0]?.id).toBe('sql:orders')
+    expect(parseSemanticContextV2(contextV2).rules[0]?.allowedRoles).toEqual(['analyst'])
+    expect(parseSemanticContextV2(contextV2).sqlExamples[0]?.version).toBe('v2')
+    expect(parseSemanticContextV2(contextV2).retrievalSummary.filteredCount).toBe(2)
+    expect(safeParseSemanticContextV2({ ...contextV2, retrievalTrace: [{ ...contextV2.retrievalTrace[0], query: 'secret' }] }).success).toBe(false)
+    expect(() => parseSemanticContextV2({ ...contextV2, extra: true })).toThrow(/unknown field/)
+  })
+
+  it('normalizes legacy measures and parses every recalled cube member kind', () => {
+    const parsed = parseSemanticContextV2({
+      ...contextV2,
+      metrics: [
+        contextV2.metrics[0],
+        { name: 'orders_cube', kind: 'cube', baseObject: 'orders', properties: { displayName: { 'zh-CN': '订单指标' } }, referencedModels: ['orders'], referencedColumns: [] },
+        { name: 'region', kind: 'dimension', expression: 'region_code', cube: 'orders_cube', referencedModels: ['orders'], referencedColumns: ['orders.region_code'] },
+        { name: 'order_day', kind: 'timeDimension', expression: 'ordered_at', cube: 'orders_cube', properties: { grain: 'day' }, referencedModels: ['orders'], referencedColumns: ['orders.ordered_at'] },
+      ],
+    })
+    expect(parsed.metrics.map((item) => item.kind)).toEqual(['measure', 'cube', 'dimension', 'timeDimension'])
+    expect(parsed.metrics[1]?.properties?.displayName).toEqual({ 'zh-CN': '订单指标' })
+    expect(safeParseSemanticContextV2({
+      ...contextV2,
+      metrics: [{ name: 'bad', kind: 'physicalTable', referencedModels: ['orders'] }],
+    }).success).toBe(false)
+  })
+
+  it('rejects physical table names and validates index build metadata', () => {
+    expect(safeParseSemanticContextV2({
+      ...contextV2,
+      schema: { models: [{ ...contextV2.schema.models[0], table: 'warehouse.fact_orders' }] },
+    }).success).toBe(false)
+    expect(parseSemanticContextV2({
+      ...contextV2,
+      indexStatus: {
+        status: 'ready', backend: 'hybrid', embeddingModelId: 'multilingual-model',
+        embeddingModelVersion: 'main', embeddingDimension: 384, indexBuildVersion: 1,
+        lastBuildAt: '2026-09-18T10:00:00Z', buildDurationMs: 12.5,
+      },
+    }).indexStatus).toMatchObject({ embeddingDimension: 384, buildDurationMs: 12.5 })
+    expect(safeParseSemanticContextV2({
+      ...contextV2,
+      indexStatus: { status: 'ready', backend: 'hybrid', buildDurationMs: -1 },
+    }).success).toBe(false)
+    expect(safeParseSemanticContextV2({
+      ...contextV2,
+      indexStatus: { status: 'ready', backend: 'hybrid', embeddingModelId: '' },
+    }).success).toBe(false)
   })
 })
 

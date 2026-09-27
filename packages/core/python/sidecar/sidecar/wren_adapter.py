@@ -15,7 +15,9 @@ import hashlib
 import importlib
 import json
 import logging
+import os
 import re
+import time
 from collections.abc import Callable, Iterable, Mapping
 from importlib import metadata
 from pathlib import Path
@@ -46,13 +48,85 @@ MAX_CONTEXT_KNOWLEDGE_ITEMS = 20
 MAX_CONTEXT_KNOWLEDGE_BYTES = 64 * 1024
 MAX_CONTEXT_TEXT_BYTES = 16 * 1024
 _PROJECT_FILE = "wren_project.yml"
-_IGNORED_REVISION_DIRS = frozenset({".git", ".wren", "__pycache__", "target"})
+_IGNORED_REVISION_DIRS = frozenset({
+    ".git", ".wren", "__pycache__", "target", ".semantic-console",
+    "node_modules", ".venv", "venv", "dist", "build", "state",
+})
 
 ModuleLoader = Callable[[str], ModuleType]
 VersionProvider = Callable[[], str | None]
 ContextRetriever = Callable[[dict[str, Any], str, Path], Any]
 SchemaDescriber = Callable[[dict[str, Any]], Any]
 EngineFactory = Callable[..., Any]
+
+_PUBLIC_SEMANTIC_PROPERTY_KEYS = (
+    "displayName",
+    "businessDomain",
+    "dataScope",
+    "format",
+    "unit",
+    "acceptedValues",
+    "grain",
+    "timeBasis",
+    "dataRange",
+    "visible",
+)
+
+
+def _merge_semantic_metadata(
+    target: dict[str, Any],
+    raw_metadata: Any,
+    *,
+    include_role: bool,
+) -> None:
+    """Project recognized, JSON-safe business metadata into Context v2."""
+
+    if not isinstance(raw_metadata, Mapping):
+        return
+    descriptions = raw_metadata.get("description")
+    description_values = (
+        [item for item in descriptions if isinstance(item, str) and item.strip()]
+        if isinstance(descriptions, list)
+        else ([descriptions] if isinstance(descriptions, str) and descriptions.strip() else [])
+    )
+    existing_description = target.get("description")
+    if isinstance(existing_description, str) and existing_description.strip():
+        description_values.insert(0, existing_description)
+    if description_values:
+        target["description"] = " / ".join(dict.fromkeys(description_values))
+
+    properties = dict(target.get("properties")) if isinstance(target.get("properties"), Mapping) else {}
+    for key in _PUBLIC_SEMANTIC_PROPERTY_KEYS:
+        value = raw_metadata.get(key)
+        if value is not None and value != [] and value != "":
+            properties[key] = value
+    if properties:
+        target["properties"] = properties
+
+    role = raw_metadata.get("semanticRole")
+    if include_role and role in {"dimension", "measure"}:
+        target["semanticRole"] = role
+
+
+def _semantic_column_projection(
+    model_name: Any,
+    raw_column: Mapping[str, Any],
+    documents_by_id: Mapping[str, Any],
+) -> dict[str, Any]:
+    column = dict(raw_column)
+    column_name = column.get("name")
+    if isinstance(model_name, str) and isinstance(column_name, str):
+        document = documents_by_id.get(f"column:{model_name}.{column_name}")
+        if document is not None:
+            _merge_semantic_metadata(column, document.metadata, include_role=True)
+    return column
+
+
+def _environment_enabled(name: str, *, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off", "disabled"}
 
 
 def _installed_wren_version() -> str | None:
@@ -82,7 +156,9 @@ class LazyWrenAdapter:
         context_retriever: ContextRetriever | None = None,
         schema_describer: SchemaDescriber | None = None,
         engine_factory: EngineFactory | None = None,
+        semantic_retriever: Any | None = None,
         *,
+        semantic_index_dir: str | Path | None = None,
         expected_version: str = WREN_SUPPORTED_VERSION,
         logger: logging.Logger | None = None,
     ) -> None:
@@ -91,6 +167,9 @@ class LazyWrenAdapter:
         self._context_retriever = context_retriever
         self._schema_describer = schema_describer
         self._engine_factory = engine_factory
+        self._semantic_retriever = semantic_retriever
+        self._semantic_index_dir = Path(semantic_index_dir).expanduser().resolve() if semantic_index_dir is not None else None
+        self._semantic_retrievers: dict[str, Any] = {}
         self.expected_version = expected_version
         self.logger = logger or logging.getLogger("sidecar.wren")
         self._context: ModuleType | None = None
@@ -227,6 +306,36 @@ class LazyWrenAdapter:
                 result["knowledge"] = knowledge
             if sql_history:
                 result["sqlHistory"] = sql_history
+            if _environment_enabled("SEMARAIL_CONTEXT_V2_SHADOW", default=False):
+                try:
+                    shadow = self.ask_v2({
+                        "projectDir": str(project_path),
+                        "question": question,
+                        "contextVersion": 2,
+                    })
+                    v1_bytes = len(json.dumps(result, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+                    v2_bytes = len(json.dumps(shadow, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+                    summary = shadow.get("retrievalSummary")
+                    summary = summary if isinstance(summary, Mapping) else {}
+                    self.logger.info(
+                        "semantic context v2 shadow completed",
+                        extra={
+                            "projectRevision": revision,
+                            "questionHash": hashlib.sha256(question.strip().encode("utf-8")).hexdigest(),
+                            "indexStatus": shadow.get("indexStatus", {}).get("status"),
+                            "retrievalCount": len(shadow.get("retrievalTrace", [])),
+                            "candidateCount": summary.get("candidateCount", 0),
+                            "filteredCount": summary.get("filteredCount", 0),
+                            "selectedCount": summary.get("selectedCount", 0),
+                            "fallbackReason": summary.get("fallbackReason"),
+                            "v1ContextBytes": v1_bytes,
+                            "v2ContextBytes": v2_bytes,
+                            "v1EstimatedTokens": max(1, (v1_bytes + 3) // 4),
+                            "v2EstimatedTokens": max(1, (v2_bytes + 3) // 4),
+                        },
+                    )
+                except Exception:
+                    self.logger.warning("semantic context v2 shadow failed")
             return result
         except RpcFault:
             raise
@@ -237,6 +346,395 @@ class LazyWrenAdapter:
                 "semantic context lookup failed",
                 retryable=False,
             ) from exc
+
+    def ask_v2(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Retrieve a bounded, revision-matched Context API v2 response."""
+
+        if not _environment_enabled("SEMARAIL_CONTEXT_V2_ENABLED", default=True):
+            raise RpcFault(
+                WREN_UNAVAILABLE,
+                "context.ask",
+                "Context API v2 is disabled",
+                retryable=False,
+            )
+
+        project_path = self._project_path(params, phase="context.ask")
+        question = params.get("question")
+        if not isinstance(question, str) or not question.strip():
+            raise RpcFault(INVALID_PARAMS, "validation", "question is required", retryable=False)
+        budgets = params.get("budgets")
+        budgets = budgets if isinstance(budgets, Mapping) else {}
+        top_k = budgets.get("topK")
+        top_k = top_k if isinstance(top_k, Mapping) else {}
+        question_type = _semantic_question_type(question)
+        relationship_budget = int(top_k.get("relationships", 8))
+        rules_budget = int(top_k.get("rules", 8))
+        sql_budget = int(top_k.get("sqlExamples", 3))
+        if question_type == "singleTable":
+            relationship_budget = min(relationship_budget, 3)
+            rules_budget = min(rules_budget, 6)
+            sql_budget = min(sql_budget, 2)
+        elif question_type == "metric":
+            relationship_budget = min(relationship_budget, 4)
+        revision = _project_revision(project_path, phase="context.ask")
+        query_id = hashlib.sha256(
+            f"{revision}\0{question}".encode("utf-8")
+        ).hexdigest()[:24]
+        manifest = self._build_manifest(project_path, phase="context.ask")
+        started = time.perf_counter()
+        try:
+            from .semantic_index import build_semantic_documents
+            from .semantic_policy import semantic_document_visible
+
+            documents = build_semantic_documents(
+                manifest, project_path, project_revision=revision
+            )
+            documents_at = time.perf_counter()
+            retriever = self._retriever_for(project_path)
+            status = retriever.status(revision)
+            if status.state not in {"active", "degraded"}:
+                retriever.build(documents, revision=revision)
+                status = retriever.activate(revision)
+            index_at = time.perf_counter()
+            policy = params.get("authorizationPolicy")
+            visibility = (
+                (lambda document: semantic_document_visible(document, policy))
+                if isinstance(policy, Mapping)
+                else None
+            )
+            quotas = {
+                "model": int(top_k.get("schema", 15)),
+                "column": int(top_k.get("schema", 15)),
+                "relationship": relationship_budget,
+                "cube": int(top_k.get("metrics", 8)),
+                "metric": int(top_k.get("metrics", 8)),
+                "dimension": int(top_k.get("metrics", 8)),
+                "time_dimension": int(top_k.get("metrics", 8)),
+                "rule": rules_budget,
+                "sql_example": sql_budget,
+                "view": int(top_k.get("views", 3)),
+            }
+            limit = max(1, min(1_000, sum(max(0, value) for value in quotas.values())))
+            depth = budgets.get("maxRelationshipDepth", 2)
+            retrieval_channels = (
+                ("exact", "lexical", "vector", "graph", "rule_binding")
+                if question_type == "crossModel"
+                else ("exact", "lexical", "vector", "rule_binding")
+            )
+            result = retriever.search(
+                question,
+                revision=revision,
+                limit=limit,
+                quotas=quotas,
+                visibility_filter=visibility,
+                relationship_depth=depth if isinstance(depth, int) else 2,
+                channels=retrieval_channels,
+                restricted=isinstance(policy, Mapping) and policy.get("defaultEffect") != "allow",
+            )
+            search_at = time.perf_counter()
+            response = self._context_v2_result(
+                manifest, project_path, revision, result, documents
+            )
+            completed = time.perf_counter()
+            response["retrievalSummary"] = {
+                "candidateCount": result.candidate_count,
+                "filteredCount": result.filtered_count,
+                "selectedCount": result.selected_count,
+                "latencyMs": round((completed - started) * 1_000, 3),
+                **(
+                    {"fallbackReason": _safe_retrieval_fallback_reason(result.fallback_reason)}
+                    if result.fallback_reason else {}
+                ),
+            }
+            context_bytes = len(json.dumps(response, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+            self.logger.info(
+                "semantic context v2 retrieval completed",
+                extra={
+                    "projectRevision": revision,
+                    "queryId": query_id,
+                    "documentCount": len(documents),
+                    "candidateCount": result.candidate_count,
+                    "filteredCount": result.filtered_count,
+                    "selectedCount": result.selected_count,
+                    "backend": result.status.backend,
+                    "questionType": question_type,
+                    "fallbackReason": result.fallback_reason,
+                    "contextBytes": context_bytes,
+                    "documentBuildMs": round((documents_at - started) * 1_000, 3),
+                    "indexReadyMs": round((index_at - documents_at) * 1_000, 3),
+                    "searchMs": round((search_at - index_at) * 1_000, 3),
+                    "assemblyMs": round((completed - search_at) * 1_000, 3),
+                    "totalMs": round((completed - started) * 1_000, 3),
+                },
+            )
+            return response
+        except RpcFault:
+            raise
+        except Exception as exc:
+            raise RpcFault(
+                SEMANTIC_ERROR,
+                "context.ask",
+                "semantic context retrieval failed",
+                retryable=False,
+            ) from exc
+
+    def _retriever_for(self, project_path: Path) -> Any:
+        if self._semantic_retriever is not None:
+            return self._semantic_retriever
+        key = str(project_path)
+        existing = self._semantic_retrievers.get(key)
+        if existing is not None:
+            return existing
+        from .semantic_retrieval import create_default_retriever
+
+        if self._semantic_index_dir is not None:
+            storage = self._semantic_index_dir
+        else:
+            configured_root = os.environ.get("SEMARAIL_SEMANTIC_INDEX_DIR", "").strip()
+            root = Path(configured_root).expanduser() if configured_root else Path.home() / ".wren" / "semantic-index"
+            project_key = hashlib.sha256(key.encode("utf-8")).hexdigest()[:24]
+            storage = root / project_key
+        try:
+            retriever = create_default_retriever(storage)
+        except ValueError as exc:
+            raise RpcFault(
+                WREN_UNAVAILABLE,
+                "context.ask",
+                "configured semantic embedding provider is unavailable",
+                retryable=False,
+            ) from exc
+        self._semantic_retrievers[key] = retriever
+        return retriever
+
+    def _context_v2_result(
+        self,
+        manifest: Mapping[str, Any],
+        project_path: Path,
+        revision: str,
+        result: Any,
+        documents: Iterable[Any],
+    ) -> dict[str, Any]:
+        hits = list(result)
+        selected = [hit.document for hit in hits]
+        selected_ids = {document.id for document in selected}
+        documents_by_id = {document.id: document for document in documents}
+        all_models = _semantic_models(manifest, project_path)
+        selected_models = {
+            model
+            for document in selected
+            for model in ((document.model,) + tuple(document.referencedModels))
+            if isinstance(model, str) and model
+        }
+        selected_columns = {
+            reference
+            for document in selected
+            for reference in (
+                ((f"{document.model}.{document.field}",) if document.kind == "column" and document.model and document.field else ())
+                + (tuple(document.referencedColumns) if document.kind != "model" else ())
+            )
+            if isinstance(reference, str) and "." in reference
+        }
+        # A retrieved model must keep its declared keys even when the key
+        # documents did not rank independently. Otherwise a compound-key
+        # snapshot (for example employee_id + review_date) can reach the
+        # Agent without the fields needed to join or select its snapshot.
+        for raw_model in all_models:
+            model_name = raw_model.get("name")
+            if model_name not in selected_models:
+                continue
+            for column in raw_model.get("columns", []):
+                if isinstance(column, Mapping) and column.get("isPrimaryKey") is True:
+                    selected_columns.add(f"{model_name}.{column['name']}")
+        models: list[dict[str, Any]] = []
+        for raw_model in all_models:
+            model_name = raw_model.get("name")
+            if model_name not in selected_models:
+                continue
+            model = dict(raw_model)
+            # Context v1 keeps its historical table field for compatibility;
+            # v2 is the semantic-only boundary and must not expose it.
+            model.pop("table", None)
+            model_document = documents_by_id.get(f"model:{model_name}")
+            if model_document is not None:
+                _merge_semantic_metadata(model, model_document.metadata, include_role=False)
+            raw_columns = raw_model.get("columns")
+            columns = [
+                _semantic_column_projection(model_name, column, documents_by_id)
+                for column in (raw_columns if isinstance(raw_columns, list) else [])
+                if isinstance(column, Mapping)
+                and f"{model_name}.{column.get('name')}" in selected_columns
+            ]
+            # A model-only hit still needs a usable structural anchor. Keep a
+            # declared primary key, but never restore every unrelated field.
+            if not columns and isinstance(raw_columns, list):
+                primary_key = raw_model.get("primaryKey")
+                keys = {primary_key} if isinstance(primary_key, str) else set(primary_key or ())
+                columns = [
+                    _semantic_column_projection(model_name, column, documents_by_id) for column in raw_columns
+                    if isinstance(column, Mapping) and column.get("name") in keys
+                ]
+            model["columns"] = columns
+            models.append(model)
+        relationships = [
+            relationship for relationship in _semantic_relationships(manifest, project_path)
+            if f"relationship:{relationship.get('name')}" in selected_ids
+        ]
+        views_by_name = {item.get("name"): item for item in _semantic_views(manifest, project_path)}
+        metrics: list[dict[str, Any]] = []
+        rules: list[dict[str, Any]] = []
+        sql_examples: list[dict[str, Any]] = []
+        views: list[dict[str, Any]] = []
+        for document in selected:
+            metadata = document.metadata if isinstance(document.metadata, Mapping) else {}
+            refs_models = list(document.referencedModels)
+            refs_columns = list(document.referencedColumns)
+            if document.kind in {"cube", "metric", "dimension", "time_dimension"}:
+                public_kind = {
+                    "cube": "cube",
+                    "metric": "measure",
+                    "dimension": "dimension",
+                    "time_dimension": "timeDimension",
+                }[document.kind]
+                name = document.field or document.id.split(":", 1)[-1]
+                metric: dict[str, Any] = {
+                    "name": name,
+                    "kind": public_kind,
+                    "referencedModels": refs_models,
+                    "referencedColumns": refs_columns,
+                }
+                if document.model:
+                    metric["model"] = document.model
+                for key in ("cube", "baseObject", "expression", "type"):
+                    value = metadata.get(key)
+                    if isinstance(value, str) and value:
+                        metric[key] = value
+                if document.kind != "cube" and "type" not in metric:
+                    metric["type"] = "UNKNOWN"
+                _merge_semantic_metadata(metric, metadata, include_role=False)
+                metrics.append(metric)
+            elif document.kind == "rule":
+                rule: dict[str, Any] = {
+                    "id": document.id,
+                    "text": document.text,
+                    "referencedModels": refs_models,
+                    "referencedColumns": refs_columns,
+                }
+                for source, target in (
+                    ("ruleType", "ruleType"),
+                    ("priority", "priority"),
+                    ("mandatory", "mandatory"),
+                    ("effectiveFrom", "effectiveFrom"),
+                    ("allowedRoles", "allowedRoles"),
+                ):
+                    if metadata.get(source) is not None:
+                        rule[target] = metadata[source]
+                if document.sourcePath:
+                    rule["sourcePath"] = document.sourcePath
+                rules.append(rule)
+            elif document.kind == "sql_example":
+                question = metadata.get("question") or metadata.get("nl")
+                sql = metadata.get("sql") or metadata.get("semanticSql")
+                if isinstance(question, str) and question and isinstance(sql, str) and sql:
+                    example: dict[str, Any] = {
+                        "id": document.id,
+                        "question": question,
+                        "sql": sql,
+                        "referencedModels": refs_models,
+                        "referencedColumns": refs_columns,
+                    }
+                    if document.sourcePath:
+                        example["sourcePath"] = document.sourcePath
+                    if document.language != "und":
+                        example["language"] = document.language
+                    labels = metadata.get("labels", metadata.get("tags"))
+                    if isinstance(labels, list) and all(isinstance(item, str) for item in labels):
+                        example["tags"] = labels
+                    review = metadata.get("reviewed")
+                    if not isinstance(review, bool):
+                        review = str(metadata.get("reviewStatus", "")).lower() in {"reviewed", "approved"}
+                    example["reviewed"] = review
+                    data_source = metadata.get("dataSource")
+                    if isinstance(data_source, str) and data_source:
+                        example["dataSource"] = data_source
+                    roles = metadata.get("roles", metadata.get("allowedRoles"))
+                    if isinstance(roles, list) and all(isinstance(item, str) for item in roles):
+                        example["roles"] = roles
+                    version = metadata.get("version")
+                    if version is not None and str(version).strip():
+                        example["version"] = str(version)
+                    sql_examples.append(example)
+            elif document.kind == "view":
+                raw_view = views_by_name.get(document.id.removeprefix("view:"))
+                if raw_view is not None:
+                    views.append({
+                        **raw_view,
+                        "referencedModels": refs_models,
+                        "referencedColumns": refs_columns,
+                    })
+
+        status = result.status
+        wire_state = {"active": "ready", "staged": "building"}.get(status.state, status.state)
+        stale_reason = None
+        if wire_state == "degraded":
+            stale_reason = "backendUnavailable"
+        elif wire_state == "stale":
+            stale_reason = "revisionMismatch"
+        elif wire_state == "missing":
+            stale_reason = "missing"
+        index_status: dict[str, Any] = {
+            "status": wire_state,
+            "activeRevision": status.active_revision,
+            "indexedRevision": status.revision,
+            "documentCount": status.document_count,
+            "backend": status.backend,
+        }
+        for key, value in (
+            ("embeddingModelId", status.embedding_model_id),
+            ("embeddingModelVersion", status.embedding_model_version),
+            ("embeddingDimension", status.embedding_dimension),
+            ("indexBuildVersion", status.index_build_version),
+            ("lastBuildAt", status.last_build_at),
+            ("buildDurationMs", status.build_duration_ms),
+        ):
+            if value is not None:
+                index_status[key] = value
+        if stale_reason:
+            index_status["staleReason"] = stale_reason
+        trace = [
+            {
+                "documentId": item.document_id,
+                "source": item.source,
+                "retrievalType": item.retrieval_type,
+                "relevance": item.relevance,
+                "reasonCode": item.reason_code,
+                "projectRevision": revision,
+                "authorizationFiltered": item.authorization_filtered,
+                "selected": item.selected,
+            }
+            for item in result.trace
+        ]
+        return {
+            "schemaVersion": 2,
+            "projectRevision": revision,
+            # Internal, complete manifest catalog for the final restricted
+            # text projection. Dispatcher strips it before returning Context.
+            "_authorizationCatalog": [
+                {
+                    "name": model["name"],
+                    "table": model.get("table"),
+                    "columns": [column["name"] for column in model["columns"]],
+                }
+                for model in all_models
+            ],
+            "schema": {"models": models},
+            "relationships": relationships,
+            "metrics": metrics,
+            "rules": rules,
+            "sqlExamples": sql_examples,
+            "views": views,
+            "indexStatus": index_status,
+            "retrievalTrace": trace,
+        }
 
     def recall_sql_history(self, params: Mapping[str, Any]) -> list[dict[str, str]]:
         """Recall confirmed SQL without building the full semantic manifest."""
@@ -808,6 +1306,28 @@ def _description(value: Mapping[str, Any], project_path: Path) -> str | None:
     return None
 
 
+def _semantic_question_type(question: str) -> str:
+    """Classify only enough intent to allocate deterministic section budgets."""
+
+    normalized = question.casefold()
+    if re.search(r"\b(join|compare|versus|across)\b|对比|比较|关联|联合|同时", normalized):
+        return "crossModel"
+    if re.search(r"\b(average|avg|count|rate|ratio|trend|total|sum|metric)\b|平均|数量|人数|比率|趋势|合计|指标", normalized):
+        return "metric"
+    return "singleTable"
+
+
+def _safe_retrieval_fallback_reason(value: Any) -> str:
+    """Collapse provider details to one stable, non-sensitive reason code."""
+
+    reason = str(value or "").lower()
+    if any(token in reason for token in ("embedder", "embedding", "sentence_transformers", "unavailable", "not_configured")):
+        return "embeddingUnavailable"
+    if any(token in reason for token in ("vector", "search")):
+        return "vectorSearchFailed"
+    return "indexDegraded"
+
+
 def _semantic_models(
     manifest: Mapping[str, Any],
     project_path: Path,
@@ -1083,6 +1603,7 @@ def default_dependencies(
     *,
     logger: logging.Logger | None = None,
     connection_resolver: Callable[[str, str], Mapping[str, Any] | None] | None = None,
+    semantic_index_dir: str | Path | None = None,
 ) -> Any:
     """Build the default dependency set around one lazy adapter.
 
@@ -1096,7 +1617,7 @@ def default_dependencies(
     from .dispatch import SidecarDependencies
     from .query import EnvPsycopgExecutor, WrenQueryService
 
-    adapter = LazyWrenAdapter(logger=logger)
+    adapter = LazyWrenAdapter(logger=logger, semantic_index_dir=semantic_index_dir)
     query_service = WrenQueryService(
         adapter,
         EnvPsycopgExecutor(),

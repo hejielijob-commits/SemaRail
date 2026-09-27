@@ -18,6 +18,7 @@ except ImportError:  # pragma: no cover
 
 _FEEDBACK_DETAIL = re.compile(r"/api/v1/diagnostics/feedback/([^/]+)\Z")
 _REGRESSION_CREATE = re.compile(r"/api/v1/diagnostics/feedback/([^/]+)/regression-cases\Z")
+_RETRIEVAL_DETAIL = re.compile(r"/api/v1/diagnostics/retrievals/([^/]+)\Z")
 
 
 class DiagnosticsApi:
@@ -101,6 +102,13 @@ class DiagnosticsApi:
                 )
             if method == "GET" and path == "/api/v1/diagnostics/regression-cases/export":
                 return 200, self.store.export_regression_cases(
+                    organization_id=auth.subject.organization_id,
+                    project_id=self.project_id,
+                )
+            retrieval = _RETRIEVAL_DETAIL.fullmatch(path)
+            if retrieval and method == "GET":
+                return 200, self.store.retrieval_explanation(
+                    retrieval.group(1),
                     organization_id=auth.subject.organization_id,
                     project_id=self.project_id,
                 )

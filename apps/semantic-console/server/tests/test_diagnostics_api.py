@@ -200,6 +200,31 @@ class DiagnosticsApiTests(unittest.TestCase):
         )
         self.assertEqual((status, body["code"]), (403, "FORBIDDEN"))
 
+    def test_admin_can_read_one_retrieval_explanation(self) -> None:
+        self.store.record_execution(
+            auth=self.auth,
+            project_id="diagnostic-project",
+            trace_id="trace-context-explanation",
+            query_id=None,
+            datasource_id="warehouse",
+            transport="core-http",
+            method="context.ask",
+            status="success",
+            stage="complete",
+            retrieval_explanation={"schemaVersion": 1, "anomalies": ["ZERO_RECALL"]},
+        )
+
+        status, result = self.api.dispatch(
+            "GET",
+            "/api/v1/diagnostics/retrievals/trace-context-explanation",
+            {},
+            None,
+            f"Bearer {self.bootstrap}",
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(result["explanation"]["anomalies"], ["ZERO_RECALL"])
+
     def test_query_and_admin_routes_cannot_cross_project_boundary(self) -> None:
         self.store.record_execution(
             auth=self.auth,

@@ -70,6 +70,34 @@ _LOGGER = logging.getLogger("semarail-core.runtime")
 DEFAULT_ARTIFACT_BASE_URL = "http://127.0.0.1:48763"
 
 
+def _normalize_context_budgets(value: Any) -> dict[str, Any] | str:
+    """Validate public Context API v2 budgets before policy dispatch."""
+
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        return "context.ask budgets must be an object"
+    if set(value) - {"topK", "maxBytes", "maxTokens", "maxRelationshipDepth"}:
+        return "context.ask budgets contains unsupported fields"
+    result: dict[str, Any] = {}
+    top_k = value.get("topK")
+    if top_k is not None:
+        sections = {"schema", "relationships", "metrics", "rules", "sqlExamples", "views"}
+        if not isinstance(top_k, Mapping) or set(top_k) - sections:
+            return "context.ask budgets.topK is invalid"
+        for section, limit in top_k.items():
+            if type(limit) is not int or limit < 0 or limit > 1_000:
+                return "context.ask budgets.topK is invalid"
+        result["topK"] = dict(top_k)
+    for field, maximum in (("maxBytes", 4 * 1024 * 1024), ("maxTokens", 256_000), ("maxRelationshipDepth", 8)):
+        if field in value:
+            limit = value[field]
+            if type(limit) is not int or limit < 1 or limit > maximum:
+                return f"context.ask budgets.{field} is invalid"
+            result[field] = limit
+    return result
+
+
 class RuntimeDispatcher(Protocol):
     def dispatch(self, request: Mapping[str, Any]) -> dict[str, Any]: ...
 
@@ -230,6 +258,55 @@ def _public_response(response: Mapping[str, Any], protocol_version: str, trace_i
     )
 
 
+def _context_retrieval_explanation(result: Mapping[str, Any]) -> dict[str, Any]:
+    """Build a bounded, text-free explanation for administrator diagnostics."""
+
+    raw_trace = result.get("retrievalTrace")
+    trace = [dict(item) for item in raw_trace[:2_000] if isinstance(item, Mapping)] \
+        if isinstance(raw_trace, list) else []
+    sections = ("relationships", "metrics", "rules", "sqlExamples", "views")
+    selected_count = sum(
+        len(result.get(section, [])) if isinstance(result.get(section), list) else 0
+        for section in sections
+    )
+    schema = result.get("schema")
+    if isinstance(schema, Mapping) and isinstance(schema.get("models"), list):
+        selected_count += len(schema["models"])
+    summary = result.get("retrievalSummary")
+    summary = summary if isinstance(summary, Mapping) else {}
+    candidate_count = summary.get("candidateCount", len(trace))
+    filtered_count = summary.get(
+        "filteredCount", sum(1 for item in trace if item.get("authorizationFiltered") is True)
+    )
+    selected_count = summary.get("selectedCount", selected_count)
+    latency_ms = summary.get("latencyMs", 0.0)
+    fallback_reason = summary.get("fallbackReason")
+    index_status = dict(result.get("indexStatus")) if isinstance(result.get("indexStatus"), Mapping) else {}
+    anomalies: list[str] = []
+    if selected_count == 0:
+        anomalies.append("ZERO_RECALL")
+    if fallback_reason is not None or (trace and all(item.get("retrievalType") == "fallback" for item in trace)):
+        anomalies.append("FULL_FALLBACK")
+    if index_status.get("status") in {"missing", "stale", "unavailable", "degraded"}:
+        anomalies.append("INDEX_NOT_READY")
+    if trace and filtered_count / len(trace) >= 0.9:
+        anomalies.append("PERMISSION_OVER_FILTERED")
+    return {
+        "schemaVersion": 1,
+        "projectRevision": result.get("projectRevision"),
+        "indexStatus": index_status,
+        "candidateCount": candidate_count,
+        "filteredCount": filtered_count,
+        "selectedCount": selected_count,
+        "latencyMs": latency_ms,
+        **({"fallbackReason": fallback_reason} if fallback_reason is not None else {}),
+        "traceCount": len(trace),
+        "authorizationFilteredCount": filtered_count,
+        "anomalies": anomalies,
+        "retrievalTrace": trace,
+    }
+
+
 def _default_dispatcher(project: ProjectStore) -> RuntimeDispatcher | None:
     try:
         from sidecar import Dispatcher, default_dependencies  # type: ignore[import-not-found]
@@ -243,7 +320,10 @@ def _default_dispatcher(project: ProjectStore) -> RuntimeDispatcher | None:
     def resolve_connection(_project_dir: str, env_name: str) -> Mapping[str, Any] | None:
         return load_active_connection(canonical_project, env_name, state_file=state_file)
 
-    return Dispatcher(default_dependencies(connection_resolver=resolve_connection))
+    return Dispatcher(default_dependencies(
+        connection_resolver=resolve_connection,
+        semantic_index_dir=project.state_dir / "semantic-index",
+    ))
 
 
 class RuntimeRpcGateway:
@@ -464,6 +544,10 @@ class RuntimeRpcGateway:
                     semantic_sql=(str(safe_params.get("semanticSql")) if isinstance(safe_params.get("semanticSql"), str) else None),
                     native_sql=(str(result.get("nativeSql")) if isinstance(result.get("nativeSql"), str) else None),
                     duration_ms=max(0.0, (time.monotonic() - started_at) * 1000.0),
+                    retrieval_explanation=(
+                        _context_retrieval_explanation(result)
+                        if method_value == "context.ask" and result else None
+                    ),
                 )
                 diagnostic_recorded = True
                 self.diagnostics.cleanup_expired()
@@ -1095,9 +1179,28 @@ class RuntimeRpcGateway:
         if method == "project.describe":
             return {"projectDir": project_dir} if not params else "project.describe params must be empty"
         if method == "context.ask":
-            if set(params) != {"question"} or not isinstance(params.get("question"), str):
-                return "context.ask requires only question"
-            return {"projectDir": project_dir, "question": params["question"]}
+            # v1 remains the exact question-only shape.  API v2 is an
+            # explicit opt-in so a typo cannot silently change the context
+            # contract or make a legacy caller receive partitioned output.
+            if "contextVersion" not in params:
+                if set(params) != {"question"} or not isinstance(params.get("question"), str):
+                    return "context.ask requires only question"
+                return {"projectDir": project_dir, "question": params["question"]}
+            if set(params) - {"question", "contextVersion", "budgets"}:
+                return "context.ask v2 contains unsupported fields"
+            if params.get("contextVersion") != 2:
+                return "context.ask contextVersion is unsupported"
+            if not isinstance(params.get("question"), str):
+                return "context.ask requires question"
+            budgets = _normalize_context_budgets(params.get("budgets"))
+            if isinstance(budgets, str):
+                return budgets
+            return {
+                "projectDir": project_dir,
+                "question": params["question"],
+                "contextVersion": 2,
+                **({"budgets": budgets} if "budgets" in params else {}),
+            }
         if method == "query.cancel":
             if set(params) != {"queryId"} or not isinstance(params.get("queryId"), str):
                 return "query.cancel requires only queryId"

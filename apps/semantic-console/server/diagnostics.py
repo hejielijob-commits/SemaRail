@@ -8,6 +8,7 @@ payloads are separate from the audit log.
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import uuid
 from collections.abc import Mapping
@@ -26,7 +27,7 @@ except ImportError:  # pragma: no cover - direct module loading
     )
 
 
-DIAGNOSTIC_SCHEMA_VERSION = 4
+DIAGNOSTIC_SCHEMA_VERSION = 6
 _DIAGNOSTIC_MIGRATION_LOCK_ID = 8_341_972_315_443_002
 DEFAULT_RETENTION_DAYS = 30
 MAX_TEXT = 64_000
@@ -49,6 +50,9 @@ _CATEGORIES = frozenset(
     }
 )
 _STATUSES = frozenset({"pending", "classified", "located", "fixed", "verified", "closed_no_fix"})
+_RETRIEVAL_ANOMALIES = frozenset(
+    {"ZERO_RECALL", "FULL_FALLBACK", "INDEX_NOT_READY", "PERMISSION_OVER_FILTERED"}
+)
 
 
 class DiagnosticError(RuntimeError):
@@ -103,6 +107,77 @@ def _filter_timestamp(value: str) -> str:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
     return _timestamp(parsed.astimezone(UTC))
+
+
+def _safe_retrieval_explanation(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Fail closed unless a retrieval diagnostic is text-free and bounded."""
+
+    allowed = {
+        "schemaVersion", "projectRevision", "indexStatus", "candidateCount",
+        "filteredCount", "selectedCount", "latencyMs", "fallbackReason",
+        "traceCount", "authorizationFilteredCount", "anomalies", "retrievalTrace",
+    }
+    if set(value) - allowed or value.get("schemaVersion") != 1:
+        raise DiagnosticError("INVALID_DIAGNOSTIC", "retrieval explanation is invalid")
+    for key in ("candidateCount", "filteredCount", "selectedCount", "traceCount", "authorizationFilteredCount"):
+        count = value.get(key, 0)
+        if type(count) is not int or not 0 <= count <= 10_000_000:
+            raise DiagnosticError("INVALID_DIAGNOSTIC", "retrieval explanation is invalid")
+    latency = value.get("latencyMs", 0.0)
+    if (
+        isinstance(latency, bool) or not isinstance(latency, (int, float))
+        or not 0 <= float(latency) <= 86_400_000
+    ):
+        raise DiagnosticError("INVALID_DIAGNOSTIC", "retrieval explanation is invalid")
+    fallback = value.get("fallbackReason")
+    if fallback is not None and fallback not in {
+        "embeddingUnavailable", "vectorSearchFailed", "indexDegraded"
+    }:
+        raise DiagnosticError("INVALID_DIAGNOSTIC", "retrieval explanation is invalid")
+    anomalies = value.get("anomalies", [])
+    if (
+        not isinstance(anomalies, list)
+        or len(anomalies) > len(_RETRIEVAL_ANOMALIES)
+        or any(item not in _RETRIEVAL_ANOMALIES for item in anomalies)
+    ):
+        raise DiagnosticError("INVALID_DIAGNOSTIC", "retrieval explanation is invalid")
+    trace = value.get("retrievalTrace", [])
+    if not isinstance(trace, list) or len(trace) > 2_000:
+        raise DiagnosticError("INVALID_DIAGNOSTIC", "retrieval explanation is invalid")
+    trace_keys = {
+        "documentId", "source", "retrievalType", "relevance", "reasonCode",
+        "projectRevision", "authorizationFiltered", "selected",
+    }
+    safe_trace: list[dict[str, Any]] = []
+    for item in trace:
+        if not isinstance(item, Mapping) or set(item) - trace_keys:
+            raise DiagnosticError("INVALID_DIAGNOSTIC", "retrieval explanation is invalid")
+        encoded = _json(dict(item), limit=4_096)
+        safe_trace.append(json.loads(encoded))
+    index_status = value.get("indexStatus", {})
+    if not isinstance(index_status, Mapping) or set(index_status) - {
+        "status", "activeRevision", "indexedRevision", "documentCount", "backend",
+        "staleReason", "embeddingModelId", "embeddingModelVersion", "embeddingDimension",
+        "indexBuildVersion", "lastBuildAt", "buildDurationMs",
+    }:
+        raise DiagnosticError("INVALID_DIAGNOSTIC", "retrieval explanation is invalid")
+    revision = value.get("projectRevision")
+    if revision is not None and (not isinstance(revision, str) or not 1 <= len(revision) <= 256):
+        raise DiagnosticError("INVALID_DIAGNOSTIC", "retrieval explanation is invalid")
+    return {
+        "schemaVersion": 1,
+        **({"projectRevision": revision} if revision is not None else {}),
+        "indexStatus": json.loads(_json(dict(index_status), limit=16_000)),
+        "candidateCount": value.get("candidateCount", 0),
+        "filteredCount": value.get("filteredCount", 0),
+        "selectedCount": value.get("selectedCount", 0),
+        "latencyMs": float(latency),
+        **({"fallbackReason": fallback} if fallback is not None else {}),
+        "traceCount": value.get("traceCount", 0),
+        "authorizationFilteredCount": value.get("authorizationFilteredCount", 0),
+        "anomalies": list(anomalies),
+        "retrievalTrace": safe_trace,
+    }
 
 
 class DiagnosticStore:
@@ -189,6 +264,29 @@ class DiagnosticStore:
                         "INSERT INTO diagnostic_schema_migrations(version,applied_at) VALUES(?,?)",
                         (4, _timestamp(self.clock())),
                     )
+                if len(applied) < 5:
+                    connection.execute(
+                        "ALTER TABLE query_diagnostics ADD COLUMN question_hash TEXT"
+                    )
+                    connection.execute(
+                        "ALTER TABLE query_diagnostics ADD COLUMN retrieval_trace_id TEXT"
+                    )
+                    connection.execute(
+                        "CREATE INDEX IF NOT EXISTS diagnostics_retrieval_link_idx "
+                        "ON query_diagnostics(organization_id,project_id,subject_id,question_hash,created_at)"
+                    )
+                    connection.execute(
+                        "INSERT INTO diagnostic_schema_migrations(version,applied_at) VALUES(?,?)",
+                        (5, _timestamp(self.clock())),
+                    )
+                if len(applied) < 6:
+                    connection.execute(
+                        "ALTER TABLE query_diagnostics ADD COLUMN retrieval_explanation_json TEXT"
+                    )
+                    connection.execute(
+                        "INSERT INTO diagnostic_schema_migrations(version,applied_at) VALUES(?,?)",
+                        (6, _timestamp(self.clock())),
+                    )
         except DiagnosticError:
             raise
         except Exception as exc:
@@ -217,6 +315,7 @@ class DiagnosticStore:
         native_sql: str | None = None,
         evidence_source: str = "server",
         duration_ms: float = 0.0,
+        retrieval_explanation: Mapping[str, Any] | None = None,
     ) -> str:
         if status not in {"success", "failure", "cancelled"}:
             raise DiagnosticError("INVALID_DIAGNOSTIC", "diagnostic status is invalid")
@@ -230,6 +329,13 @@ class DiagnosticStore:
         bounded_duration = float(duration_ms)
         if not 0 <= bounded_duration <= 86_400_000:
             raise DiagnosticError("INVALID_DIAGNOSTIC", "diagnostic duration is invalid")
+        safe_question = _safe_text(question) if question is not None else None
+        question_hash = (
+            hashlib.sha256(safe_question.strip().encode("utf-8")).hexdigest()
+            if isinstance(safe_question, str) and safe_question.strip()
+            else None
+        )
+        retrieval_trace_id: str | None = None
         values = (
             diagnostic_id,
             _safe_text(trace_id, required=True, limit=128),
@@ -247,19 +353,40 @@ class DiagnosticStore:
             _safe_text(semantic_version, limit=256),
             _json(list(policy_versions)[:64], limit=16_000),
             _json(dict(error)) if keep_content and error is not None else None,
-            _safe_text(question) if keep_content else None,
+            safe_question if keep_content else None,
             _safe_text(semantic_sql) if keep_content else None,
             _safe_text(native_sql) if keep_content else None,
             evidence_source,
             _timestamp(now),
             _timestamp(now + timedelta(days=self.retention_days)),
             bounded_duration,
+            question_hash,
+            retrieval_trace_id,
+            _json(_safe_retrieval_explanation(retrieval_explanation), limit=256_000)
+            if method == "context.ask" and retrieval_explanation is not None
+            else None,
         )
         try:
             connect = getattr(self.access_control, "_connect")
             with connect() as connection:
+                if method != "context.ask" and question_hash is not None:
+                    retrieval = connection.execute(
+                        "SELECT trace_id FROM query_diagnostics "
+                        "WHERE organization_id=? AND project_id=? AND subject_id=? "
+                        "AND method='context.ask' AND question_hash=? "
+                        "ORDER BY created_at DESC,id DESC LIMIT 1",
+                        (
+                            auth.subject.organization_id,
+                            project_id,
+                            auth.subject.id,
+                            question_hash,
+                        ),
+                    ).fetchone()
+                    if retrieval is not None and isinstance(retrieval["trace_id"], str):
+                        retrieval_trace_id = retrieval["trace_id"]
+                        values = (*values[:-2], retrieval_trace_id, values[-1])
                 connection.execute(
-                    "INSERT OR IGNORE INTO query_diagnostics(id,trace_id,query_id,original_query_id,organization_id,project_id,datasource_id,subject_id,credential_id,transport,method,status,stage,semantic_version,policy_versions_json,error_json,question,semantic_sql,native_sql,evidence_source,created_at,expires_at,duration_ms) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT OR IGNORE INTO query_diagnostics(id,trace_id,query_id,original_query_id,organization_id,project_id,datasource_id,subject_id,credential_id,transport,method,status,stage,semantic_version,policy_versions_json,error_json,question,semantic_sql,native_sql,evidence_source,created_at,expires_at,duration_ms,question_hash,retrieval_trace_id,retrieval_explanation_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     values,
                 )
                 row = connection.execute(
@@ -495,12 +622,42 @@ class DiagnosticStore:
         items = [self._diagnostic_public(row) for row in rows[:bounded]]
         return {"items": items, "nextCursor": items[-1]["id"] if len(rows) > bounded else None}
 
+    def retrieval_explanation(
+        self, trace_id: str, *, organization_id: str, project_id: str
+    ) -> dict[str, Any]:
+        """Return one bounded, administrator-scoped retrieval explanation."""
+
+        safe_trace = _safe_text(trace_id, required=True, limit=128) or ""
+        connect = getattr(self.access_control, "_connect")
+        with connect() as connection:
+            row = connection.execute(
+                "SELECT trace_id,semantic_version,created_at,content_purged_at,retrieval_explanation_json "
+                "FROM query_diagnostics WHERE trace_id=? AND organization_id=? AND project_id=? "
+                "AND method='context.ask' LIMIT 1",
+                (safe_trace, organization_id, project_id),
+            ).fetchone()
+        if row is None:
+            raise DiagnosticError(
+                "RETRIEVAL_TRACE_NOT_FOUND", "retrieval trace was not found", status=404
+            )
+        return {
+            "traceId": row["trace_id"],
+            "semanticVersion": row["semantic_version"],
+            "createdAt": row["created_at"],
+            "contentPurgedAt": row["content_purged_at"],
+            "explanation": (
+                json.loads(row["retrieval_explanation_json"])
+                if row["retrieval_explanation_json"]
+                else None
+            ),
+        }
+
     def cleanup_expired(self) -> int:
         now = _timestamp(self.clock())
         connect = getattr(self.access_control, "_connect")
         with connect() as connection:
             cursor = connection.execute(
-                "UPDATE query_diagnostics SET error_json=NULL,question=NULL,semantic_sql=NULL,native_sql=NULL,content_purged_at=? WHERE expires_at<=? AND content_purged_at IS NULL",
+                "UPDATE query_diagnostics SET error_json=NULL,question=NULL,semantic_sql=NULL,native_sql=NULL,retrieval_explanation_json=NULL,content_purged_at=? WHERE expires_at<=? AND content_purged_at IS NULL",
                 (now, now),
             )
         return max(int(cursor.rowcount), 0)
@@ -562,7 +719,7 @@ class DiagnosticStore:
         params.append(bounded + 1)
         with connect() as connection:
             rows = connection.execute(
-                "SELECT f.*,d.trace_id,d.query_id,d.original_query_id,d.datasource_id,d.transport,d.method,d.stage,d.semantic_version,d.duration_ms,d.policy_versions_json,d.error_json,d.question AS automatic_question,d.semantic_sql AS automatic_semantic_sql,d.native_sql AS automatic_native_sql,d.created_at AS diagnostic_created_at,d.content_purged_at "
+                    "SELECT f.*,d.trace_id,d.query_id,d.original_query_id,d.retrieval_trace_id,d.datasource_id,d.transport,d.method,d.stage,d.semantic_version,d.duration_ms,d.policy_versions_json,d.error_json,d.question AS automatic_question,d.semantic_sql AS automatic_semantic_sql,d.native_sql AS automatic_native_sql,d.created_at AS diagnostic_created_at,d.content_purged_at "
                 f"FROM query_feedback f JOIN query_diagnostics d ON d.id=f.diagnostic_id WHERE {' AND '.join(clauses)} ORDER BY f.created_at DESC,f.id DESC LIMIT ?",  # noqa: S608 - clauses are server constants
                 tuple(params),
             ).fetchall()
@@ -575,7 +732,7 @@ class DiagnosticStore:
         connect = getattr(self.access_control, "_connect")
         with connect() as connection:
             row = connection.execute(
-                "SELECT f.*,d.trace_id,d.query_id,d.original_query_id,d.datasource_id,d.transport,d.method,d.stage,d.semantic_version,d.duration_ms,d.policy_versions_json,d.error_json,d.question AS automatic_question,d.semantic_sql AS automatic_semantic_sql,d.native_sql AS automatic_native_sql,d.created_at AS diagnostic_created_at,d.content_purged_at "
+                "SELECT f.*,d.trace_id,d.query_id,d.original_query_id,d.retrieval_trace_id,d.datasource_id,d.transport,d.method,d.stage,d.semantic_version,d.duration_ms,d.policy_versions_json,d.error_json,d.question AS automatic_question,d.semantic_sql AS automatic_semantic_sql,d.native_sql AS automatic_native_sql,d.created_at AS diagnostic_created_at,d.content_purged_at "
                 "FROM query_feedback f JOIN query_diagnostics d ON d.id=f.diagnostic_id WHERE f.id=? AND f.organization_id=? AND f.project_id=?",
                 (_safe_text(feedback_id, required=True, limit=128), organization_id, project_id),
             ).fetchone()
@@ -735,6 +892,7 @@ class DiagnosticStore:
             "traceId": row["trace_id"],
             "queryId": row["query_id"],
             "originalQueryId": row["original_query_id"],
+            "retrievalTraceId": row["retrieval_trace_id"],
             "projectId": row["project_id"],
             "datasourceId": row["datasource_id"],
             "subjectId": row["subject_id"],
@@ -764,6 +922,7 @@ class DiagnosticStore:
             "traceId": row["trace_id"],
             "queryId": row["query_id"],
             "originalQueryId": row["original_query_id"],
+            "retrievalTraceId": row["retrieval_trace_id"],
             "datasourceId": row["datasource_id"],
             "subjectId": row["subject_id"],
             "credentialId": row["credential_id"],

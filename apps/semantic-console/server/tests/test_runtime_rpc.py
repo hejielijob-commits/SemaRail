@@ -9,7 +9,7 @@ from server.app import create_app
 from server.diagnostics import DiagnosticError
 from server.models import DatasourceRecord
 from server.project import ProjectStore
-from server.runtime_rpc import RuntimeRpcGateway
+from server.runtime_rpc import RuntimeRpcGateway, _context_retrieval_explanation
 from server.service import SemanticConsoleService
 
 
@@ -22,6 +22,32 @@ class FakeValidator:
 
     def build(self, _project_dir):
         return {"models": []}
+
+
+class RetrievalExplanationTests(unittest.TestCase):
+    def test_flags_zero_recall_stale_and_permission_over_filtering(self) -> None:
+        result = _context_retrieval_explanation({
+            "projectRevision": "rev-1",
+            "schema": {"models": []},
+            "relationships": [],
+            "metrics": [],
+            "rules": [],
+            "sqlExamples": [],
+            "views": [],
+            "indexStatus": {"status": "stale", "backend": "hybrid"},
+            "retrievalTrace": [{
+                "documentId": "model:employees",
+                "source": "schema",
+                "retrievalType": "vector",
+                "authorizationFiltered": True,
+            }],
+        })
+
+        self.assertEqual(result["selectedCount"], 0)
+        self.assertEqual(
+            result["anomalies"],
+            ["ZERO_RECALL", "INDEX_NOT_READY", "PERMISSION_OVER_FILTERED"],
+        )
 
 
 class RecordingDispatcher:

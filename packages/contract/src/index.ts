@@ -5,16 +5,19 @@ export * from './errors.js'
 export * from './schema.js'
 export * from './rpc.js'
 export * from './context.js'
+export * from './context_v2.js'
 export * from './chart.js'
 export * from './query.js'
 export * from './feedback.js'
 
 import type { RpcRequest, RpcResponse } from './rpc.js'
 import type { SemanticContext } from './context.js'
+import type { SemanticContextV2 } from './context_v2.js'
 import type { ChartSpecV1 } from './chart.js'
 import type { DataQueryErrorPresentationV3, DataQueryInput, DataQueryPresentation, DataQueryPresentationV1, DataQueryPresentationV2 } from './query.js'
 import { rpcRequestSchema, rpcResponseSchema } from './rpc.js'
 import { semanticContextSchema } from './context.js'
+import { semanticContextV2Schema } from './context_v2.js'
 import { chartSpecV1Schema } from './chart.js'
 import { dataQueryInputSchema, dataQueryPresentationSchema, dataQueryPresentationV1Schema, dataQueryPresentationV2Schema, dataQueryPresentationV3Schema } from './query.js'
 import type { SafeParseResult } from './json.js'
@@ -27,6 +30,9 @@ export const safeParseRpcResponse = (value: unknown): SafeParseResult<RpcRespons
 
 /** Parse semantic context without throwing on invalid input. */
 export const safeParseSemanticContext = (value: unknown): SafeParseResult<SemanticContext> => semanticContextSchema.safeParse(value)
+
+/** Parse Context API v2 without throwing on invalid input. */
+export const safeParseSemanticContextV2 = (value: unknown): SafeParseResult<SemanticContextV2> => semanticContextV2Schema.safeParse(value)
 
 /** Parse DataQuery input without throwing on invalid input. */
 export const safeParseDataQueryInput = (value: unknown): SafeParseResult<DataQueryInput> => dataQueryInputSchema.safeParse(value)

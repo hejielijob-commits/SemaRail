@@ -21,6 +21,9 @@ wren = ["wrenai[postgres]==0.13.2"]
 # Agent-neutral MCP runtime and official Python client. Wren 0.13.2 still uses
 # the v1 FastMCP API, so keep the SDK at its upstream lockfile version.
 mcp = ["wrenai[mcp]==0.13.2", "mcp[cli]==1.28.1"]
+# Optional multilingual embeddings for Context API v2. Without this extra the
+# exact/BM25 path remains available and reports an explicit degraded status.
+retrieval = ["sentence-transformers>=3,<6"]
 
 [project.scripts]
 # SemaRail-owned commands. The DSH-prefixed entries remain compatibility
