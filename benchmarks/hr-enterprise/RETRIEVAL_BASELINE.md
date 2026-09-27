@@ -33,11 +33,19 @@ recall passes, overall Recall@5/10 falls to 0.5472/0.6876 and p95 rises to
 | MRR | 0.8882 | >= 0.75 |
 | NDCG@10 | 0.7043 | >= 0.65 |
 | Permission leakage | 0 | 0 |
-| First-pass SQL accuracy | 51/60 | >= 54/60 |
+| First-pass SQL accuracy (older direct-agent run; not Context v2) | 51/60 | >= 54/60 for a future Context v2 run |
 
 The SQL figure is the defensible optimized blind first-pass result already
 recorded in `EVALUATION_REPORT.md`; the classification-corrected 60/60 result
 is not used as the baseline because it also includes evaluator corrections.
+That run let agents read the checked-in semantic project directly and did not
+exercise this report's Context v2 adaptive-hybrid retrieval path. Its nine
+apparent first-pass residuals were classified as seven evaluator alias/column
+judgments, one test-set error, and one unclear question requirement; none was
+established as a retrieval miss. Therefore `51/60` is historical Agent context,
+not evidence that adaptive hybrid passes or fails the Agent acceptance gate.
+A new predeclared, policy-safe Context v2 Agent run on the revised build is
+still required before default enablement.
 
 Reproduce the retrieval capture and report without database rows or
 credentials:
