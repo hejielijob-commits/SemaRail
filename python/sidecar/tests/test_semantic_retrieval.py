@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import time
 import tracemalloc
@@ -342,6 +343,35 @@ class HybridRetrievalTests(unittest.TestCase):
             reopened.activate("r2")
             self.assertEqual(reopened.status().state, "active")
             self.assertEqual(reopened.search("revenue")[0].document.id, "metric:revenue")
+
+    def test_corrupt_persisted_vector_partition_fails_closed_on_startup(self) -> None:
+        for corruption in ("missing_vector", "wrong_dimension", "invalid_vector", "invalid_root"):
+            with self.subTest(corruption=corruption), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                index = HybridSemanticRetriever(
+                    embedder=DeterministicEmbedder(), storage_path=root
+                )
+                index.build(documents(), revision="r1")
+                index.activate("r1")
+                partition_path = next(root.glob("partition-*.json"))
+                payload = json.loads(partition_path.read_text(encoding="utf-8"))
+                if corruption == "missing_vector":
+                    payload["vectors"].pop("metric:revenue")
+                elif corruption == "wrong_dimension":
+                    payload["embeddingDimension"] = 3
+                elif corruption == "invalid_vector":
+                    payload["vectors"]["metric:revenue"] = ["not-a-number"]
+                partition_path.write_text(
+                    json.dumps([] if corruption == "invalid_root" else payload),
+                    encoding="utf-8",
+                )
+
+                reopened = HybridSemanticRetriever(
+                    embedder=DeterministicEmbedder(), storage_path=root
+                )
+                self.assertEqual(reopened.status().state, "stale")
+                self.assertEqual(reopened.status().stale_reason, "active_partition_corrupt")
+                self.assertEqual(reopened.search("revenue").hits, ())
 
     def test_sentence_transformer_missing_dependency_is_explicitly_degraded(self) -> None:
         index = HybridSemanticRetriever(

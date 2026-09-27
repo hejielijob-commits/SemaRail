@@ -1776,6 +1776,7 @@ class HybridSemanticRetriever:
 
     def _load_storage(self) -> None:
         assert self.storage_path is not None
+        corrupt_partition_files: set[str] = set()
         try:
             self.storage_path.mkdir(parents=True, exist_ok=True)
             for path in sorted(self.storage_path.glob("partition-*.json")):
@@ -1783,8 +1784,13 @@ class HybridSemanticRetriever:
                     continue
                 try:
                     payload = json.loads(path.read_text(encoding="utf-8"))
+                    if not isinstance(payload, Mapping):
+                        raise SemanticIndexError("partition must contain an object")
                     partition = _partition_from_dict(payload)
+                    if path.name != self._partition_filename(partition.revision):
+                        raise SemanticIndexError("partition filename does not match revision")
                 except (OSError, ValueError, TypeError, SemanticIndexError, json.JSONDecodeError):
+                    corrupt_partition_files.add(path.name)
                     continue
                 self._revisions[partition.revision] = partition
             pointer = self.storage_path / "active.json"
@@ -1796,7 +1802,11 @@ class HybridSemanticRetriever:
             self._active_revision = revision
             self._active_partition_file = partition_name if isinstance(partition_name, str) else None
             if revision is None or revision not in self._revisions:
-                self._pointer_error = "active_partition_missing"
+                self._pointer_error = (
+                    "active_partition_corrupt"
+                    if self._active_partition_file in corrupt_partition_files
+                    else "active_partition_missing"
+                )
             elif self._active_partition_file != self._partition_filename(revision):
                 self._pointer_error = "active_pointer_invalid"
         except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
@@ -2024,12 +2034,28 @@ def _partition_from_dict(value: Mapping[str, Any]) -> _Partition:
     if len({document.id for document in documents}) != len(documents):
         raise SemanticIndexError("partition contains duplicate document ids")
     raw_vectors = value.get("vectors", {})
+    if not isinstance(raw_vectors, Mapping):
+        raise SemanticIndexError("partition vectors must be an object")
     vectors: dict[str, Vector] = {}
-    if isinstance(raw_vectors, Mapping):
-        for key, raw in raw_vectors.items():
-            vector = _safe_vector(raw)
-            if vector is not None:
-                vectors[str(key)] = vector
+    for key, raw in raw_vectors.items():
+        if not isinstance(key, str):
+            raise SemanticIndexError("partition vector id must be a string")
+        vector = _safe_vector(raw)
+        if vector is None:
+            raise SemanticIndexError("partition contains an invalid vector")
+        vectors[key] = vector
+    vector_dimensions = {len(vector) for vector in vectors.values()}
+    if len(vector_dimensions) > 1:
+        raise SemanticIndexError("partition contains mixed vector dimensions")
+    embedding_available = bool(value.get("embeddingAvailable", bool(vectors)))
+    document_ids = {document.id for document in documents}
+    if embedding_available and set(vectors) != document_ids:
+        raise SemanticIndexError("partition vectors do not match documents")
+    if not embedding_available and vectors:
+        raise SemanticIndexError("degraded partition unexpectedly contains vectors")
+    stored_dimension = value.get("embeddingDimension")
+    if vectors and (not isinstance(stored_dimension, int) or stored_dimension != next(iter(vector_dimensions))):
+        raise SemanticIndexError("partition embedding dimension mismatch")
     config = value.get("embeddingConfig")
     if not isinstance(config, Mapping):
         config = {"provider": "none"}
@@ -2038,7 +2064,7 @@ def _partition_from_dict(value: Mapping[str, Any]) -> _Partition:
         documents=documents,
         vectors=vectors,
         embedding_config=_json_safe(config),
-        embedding_available=bool(value.get("embeddingAvailable", bool(vectors))),
+        embedding_available=embedding_available,
         degraded_reason=value.get("degradedReason") if isinstance(value.get("degradedReason"), str) else None,
         built_at=value.get("builtAt") if isinstance(value.get("builtAt"), str) else None,
         build_duration_ms=(
@@ -2047,8 +2073,8 @@ def _partition_from_dict(value: Mapping[str, Any]) -> _Partition:
             else None
         ),
         embedding_dimension=(
-            int(value["embeddingDimension"])
-            if isinstance(value.get("embeddingDimension"), int)
+            int(stored_dimension)
+            if isinstance(stored_dimension, int)
             else (len(next(iter(vectors.values()))) if vectors else None)
         ),
     )
