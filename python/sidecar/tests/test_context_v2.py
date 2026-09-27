@@ -98,6 +98,7 @@ class Provider:
             "indexStatus": {"status": "ready", "backend": "hybrid", "path": "C:/private/index"},
             "retrievalTrace": [
                 {
+                    "documentId": "model:orders",
                     "source": "schema",
                     "retrievalType": "vector",
                     "relevance": 0.8,
@@ -202,7 +203,7 @@ class ContextV2Tests(unittest.TestCase):
             def ask_v2(self, params: object) -> dict[str, Any]:
                 value = super().ask_v2(params)
                 value["_authorizationCatalog"] = [
-                    {"name": "orders", "table": "physical_orders", "columns": ["order_id", "secret"]},
+                    {"name": "orders", "table": "orders", "columns": ["order_id", "secret"]},
                     {"name": "payroll", "table": "payroll_private", "columns": ["salary"]},
                 ]
                 columns = value["schema"]["models"][0]["columns"]
@@ -269,6 +270,21 @@ class ContextV2Tests(unittest.TestCase):
         self.assertNotIn("description", row_leak["result"]["schema"]["models"][0]["columns"][0])
         self.assertNotIn("org-private", json.dumps(row_leak["result"]))
 
+        class MismatchedPhysicalProvider(CatalogProvider):
+            def ask_v2(self, params: object) -> dict[str, Any]:
+                value = super().ask_v2(params)
+                value["_authorizationCatalog"][0]["table"] = "private_orders"
+                return value
+
+        mismatch = Dispatcher(context_provider=MismatchedPhysicalProvider()).dispatch(request({
+            "projectDir": "project", "question": "orders", "contextVersion": 2,
+            "authorizationPolicy": self.policy,
+        }))
+        self.assertTrue(mismatch["ok"])
+        self.assertEqual(mismatch["result"]["schema"]["models"], [])
+        self.assertEqual(mismatch["result"]["sqlExamples"], [])
+        self.assertEqual(mismatch["result"]["retrievalTrace"], [])
+
     def test_restricted_documents_are_filtered_before_retrieval_scoring(self) -> None:
         safe = SemanticDocument(
             id="column:orders.order_id", kind="column", projectRevision="r1",
@@ -284,6 +300,8 @@ class ContextV2Tests(unittest.TestCase):
         )
         unbound = SemanticDocument(id="rule:free-text", kind="rule", projectRevision="r1")
         self.assertTrue(semantic_document_visible(safe, self.policy))
+        self.assertTrue(semantic_document_visible(safe, self.policy, model_sources={"orders": "orders"}))
+        self.assertFalse(semantic_document_visible(safe, self.policy, model_sources={"orders": "private_orders"}))
         self.assertFalse(semantic_document_visible(denied, self.policy))
         self.assertFalse(semantic_document_visible(aggregate, self.policy))
         self.assertFalse(semantic_document_visible(unbound, self.policy))

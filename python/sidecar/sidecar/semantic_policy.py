@@ -45,7 +45,12 @@ def filter_semantic_result(
     raise _denied()
 
 
-def semantic_document_visible(document: Any, policy: Mapping[str, Any] | None) -> bool:
+def semantic_document_visible(
+    document: Any,
+    policy: Mapping[str, Any] | None,
+    *,
+    model_sources: Mapping[str, str | None] | None = None,
+) -> bool:
     """Return whether a document may participate in retrieval for ``policy``.
 
     This predicate is intentionally usable by retrieval backends before exact,
@@ -64,6 +69,16 @@ def semantic_document_visible(document: Any, policy: Mapping[str, Any] | None) -
     if unrestricted:
         return True
 
+    def model_rule(model: str) -> Mapping[str, Any] | None:
+        if model_sources is not None:
+            if model.lower() not in model_sources:
+                return None
+            source = model_sources[model.lower()]
+            if source is not None and (not isinstance(source, str) or not source):
+                return None
+            return _rule_for_name(source or model, rules)
+        return _rule_for_name(model, rules)
+
     def value(wire_name: str, python_name: str) -> Any:
         if isinstance(document, Mapping):
             return document.get(wire_name, document.get(python_name))
@@ -81,7 +96,7 @@ def semantic_document_visible(document: Any, policy: Mapping[str, Any] | None) -
         return False
     resolved: dict[str, Mapping[str, Any]] = {}
     for model in models:
-        rule = _rule_for_name(model, rules)
+        rule = model_rule(model)
         if rule is None:
             return False
         resolved[model.lower()] = rule
@@ -90,7 +105,7 @@ def semantic_document_visible(document: Any, policy: Mapping[str, Any] | None) -
         if len(pieces) != 2:
             return False
         model_name, column_name = pieces
-        rule = resolved.get(model_name) or _rule_for_name(model_name, rules)
+        rule = resolved.get(model_name) or model_rule(model_name)
         if rule is None:
             return False
         allowed = rule.get("allowedColumns")
@@ -229,12 +244,27 @@ def _filter_context_v2(
     # physical tables. Only a complete manifest catalog can justify copying
     # arbitrary descriptions into restricted Context; missing means fail closed.
     catalog_forbidden = _catalog_forbidden_identifiers(context_catalog, rules)
+    if context_catalog is not None and catalog_forbidden is None:
+        raise _denied()
+    catalog_sources = (
+        {item["name"].lower(): item.get("table") for item in context_catalog}
+        if catalog_forbidden is not None else None
+    )
     models: list[dict[str, Any]] = []
     model_columns: dict[str, set[str]] = {}
     for raw_model in raw_models:
         if not isinstance(raw_model, Mapping):
             continue
-        rule = _rule_for_name(raw_model.get("table") or raw_model.get("name"), rules)
+        name = raw_model.get("name")
+        if catalog_sources is not None:
+            if not isinstance(name, str) or name.lower() not in catalog_sources:
+                continue
+            # Native v2 strips physical tables from public Context. Recover
+            # the binding only from the complete private manifest catalog;
+            # an unrelated policy for the semantic alias cannot authorize it.
+            rule = _rule_for_name(catalog_sources[name.lower()] or name, rules)
+        else:
+            rule = _rule_for_name(raw_model.get("table") or name, rules)
         if rule is None:
             continue
         model = _filter_model(raw_model, rule, text_guard=catalog_forbidden)
@@ -252,7 +282,10 @@ def _filter_context_v2(
     filtered_rules = _filter_bound_records(result.get("rules"), model_columns, forbidden_identifiers, kind="rule")
     filtered_sql_examples = _filter_bound_records(result.get("sqlExamples"), model_columns, forbidden_identifiers, kind="sqlExample")
     filtered_views = _filter_bound_records(result.get("views"), model_columns, forbidden_identifiers, kind="view")
-    trace = _safe_v2_trace(result.get("retrievalTrace"), revision)
+    trace = _visible_v2_trace(
+        result.get("retrievalTrace"), revision, models, relationships,
+        filtered_metrics, filtered_rules, filtered_sql_examples, filtered_views,
+    )
     raw_counts = {
         "metrics": len(result.get("metrics", [])) if isinstance(result.get("metrics"), list) else 0,
         "rules": len(result.get("rules", [])) if isinstance(result.get("rules"), list) else 0,
@@ -434,6 +467,7 @@ def _catalog_forbidden_identifiers(
         return None
     forbidden: set[str] = set()
     allowed_model_names: set[str] = set()
+    seen_models: set[str] = set()
     for raw_model in catalog:
         if not isinstance(raw_model, Mapping):
             return None
@@ -444,8 +478,11 @@ def _catalog_forbidden_identifiers(
             not isinstance(column, str) or not column for column in columns
         ) or (table is not None and not isinstance(table, str)):
             return None
-        rule = _rule_for_name(table or name, rules) or _rule_for_name(name, rules)
-        if isinstance(table, str) and table:
+        if name.lower() in seen_models:
+            return None
+        seen_models.add(name.lower())
+        rule = _rule_for_name(table or name, rules)
+        if isinstance(table, str) and table and table.lower() != name.lower():
             forbidden.add(table.lower())
             if table.lower().rsplit(".", 1)[-1] != name.lower():
                 forbidden.add(table.lower().rsplit(".", 1)[-1])
@@ -626,6 +663,50 @@ def _safe_v2_trace(value: Any, revision: str) -> list[dict[str, Any]]:
             trace["selected"] = item["selected"]
         safe.append(trace)
     return safe
+
+
+def _visible_v2_trace(
+    value: Any,
+    revision: str,
+    models: list[dict[str, Any]],
+    relationships: list[dict[str, Any]],
+    metrics: list[dict[str, Any]],
+    rules: list[dict[str, Any]],
+    sql_examples: list[dict[str, Any]],
+    views: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Never expose a document ID for a record removed by authorization."""
+
+    visible: set[tuple[str, str]] = set()
+    for model in models:
+        name = model.get("name")
+        if isinstance(name, str):
+            visible.add(("schema", f"model:{name}"))
+            for column in model.get("columns", []):
+                field = column.get("name") if isinstance(column, Mapping) else None
+                if isinstance(field, str):
+                    visible.add(("schema", f"column:{name}.{field}"))
+    for item in relationships:
+        if isinstance(item.get("name"), str):
+            visible.add(("relationships", f"relationship:{item['name']}"))
+    kind_prefix = {"cube": "cube", "measure": "metric", "dimension": "dimension", "timeDimension": "time_dimension"}
+    for item in metrics:
+        name, cube, kind = item.get("name"), item.get("cube"), item.get("kind")
+        if kind == "cube" and isinstance(name, str):
+            visible.add(("metrics", f"cube:{name}"))
+        elif kind in kind_prefix and isinstance(cube, str) and isinstance(name, str):
+            visible.add(("metrics", f"{kind_prefix[kind]}:{cube}.{name}"))
+    for section, items in (("rules", rules), ("sqlExamples", sql_examples)):
+        for item in items:
+            if isinstance(item.get("id"), str):
+                visible.add((section, item["id"]))
+    for item in views:
+        if isinstance(item.get("name"), str):
+            visible.add(("views", f"view:{item['name']}"))
+    return [
+        item for item in _safe_v2_trace(value, revision)
+        if (item["source"], item.get("documentId")) in visible
+    ]
 
 
 def _safe_relationship_condition(

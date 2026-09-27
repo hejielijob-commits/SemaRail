@@ -397,8 +397,14 @@ class LazyWrenAdapter:
                 status = retriever.activate(revision)
             index_at = time.perf_counter()
             policy = params.get("authorizationPolicy")
+            model_sources = {
+                model["name"].lower(): model.get("table")
+                for model in _semantic_models(manifest, project_path)
+            }
             visibility = (
-                (lambda document: semantic_document_visible(document, policy))
+                (lambda document: semantic_document_visible(
+                    document, policy, model_sources=model_sources
+                ))
                 if isinstance(policy, Mapping)
                 else None
             )

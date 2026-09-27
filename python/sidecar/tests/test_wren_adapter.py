@@ -15,6 +15,40 @@ from sidecar.wren_adapter import LazyWrenAdapter, _semantic_question_type, defau
 
 
 class WrenAdapterTests(unittest.TestCase):
+    def test_v2_rejects_semantic_alias_with_unauthorized_physical_source_before_scoring(self) -> None:
+        manifest = {
+            "models": [{
+                "name": "orders", "tableReference": {"table": "private_orders"},
+                "columns": [{"name": "order_id", "type": "BIGINT"}],
+            }],
+            "relationships": [],
+        }
+        context = SimpleNamespace(build_json=lambda _: manifest)
+        with tempfile.TemporaryDirectory() as temp:
+            project = Path(temp)
+            (project / "wren_project.yml").write_text("name: demo\n", encoding="utf-8")
+            adapter = LazyWrenAdapter(
+                module_loader=lambda _: context,
+                version_provider=lambda: "0.13.2",
+                semantic_retriever=HybridSemanticRetriever(embedder=None),
+            )
+            response = Dispatcher(context_provider=adapter).dispatch({
+                "protocolVersion": "2", "id": "physical-source", "method": "context.ask",
+                "params": {
+                    "projectDir": str(project), "question": "orders", "contextVersion": 2,
+                    "authorizationPolicy": {
+                        "schemaVersion": 1, "defaultEffect": "deny",
+                        "tables": {"public.orders": {"allowedColumns": ["order_id"], "deniedColumns": []}},
+                    },
+                },
+                "traceId": "physical-source",
+            })
+        self.assertTrue(response["ok"])
+        result = response["result"]
+        self.assertEqual(result["schema"]["models"], [])
+        self.assertGreater(result["retrievalSummary"]["filteredCount"], 0)
+        self.assertNotIn("private_orders", str(result))
+
     def test_context_v2_keeps_all_composite_primary_key_columns(self) -> None:
         manifest = {
             "models": [{
