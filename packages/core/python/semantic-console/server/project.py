@@ -53,6 +53,46 @@ class ProjectValidator(Protocol):
     def build(self, project_dir: Path) -> dict[str, Any]: ...
 
 
+class SemanticIndexLifecycle(Protocol):
+    """Publish-time seam for staging and atomically activating one revision."""
+
+    def stage(self, manifest: Mapping[str, Any], project_dir: Path, revision: str) -> None: ...
+
+    def activate(self, revision: str) -> None: ...
+
+    def status(self, revision: str | None = None) -> Mapping[str, Any]: ...
+
+
+class _SidecarSemanticIndexLifecycle:
+    def __init__(self, storage_path: Path) -> None:
+        from sidecar.semantic_retrieval import create_default_retriever  # type: ignore[import-not-found]
+
+        self._retriever = create_default_retriever(storage_path)
+
+    def stage(self, manifest: Mapping[str, Any], project_dir: Path, revision: str) -> None:
+        from sidecar.semantic_index import build_semantic_documents  # type: ignore[import-not-found]
+
+        documents = build_semantic_documents(
+            manifest, project_dir, project_revision=revision
+        )
+        self._retriever.build(documents, revision=revision)
+
+    def activate(self, revision: str) -> None:
+        self._retriever.activate(revision)
+
+    def status(self, revision: str | None = None) -> Mapping[str, Any]:
+        return self._retriever.status(revision).to_dict()
+
+
+def _default_semantic_index_lifecycle(storage_path: Path) -> SemanticIndexLifecycle | None:
+    try:
+        return _SidecarSemanticIndexLifecycle(storage_path)
+    except (ImportError, ModuleNotFoundError):
+        return None
+    except ValueError as exc:
+        raise ProjectError("INDEX_CONFIG_INVALID", "semantic index configuration is invalid") from exc
+
+
 _IGNORED_DIRS = frozenset({".git", ".wren", "target", "__pycache__", ".semantic-console", "node_modules", ".venv", "venv", "dist", "build", "state"})
 _MAX_FILE_BYTES = 2 * 1024 * 1024
 _SAFE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]*$")
@@ -429,6 +469,7 @@ class ProjectStore:
         *,
         state_dir: str | Path | None = None,
         validator: ProjectValidator | None = None,
+        semantic_index_lifecycle: SemanticIndexLifecycle | None = None,
     ) -> None:
         configured = project_dir or os.environ.get("WREN_PROJECT_HOME") or os.getcwd()
         self.project_dir = Path(configured).expanduser().resolve()
@@ -452,6 +493,9 @@ class ProjectStore:
         self.versions_dir = self.state_dir / "versions"
         self.versions_dir.mkdir(parents=True, exist_ok=True)
         self.validator = validator or WrenProjectAdapter()
+        self.semantic_index_lifecycle = semantic_index_lifecycle or _default_semantic_index_lifecycle(
+            self.state_dir / "semantic-index"
+        )
         self.drafts: dict[str, str | None] = {}
         self._lock = threading.RLock()
         self._datasources: dict[str, DatasourceRecord] = {}
@@ -723,6 +767,56 @@ class ProjectStore:
             finally:
                 shutil.rmtree(stage, ignore_errors=True)
 
+    def semantic_index_status(self) -> dict[str, Any]:
+        """Return safe status for the currently published MDL revision."""
+
+        with self._lock:
+            revision = _file_digest(self.project_dir, exclude=self.state_dir)
+            lifecycle = self.semantic_index_lifecycle
+            status_method = getattr(lifecycle, "status", None) if lifecycle is not None else None
+            if not callable(status_method):
+                return {
+                    "status": "unavailable",
+                    "backend": "none",
+                    "indexedRevision": revision,
+                    "staleReason": "backendUnavailable",
+                }
+            try:
+                raw = status_method(revision)
+            except Exception as exc:
+                raise ProjectError("INDEX_STATUS_FAILED", "semantic index status is unavailable") from exc
+            if not isinstance(raw, Mapping):
+                raise ProjectError("INDEX_STATUS_FAILED", "semantic index status is unavailable")
+            # The retriever status is already path-free and JSON-safe. Keep a
+            # strict allow-list here so a custom lifecycle cannot expose its
+            # storage directory or provider internals.
+            allowed = {
+                "status", "state", "backend", "revision", "activeRevision",
+                "indexedRevision", "documentCount", "staleReason", "degradedReason",
+                "vectorAvailable", "embeddingModelId", "embeddingModelVersion",
+                "embeddingDimension", "indexBuildVersion", "lastBuildAt", "buildDurationMs",
+            }
+            return {key: raw[key] for key in allowed if key in raw}
+
+    def rebuild_semantic_index(self) -> dict[str, Any]:
+        """Rebuild and atomically activate the index for published MDL only."""
+
+        with self._lock:
+            lifecycle = self.semantic_index_lifecycle
+            if lifecycle is None:
+                raise ProjectError("INDEX_UNAVAILABLE", "semantic index backend is unavailable")
+            result = self.validator.validate(self.project_dir)
+            if not isinstance(result, dict) or not result.get("valid"):
+                raise ProjectError("VALIDATION_FAILED", "published project validation failed", _safe_details(result if isinstance(result, dict) else None))
+            manifest = self.validator.build(self.project_dir)
+            revision = _file_digest(self.project_dir, exclude=self.state_dir)
+            self._stage_semantic_index(manifest, self.project_dir, revision)
+            try:
+                lifecycle.activate(revision)
+            except Exception as exc:
+                raise ProjectError("INDEX_ACTIVATION_FAILED", "semantic index could not be activated") from exc
+            return self.semantic_index_status()
+
     @contextmanager
     def staged_snapshot(self) -> Iterator[tuple[Path, str]]:
         """Yield an isolated source tree containing the current draft overlay.
@@ -754,7 +848,9 @@ class ProjectStore:
                 manifest = self.validator.build(stage)
                 if isinstance(self.validator, WrenProjectAdapter):
                     self.validator.write_target(stage, manifest)
-                return self._publish_stage(stage, label=label, revision=_file_digest(self.project_dir, self.drafts, exclude=self.state_dir), clear_drafts=True)
+                revision = _file_digest(self.project_dir, self.drafts, exclude=self.state_dir)
+                self._stage_semantic_index(manifest, stage, revision)
+                return self._publish_stage(stage, label=label, revision=revision, clear_drafts=True)
             except ProjectError:
                 raise
             finally:
@@ -799,7 +895,9 @@ class ProjectStore:
                 manifest = self.validator.build(stage)
                 if isinstance(self.validator, WrenProjectAdapter):
                     self.validator.write_target(stage, manifest)
-                return self._publish_stage(stage, label=f"rollback:{version_id}", revision=_file_digest(snapshot), clear_drafts=True)
+                revision = _file_digest(snapshot)
+                self._stage_semantic_index(manifest, stage, revision)
+                return self._publish_stage(stage, label=f"rollback:{version_id}", revision=revision, clear_drafts=True)
             finally:
                 if stage.exists():
                     shutil.rmtree(stage, ignore_errors=True)
@@ -840,10 +938,16 @@ class ProjectStore:
         try:
             self.project_dir.parent.mkdir(parents=True, exist_ok=True)
             self._replace_managed_files(stage, backup)
+            if self.semantic_index_lifecycle is not None:
+                self.semantic_index_lifecycle.activate(revision)
             swapped = True
             shutil.rmtree(backup, ignore_errors=True)
         except Exception as exc:
             self._restore_managed_files(backup)
+            # A failed activation is not a publishable version. Keeping the
+            # pre-created snapshot would expose an orphan revision that was
+            # never active and could later be selected for rollback.
+            shutil.rmtree(version_dir, ignore_errors=True)
             raise ProjectError("PUBLISH_FAILED", "project could not be published") from exc
         finally:
             if backup.exists() and swapped:
@@ -855,6 +959,24 @@ class ProjectStore:
         metadata = record.public()
         version_dir.joinpath("version.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
         return {"version": metadata, "project": self.overview()}
+
+    def _stage_semantic_index(
+        self,
+        manifest: Mapping[str, Any],
+        stage: Path,
+        revision: str,
+    ) -> None:
+        if self.semantic_index_lifecycle is None:
+            return
+        try:
+            self.semantic_index_lifecycle.stage(manifest, stage, revision)
+        except ProjectError:
+            raise
+        except Exception as exc:
+            raise ProjectError(
+                "INDEX_BUILD_FAILED",
+                "semantic index could not be built for the validated revision",
+            ) from exc
 
     def _replace_managed_files(self, stage: Path, backup: Path) -> None:
         """Transactionally replace source/target files while preserving Git.
@@ -1013,5 +1135,6 @@ __all__ = [
     "ProjectError",
     "ProjectStore",
     "ProjectValidator",
+    "SemanticIndexLifecycle",
     "WrenProjectAdapter",
 ]

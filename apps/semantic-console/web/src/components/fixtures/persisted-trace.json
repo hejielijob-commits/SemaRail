@@ -1,0 +1,33 @@
+{
+  "id": "atr_fixture",
+  "source": "codex",
+  "sourceSessionId": "thr_fixture",
+  "sourceTurnId": "turn_fixture",
+  "subjectId": "service_fixture",
+  "startedAt": "2026-09-30T08:00:00Z",
+  "endedAt": "2026-09-30T08:00:08Z",
+  "status": "success",
+  "model": "gpt-6-luna",
+  "tokenUsage": null,
+  "eventCount": 12,
+  "issueCount": 1,
+  "coreTraceIds": ["trace_core_failure", "trace_core_second"],
+  "coreDiagnostics": [{"traceId": "trace_core_failure", "method": "query.run", "status": "failure", "stage": "execution", "durationMs": 6.0, "phaseSpans": [{"name": "authentication", "status": "success", "durationMs": 1.0}, {"name": "policy", "status": "success", "durationMs": 2.0}, {"name": "runtime", "status": "failure", "durationMs": 3.0}], "issueIds": ["fb_core_failure"]}, {"traceId": "trace_core_second", "method": "query.run", "status": "failure", "stage": "execution", "durationMs": 3.0, "phaseSpans": [{"name": "runtime", "status": "failure", "durationMs": 3.0}], "issueIds": ["fb_core_second"]}],
+  "issueIds": ["fb_core_failure", "fb_core_second"],
+  "createdAt": "2026-09-30T08:00:00Z",
+  "expiresAt": "2026-10-30T08:00:00Z",
+  "events": [
+    {"eventId": "tool-end:call-failed", "occurredAt": "2026-09-30T08:00:05Z", "type": "tool_completed", "toolUseId": "call-failed", "toolName": "mcp__semarail__query", "status": "failure", "coreTraceId": "trace_core_failure"},
+    {"eventId": "tool-start:call-second", "occurredAt": "2026-09-30T08:00:05Z", "type": "tool_started", "toolUseId": "call-second", "toolName": "mcp__semarail__query", "status": "running"},
+    {"eventId": "tool-end:call-second", "occurredAt": "2026-09-30T08:00:06Z", "type": "tool_completed", "toolUseId": "call-second", "toolName": "mcp__semarail__query", "status": "failure", "coreTraceId": "trace_core_second"},
+    {"eventId": "subagent-start:agent-b", "occurredAt": "2026-09-30T08:00:02Z", "type": "subagent_started", "agentId": "agent-b", "status": "running"},
+    {"eventId": "turn-end", "occurredAt": "2026-09-30T08:00:08Z", "type": "turn_completed", "status": "success"},
+    {"eventId": "tool-start:call-failed", "occurredAt": "2026-09-30T08:00:03Z", "type": "tool_started", "toolUseId": "call-failed", "toolName": "mcp__semarail__query", "status": "running"},
+    {"eventId": "turn-start", "occurredAt": "2026-09-30T08:00:00Z", "type": "turn_started", "model": "gpt-6-luna", "status": "running"},
+    {"eventId": "subagent-start:agent-a", "occurredAt": "2026-09-30T08:00:01Z", "type": "subagent_started", "agentId": "agent-a", "status": "running"},
+    {"eventId": "subagent-end:agent-a", "occurredAt": "2026-09-30T08:00:06Z", "type": "subagent_completed", "agentId": "agent-a", "status": "success"},
+    {"eventId": "subagent-end:agent-b", "occurredAt": "2026-09-30T08:00:07Z", "type": "subagent_completed", "agentId": "agent-b"},
+    {"eventId": "tool-start:call-missing-end", "occurredAt": "2026-09-30T08:00:04Z", "type": "tool_started", "toolUseId": "call-missing-end", "toolName": "Bash", "status": "running"},
+    {"eventId": "output", "occurredAt": "2026-09-30T08:00:08Z", "type": "output"}
+  ]
+}

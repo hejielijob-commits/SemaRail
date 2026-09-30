@@ -1,0 +1,1253 @@
+{
+  "schemaVersion": 1,
+  "corpusId": "semarail-hr-enterprise-v1",
+  "source": "golden-questions.json (read-only)",
+  "metricContract": {
+    "recall": "mean per-question fraction of required IDs in top K",
+    "mrr": "mean reciprocal rank of the first required ID",
+    "ndcg": "binary relevance NDCG over required IDs",
+    "estimatedTokens": "ceil(UTF-8 context bytes / 4)",
+    "permissionLeakage": "count of forbidden IDs present in client-visible candidates"
+  },
+  "questions": [
+    {
+      "questionId": "current-headcount",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.employee_id",
+        "column:employees.resigned"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-01"
+      ],
+      "requiredSqlExamples": [
+        "sql_example:knowledge/sql/current-headcount-by-department"
+      ],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "headcount-region",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.employee_id",
+        "column:employees.region_code",
+        "column:employees.resigned"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-01",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "headcount-department",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.employee_id",
+        "column:employees.department_code",
+        "column:employees.resigned"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-01",
+        "rule:hr-metrics#query-shape-查询结果形状-04",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [
+        "sql_example:knowledge/sql/current-headcount-by-department"
+      ],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "attrition-rate",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.resigned"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-02"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "attrition-region",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.region_code",
+        "column:employees.resigned"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-02",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "average-age",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.age",
+        "column:employees.resigned"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "gender-count",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.gender",
+        "column:employees.resigned"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "education-count",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.education_level"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "top-job-titles",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.job_title"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-01",
+        "rule:hr-metrics#query-shape-查询结果形状-04"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "remote-frequency",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.remote_work_frequency"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#query-shape-查询结果形状-02"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "average-projects",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.region_code",
+        "column:employees.projects_handled"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "average-training",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.department_code",
+        "column:employees.training_hours"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-04",
+        "rule:hr-metrics#query-shape-查询结果形状-04",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "average-work-hours",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.region_code",
+        "column:employees.work_hours_per_week"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "promotion-count",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.region_code",
+        "column:employees.promotions"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "resigned-department",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.department_code",
+        "column:employees.resigned"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#query-shape-查询结果形状-04",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "current-salary-region",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:compensation_history"
+      ],
+      "requiredColumns": [
+        "column:compensation_history.effective_date",
+        "column:compensation_history.region_code",
+        "column:compensation_history.monthly_salary"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-03",
+        "rule:hr-metrics#query-shape-查询结果形状-03",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [
+        "sql_example:knowledge/sql/current-average-salary"
+      ],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "current-salary-title",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:compensation_history",
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:compensation_history.employee_id",
+        "column:compensation_history.effective_date",
+        "column:compensation_history.monthly_salary",
+        "column:employees.employee_id",
+        "column:employees.job_title"
+      ],
+      "requiredRelationships": [
+        "relationship:compensation_employee"
+      ],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-03",
+        "rule:hr-metrics#query-shape-查询结果形状-03",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-01",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-02",
+        "rule:hr-metrics#query-shape-查询结果形状-04"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "current-performance-region",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:performance_reviews"
+      ],
+      "requiredColumns": [
+        "column:performance_reviews.review_date",
+        "column:performance_reviews.region_code",
+        "column:performance_reviews.performance_score"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-04",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "current-satisfaction-region",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:performance_reviews"
+      ],
+      "requiredColumns": [
+        "column:performance_reviews.review_date",
+        "column:performance_reviews.region_code",
+        "column:performance_reviews.satisfaction_score"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-04",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "annual-overtime-region",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:attendance_monthly"
+      ],
+      "requiredColumns": [
+        "column:attendance_monthly.attendance_month",
+        "column:attendance_monthly.region_code",
+        "column:attendance_monthly.overtime_hours_rolling_12m"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-05",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "annual-sick-region",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:attendance_monthly"
+      ],
+      "requiredColumns": [
+        "column:attendance_monthly.attendance_month",
+        "column:attendance_monthly.region_code",
+        "column:attendance_monthly.sick_days_rolling_12m"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-05",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "manager-count",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.manager_id",
+        "column:employees.resigned"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-01",
+        "rule:hr-metrics#security-semantics-安全语义-04"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "departments-per-region",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:departments"
+      ],
+      "requiredColumns": [
+        "column:departments.region_code"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "region-directory",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:regions"
+      ],
+      "requiredColumns": [
+        "column:regions.region_code",
+        "column:regions.region_name_en",
+        "column:regions.region_name_zh"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "active-by-remote",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.remote_work_frequency",
+        "column:employees.resigned"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-01",
+        "rule:hr-metrics#query-shape-查询结果形状-02"
+      ],
+      "requiredSqlExamples": [
+        "sql_example:knowledge/sql/current-headcount-by-department"
+      ],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "employee-profile",
+      "language": "en",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.employee_id",
+        "column:employees.department_code",
+        "column:employees.region_code",
+        "column:employees.job_title"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06",
+        "rule:hr-metrics#security-semantics-安全语义-02"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "employee-salary",
+      "language": "en",
+      "requiredModels": [
+        "model:compensation_history"
+      ],
+      "requiredColumns": [
+        "column:compensation_history.employee_id",
+        "column:compensation_history.effective_date",
+        "column:compensation_history.monthly_salary"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-03",
+        "rule:hr-metrics#query-shape-查询结果形状-03",
+        "rule:hr-metrics#security-semantics-安全语义-02"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "manager-report-count",
+      "language": "en",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.employee_id",
+        "column:employees.manager_id"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-04"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "hrbp-active-count",
+      "language": "en",
+      "requiredModels": [
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:employees.resigned",
+        "column:employees.region_code"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-01",
+        "rule:hr-metrics#security-semantics-安全语义-02"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "comp-admin-average",
+      "language": "en",
+      "requiredModels": [
+        "model:compensation_history"
+      ],
+      "requiredColumns": [
+        "column:compensation_history.effective_date",
+        "column:compensation_history.monthly_salary",
+        "column:compensation_history.region_code"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-03",
+        "rule:hr-metrics#query-shape-查询结果形状-03",
+        "rule:hr-metrics#security-semantics-安全语义-02"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "salary-trend",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:compensation_history"
+      ],
+      "requiredColumns": [
+        "column:compensation_history.effective_date",
+        "column:compensation_history.monthly_salary"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#query-shape-查询结果形状-03",
+        "rule:hr-metrics#query-shape-查询结果形状-02"
+      ],
+      "requiredSqlExamples": [
+        "sql_example:knowledge/sql/current-average-salary"
+      ],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "performance-trend",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:performance_reviews"
+      ],
+      "requiredColumns": [
+        "column:performance_reviews.review_date",
+        "column:performance_reviews.performance_score"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#query-shape-查询结果形状-03",
+        "rule:hr-metrics#query-shape-查询结果形状-02"
+      ],
+      "requiredSqlExamples": [
+        "sql_example:knowledge/sql/quarterly-performance-trend"
+      ],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "satisfaction-trend",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:performance_reviews"
+      ],
+      "requiredColumns": [
+        "column:performance_reviews.review_date",
+        "column:performance_reviews.satisfaction_score"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#query-shape-查询结果形状-03",
+        "rule:hr-metrics#query-shape-查询结果形状-02"
+      ],
+      "requiredSqlExamples": [
+        "sql_example:knowledge/sql/quarterly-performance-trend"
+      ],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "overtime-trend",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:attendance_monthly"
+      ],
+      "requiredColumns": [
+        "column:attendance_monthly.attendance_month",
+        "column:attendance_monthly.overtime_hours"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#query-shape-查询结果形状-03",
+        "rule:hr-metrics#query-shape-查询结果形状-02"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "sick-trend",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:attendance_monthly"
+      ],
+      "requiredColumns": [
+        "column:attendance_monthly.attendance_month",
+        "column:attendance_monthly.sick_days"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#query-shape-查询结果形状-03",
+        "rule:hr-metrics#query-shape-查询结果形状-02"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "salary-performance-region",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:compensation_history",
+        "model:performance_reviews"
+      ],
+      "requiredColumns": [
+        "column:compensation_history.employee_id",
+        "column:compensation_history.effective_date",
+        "column:compensation_history.region_code",
+        "column:compensation_history.monthly_salary",
+        "column:performance_reviews.employee_id",
+        "column:performance_reviews.review_date",
+        "column:performance_reviews.performance_score"
+      ],
+      "requiredRelationships": [
+        "relationship:compensation_employee",
+        "relationship:performance_employee"
+      ],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-03",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-04",
+        "rule:hr-metrics#query-shape-查询结果形状-03",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-01",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-02",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [
+        "sql_example:knowledge/sql/current-salary-performance-by-region"
+      ],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "overtime-performance-department",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:attendance_monthly",
+        "model:performance_reviews"
+      ],
+      "requiredColumns": [
+        "column:attendance_monthly.employee_id",
+        "column:attendance_monthly.attendance_month",
+        "column:attendance_monthly.department_code",
+        "column:attendance_monthly.overtime_hours_rolling_12m",
+        "column:performance_reviews.employee_id",
+        "column:performance_reviews.review_date",
+        "column:performance_reviews.performance_score"
+      ],
+      "requiredRelationships": [
+        "relationship:attendance_employee",
+        "relationship:performance_employee"
+      ],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-04",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-05",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-01",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-02",
+        "rule:hr-metrics#query-shape-查询结果形状-04",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "salary-attrition-region",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees",
+        "model:compensation_history"
+      ],
+      "requiredColumns": [
+        "column:employees.employee_id",
+        "column:employees.region_code",
+        "column:employees.resigned",
+        "column:compensation_history.employee_id",
+        "column:compensation_history.effective_date",
+        "column:compensation_history.monthly_salary"
+      ],
+      "requiredRelationships": [
+        "relationship:compensation_employee"
+      ],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-02",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-03",
+        "rule:hr-metrics#query-shape-查询结果形状-03",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-01",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-02",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "training-performance",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees",
+        "model:performance_reviews"
+      ],
+      "requiredColumns": [
+        "column:employees.employee_id",
+        "column:employees.training_hours",
+        "column:performance_reviews.employee_id",
+        "column:performance_reviews.review_date",
+        "column:performance_reviews.performance_score"
+      ],
+      "requiredRelationships": [
+        "relationship:performance_employee"
+      ],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-04",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-01",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-02",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-04",
+        "rule:hr-metrics#query-shape-查询结果形状-02"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "remote-satisfaction",
+      "language": "zh-CN",
+      "requiredModels": [
+        "model:employees",
+        "model:performance_reviews"
+      ],
+      "requiredColumns": [
+        "column:employees.employee_id",
+        "column:employees.remote_work_frequency",
+        "column:performance_reviews.employee_id",
+        "column:performance_reviews.review_date",
+        "column:performance_reviews.satisfaction_score"
+      ],
+      "requiredRelationships": [
+        "relationship:performance_employee"
+      ],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-04",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-01",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-02",
+        "rule:hr-metrics#query-shape-查询结果形状-02"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "manager-performance",
+      "language": "en",
+      "requiredModels": [
+        "model:performance_reviews"
+      ],
+      "requiredColumns": [
+        "column:performance_reviews.review_date",
+        "column:performance_reviews.performance_score",
+        "column:performance_reviews.manager_id"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-04",
+        "rule:hr-metrics#security-semantics-安全语义-04"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "hrbp-performance-department",
+      "language": "en",
+      "requiredModels": [
+        "model:performance_reviews"
+      ],
+      "requiredColumns": [
+        "column:performance_reviews.review_date",
+        "column:performance_reviews.department_code",
+        "column:performance_reviews.performance_score",
+        "column:performance_reviews.region_code"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-04",
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-06",
+        "rule:hr-metrics#security-semantics-安全语义-02"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "comp-salary-trend",
+      "language": "en",
+      "requiredModels": [
+        "model:compensation_history"
+      ],
+      "requiredColumns": [
+        "column:compensation_history.effective_date",
+        "column:compensation_history.monthly_salary",
+        "column:compensation_history.region_code"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#query-shape-查询结果形状-03",
+        "rule:hr-metrics#query-shape-查询结果形状-02",
+        "rule:hr-metrics#security-semantics-安全语义-02"
+      ],
+      "requiredSqlExamples": [
+        "sql_example:knowledge/sql/current-average-salary"
+      ],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "employee-attendance",
+      "language": "en",
+      "requiredModels": [
+        "model:attendance_monthly"
+      ],
+      "requiredColumns": [
+        "column:attendance_monthly.attendance_month",
+        "column:attendance_monthly.overtime_hours",
+        "column:attendance_monthly.sick_days",
+        "column:attendance_monthly.employee_id"
+      ],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#query-shape-查询结果形状-03",
+        "rule:hr-metrics#security-semantics-安全语义-02"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "salary-change-title",
+      "language": "en",
+      "requiredModels": [
+        "model:compensation_history",
+        "model:employees"
+      ],
+      "requiredColumns": [
+        "column:compensation_history.employee_id",
+        "column:compensation_history.effective_date",
+        "column:compensation_history.monthly_salary",
+        "column:employees.employee_id",
+        "column:employees.job_title"
+      ],
+      "requiredRelationships": [
+        "relationship:compensation_employee"
+      ],
+      "requiredRules": [
+        "rule:hr-metrics#hr-metric-definitions-人力指标口径-03",
+        "rule:hr-metrics#query-shape-查询结果形状-03",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-01",
+        "rule:hr-metrics#cross-model-analysis-跨模型分析-02",
+        "rule:hr-metrics#query-shape-查询结果形状-04"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": []
+    },
+    {
+      "questionId": "deny-employee-age",
+      "language": "en",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [],
+      "forbiddenColumns": [
+        "column:employees.gender",
+        "column:employees.age"
+      ]
+    },
+    {
+      "questionId": "deny-employee-performance",
+      "language": "en",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [
+        "model:performance_reviews"
+      ],
+      "forbiddenColumns": [
+        "column:performance_reviews.employee_id",
+        "column:performance_reviews.department_code",
+        "column:performance_reviews.performance_score"
+      ]
+    },
+    {
+      "questionId": "deny-employee-satisfaction",
+      "language": "en",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [
+        "model:performance_reviews"
+      ],
+      "forbiddenColumns": [
+        "column:performance_reviews.employee_id",
+        "column:performance_reviews.satisfaction_score"
+      ]
+    },
+    {
+      "questionId": "deny-manager-salary",
+      "language": "en",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-04",
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [
+        "model:compensation_history"
+      ],
+      "forbiddenColumns": [
+        "column:compensation_history.employee_id",
+        "column:compensation_history.monthly_salary"
+      ]
+    },
+    {
+      "questionId": "deny-manager-salary-average",
+      "language": "en",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [
+        "model:compensation_history"
+      ],
+      "forbiddenColumns": [
+        "column:compensation_history.monthly_salary"
+      ]
+    },
+    {
+      "questionId": "deny-manager-salary-history",
+      "language": "zh-CN",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-04",
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [
+        "model:compensation_history"
+      ],
+      "forbiddenColumns": [
+        "column:compensation_history.employee_id",
+        "column:compensation_history.effective_date",
+        "column:compensation_history.monthly_salary"
+      ]
+    },
+    {
+      "questionId": "deny-hrbp-salary",
+      "language": "zh-CN",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [
+        "model:compensation_history"
+      ],
+      "forbiddenColumns": [
+        "column:compensation_history.employee_id",
+        "column:compensation_history.region_code",
+        "column:compensation_history.monthly_salary"
+      ]
+    },
+    {
+      "questionId": "deny-hrbp-salary-rank",
+      "language": "zh-CN",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [
+        "model:compensation_history"
+      ],
+      "forbiddenColumns": [
+        "column:compensation_history.employee_id",
+        "column:compensation_history.monthly_salary"
+      ]
+    },
+    {
+      "questionId": "deny-hrbp-salary-average",
+      "language": "zh-CN",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [
+        "model:compensation_history"
+      ],
+      "forbiddenColumns": [
+        "column:compensation_history.effective_date",
+        "column:compensation_history.monthly_salary"
+      ]
+    },
+    {
+      "questionId": "deny-comp-performance",
+      "language": "zh-CN",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [
+        "model:performance_reviews"
+      ],
+      "forbiddenColumns": [
+        "column:performance_reviews.employee_id",
+        "column:performance_reviews.performance_score"
+      ]
+    },
+    {
+      "questionId": "deny-comp-satisfaction",
+      "language": "en",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [
+        "model:performance_reviews"
+      ],
+      "forbiddenColumns": [
+        "column:performance_reviews.employee_id",
+        "column:performance_reviews.satisfaction_score"
+      ]
+    },
+    {
+      "questionId": "deny-comp-performance-average",
+      "language": "en",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [
+        "model:performance_reviews"
+      ],
+      "forbiddenColumns": [
+        "column:performance_reviews.performance_score"
+      ]
+    },
+    {
+      "questionId": "deny-manager-comp-join",
+      "language": "en",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [
+        "model:compensation_history"
+      ],
+      "forbiddenColumns": [
+        "column:compensation_history.employee_id",
+        "column:compensation_history.monthly_salary"
+      ]
+    },
+    {
+      "questionId": "deny-hrbp-comp-join",
+      "language": "en",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [
+        "model:compensation_history"
+      ],
+      "forbiddenColumns": [
+        "column:compensation_history.employee_id",
+        "column:compensation_history.monthly_salary"
+      ]
+    },
+    {
+      "questionId": "deny-comp-review-join",
+      "language": "en",
+      "requiredModels": [],
+      "requiredColumns": [],
+      "requiredRelationships": [],
+      "requiredRules": [
+        "rule:hr-metrics#security-semantics-安全语义-03",
+        "rule:hr-metrics#security-semantics-安全语义-01"
+      ],
+      "requiredSqlExamples": [],
+      "forbiddenModels": [
+        "model:performance_reviews"
+      ],
+      "forbiddenColumns": [
+        "column:performance_reviews.employee_id",
+        "column:performance_reviews.satisfaction_score"
+      ]
+    }
+  ]
+}

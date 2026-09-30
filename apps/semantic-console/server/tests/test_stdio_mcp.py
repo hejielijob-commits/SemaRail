@@ -59,6 +59,7 @@ class _CoreHandler(BaseHTTPRequestHandler):
             payload = {
                 "protocolVersion": body["protocolVersion"],
                 "id": body["id"],
+                "traceId": "trace-stdio-success",
                 "ok": True,
                 "result": type(self).response_result or {"schemaVersion": 1, "method": body["method"]},
             }
@@ -66,6 +67,7 @@ class _CoreHandler(BaseHTTPRequestHandler):
             payload = {
                 "protocolVersion": body["protocolVersion"],
                 "id": body["id"],
+                "traceId": (type(self).response_error or {}).get("traceId", "trace-stdio-error"),
                 "ok": False,
                 "error": type(self).response_error or {"code": "FORBIDDEN", "message": "denied"},
             }
@@ -167,7 +169,8 @@ class StdioMcpTests(unittest.TestCase):
             {key for key in request["body"] if key not in {"id"}},
             {"protocolVersion", "method", "params"},
         )
-        self.assertEqual(request["body"]["protocolVersion"], "2")
+        self.assertEqual(request["body"]["protocolVersion"], "3")
+        self.assertEqual(result.trace_id, "trace-stdio-success")
         self.assertNotIn(token, str(result))
 
     def test_detailed_core_error_is_preserved_for_mcp(self) -> None:
@@ -191,6 +194,38 @@ class StdioMcpTests(unittest.TestCase):
             asyncio.run(CoreHttpTransport(self.endpoint, token).call("query.run", {}))
 
         self.assertEqual(json.loads(str(caught.exception)), expected)
+
+    def test_redacted_core_error_preserves_v3_correlation_in_official_client(self) -> None:
+        token = "sr_live_" + "e" * 24 + "_" + "f" * 32
+        _CoreHandler.response_status = 403
+        # An incomplete resource descriptor cannot enter the detailed error
+        # payload, but its request-matched correlation remains safe.
+        _CoreHandler.response_error = {
+            "code": "POLICY_DENIED", "phase": "authorization", "message": "denied",
+            "retryable": False, "reasonCode": "DATASOURCE_PERMISSION_REQUIRED",
+            "resources": [{"kind": "datasource", "name": ""}],
+            "requiredPermissions": ["datasource:access"], "suggestion": "Ask an administrator.",
+            "origin": "semarail-policy", "traceId": "trace-redacted-error",
+        }
+
+        async def exercise() -> Any:
+            environment = dict(os.environ)
+            environment["SEMARAIL_MCP_TOKEN"] = token
+            parameters = StdioServerParameters(
+                command=sys.executable,
+                args=["-m", "server.stdio_mcp", "--endpoint", self.endpoint],
+                cwd=str(Path(__file__).resolve().parents[2]), env=environment,
+            )
+            async with stdio_client(parameters) as (read_stream, write_stream):
+                async with ClientSession(read_stream, write_stream) as session:
+                    await session.initialize()
+                    return await session.call_tool("semarail_list_models", {})
+
+        called = asyncio.run(exercise())
+        self.assertTrue(called.isError)
+        self.assertEqual(called.meta, {"traceId": "trace-redacted-error"})
+        self.assertNotIn(token, str(called))
+        self.assertNotIn("resources", called.content[0].text)
 
     def test_official_mcp_client_talks_stdio_while_bridge_calls_core(self) -> None:
         token = "sr_live_" + "e" * 24 + "_" + "f" * 32
@@ -216,6 +251,8 @@ class StdioMcpTests(unittest.TestCase):
         tools, called = asyncio.run(exercise())
         self.assertEqual(len(tools), 7)
         self.assertFalse(called.isError)
+        self.assertEqual(called.meta, {"traceId": "trace-stdio-success"})
+        self.assertNotIn("traceId", called.structuredContent)
         self.assertEqual(_CoreHandler.requests[-1]["authorization"], f"Bearer {token}")
         self.assertEqual(_CoreHandler.requests[-1]["body"]["method"], "context.ask")
         self.assertNotIn(token, str(called))

@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "ruleMetadata": {
+    "HR metric definitions / 人力指标口径-01": {
+      "models": ["employees"],
+      "fields": ["employees.employee_id", "employees.resigned"],
+      "ruleType": "metric_definition", "priority": 100, "mandatory": true,
+      "aliases": ["headcount", "current headcount", "active employee count", "员工数", "在职人数"]
+    },
+    "HR metric definitions / 人力指标口径-02": {
+      "models": ["employees"], "fields": ["employees.resigned"],
+      "ruleType": "metric_definition", "priority": 100, "mandatory": true,
+      "aliases": ["attrition rate", "resignation rate", "resigned employees", "离职率", "已离职员工"]
+    },
+    "HR metric definitions / 人力指标口径-03": {
+      "models": ["compensation_history"],
+      "fields": ["compensation_history.monthly_salary", "compensation_history.effective_date"],
+      "ruleType": "metric_definition", "priority": 100, "mandatory": true,
+      "aliases": ["current average salary", "current monthly salary", "latest salary", "salary history", "当前平均月薪", "月薪", "薪资历史"]
+    },
+    "HR metric definitions / 人力指标口径-04": {
+      "models": ["performance_reviews"],
+      "fields": ["performance_reviews.performance_score", "performance_reviews.satisfaction_score", "performance_reviews.review_date"],
+      "ruleType": "metric_definition", "priority": 100, "mandatory": true,
+      "aliases": ["current performance", "current satisfaction", "latest performance", "latest satisfaction", "当前绩效", "当前满意度"]
+    },
+    "HR metric definitions / 人力指标口径-05": {
+      "models": ["attendance_monthly"],
+      "fields": ["attendance_monthly.overtime_hours_rolling_12m", "attendance_monthly.sick_days_rolling_12m", "attendance_monthly.attendance_month"],
+      "ruleType": "metric_definition", "priority": 100, "mandatory": true,
+      "aliases": ["annual overtime", "annual sick leave", "rolling 12 months", "年度加班", "年度病假", "过去 12 个月"]
+    },
+    "HR metric definitions / 人力指标口径-06": {
+      "models": ["employees", "departments", "regions"],
+      "fields": ["employees.department_code", "employees.region_code", "departments.department_code", "departments.region_code", "regions.region_code"],
+      "ruleType": "join_semantics", "priority": 90, "mandatory": true,
+      "aliases": ["region code", "department code", "by region", "by department", "each region", "each department", "organization keys", "region directory", "departments per region", "各区域", "各部门", "按区域", "按部门", "区域编码", "部门编码"]
+    },
+    "Query shape / 查询结果形状-01": {
+      "models": ["employees", "departments", "regions"],
+      "fields": ["employees.department_code", "employees.region_code", "departments.department_code", "regions.region_code"],
+      "ruleType": "result_shape", "priority": 80, "mandatory": true,
+      "aliases": ["group by region", "group by department", "display name", "region name", "department name", "按区域分组", "按部门分组"]
+    },
+    "Query shape / 查询结果形状-02": {
+      "models": ["employees"], "fields": ["employees.employee_id"],
+      "ruleType": "result_shape", "priority": 70, "mandatory": false,
+      "aliases": ["category distribution", "grouped counts", "employee count by category", "remote work frequency distribution", "average projects", "promotion count", "monthly average overtime", "average performance by training band", "salary trend average", "current average metric", "分类分布", "远程办公比例", "平均项目数", "晋升人数", "每月平均加班", "培训分档平均绩效"]
+    },
+    "Query shape / 查询结果形状-03": {
+      "models": ["compensation_history", "performance_reviews", "attendance_monthly"],
+      "fields": ["compensation_history.effective_date", "performance_reviews.review_date", "attendance_monthly.attendance_month", "attendance_monthly.overtime_hours", "attendance_monthly.sick_days"],
+      "ruleType": "time_semantics", "priority": 90, "mandatory": true,
+      "aliases": ["current snapshot", "latest snapshot", "current metric", "current monthly salary", "current performance", "trend", "history", "chronological", "average salary trend", "performance trend", "satisfaction trend", "monthly overtime history", "monthly sick day history", "overtime trend", "sick leave trend", "当前月薪", "当前绩效", "最新快照", "趋势", "历史", "每月加班历史", "每月病假历史", "加班趋势", "病假趋势"]
+    },
+    "Query shape / 查询结果形状-04": {
+      "models": ["employees"], "ruleType": "result_shape", "priority": 70, "mandatory": true,
+      "aliases": ["top 10", "top 20", "top n", "top job titles", "most employees", "tie break", "highest", "largest increase", "前 10", "前 20", "十个岗位", "员工数量最多", "并列排序"]
+    },
+    "Query shape / 查询结果形状-05": {
+      "models": ["employees"], "fields": ["employees.employee_id"],
+      "ruleType": "security_projection", "priority": 100, "mandatory": true,
+      "aliases": ["employee profile", "my employee id", "self scoped detail", "my attendance", "我的员工信息", "我的考勤"]
+    },
+    "Cross-model analysis / 跨模型分析-01": {
+      "models": ["employees", "compensation_history", "performance_reviews", "attendance_monthly"],
+      "fields": ["employees.employee_id", "compensation_history.employee_id", "performance_reviews.employee_id", "attendance_monthly.employee_id"],
+      "ruleType": "join_semantics", "priority": 100, "mandatory": true,
+      "aliases": ["compare salary and performance", "salary performance", "compare salary and satisfaction", "salary satisfaction", "salary and attrition", "salary attrition", "overtime and performance", "training and performance", "join employee records", "cross model comparison", "当前平均月薪和当前平均绩效", "平均月薪和离职率", "平均加班时数和当前平均绩效", "培训时数分档比较当前平均绩效", "薪资与绩效对比", "薪资与离职", "跨模型"]
+    },
+    "Cross-model analysis / 跨模型分析-02": {
+      "models": ["compensation_history", "performance_reviews", "attendance_monthly"],
+      "fields": ["compensation_history.effective_date", "performance_reviews.review_date", "attendance_monthly.attendance_month"],
+      "ruleType": "time_semantics", "priority": 100, "mandatory": true,
+      "aliases": ["current snapshot join", "latest snapshot comparison", "current salary and performance", "training current performance", "overtime current performance", "salary change", "当前快照关联", "培训当前绩效", "加班当前绩效", "薪资变化"]
+    },
+    "Cross-model analysis / 跨模型分析-03": {
+      "models": ["attendance_monthly", "departments"],
+      "fields": ["attendance_monthly.overtime_hours_rolling_12m", "attendance_monthly.department_code", "departments.department_code"],
+      "ruleType": "metric_definition", "priority": 90, "mandatory": true,
+      "aliases": ["departments with most overtime", "average overtime by department", "加班最多的部门", "部门平均加班"]
+    },
+    "Cross-model analysis / 跨模型分析-04": {
+      "models": ["employees"], "fields": ["employees.training_hours"],
+      "ruleType": "business_band", "priority": 100, "mandatory": true,
+      "aliases": ["training bands", "training hours bands", "low medium high training", "培训时数分档"]
+    },
+    "Security semantics / 安全语义-01": {
+      "models": ["employees"], "ruleType": "security", "priority": 100, "mandatory": true,
+      "aliases": ["sensitive", "confidential", "salary", "performance score", "satisfaction score", "age and gender", "forbidden salary", "forbidden performance", "forbidden satisfaction", "denied sensitive field", "薪资", "绩效", "满意度", "年龄和性别", "敏感字段", "禁止访问"]
+    },
+    "Security semantics / 安全语义-02": {
+      "models": ["employees"], "fields": ["employees.manager_id", "employees.region_code"],
+      "ruleType": "security", "priority": 100, "mandatory": true,
+      "aliases": ["my data", "self only", "my region", "in my region", "assigned region", "authorized region", "my current salary", "my employee id", "my monthly attendance", "policy scope", "我的数据", "本人", "我的区域", "我的月薪", "我的考勤", "授权区域"]
+    },
+    "Security semantics / 安全语义-03": {
+      "models": ["employees"], "ruleType": "security", "priority": 100, "mandatory": true,
+      "aliases": ["fail closed", "policy denied", "direct report salary", "monthly salaries", "salary", "performance score", "satisfaction score", "age and gender", "outside my department", "outside my region", "cross-region", "unauthorized request", "直属员工薪资", "月薪", "薪资", "绩效", "满意度", "年龄和性别", "超出部门", "超出区域", "权限拒绝"]
+    },
+    "Security semantics / 安全语义-04": {
+      "models": ["employees"], "fields": ["employees.manager_id"],
+      "ruleType": "security", "priority": 100, "mandatory": true,
+      "aliases": ["direct reports", "my reports", "reporting line", "department manager", "直属员工", "我的下属"]
+    }
+  }
+}

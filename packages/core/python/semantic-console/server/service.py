@@ -705,6 +705,18 @@ class SemanticConsoleService:
         except Exception as exc:
             raise _public_error(exc) from exc
 
+    def semantic_index_status(self) -> dict[str, Any]:
+        try:
+            return self.project.semantic_index_status()
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
+    def rebuild_semantic_index(self) -> dict[str, Any]:
+        try:
+            return self.project.rebuild_semantic_index()
+        except Exception as exc:
+            raise _public_error(exc) from exc
+
     # ---- request dispatch ------------------------------------------------
 
     def dispatch(self, method: str, path: str, query: Mapping[str, Any] | None = None, body: Any = None) -> tuple[int, dict[str, Any]]:
@@ -869,6 +881,10 @@ class SemanticConsoleService:
                 return 200, self.validate_project()
             if method == "POST" and clean_path == "/api/project/publish":
                 return 200, self.publish_project(body if isinstance(body, Mapping) else {})
+            if method == "GET" and clean_path == "/api/project/semantic-index":
+                return 200, self.semantic_index_status()
+            if method == "POST" and clean_path == "/api/project/semantic-index/rebuild":
+                return 200, self.rebuild_semantic_index()
             if method == "GET" and clean_path == "/api/versions":
                 return 200, self.versions()
             match = re.fullmatch(r"/api/versions/([^/]+)/rollback", clean_path)

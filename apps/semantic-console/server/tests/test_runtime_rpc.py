@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from server.app import create_app
-from server.diagnostics import DiagnosticError
 from server.models import DatasourceRecord
 from server.project import ProjectStore
-from server.runtime_rpc import RuntimeRpcGateway
+from server.runtime_rpc import RuntimeRpcGateway, _context_retrieval_explanation
 from server.service import SemanticConsoleService
 
 
@@ -22,6 +22,32 @@ class FakeValidator:
 
     def build(self, _project_dir):
         return {"models": []}
+
+
+class RetrievalExplanationTests(unittest.TestCase):
+    def test_flags_zero_recall_stale_and_permission_over_filtering(self) -> None:
+        result = _context_retrieval_explanation({
+            "projectRevision": "rev-1",
+            "schema": {"models": []},
+            "relationships": [],
+            "metrics": [],
+            "rules": [],
+            "sqlExamples": [],
+            "views": [],
+            "indexStatus": {"status": "stale", "backend": "hybrid"},
+            "retrievalTrace": [{
+                "documentId": "model:employees",
+                "source": "schema",
+                "retrievalType": "vector",
+                "authorizationFiltered": True,
+            }],
+        })
+
+        self.assertEqual(result["selectedCount"], 0)
+        self.assertEqual(
+            result["anomalies"],
+            ["ZERO_RECALL", "INDEX_NOT_READY", "PERMISSION_OVER_FILTERED"],
+        )
 
 
 class RecordingDispatcher:
@@ -138,6 +164,26 @@ class RuntimeRpcTests(unittest.TestCase):
         self.assertEqual(denied["error"]["requiredPermissions"], ["query.run"])
         self.assertEqual(denied["error"]["origin"], "semarail-policy")
         self.assertTrue(denied["error"]["traceId"].startswith("trace-"))
+        self.assertNotIn("traceId", response)
+        self.assertNotIn("traceId", denied)
+
+    def test_v3_rpc_exposes_same_core_trace_on_success_and_failure(self) -> None:
+        status, response = self.gateway.dispatch(
+            {"protocolVersion": "3", "id": "health-v3", "method": "health", "params": {}},
+            authorization=self.authorization,
+        )
+        self.assertEqual(status, 200)
+        self.assertTrue(response["traceId"].startswith("trace-"))
+        self.assertEqual(response["traceId"], self.dispatcher.requests[-1]["traceId"])
+        self.assertNotIn("traceId", response["result"])
+
+        denied_status, denied = self.gateway.dispatch(
+            {"protocolVersion": "3", "id": "bootstrap-v3", "method": "query.run", "params": {}},
+            authorization=f"Bearer {self.token}",
+        )
+        self.assertEqual(denied_status, 403)
+        self.assertTrue(denied["traceId"].startswith("trace-"))
+        self.assertEqual(denied["traceId"], denied["error"]["traceId"])
 
     def test_v2_rpc_preserves_sidecar_column_denial_and_owns_trace(self) -> None:
         class ColumnDeniedDispatcher:
@@ -271,6 +317,15 @@ class RuntimeRpcTests(unittest.TestCase):
         self.assertEqual(captured["status"], "success")
         self.assertIsNone(captured["question"])
         self.assertIsNone(captured["semanticSql"])
+        with self.gateway.access_control._connect() as connection:
+            row = connection.execute(
+                "SELECT phase_spans_json FROM query_diagnostics WHERE trace_id=?",
+                (captured["traceId"],),
+            ).fetchone()
+        self.assertEqual(
+            [phase["name"] for phase in json.loads(row["phase_spans_json"])],
+            ["authentication", "policy", "runtime"],
+        )
 
     def test_planning_failure_is_automatically_captured_with_available_sql(self) -> None:
         class PlanningFailureDispatcher:
@@ -495,7 +550,7 @@ class RuntimeRpcTests(unittest.TestCase):
     def test_diagnostic_write_failure_never_replaces_query_result(self) -> None:
         class UnavailableDiagnostics:
             def record_execution(self, **_kwargs):
-                raise DiagnosticError("DIAGNOSTIC_STORE_UNAVAILABLE", "unavailable", status=503)
+                raise TypeError("adapter failed")
 
         self.gateway.diagnostics = UnavailableDiagnostics()
         status, response = self.gateway.dispatch(
@@ -514,6 +569,42 @@ class RuntimeRpcTests(unittest.TestCase):
 
         self.assertEqual(status, 200)
         self.assertTrue(response["ok"])
+
+    def test_validation_failure_records_only_measured_phases(self) -> None:
+        status, response = self.gateway.dispatch(
+            {
+                "protocolVersion": "3",
+                "id": "validation-before-policy",
+                "method": "query.dryPlan",
+                "params": {"semanticSql": "SELECT 1"},
+                "unexpected": True,
+            },
+            authorization=self.authorization,
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(response["protocolVersion"], "3")
+        self.assertTrue(response["traceId"].startswith("trace-"))
+        organization_id = self.gateway.access_control.authenticate(self.authorization).subject.organization_id
+        captured = self.gateway.diagnostics.list_diagnostics(
+            organization_id=organization_id, project_id="runtime-test",
+        )["items"][0]
+        with self.gateway.access_control._connect() as connection:
+            row = connection.execute(
+                "SELECT phase_spans_json FROM query_diagnostics WHERE trace_id=?",
+                (captured["traceId"],),
+            ).fetchone()
+        phases = json.loads(row["phase_spans_json"])
+        self.assertEqual([phase["name"] for phase in phases], ["authentication"])
+
+    def test_security_event_failure_does_not_replace_auth_response(self) -> None:
+        with patch.object(self.gateway.diagnostics, "record_security_event", side_effect=ValueError("write failed")):
+            status, response = self.gateway.dispatch(
+                {"protocolVersion": "3", "id": "security-failure", "method": "health", "params": {}},
+                authorization="Bearer invalid-credential-value-that-is-long-enough",
+            )
+        self.assertEqual(status, 401)
+        self.assertEqual(response["protocolVersion"], "3")
+        self.assertTrue(response["traceId"].startswith("trace-"))
 
     def test_auth_failure_cancel_and_context_failure_follow_capture_boundaries(self) -> None:
         unauthenticated_status, unauthenticated = self.gateway.dispatch(
@@ -555,7 +646,12 @@ class RuntimeRpcTests(unittest.TestCase):
         self.assertTrue(cancel["ok"])
         with self.gateway.access_control._connect() as connection:
             diagnostic_count = connection.execute("SELECT COUNT(*) AS count FROM query_diagnostics").fetchone()
-        self.assertEqual(diagnostic_count["count"], 0)
+        self.assertEqual(diagnostic_count["count"], 1)
+        cancel_record = self.gateway.diagnostics.list_diagnostics(
+            organization_id=self.gateway.access_control.authenticate(self.authorization).subject.organization_id,
+            project_id="runtime-test",
+        )["items"][0]
+        self.assertEqual((cancel_record["method"], cancel_record["status"]), ("query.cancel", "success"))
 
         class ContextFailureDispatcher:
             def dispatch(self, request):
@@ -593,11 +689,12 @@ class RuntimeRpcTests(unittest.TestCase):
             organization_id=self.gateway.access_control.authenticate(self.authorization).subject.organization_id,
             project_id="runtime-test",
         )["items"]
-        self.assertEqual(len(captured), 1)
-        self.assertEqual(captured[0]["question"], "Where is revenue defined?")
-        self.assertIsNone(captured[0]["semanticSql"])
-        self.assertIsNone(captured[0]["nativeSql"])
-        self.assertEqual(captured[0]["error"]["reasonCode"], "SEMANTIC_PARSE_FAILED")
+        self.assertEqual(len(captured), 2)
+        context_record = next(item for item in captured if item["method"] == "context.ask")
+        self.assertEqual(context_record["question"], "Where is revenue defined?")
+        self.assertIsNone(context_record["semanticSql"])
+        self.assertIsNone(context_record["nativeSql"])
+        self.assertEqual(context_record["error"]["reasonCode"], "SEMANTIC_PARSE_FAILED")
 
     def test_query_pins_project_credentials_and_limits_server_side(self) -> None:
         status, response = self.gateway.dispatch(

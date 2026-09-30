@@ -54,6 +54,7 @@ except ImportError:  # pragma: no cover - direct module loading
 
 CORE_API_VERSION = "1"
 CORE_PROTOCOL_VERSION = "2"
+TRACE_CORE_PROTOCOL_VERSION = "3"
 LEGACY_CORE_PROTOCOL_VERSION = "1"
 SIDECAR_PROTOCOL_VERSION = "2"
 MAX_QUERY_ROWS = 500
@@ -64,10 +65,38 @@ _PUBLIC_METHODS = frozenset(
     {"health", "project.validate", "project.describe", "context.ask", "query.prepare", "query.dryPlan", "query.run", "query.cancel"}
 )
 _DATA_POLICY_METHODS = frozenset({"project.describe", "context.ask", "query.prepare", "query.dryPlan", "query.run"})
-_DIAGNOSTIC_METHODS = frozenset({"context.ask", "query.dryPlan", "query.run"})
+_DIAGNOSTIC_METHODS = _PUBLIC_METHODS
 _REQUEST_FIELDS = frozenset({"protocolVersion", "id", "method", "params", "deadlineMs"})
 _LOGGER = logging.getLogger("semarail-core.runtime")
 DEFAULT_ARTIFACT_BASE_URL = "http://127.0.0.1:48763"
+
+
+def _normalize_context_budgets(value: Any) -> dict[str, Any] | str:
+    """Validate public Context API v2 budgets before policy dispatch."""
+
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        return "context.ask budgets must be an object"
+    if set(value) - {"topK", "maxBytes", "maxTokens", "maxRelationshipDepth"}:
+        return "context.ask budgets contains unsupported fields"
+    result: dict[str, Any] = {}
+    top_k = value.get("topK")
+    if top_k is not None:
+        sections = {"schema", "relationships", "metrics", "rules", "sqlExamples", "views"}
+        if not isinstance(top_k, Mapping) or set(top_k) - sections:
+            return "context.ask budgets.topK is invalid"
+        for section, limit in top_k.items():
+            if type(limit) is not int or limit < 0 or limit > 1_000:
+                return "context.ask budgets.topK is invalid"
+        result["topK"] = dict(top_k)
+    for field, maximum in (("maxBytes", 4 * 1024 * 1024), ("maxTokens", 256_000), ("maxRelationshipDepth", 8)):
+        if field in value:
+            limit = value[field]
+            if type(limit) is not int or limit < 1 or limit > maximum:
+                return f"context.ask budgets.{field} is invalid"
+            result[field] = limit
+    return result
 
 
 class RuntimeDispatcher(Protocol):
@@ -95,7 +124,7 @@ def _error(
         "message": message,
         "retryable": retryable,
     }
-    if protocol_version == CORE_PROTOCOL_VERSION:
+    if protocol_version in {CORE_PROTOCOL_VERSION, TRACE_CORE_PROTOCOL_VERSION}:
         error.update({
             "reasonCode": reason_code,
             "resources": resources or [],
@@ -109,6 +138,7 @@ def _error(
         "id": request_id,
         "ok": False,
         "error": error,
+        **({"traceId": trace_id} if protocol_version == TRACE_CORE_PROTOCOL_VERSION else {}),
     }
 
 
@@ -161,7 +191,9 @@ def _public_response(response: Mapping[str, Any], protocol_version: str, trace_i
 
     projected = dict(response)
     projected["protocolVersion"] = protocol_version
-    if protocol_version != CORE_PROTOCOL_VERSION or projected.get("ok") is True:
+    if protocol_version == TRACE_CORE_PROTOCOL_VERSION:
+        projected["traceId"] = trace_id
+    if protocol_version not in {CORE_PROTOCOL_VERSION, TRACE_CORE_PROTOCOL_VERSION} or projected.get("ok") is True:
         return projected
     raw_error = projected.get("error")
     if not isinstance(raw_error, Mapping):
@@ -230,6 +262,55 @@ def _public_response(response: Mapping[str, Any], protocol_version: str, trace_i
     )
 
 
+def _context_retrieval_explanation(result: Mapping[str, Any]) -> dict[str, Any]:
+    """Build a bounded, text-free explanation for administrator diagnostics."""
+
+    raw_trace = result.get("retrievalTrace")
+    trace = [dict(item) for item in raw_trace[:2_000] if isinstance(item, Mapping)] \
+        if isinstance(raw_trace, list) else []
+    sections = ("relationships", "metrics", "rules", "sqlExamples", "views")
+    selected_count = sum(
+        len(result.get(section, [])) if isinstance(result.get(section), list) else 0
+        for section in sections
+    )
+    schema = result.get("schema")
+    if isinstance(schema, Mapping) and isinstance(schema.get("models"), list):
+        selected_count += len(schema["models"])
+    summary = result.get("retrievalSummary")
+    summary = summary if isinstance(summary, Mapping) else {}
+    candidate_count = summary.get("candidateCount", len(trace))
+    filtered_count = summary.get(
+        "filteredCount", sum(1 for item in trace if item.get("authorizationFiltered") is True)
+    )
+    selected_count = summary.get("selectedCount", selected_count)
+    latency_ms = summary.get("latencyMs", 0.0)
+    fallback_reason = summary.get("fallbackReason")
+    index_status = dict(result.get("indexStatus")) if isinstance(result.get("indexStatus"), Mapping) else {}
+    anomalies: list[str] = []
+    if selected_count == 0:
+        anomalies.append("ZERO_RECALL")
+    if fallback_reason is not None or (trace and all(item.get("retrievalType") == "fallback" for item in trace)):
+        anomalies.append("FULL_FALLBACK")
+    if index_status.get("status") in {"missing", "stale", "unavailable", "degraded"}:
+        anomalies.append("INDEX_NOT_READY")
+    if trace and filtered_count / len(trace) >= 0.9:
+        anomalies.append("PERMISSION_OVER_FILTERED")
+    return {
+        "schemaVersion": 1,
+        "projectRevision": result.get("projectRevision"),
+        "indexStatus": index_status,
+        "candidateCount": candidate_count,
+        "filteredCount": filtered_count,
+        "selectedCount": selected_count,
+        "latencyMs": latency_ms,
+        **({"fallbackReason": fallback_reason} if fallback_reason is not None else {}),
+        "traceCount": len(trace),
+        "authorizationFilteredCount": filtered_count,
+        "anomalies": anomalies,
+        "retrievalTrace": trace,
+    }
+
+
 def _default_dispatcher(project: ProjectStore) -> RuntimeDispatcher | None:
     try:
         from sidecar import Dispatcher, default_dependencies  # type: ignore[import-not-found]
@@ -243,7 +324,10 @@ def _default_dispatcher(project: ProjectStore) -> RuntimeDispatcher | None:
     def resolve_connection(_project_dir: str, env_name: str) -> Mapping[str, Any] | None:
         return load_active_connection(canonical_project, env_name, state_file=state_file)
 
-    return Dispatcher(default_dependencies(connection_resolver=resolve_connection))
+    return Dispatcher(default_dependencies(
+        connection_resolver=resolve_connection,
+        semantic_index_dir=project.state_dir / "semantic-index",
+    ))
 
 
 class RuntimeRpcGateway:
@@ -418,8 +502,12 @@ class RuntimeRpcGateway:
         request_id = _request_id(body)
         trace_id = f"trace-{uuid.uuid4().hex}"
         started_at = time.monotonic()
+        auth_completed_at: float | None = None
+        policy_duration_ms: float | None = None
+        policy_status: str | None = None
+        runtime_started_at: float | None = None
         raw_protocol = body.get("protocolVersion") if isinstance(body, Mapping) else None
-        protocol_version = raw_protocol if raw_protocol in {LEGACY_CORE_PROTOCOL_VERSION, CORE_PROTOCOL_VERSION} else CORE_PROTOCOL_VERSION
+        protocol_version = raw_protocol if raw_protocol in {LEGACY_CORE_PROTOCOL_VERSION, CORE_PROTOCOL_VERSION, TRACE_CORE_PROTOCOL_VERSION} else CORE_PROTOCOL_VERSION
 
         auth: AuthContext | None = None
         diagnostic_recorded = False
@@ -445,6 +533,23 @@ class RuntimeRpcGateway:
                 dict(error_value) if isinstance(error_value, Mapping)
                 else dict(result_error) if isinstance(result_error, Mapping) else None
             )
+            captured_at = time.monotonic()
+            phase_spans: list[dict[str, Any]] = []
+            if auth_completed_at is not None:
+                phase_spans.append({
+                    "name": "authentication", "status": "success",
+                    "durationMs": max(0.0, (auth_completed_at - started_at) * 1000.0),
+                })
+            if auth_completed_at is not None and policy_duration_ms is not None:
+                phase_spans.append({
+                    "name": "policy", "status": policy_status or "success",
+                    "durationMs": max(0.0, policy_duration_ms or 0.0),
+                })
+            if runtime_started_at is not None:
+                phase_spans.append({
+                    "name": "runtime", "status": status,
+                    "durationMs": max(0.0, (captured_at - runtime_started_at) * 1000.0),
+                })
             try:
                 self.diagnostics.record_execution(
                     auth=auth,
@@ -464,10 +569,15 @@ class RuntimeRpcGateway:
                     semantic_sql=(str(safe_params.get("semanticSql")) if isinstance(safe_params.get("semanticSql"), str) else None),
                     native_sql=(str(result.get("nativeSql")) if isinstance(result.get("nativeSql"), str) else None),
                     duration_ms=max(0.0, (time.monotonic() - started_at) * 1000.0),
+                    phase_spans=phase_spans,
+                    retrieval_explanation=(
+                        _context_retrieval_explanation(result)
+                        if method_value == "context.ask" and result else None
+                    ),
                 )
                 diagnostic_recorded = True
                 self.diagnostics.cleanup_expired()
-            except (DiagnosticError, AccessControlError, OSError, RuntimeError):
+            except Exception:
                 _LOGGER.error("diagnostic write failed for trace %s", trace_id)
 
         def fail(code: str, message: str, **details: Any) -> dict[str, Any]:
@@ -485,6 +595,7 @@ class RuntimeRpcGateway:
 
         try:
             auth = self.access_control.authenticate(authorization)
+            auth_completed_at = time.monotonic()
         except AccessControlError as exc:
             if self.diagnostics is not None:
                 raw_method = body.get("method") if isinstance(body, Mapping) else None
@@ -494,7 +605,7 @@ class RuntimeRpcGateway:
                         transport=transport,
                         method=(raw_method if isinstance(raw_method, str) and len(raw_method) <= 64 else None),
                     )
-                except (DiagnosticError, AccessControlError, OSError, RuntimeError):
+                except Exception:
                     _LOGGER.error("diagnostic security-event write failed for trace %s", trace_id)
             reason_code = "ACCOUNT_DISABLED" if exc.code in {"ACCOUNT_DISABLED", "SUBJECT_DISABLED"} else "AUTHENTICATION_EXPIRED"
             return exc.status, fail(
@@ -509,7 +620,7 @@ class RuntimeRpcGateway:
             return 400, fail("INVALID_REQUEST", "request must be a JSON object")
         if set(body) - _REQUEST_FIELDS:
             return 400, fail("INVALID_REQUEST", "request contains unknown fields")
-        if body.get("protocolVersion") not in {LEGACY_CORE_PROTOCOL_VERSION, CORE_PROTOCOL_VERSION}:
+        if body.get("protocolVersion") not in {LEGACY_CORE_PROTOCOL_VERSION, CORE_PROTOCOL_VERSION, TRACE_CORE_PROTOCOL_VERSION}:
             return 400, fail(
                 "UNSUPPORTED_PROTOCOL",
                 "protocolVersion is unsupported",
@@ -588,13 +699,18 @@ class RuntimeRpcGateway:
         # Data-facing authorization is bound to the server-known active
         # datasource; callers cannot select or spoof a source in the public
         # RPC payload.
+        policy_started_at = time.monotonic()
         datasource_id = self.project.active_datasource_identifier() if method in _DATA_POLICY_METHODS else None
-        if method in _DATA_POLICY_METHODS and datasource_id is None:
-            decision = PolicyDecision(False, "active datasource binding is required")
-        else:
-            decision = self.policy_engine.authorize_method(
-                auth.subject, str(method), policies, project_id=project_id, datasource_id=datasource_id
-            )
+        try:
+            if method in _DATA_POLICY_METHODS and datasource_id is None:
+                decision = PolicyDecision(False, "active datasource binding is required")
+            else:
+                decision = self.policy_engine.authorize_method(
+                    auth.subject, str(method), policies, project_id=project_id, datasource_id=datasource_id
+                )
+        finally:
+            policy_duration_ms = max(0.0, (time.monotonic() - policy_started_at) * 1000.0)
+        policy_status = "success" if decision.allowed else "failure"
         if not decision.allowed:
             self._audit(
                 auth, str(method), "denied", request_id, decision,
@@ -638,12 +754,15 @@ class RuntimeRpcGateway:
             return 400, fail("INVALID_PARAMS", normalized, phase="validation")
         compiled_policy: Mapping[str, Any] | None = None
         if method in _DATA_POLICY_METHODS:
+            compile_started_at = time.monotonic()
             try:
                 compiled_policy = self.policy_engine.compile_data_policy(
                     auth.subject, policies, project_id=project_id, datasource_id=datasource_id
                 )
                 normalized["authorizationPolicy"] = compiled_policy
             except MissingSubjectAttribute as exc:
+                policy_duration_ms += max(0.0, (time.monotonic() - compile_started_at) * 1000.0)
+                policy_status = "failure"
                 self._audit(
                     auth, str(method), "denied", request_id, decision,
                     transport=transport, datasource_id=datasource_id,
@@ -660,6 +779,8 @@ class RuntimeRpcGateway:
                     phase="authorization",
                 )
             except Exception:
+                policy_duration_ms += max(0.0, (time.monotonic() - compile_started_at) * 1000.0)
+                policy_status = "failure"
                 self._audit(
                     auth, str(method), "denied", request_id, decision,
                     transport=transport, datasource_id=datasource_id,
@@ -674,8 +795,11 @@ class RuntimeRpcGateway:
                     origin="semarail-policy",
                     phase="authorization",
                 )
+            else:
+                policy_duration_ms += max(0.0, (time.monotonic() - compile_started_at) * 1000.0)
         if method == "query.prepare":
             try:
+                runtime_started_at = time.monotonic()
                 prepared = self.preparations.prepare(
                     auth=auth,
                     project_id=project_id,
@@ -690,12 +814,14 @@ class RuntimeRpcGateway:
                 auth, str(method), "allowed", request_id, decision,
                 transport=transport, datasource_id=datasource_id, compiled_policy=compiled_policy,
             )
-            return 200, {
+            public_response = _public_response({
                 "protocolVersion": protocol_version,
                 "id": request_id,
                 "ok": True,
                 "result": prepared,
-            }
+            }, protocol_version, trace_id)
+            capture(public_response, "success")
+            return 200, public_response
         artifact_reservation: ArtifactReservation | None = None
         if method == "query.run":
             normalized.pop("retryOfQueryId", None)
@@ -807,6 +933,7 @@ class RuntimeRpcGateway:
             **({"deadlineMs": body["deadlineMs"]} if type(body.get("deadlineMs")) is int else {}),
         }
         try:
+            runtime_started_at = time.monotonic()
             response = self.dispatcher.dispatch(internal)
         except Exception:
             if artifact_reservation is not None:
@@ -1095,9 +1222,28 @@ class RuntimeRpcGateway:
         if method == "project.describe":
             return {"projectDir": project_dir} if not params else "project.describe params must be empty"
         if method == "context.ask":
-            if set(params) != {"question"} or not isinstance(params.get("question"), str):
-                return "context.ask requires only question"
-            return {"projectDir": project_dir, "question": params["question"]}
+            # v1 remains the exact question-only shape.  API v2 is an
+            # explicit opt-in so a typo cannot silently change the context
+            # contract or make a legacy caller receive partitioned output.
+            if "contextVersion" not in params:
+                if set(params) != {"question"} or not isinstance(params.get("question"), str):
+                    return "context.ask requires only question"
+                return {"projectDir": project_dir, "question": params["question"]}
+            if set(params) - {"question", "contextVersion", "budgets"}:
+                return "context.ask v2 contains unsupported fields"
+            if params.get("contextVersion") != 2:
+                return "context.ask contextVersion is unsupported"
+            if not isinstance(params.get("question"), str):
+                return "context.ask requires question"
+            budgets = _normalize_context_budgets(params.get("budgets"))
+            if isinstance(budgets, str):
+                return budgets
+            return {
+                "projectDir": project_dir,
+                "question": params["question"],
+                "contextVersion": 2,
+                **({"budgets": budgets} if "budgets" in params else {}),
+            }
         if method == "query.cancel":
             if set(params) != {"queryId"} or not isinstance(params.get("queryId"), str):
                 return "query.cancel requires only queryId"
@@ -1123,7 +1269,7 @@ class RuntimeRpcGateway:
                 "confirmedConditions": list(confirmed),
             }
         allowed = {"question", "semanticSql", "chartIntent", "queryId", "preparationId"}
-        if protocol_version == CORE_PROTOCOL_VERSION:
+        if protocol_version in {CORE_PROTOCOL_VERSION, TRACE_CORE_PROTOCOL_VERSION}:
             allowed.add("retryOfQueryId")
         if set(params) - allowed:
             return "query.run contains unsupported fields"

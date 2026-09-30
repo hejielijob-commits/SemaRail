@@ -166,6 +166,9 @@ class RemoteMcpTests(unittest.TestCase):
                                 "semarail_get_context", {"question": "Employee revenue?"}
                             )
                             self.assertFalse(result.isError)
+                            self.assertIsInstance(result.meta, dict)
+                            self.assertTrue(result.meta["traceId"].startswith("trace-"))
+                            self.assertNotIn("traceId", result.structuredContent)
 
         asyncio.run(exercise())
         event = self.gateway.access_control.list_audit()[0]
@@ -259,6 +262,8 @@ class RemoteMcpTests(unittest.TestCase):
                                 {"question": "Revenue?", "semantic_sql": "SELECT amount FROM sales"},
                             )
                             self.assertTrue(denied.isError)
+                            self.assertIsNotNone(denied.meta, str(denied.content))
+                            self.assertTrue(denied.meta["traceId"].startswith("trace-"))
                             denial_text = " ".join(
                                 str(getattr(content, "text", "")) for content in denied.content
                             )

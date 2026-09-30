@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import re
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,7 @@ _PUBLIC_CONSOLE_ROUTES = frozenset(
     }
 )
 _ARTIFACT_DOWNLOAD_ROUTE = re.compile(r"/api/v1/artifacts/([^/]+)/download\Z")
+_DIAGNOSTIC_CLEANUP_INTERVAL_SECONDS = 60 * 60
 
 
 def _allowed_browser_origin(origin: str | None) -> bool:
@@ -460,6 +462,7 @@ class SemanticConsoleHTTPServer(ThreadingHTTPServer):
 
     def __init__(self, address: tuple[str, int], application: SemanticConsoleApplication) -> None:
         self.application = application
+        self._next_diagnostic_cleanup_at = 0.0
         super().__init__(address, _Handler)
         # A real Core HTTP server knows its bound port only after bind (not
         # from a request Host header).  Publish that trusted authority for
@@ -473,6 +476,25 @@ class SemanticConsoleHTTPServer(ThreadingHTTPServer):
                 bound_host = "127.0.0.1"
             authority = f"[{bound_host}]" if ":" in bound_host and not bound_host.startswith("[") else bound_host
             setter(f"http://{authority}:{int(self.server_address[1])}")
+
+    def service_actions(self) -> None:
+        """Run retention maintenance on the live server loop, even when idle."""
+
+        now = time.monotonic()
+        if now < self._next_diagnostic_cleanup_at:
+            return
+        self._next_diagnostic_cleanup_at = now + _DIAGNOSTIC_CLEANUP_INTERVAL_SECONDS
+        diagnostics_api = getattr(self.application, "diagnostics_api", None)
+        diagnostics = getattr(diagnostics_api, "store", None)
+        if diagnostics is None:
+            diagnostics = getattr(self.application.runtime_rpc, "diagnostics", None)
+        cleanup = getattr(diagnostics, "cleanup_expired", None)
+        if not callable(cleanup):
+            return
+        try:
+            cleanup()
+        except Exception:
+            _LOGGER.error("diagnostic retention cleanup failed")
 
 
 def serve(

@@ -55,6 +55,7 @@ export interface JsonSchema {
   readonly $defs?: Readonly<Record<string, JsonSchema>>
   readonly anyOf?: readonly JsonSchema[]
   readonly oneOf?: readonly JsonSchema[]
+  readonly not?: JsonSchema
   readonly type?: string | readonly string[]
   readonly const?: JsonValue
   readonly enum?: readonly JsonValue[]
