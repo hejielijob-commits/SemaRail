@@ -16,7 +16,7 @@ from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.fastmcp.server import TransportSecuritySettings
-from mcp.types import ToolAnnotations
+from mcp.types import CallToolResult, TextContent, ToolAnnotations
 from starlette.requests import Request
 from starlette.responses import JSONResponse, StreamingResponse
 
@@ -34,6 +34,38 @@ except ImportError:  # pragma: no cover - direct module loading
 
 DEFAULT_REMOTE_MCP_HOST = "127.0.0.1"
 DEFAULT_REMOTE_MCP_PORT = 48764
+
+
+class _CoreResult(dict[str, Any]):
+    """Keep Core correlation separate from MCP's structured tool result."""
+
+    def __init__(self, result: Mapping[str, Any], trace_id: str) -> None:
+        super().__init__(result)
+        self.trace_id = trace_id
+
+
+class _CoreToolError(ToolError):
+    def __init__(self, error: Mapping[str, Any], trace_id: str) -> None:
+        super().__init__(json.dumps(dict(error), ensure_ascii=False, separators=(",", ":")))
+        self.trace_id = trace_id
+
+
+def _mcp_result(result: Mapping[str, Any]) -> CallToolResult:
+    data = dict(result)
+    trace_id = getattr(result, "trace_id", None)
+    return CallToolResult(
+        content=[TextContent(type="text", text=json.dumps(data, ensure_ascii=False, indent=2))],
+        structuredContent=data,
+        **({"_meta": {"traceId": trace_id}} if isinstance(trace_id, str) else {}),
+    )
+
+
+def _mcp_failure(error: _CoreToolError) -> CallToolResult:
+    return CallToolResult(
+        content=[TextContent(type="text", text=str(error))],
+        isError=True,
+        _meta={"traceId": error.trace_id},
+    )
 
 
 class SemaRailTokenVerifier:
@@ -80,7 +112,7 @@ class RuntimeMcpBridge:
         status, response = await asyncio.to_thread(
             self.gateway.dispatch,
             {
-                "protocolVersion": "2",
+                "protocolVersion": "3",
                 "id": request_id,
                 "method": method,
                 "params": dict(params),
@@ -97,11 +129,17 @@ class RuntimeMcpBridge:
                 "message": "SemaRail operation failed",
                 "retryable": False,
             }
+            trace_id = response.get("traceId")
+            if isinstance(trace_id, str) and trace_id.startswith("trace-"):
+                raise _CoreToolError(safe, trace_id)
             raise ToolError(json.dumps(dict(safe), ensure_ascii=False, separators=(",", ":")))
         result = response.get("result")
         if not isinstance(result, Mapping):
             raise ToolError("SemaRail operation returned an invalid result")
-        return dict(result)
+        trace_id = response.get("traceId")
+        if not isinstance(trace_id, str) or not trace_id.startswith("trace-"):
+            raise ToolError("SemaRail operation returned an invalid trace identifier")
+        return _CoreResult(result, trace_id)
 
     async def submit_feedback(self, payload: Mapping[str, Any]) -> dict[str, Any]:
         access = get_access_token()
@@ -256,12 +294,12 @@ def create_remote_mcp_server(
         )
 
     @server.tool(annotations=_readonly("Validate the SemaRail semantic project"))
-    async def semarail_validate_project() -> dict[str, Any]:
-        return await bridge.call("project.validate", {})
+    async def semarail_validate_project() -> CallToolResult:
+        return _mcp_result(await bridge.call("project.validate", {}))
 
     @server.tool(annotations=_readonly("List SemaRail semantic models"))
-    async def semarail_list_models() -> dict[str, Any]:
-        return await bridge.call("project.describe", {})
+    async def semarail_list_models() -> CallToolResult:
+        return _mcp_result(await bridge.call("project.describe", {}))
 
     @server.tool(annotations=_readonly("Get SemaRail semantic context"))
     async def semarail_get_context(
@@ -269,7 +307,7 @@ def create_remote_mcp_server(
         context_version: int | None = None,
         budgets: dict[str, Any] | None = None,
         include_retrieval_trace: bool = False,
-    ) -> dict[str, Any]:
+    ) -> CallToolResult:
         """Return bounded context with explicit evidence roles.
 
         Treat v2 schema/relationships/metrics as published facts, mandatory
@@ -284,15 +322,15 @@ def create_remote_mcp_server(
             params["budgets"] = budgets
         result = await bridge.call("context.ask", params)
         if include_retrieval_trace:
-            return result
-        agent_context = dict(result)
+            return _mcp_result(result)
+        agent_context = _CoreResult(result, result.trace_id)
         agent_context.pop("retrievalTrace", None)
         agent_context.pop("retrievalSummary", None)
-        return agent_context
+        return _mcp_result(agent_context)
 
     @server.tool(annotations=_readonly("Plan a SemaRail semantic query"))
-    async def semarail_plan_query(semantic_sql: str) -> dict[str, Any]:
-        return await bridge.call("query.dryPlan", {"semanticSql": semantic_sql})
+    async def semarail_plan_query(semantic_sql: str) -> CallToolResult:
+        return _mcp_result(await bridge.call("query.dryPlan", {"semanticSql": semantic_sql}))
 
     @server.tool(annotations=_stateful("Prepare and confirm a SemaRail query"))
     async def semarail_prepare_query(
@@ -300,8 +338,8 @@ def create_remote_mcp_server(
         semantic_sql: str,
         conditions: dict[str, Any] | None = None,
         confirmed_conditions: list[str] | None = None,
-    ) -> dict[str, Any]:
-        return await bridge.call(
+    ) -> CallToolResult:
+        return _mcp_result(await bridge.call(
             "query.prepare",
             {
                 "question": question,
@@ -309,7 +347,7 @@ def create_remote_mcp_server(
                 "conditions": conditions or {},
                 "confirmedConditions": confirmed_conditions or [],
             },
-        )
+        ))
 
     @server.tool(annotations=_readonly("Run a governed SemaRail query", idempotent=False))
     async def semarail_governed_query(
@@ -317,10 +355,10 @@ def create_remote_mcp_server(
         semantic_sql: str,
         chart_intent: Literal["auto", "table", "line", "bar", "pie"] = "auto",
         preparation_id: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> CallToolResult:
         query_id = f"remote-mcp-query-{uuid.uuid4().hex}"
         try:
-            return await bridge.call(
+            return _mcp_result(await bridge.call(
                 "query.run",
                 {
                     "question": question,
@@ -329,7 +367,7 @@ def create_remote_mcp_server(
                     "queryId": query_id,
                     **({"preparationId": preparation_id} if preparation_id is not None else {}),
                 },
-            )
+            ))
         except asyncio.CancelledError:
             try:
                 await asyncio.shield(bridge.call("query.cancel", {"queryId": query_id}))
@@ -373,6 +411,15 @@ def create_remote_mcp_server(
         tool.parameters["additionalProperties"] = False
         tool.fn_metadata.arg_model.model_config["extra"] = "forbid"
         tool.fn_metadata.arg_model.model_rebuild(force=True)
+        original = tool.fn
+
+        async def with_core_error_meta(*args: Any, _original: Any = original, **kwargs: Any) -> Any:
+            try:
+                return await _original(*args, **kwargs)
+            except _CoreToolError as exc:
+                return _mcp_failure(exc)
+
+        tool.fn = with_core_error_meta
 
     return server
 

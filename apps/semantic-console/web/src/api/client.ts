@@ -44,6 +44,8 @@ import type {
   FeedbackStatus,
   RegressionCaseExport,
   RegressionCaseRecord,
+  AgentTraceDetail,
+  AgentTraceSummary,
 } from "../types";
 
 export class ApiClientError extends Error {
@@ -265,6 +267,25 @@ export class ApiClient {
 
   exportRegressionCases(): Promise<RegressionCaseExport> {
     return this.request("/api/v1/diagnostics/regression-cases/export");
+  }
+
+  /** List durable, project-scoped agent trace summaries. */
+  listTraces(filters: { limit?: number; cursor?: string } = {}): Promise<{ items: AgentTraceSummary[]; nextCursor?: string | null }> {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined && value !== "") query.set(key, String(value));
+    }
+    const suffix = query.size ? `?${query.toString()}` : "";
+    return this.request(`/api/v1/traces${suffix}`);
+  }
+
+  /** Read one durable trace with events in server-provided time order. */
+  getTrace(id: string): Promise<AgentTraceDetail> {
+    return this.request(`/api/v1/traces/${encodeURIComponent(id)}`);
+  }
+
+  getTraceByCore(coreTraceId: string): Promise<AgentTraceDetail> {
+    return this.request(`/api/v1/traces/by-core/${encodeURIComponent(coreTraceId)}`);
   }
 
   /** Load the structured business-model projection used by the visual editor. */

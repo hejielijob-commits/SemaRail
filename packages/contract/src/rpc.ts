@@ -30,12 +30,15 @@ export const RPC_METHODS = ['health', 'project.validate', 'project.describe', 'c
 /** Supported sidecar RPC method. */
 export type RpcMethod = typeof RPC_METHODS[number]
 
-/** Public RPC protocol versions accepted during the v2 migration. */
-export type RpcProtocolVersion = typeof LEGACY_PROTOCOL_VERSION | typeof PROTOCOL_VERSION
+/** Public RPC v3 adds a Core-owned trace identifier to every response. */
+export const TRACE_PROTOCOL_VERSION = '3' as const
+
+/** Public RPC protocol versions. */
+export type RpcProtocolVersion = typeof LEGACY_PROTOCOL_VERSION | typeof PROTOCOL_VERSION | typeof TRACE_PROTOCOL_VERSION
 
 function parseProtocolVersion(value: unknown, path: string): RpcProtocolVersion {
-  if (value === LEGACY_PROTOCOL_VERSION || value === PROTOCOL_VERSION) return value
-  _fail(path, `unsupported version; expected ${JSON.stringify(PROTOCOL_VERSION)}`, 'UNSUPPORTED_VERSION')
+  if (value === LEGACY_PROTOCOL_VERSION || value === PROTOCOL_VERSION || value === TRACE_PROTOCOL_VERSION) return value
+  _fail(path, `unsupported version; expected ${JSON.stringify(TRACE_PROTOCOL_VERSION)}`, 'UNSUPPORTED_VERSION')
 }
 
 /** Request envelope sent to the sidecar. */
@@ -49,9 +52,18 @@ export interface RpcRequest<Params extends JsonValue = JsonValue> {
 
 /** Successful RPC response. */
 export interface RpcSuccess<Result extends JsonValue = JsonValue> {
-  readonly protocolVersion: RpcProtocolVersion
+  readonly protocolVersion: typeof LEGACY_PROTOCOL_VERSION | typeof PROTOCOL_VERSION
   readonly id: string
   readonly ok: true
+  readonly result: Result
+}
+
+/** Successful v3 RPC response with a Core-owned trace identifier. */
+export interface RpcSuccessV3<Result extends JsonValue = JsonValue> {
+  readonly protocolVersion: typeof TRACE_PROTOCOL_VERSION
+  readonly id: string
+  readonly ok: true
+  readonly traceId: string
   readonly result: Result
 }
 
@@ -71,11 +83,20 @@ export interface RpcFailureV2 {
   readonly error: DataAgentErrorV2
 }
 
+/** Failed v3 RPC response with the same trace identifier in the envelope and error. */
+export interface RpcFailureV3 {
+  readonly protocolVersion: typeof TRACE_PROTOCOL_VERSION
+  readonly id: string
+  readonly ok: false
+  readonly traceId: string
+  readonly error: DataAgentErrorV2
+}
+
 /** Failed RPC response for either supported protocol version. */
-export type RpcFailure = RpcFailureV1 | RpcFailureV2
+export type RpcFailure = RpcFailureV1 | RpcFailureV2 | RpcFailureV3
 
 /** RPC response envelope. */
-export type RpcResponse<Result extends JsonValue = JsonValue> = RpcSuccess<Result> | RpcFailure
+export type RpcResponse<Result extends JsonValue = JsonValue> = RpcSuccess<Result> | RpcSuccessV3<Result> | RpcFailure
 
 /** Parse an RPC request and fail closed on unknown versions/fields. */
 export function parseRpcRequest(value: unknown): RpcRequest {
@@ -95,8 +116,14 @@ export function parseRpcRequest(value: unknown): RpcRequest {
 /** Parse an RPC response and enforce its success/error discriminant. */
 export function parseRpcResponse(value: unknown): RpcResponse {
   const object = _record(value, 'response')
-  _keys(object, ['protocolVersion', 'id', 'ok', 'result', 'error'], 'response')
+  _keys(object, ['protocolVersion', 'id', 'ok', 'result', 'error', 'traceId'], 'response')
   const protocolVersion = parseProtocolVersion(_required(object, 'protocolVersion', 'response'), 'response.protocolVersion')
+  const hasTrace = Object.prototype.hasOwnProperty.call(object, 'traceId')
+  if (protocolVersion === TRACE_PROTOCOL_VERSION && !hasTrace) _fail('response.traceId', 'field is required for v3')
+  if (protocolVersion !== TRACE_PROTOCOL_VERSION && hasTrace) _fail('response.traceId', 'field is only supported in v3')
+  const traceId = protocolVersion === TRACE_PROTOCOL_VERSION
+    ? _string(object.traceId, 'response.traceId', 1, 128)
+    : undefined
   const id = _string(_required(object, 'id', 'response'), 'response.id', 1, 128)
   const ok = _boolean(_required(object, 'ok', 'response'), 'response.ok')
   const hasResult = Object.prototype.hasOwnProperty.call(object, 'result')
@@ -104,13 +131,20 @@ export function parseRpcResponse(value: unknown): RpcResponse {
   if (ok) {
     if (!hasResult) _fail('response.result', 'field is required when response.ok is true')
     if (hasError) _fail('response.error', 'must be omitted when response.ok is true')
-    return { protocolVersion, id, ok: true, result: _json(object.result, 'response.result') }
+    const result = _json(object.result, 'response.result')
+    return protocolVersion === TRACE_PROTOCOL_VERSION
+      ? { protocolVersion, id, ok: true, traceId: traceId!, result }
+      : { protocolVersion, id, ok: true, result }
   }
   if (!hasError) _fail('response.error', 'field is required when response.ok is false')
   if (hasResult) _fail('response.result', 'must be omitted when response.ok is false')
-  return protocolVersion === LEGACY_PROTOCOL_VERSION
-    ? { protocolVersion, id, ok: false, error: _parseError(object.error, 'response.error') }
-    : { protocolVersion, id, ok: false, error: _parseErrorV2(object.error, 'response.error') }
+  if (protocolVersion === LEGACY_PROTOCOL_VERSION) return { protocolVersion, id, ok: false, error: _parseError(object.error, 'response.error') }
+  const error = _parseErrorV2(object.error, 'response.error')
+  if (protocolVersion === TRACE_PROTOCOL_VERSION) {
+    if (error.traceId !== traceId) _fail('response.error.traceId', 'must match response.traceId')
+    return { protocolVersion, id, ok: false, traceId: traceId!, error }
+  }
+  return { protocolVersion, id, ok: false, error }
 }
 
 const SCHEMA = 'https://json-schema.org/draft/2020-12/schema'
@@ -122,7 +156,7 @@ export const RPC_REQUEST_JSON_SCHEMA: JsonSchema = {
   additionalProperties: false,
   required: ['protocolVersion', 'id', 'method', 'params'],
   properties: {
-    protocolVersion: { enum: [LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION] },
+    protocolVersion: { enum: [LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION, TRACE_PROTOCOL_VERSION] },
     id: { type: 'string', minLength: 1, maxLength: 128 },
     method: { enum: [...RPC_METHODS] },
     params: {},
@@ -136,19 +170,22 @@ export const RPC_RESPONSE_JSON_SCHEMA: JsonSchema = {
   type: 'object',
   additionalProperties: false,
   oneOf: [
-    { required: ['protocolVersion', 'id', 'ok', 'result'], properties: { ok: { const: true } } },
+    { required: ['protocolVersion', 'id', 'ok', 'result'], properties: { protocolVersion: { enum: [LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION] }, ok: { const: true } }, not: { required: ['traceId'] } },
+    { required: ['protocolVersion', 'id', 'ok', 'result', 'traceId'], properties: { protocolVersion: { const: TRACE_PROTOCOL_VERSION }, ok: { const: true } } },
     {
       required: ['protocolVersion', 'id', 'ok', 'error'],
-      properties: { protocolVersion: { const: LEGACY_PROTOCOL_VERSION }, ok: { const: false }, error: ERROR_JSON_SCHEMA },
+      properties: { protocolVersion: { const: LEGACY_PROTOCOL_VERSION }, ok: { const: false }, error: ERROR_JSON_SCHEMA }, not: { required: ['traceId'] },
     },
     {
       required: ['protocolVersion', 'id', 'ok', 'error'],
-      properties: { protocolVersion: { const: PROTOCOL_VERSION }, ok: { const: false }, error: ERROR_V2_JSON_SCHEMA },
+      properties: { protocolVersion: { const: PROTOCOL_VERSION }, ok: { const: false }, error: ERROR_V2_JSON_SCHEMA }, not: { required: ['traceId'] },
     },
+    { required: ['protocolVersion', 'id', 'ok', 'error', 'traceId'], properties: { protocolVersion: { const: TRACE_PROTOCOL_VERSION }, ok: { const: false }, error: ERROR_V2_JSON_SCHEMA } },
   ],
   properties: {
-    protocolVersion: { enum: [LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION] },
+    protocolVersion: { enum: [LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION, TRACE_PROTOCOL_VERSION] },
     id: { type: 'string', minLength: 1, maxLength: 128 },
+    traceId: { type: 'string', minLength: 1, maxLength: 128 },
     ok: { type: 'boolean' },
     result: {},
     error: { anyOf: [ERROR_JSON_SCHEMA, ERROR_V2_JSON_SCHEMA] },

@@ -19,6 +19,8 @@ except ImportError:  # pragma: no cover
 _FEEDBACK_DETAIL = re.compile(r"/api/v1/diagnostics/feedback/([^/]+)\Z")
 _REGRESSION_CREATE = re.compile(r"/api/v1/diagnostics/feedback/([^/]+)/regression-cases\Z")
 _RETRIEVAL_DETAIL = re.compile(r"/api/v1/diagnostics/retrievals/([^/]+)\Z")
+_TRACE_DETAIL = re.compile(r"/api/v1/traces/([^/]+)\Z")
+_TRACE_CORE_DETAIL = re.compile(r"/api/v1/traces/by-core/([^/]+)\Z")
 
 
 class DiagnosticsApi:
@@ -43,7 +45,7 @@ class DiagnosticsApi:
         body: Any,
         authorization: str | None,
     ) -> tuple[int, dict[str, Any]] | None:
-        if path != "/api/v1/feedback" and not path.startswith("/api/v1/diagnostics/"):
+        if path != "/api/v1/feedback" and not path.startswith("/api/v1/diagnostics/") and not path.startswith("/api/v1/traces"):
             return None
         if self.store is None:
             return 503, {
@@ -54,7 +56,34 @@ class DiagnosticsApi:
             auth = self.access_control.authenticate(authorization)
             if method == "POST" and path == "/api/v1/feedback":
                 return 201, self._submit(auth, body)
+            if method == "POST" and path == "/api/v1/traces/events":
+                self._require_trace_write(auth)
+                payload = self._body(body, {"schemaVersion", "source", "sourceSessionId", "sourceTurnId", "events"})
+                if type(payload.get("schemaVersion")) is not int or payload["schemaVersion"] != 1 or payload.get("source") != "codex":
+                    raise DiagnosticError("INVALID_TRACE", "trace schema or source is invalid")
+                return 201, self.store.record_trace_events(
+                    auth=auth, project_id=self.project_id,
+                    source_session_id=payload.get("sourceSessionId"),
+                    source_turn_id=payload.get("sourceTurnId"), events=payload.get("events"),
+                )
             self._require_admin(auth, path)
+            if method == "GET" and path == "/api/v1/traces":
+                return 200, self.store.list_traces(
+                    organization_id=auth.subject.organization_id, project_id=self.project_id,
+                    limit=self._limit(query.get("limit", 50)), cursor=self._optional(query.get("cursor")),
+                )
+            core_trace = _TRACE_CORE_DETAIL.fullmatch(path)
+            if core_trace and method == "GET":
+                return 200, self.store.trace_for_core(
+                    core_trace.group(1), organization_id=auth.subject.organization_id,
+                    project_id=self.project_id,
+                )
+            trace = _TRACE_DETAIL.fullmatch(path)
+            if trace and method == "GET":
+                return 200, self.store.trace_detail(
+                    trace.group(1), organization_id=auth.subject.organization_id,
+                    project_id=self.project_id,
+                )
             if method == "GET" and path == "/api/v1/diagnostics/feedback":
                 return 200, self.store.list_feedback(
                     organization_id=auth.subject.organization_id,
@@ -136,6 +165,16 @@ class DiagnosticsApi:
             semantic_sql=payload.get("semanticSql"),
             native_sql=payload.get("nativeSql"),
         )
+
+    def _require_trace_write(self, auth: AuthContext) -> None:
+        if auth.subject.id == BOOTSTRAP_SUBJECT_ID:
+            raise AccessControlError("FORBIDDEN", "managed trace credential required", status=403)
+        policies = self.access_control.policies_for_subject(auth.subject.id)
+        decision = self.policy_engine.authorize_scope(
+            auth.subject, "trace:write", policies, project_id=self.project_id,
+        )
+        if not decision.allowed:
+            raise AccessControlError("FORBIDDEN", "trace write permission is required", status=403)
 
     def _require_admin(self, auth: AuthContext, resource: str) -> None:
         policies = (

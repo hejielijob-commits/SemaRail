@@ -44,7 +44,11 @@ describe('versioned RPC contracts', () => {
     expect(parseRpcRequest({ protocolVersion: '1', id: '2', method: 'project.validate', params: {} }).method).toBe('project.validate')
     expect(() => parseRpcRequest({ protocolVersion: '1', id: '1', method: 'health', params: {}, extra: true })).toThrow(ContractValidationError)
     expect(parseRpcResponse({ protocolVersion: '1', id: '1', ok: true, result: { ready: true } })).toMatchObject({ ok: true })
-    expect(() => parseRpcResponse({ protocolVersion: '3', id: '1', ok: true, result: null })).toThrow(/unsupported version/)
+    expect(() => parseRpcResponse({ protocolVersion: '4', id: '1', ok: true, result: null })).toThrow(/unsupported version/)
+    expect(parseRpcRequest({ protocolVersion: '3', id: 'v3', method: 'health', params: {} }).protocolVersion).toBe('3')
+    expect(parseRpcResponse({ protocolVersion: '3', id: 'v3', ok: true, traceId: 'trace-core', result: { ready: true } })).toMatchObject({ traceId: 'trace-core' })
+    expect(() => parseRpcResponse({ protocolVersion: '3', id: 'v3', ok: true, result: {} })).toThrow(/traceId/)
+    expect(() => parseRpcResponse({ protocolVersion: '2', id: 'v2', ok: true, traceId: 'trace-core', result: {} })).toThrow(/traceId/)
     expect(parseRpcResponse({
       protocolVersion: '1', id: 'python-1', ok: false,
       error: { code: 'PROJECT_VALIDATION_FAILED', phase: 'project.validate', message: 'project validation failed', retryable: false },
@@ -63,6 +67,14 @@ describe('versioned RPC contracts', () => {
       protocolVersion: '2', ok: false,
       error: { reasonCode: 'COLUMN_PERMISSION_REQUIRED', traceId: 'trace-1' },
     })
+    expect(parseRpcResponse({
+      protocolVersion: '3', id: 'python-3', ok: false, traceId: 'trace-3',
+      error: {
+        code: 'POLICY_DENIED', phase: 'authorization', message: 'denied', retryable: false,
+        reasonCode: 'EXPLICIT_DENIAL', resources: [], requiredPermissions: [],
+        suggestion: 'Ask an administrator.', origin: 'semarail-policy', traceId: 'trace-3',
+      },
+    })).toMatchObject({ traceId: 'trace-3', error: { traceId: 'trace-3' } })
     expect(parseRpcResponse({
       protocolVersion: '2', id: 'missing-attribute', ok: false,
       error: {

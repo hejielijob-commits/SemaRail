@@ -24,7 +24,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
-from mcp.types import ToolAnnotations
+from mcp.types import CallToolResult, TextContent, ToolAnnotations
 
 
 DEFAULT_CORE_ENDPOINT = "http://127.0.0.1:48763"
@@ -61,6 +61,38 @@ class CoreTransport(Protocol):
     async def call(self, method: str, params: Mapping[str, Any]) -> dict[str, Any]: ...
 
     async def submit_feedback(self, payload: Mapping[str, Any]) -> dict[str, Any]: ...
+
+
+class _CoreResult(dict[str, Any]):
+    """Keep Core correlation separate from MCP's structured tool result."""
+
+    def __init__(self, result: Mapping[str, Any], trace_id: str) -> None:
+        super().__init__(result)
+        self.trace_id = trace_id
+
+
+class _CoreToolError(ToolError):
+    def __init__(self, error: Mapping[str, Any], trace_id: str) -> None:
+        super().__init__(json.dumps(dict(error), ensure_ascii=False, separators=(",", ":")))
+        self.trace_id = trace_id
+
+
+def _mcp_result(result: Mapping[str, Any]) -> CallToolResult:
+    data = dict(result)
+    trace_id = getattr(result, "trace_id", None)
+    return CallToolResult(
+        content=[TextContent(type="text", text=json.dumps(data, ensure_ascii=False, indent=2))],
+        structuredContent=data,
+        **({"_meta": {"traceId": trace_id}} if isinstance(trace_id, str) else {}),
+    )
+
+
+def _mcp_failure(error: _CoreToolError) -> CallToolResult:
+    return CallToolResult(
+        content=[TextContent(type="text", text=str(error))],
+        isError=True,
+        _meta={"traceId": error.trace_id},
+    )
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -156,7 +188,7 @@ def resolve_authentication(
 
 def _safe_error(status: int, payload: Any = None) -> dict[str, Any]:
     error = payload.get("error") if isinstance(payload, Mapping) else None
-    if isinstance(payload, Mapping) and payload.get("protocolVersion") == "2" and isinstance(error, Mapping):
+    if isinstance(payload, Mapping) and payload.get("protocolVersion") in {"2", "3"} and isinstance(error, Mapping):
         expected_fields = {
             "code", "phase", "message", "retryable", "reasonCode", "resources",
             "requiredPermissions", "suggestion", "origin", "traceId",
@@ -307,7 +339,7 @@ class CoreHttpTransport:
     def _call_sync(self, method: str, params: Mapping[str, Any]) -> dict[str, Any]:
         request_id = f"stdio-mcp-{uuid.uuid4().hex}"
         body = json.dumps(
-            {"protocolVersion": "2", "id": request_id, "method": method, "params": dict(params)},
+            {"protocolVersion": "3", "id": request_id, "method": method, "params": dict(params)},
             ensure_ascii=False,
             separators=(",", ":"),
         ).encode("utf-8")
@@ -337,15 +369,30 @@ class CoreHttpTransport:
         except (UnicodeDecodeError, json.JSONDecodeError):
             raise ToolError(json.dumps(_safe_error(status), separators=(",", ":"))) from None
         if status != 200 or not isinstance(payload, Mapping) or payload.get("ok") is not True:
-            raise ToolError(json.dumps(_safe_error(status, payload), ensure_ascii=False, separators=(",", ":")))
-        if payload.get("id") != request_id or payload.get("protocolVersion") != "2":
+            safe = _safe_error(status, payload)
+            trace_id = payload.get("traceId") if isinstance(payload, Mapping) else None
+            error = payload.get("error") if isinstance(payload, Mapping) else None
+            if (
+                isinstance(trace_id, str) and _SAFE_TRACE_PATTERN.fullmatch(trace_id)
+                and payload.get("protocolVersion") == "3" and payload.get("id") == request_id
+                and isinstance(error, Mapping) and error.get("traceId") == trace_id
+            ):
+                # Redacting malformed error details must not discard a valid,
+                # request-matched v3 correlation envelope.
+                safe["traceId"] = trace_id
+                raise _CoreToolError(safe, trace_id)
+            raise ToolError(json.dumps(safe, ensure_ascii=False, separators=(",", ":")))
+        if payload.get("id") != request_id or payload.get("protocolVersion") != "3":
+            raise ToolError(json.dumps(_safe_error(502), separators=(",", ":")))
+        trace_id = payload.get("traceId")
+        if not isinstance(trace_id, str) or not _SAFE_TRACE_PATTERN.fullmatch(trace_id):
             raise ToolError(json.dumps(_safe_error(502), separators=(",", ":")))
         result = payload.get("result")
         if not isinstance(result, Mapping):
             raise ToolError(json.dumps(_safe_error(502), separators=(",", ":")))
         if self._token in json.dumps(result, ensure_ascii=False, separators=(",", ":")):
             raise ToolError(json.dumps(_safe_error(502), separators=(",", ":")))
-        return dict(result)
+        return _CoreResult(result, trace_id)
 
 
 def _readonly(title: str, *, idempotent: bool = True) -> ToolAnnotations:
@@ -385,12 +432,12 @@ def create_stdio_mcp_server(transport: CoreTransport) -> FastMCP:
     )
 
     @server.tool(annotations=_readonly("Validate the SemaRail semantic project"))
-    async def semarail_validate_project() -> dict[str, Any]:
-        return await transport.call("project.validate", {})
+    async def semarail_validate_project() -> CallToolResult:
+        return _mcp_result(await transport.call("project.validate", {}))
 
     @server.tool(annotations=_readonly("List SemaRail semantic models"))
-    async def semarail_list_models() -> dict[str, Any]:
-        return await transport.call("project.describe", {})
+    async def semarail_list_models() -> CallToolResult:
+        return _mcp_result(await transport.call("project.describe", {}))
 
     @server.tool(annotations=_readonly("Get SemaRail semantic context"))
     async def semarail_get_context(
@@ -398,7 +445,7 @@ def create_stdio_mcp_server(transport: CoreTransport) -> FastMCP:
         context_version: int | None = None,
         budgets: dict[str, Any] | None = None,
         include_retrieval_trace: bool = False,
-    ) -> dict[str, Any]:
+    ) -> CallToolResult:
         """Return bounded context with explicit evidence roles.
 
         Treat v2 schema/relationships/metrics as published facts, mandatory
@@ -413,15 +460,15 @@ def create_stdio_mcp_server(transport: CoreTransport) -> FastMCP:
             params["budgets"] = budgets
         result = await transport.call("context.ask", params)
         if include_retrieval_trace:
-            return result
-        agent_context = dict(result)
+            return _mcp_result(result)
+        agent_context = _CoreResult(result, result.trace_id) if isinstance(result, _CoreResult) else dict(result)
         agent_context.pop("retrievalTrace", None)
         agent_context.pop("retrievalSummary", None)
-        return agent_context
+        return _mcp_result(agent_context)
 
     @server.tool(annotations=_readonly("Plan a SemaRail semantic query"))
-    async def semarail_plan_query(semantic_sql: str) -> dict[str, Any]:
-        return await transport.call("query.dryPlan", {"semanticSql": semantic_sql})
+    async def semarail_plan_query(semantic_sql: str) -> CallToolResult:
+        return _mcp_result(await transport.call("query.dryPlan", {"semanticSql": semantic_sql}))
 
     @server.tool(annotations=_stateful("Prepare and confirm a SemaRail query"))
     async def semarail_prepare_query(
@@ -429,8 +476,8 @@ def create_stdio_mcp_server(transport: CoreTransport) -> FastMCP:
         semantic_sql: str,
         conditions: dict[str, Any] | None = None,
         confirmed_conditions: list[str] | None = None,
-    ) -> dict[str, Any]:
-        return await transport.call(
+    ) -> CallToolResult:
+        return _mcp_result(await transport.call(
             "query.prepare",
             {
                 "question": question,
@@ -438,7 +485,7 @@ def create_stdio_mcp_server(transport: CoreTransport) -> FastMCP:
                 "conditions": conditions or {},
                 "confirmedConditions": confirmed_conditions or [],
             },
-        )
+        ))
 
     @server.tool(annotations=_readonly("Run a governed SemaRail query", idempotent=False))
     async def semarail_governed_query(
@@ -446,10 +493,10 @@ def create_stdio_mcp_server(transport: CoreTransport) -> FastMCP:
         semantic_sql: str,
         chart_intent: Literal["auto", "table", "line", "bar", "pie"] = "auto",
         preparation_id: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> CallToolResult:
         query_id = f"stdio-mcp-query-{uuid.uuid4().hex}"
         try:
-            return await transport.call(
+            return _mcp_result(await transport.call(
                 "query.run",
                 {
                     "question": question,
@@ -458,7 +505,7 @@ def create_stdio_mcp_server(transport: CoreTransport) -> FastMCP:
                     "queryId": query_id,
                     **({"preparationId": preparation_id} if preparation_id is not None else {}),
                 },
-            )
+            ))
         except asyncio.CancelledError:
             try:
                 await asyncio.shield(transport.call("query.cancel", {"queryId": query_id}))
@@ -501,6 +548,15 @@ def create_stdio_mcp_server(transport: CoreTransport) -> FastMCP:
         tool.parameters["additionalProperties"] = False
         tool.fn_metadata.arg_model.model_config["extra"] = "forbid"
         tool.fn_metadata.arg_model.model_rebuild(force=True)
+        original = tool.fn
+
+        async def with_core_error_meta(*args: Any, _original: Any = original, **kwargs: Any) -> Any:
+            try:
+                return await _original(*args, **kwargs)
+            except _CoreToolError as exc:
+                return _mcp_failure(exc)
+
+        tool.fn = with_core_error_meta
 
     return server
 

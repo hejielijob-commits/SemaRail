@@ -9,6 +9,9 @@
 
 SemaRail turns database schemas, business definitions, relationships, rules, and reviewed SQL into a semantic context that AI agents can use consistently. It provides a visual Semantic Console for managing that context, a stable MCP interface for agent integration, and a governed query boundary for read-only data access.
 
+For the optional Codex desktop integration, metadata policy, Trace API, and
+replay verification, see [Codex desktop Trace v1](docs/trace-v1.md).
+
 SemaRail is agent-neutral. Any MCP-capable client can use its semantic tools through the authenticated HTTP endpoint or stdio bridge.
 
 > **Status:** Alpha. APIs, configuration, and storage formats may change before the first stable release. The Core tarball can be built from source; npm and PyPI packages are not published yet.
@@ -26,6 +29,7 @@ SemaRail is agent-neutral. Any MCP-capable client can use its semantic tools thr
 - **Versioned semantic projects** — validate drafts, inspect generated source and diffs, publish revisions, and roll back changes.
 - **Bilingual metadata** — maintain English and Simplified Chinese display names without changing stable technical identifiers.
 - **Actionable query diagnostics** — carry a Core trace across policy, planning, and execution, preserve versioned detailed errors, and retain bounded redacted failure evidence for 30 days without storing result rows.
+- **Full execution Traces** — replay an opted-in Codex desktop turn as Session → turn → Agent/subagent → tool → Core, with parallel activity, observed durations, errors, and direct issue navigation. Trace events retain only safe metadata for 30 days.
 - **Explicit feedback and regression review** — submit caller-owned feedback from MCP or a Console link, classify it in the Console, and export only reviewed reproducible regression cases.
 - **Business-condition clarification** — publish structured metric, time-range, grain, and business-definition confirmation rules; required conditions block execution until `semarail_prepare_query` returns ready.
 
@@ -47,6 +51,41 @@ Explore and maintain field-level model relationships in an interactive graph.
 
 ![Semantic relationship graph](docs/images/relationship-graph.png)
 
+### Agent Trace workbench
+
+Open **Quality → Agent traces** (**质量 → Agent 追踪**) to browse execution
+Traces by time and inspect the persisted event timeline. A Codex chat is a
+Session; each main Agent turn is one Trace.
+
+| Console page | New functionality |
+| --- | --- |
+| **Agent traces / Agent 追踪** | Trace list, Session/turn/Agent/subagent/tool/Core hierarchy, parallel activity, status, observed durations, Core authentication/policy/runtime phases, and evidence links. |
+| **Issues & feedback / 问题与反馈** | Open the originating Agent Trace from a Core `traceId`; failed tool Spans link directly to their corresponding issue. |
+
+![Failed subagent tool Span with Core evidence and a direct issue link](docs/images/agent-trace-failure.jpg)
+
+[View the full Trace page](docs/images/agent-traces.jpg).
+
+- Refresh reconstructs the timeline from persisted events. Missing completions,
+  unknown tool ownership, running Spans, and unknown outcomes have explicit labels.
+- Collection requires explicit project enablement and an independently installed
+  [SemaRail Codex Trace plugin](https://github.com/hejielijob-commits/semarail-codex-trace).
+  Trust its current Hooks in Codex, then start a new chat; existing chats are not
+  backfilled. Collection failures do not change tool results or execution.
+- Prompts, model input/output, tool argument/result bodies, and transcripts are
+  not saved as Trace data. Missing LLM duration and Token events show **Not
+  collected / 未采集**. Agent/tool intervals are Hook observation durations;
+  Core durations are measured within Core.
+- Event ingestion and administrative reads enforce project-scoped permissions;
+  duplicate/out-of-order events are supported, Core links verify organization,
+  project, and subject ownership, and expired Trace events are deleted after
+  30 days. Core RPC v3 supplies correlation IDs on success and failure while
+  retaining v1/v2 compatibility.
+
+This first version provides structural replay and error location. See
+[Trace v1 setup, API, boundaries, and desktop verification](docs/trace-v1.md)
+for configuration and acceptance details.
+
 ## Project roadmap
 
 This roadmap highlights major project milestones. For file-level release notes,
@@ -61,6 +100,7 @@ see [CHANGELOG.md](CHANGELOG.md).
 | 2026-09-03 | Completed | Hardened permission-control acceptance with real PostgreSQL 17 tests, first-request MCP query startup, clean Linux CI builds, and A/B employee row-isolation verification. |
 | 2026-09-04 | Completed | Added bounded query-result delivery: up to 50 rows and 128 KiB inline, otherwise a revocable 15-minute CSV artifact with a 20-row Agent preview and 16 MiB ceiling. |
 | 2026-09-10 | Completed | Added versioned detailed query errors and traces, independent 30-day diagnostics, explicit feedback and reviewed regression cases, and Core-enforced query clarification rules. |
+| 2026-09-30 | Completed | Added the Agent Trace workbench, metadata-only Codex lifecycle collection, Core RPC v3 correlation, parallel replay, and bidirectional issue navigation; verified enabled and unenabled desktop chats. |
 | Next | Planned | Extend governed query execution beyond PostgreSQL while preserving the same policy, limits, audit, and cancellation contract. |
 | Next | Planned | Add a managed CSV/Excel ingestion workflow backed by DuckDB, without exposing uploaded files or local paths to Agents. |
 | Later | Planned | Publish versioned SemaRail Core packages after the alpha installation and upgrade flow is stable. |

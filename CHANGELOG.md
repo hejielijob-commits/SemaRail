@@ -6,6 +6,18 @@ All notable user-visible changes to this project are documented here. The format
 
 ### Added
 
+- Agent Trace workbench in the Console quality section, with a persisted
+  Session/turn/Agent/subagent/tool/Core timeline, parallel activity, observed
+  durations, explicit missing/unknown states, and bidirectional issue links.
+- Authenticated, scoped Trace ingestion and administrator list/detail APIs,
+  idempotent out-of-order events, verified Core associations, and physical
+  cleanup of 30-day Trace metadata.
+- Core RPC v3 correlation IDs on success and failure, MCP response metadata,
+  and measured authentication/policy/runtime phases with v1/v2 compatibility.
+- Optional metadata-only Codex desktop adapter in the independent
+  `semarail-codex-trace` repository, with explicit project opt-in and seven
+  asynchronous lifecycle Hooks.
+
 - Independently installable `@hejielijob/semarail-core` distribution.
 - An authenticated, versioned HTTP v1 boundary for Core handshake, semantic
   context, governed query execution, and cancellation.

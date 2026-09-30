@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import logging
 import re
 import uuid
 from collections.abc import Mapping
@@ -27,9 +28,10 @@ except ImportError:  # pragma: no cover - direct module loading
     )
 
 
-DIAGNOSTIC_SCHEMA_VERSION = 6
+DIAGNOSTIC_SCHEMA_VERSION = 11
 _DIAGNOSTIC_MIGRATION_LOCK_ID = 8_341_972_315_443_002
 DEFAULT_RETENTION_DAYS = 30
+TRACE_RETENTION_DAYS = 30
 MAX_TEXT = 64_000
 MAX_ERROR_JSON = 64_000
 _SECRET = re.compile(
@@ -53,6 +55,17 @@ _STATUSES = frozenset({"pending", "classified", "located", "fixed", "verified", 
 _RETRIEVAL_ANOMALIES = frozenset(
     {"ZERO_RECALL", "FULL_FALLBACK", "INDEX_NOT_READY", "PERMISSION_OVER_FILTERED"}
 )
+_TRACE_EVENT_TYPES = frozenset({
+    "turn_started", "turn_completed", "turn_interrupted", "tool_started",
+    "tool_completed", "subagent_started", "subagent_completed", "output",
+})
+_TRACE_STATUSES = frozenset({"running", "success", "failure", "cancelled"})
+_TRACE_EVENT_FIELDS = frozenset({
+    "eventId", "occurredAt", "type", "agentId", "parentAgentId", "toolUseId",
+    "parentToolUseId", "toolName", "model", "status", "coreTraceId", "tokenUsage",
+})
+_TRACE_TOOL_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,127}\Z")
+_LOGGER = logging.getLogger("semarail-core.diagnostics")
 
 
 class DiagnosticError(RuntimeError):
@@ -180,6 +193,73 @@ def _safe_retrieval_explanation(value: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _trace_id(value: Any, field: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not re.fullmatch(r"[A-Za-z0-9._:-]{1,256}", value)
+        or _SECRET.sub("[REDACTED]", value) != value
+    ):
+        raise DiagnosticError("INVALID_TRACE", f"{field} is invalid")
+    return value
+
+
+def _trace_time(value: str) -> datetime:
+    """Parse a normalized event timestamp for ordering without string quirks."""
+
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
+
+
+def _trace_event(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping) or set(value) - _TRACE_EVENT_FIELDS:
+        raise DiagnosticError("INVALID_TRACE", "trace event is invalid")
+    event_id = _trace_id(value.get("eventId"), "eventId")
+    kind = value.get("type")
+    if not isinstance(kind, str) or kind not in _TRACE_EVENT_TYPES:
+        raise DiagnosticError("INVALID_TRACE", "trace event type is invalid")
+    occurred = value.get("occurredAt")
+    if not isinstance(occurred, str) or len(occurred) > 64:
+        raise DiagnosticError("INVALID_TRACE", "trace event time is invalid")
+    try:
+        parsed = datetime.fromisoformat(occurred.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise DiagnosticError("INVALID_TRACE", "trace event time is invalid") from exc
+    if parsed.tzinfo is None:
+        raise DiagnosticError("INVALID_TRACE", "trace event time needs a timezone")
+    event: dict[str, Any] = {
+        "eventId": event_id, "occurredAt": _timestamp(parsed.astimezone(UTC)), "type": kind,
+    }
+    for field in ("agentId", "parentAgentId", "toolUseId", "parentToolUseId", "coreTraceId"):
+        if field in value:
+            event[field] = _trace_id(value[field], field)
+    if kind in {"tool_started", "tool_completed"} and "toolUseId" not in event:
+        raise DiagnosticError("INVALID_TRACE", "tool events require toolUseId")
+    if kind in {"subagent_started", "subagent_completed"} and "agentId" not in event:
+        raise DiagnosticError("INVALID_TRACE", "subagent events require agentId")
+    if "coreTraceId" in event and kind != "tool_completed":
+        raise DiagnosticError("INVALID_TRACE", "Core trace IDs belong to completed tool events")
+    if "toolName" in value:
+        name = value["toolName"]
+        if not isinstance(name, str) or not _TRACE_TOOL_NAME.fullmatch(name) or _SECRET.sub("[REDACTED]", name) != name:
+            raise DiagnosticError("INVALID_TRACE", "toolName is invalid")
+        event["toolName"] = name
+    if "model" in value:
+        event["model"] = _trace_id(value["model"], "model")
+    if "status" in value:
+        if not isinstance(value["status"], str) or value["status"] not in _TRACE_STATUSES:
+            raise DiagnosticError("INVALID_TRACE", "trace event status is invalid")
+        event["status"] = value["status"]
+    if "tokenUsage" in value:
+        usage = value["tokenUsage"]
+        if not isinstance(usage, Mapping) or not usage or set(usage) - {"input", "output", "total"}:
+            raise DiagnosticError("INVALID_TRACE", "token usage is invalid")
+        if any(type(count) is not int or not 0 <= count <= 1_000_000_000 for count in usage.values()):
+            raise DiagnosticError("INVALID_TRACE", "token usage is invalid")
+        event["tokenUsage"] = {
+            key: usage[key] for key in ("input", "output", "total") if key in usage
+        }
+    return event
+
+
 class DiagnosticStore:
     """Versioned SQLite/PostgreSQL diagnostics storage with 30-day bodies."""
 
@@ -287,6 +367,125 @@ class DiagnosticStore:
                         "INSERT INTO diagnostic_schema_migrations(version,applied_at) VALUES(?,?)",
                         (6, _timestamp(self.clock())),
                     )
+                if len(applied) < 7:
+                    connection.execute(
+                        "CREATE TABLE IF NOT EXISTS agent_traces ("
+                        "id TEXT PRIMARY KEY,organization_id TEXT NOT NULL,project_id TEXT NOT NULL,"
+                        "subject_id TEXT NOT NULL,source TEXT NOT NULL,source_session_id TEXT NOT NULL,"
+                        "source_turn_id TEXT NOT NULL,created_at TEXT NOT NULL,expires_at TEXT NOT NULL,"
+                        "UNIQUE(organization_id,project_id,subject_id,source,source_session_id,source_turn_id))"
+                    )
+                    connection.execute(
+                        "CREATE INDEX IF NOT EXISTS agent_traces_scope_time_idx "
+                        "ON agent_traces(organization_id,project_id,created_at,id)"
+                    )
+                    connection.execute(
+                        "CREATE TABLE IF NOT EXISTS agent_trace_events ("
+                        "trace_id TEXT NOT NULL REFERENCES agent_traces(id),event_id TEXT NOT NULL,"
+                        "occurred_at TEXT NOT NULL,event_type TEXT NOT NULL,event_json TEXT NOT NULL,"
+                        "created_at TEXT NOT NULL,PRIMARY KEY(trace_id,event_id))"
+                    )
+                    connection.execute(
+                        "CREATE INDEX IF NOT EXISTS agent_trace_events_time_idx "
+                        "ON agent_trace_events(trace_id,occurred_at,event_id)"
+                    )
+                    connection.execute(
+                        "INSERT INTO diagnostic_schema_migrations(version,applied_at) VALUES(?,?)",
+                        (7, _timestamp(self.clock())),
+                    )
+                if len(applied) < 8:
+                    connection.execute(
+                        "CREATE TABLE IF NOT EXISTS agent_trace_core_links ("
+                        "trace_id TEXT NOT NULL REFERENCES agent_traces(id),"
+                        "event_id TEXT NOT NULL,core_trace_id TEXT NOT NULL,"
+                        "PRIMARY KEY(trace_id,event_id))"
+                    )
+                    connection.execute(
+                        "CREATE INDEX IF NOT EXISTS agent_trace_core_lookup_idx "
+                        "ON agent_trace_core_links(core_trace_id,trace_id)"
+                    )
+                    for saved in connection.execute(
+                        "SELECT trace_id,event_id,event_json FROM agent_trace_events"
+                    ).fetchall():
+                        core_id = json.loads(saved["event_json"]).get("coreTraceId")
+                        if isinstance(core_id, str):
+                            connection.execute(
+                                "INSERT INTO agent_trace_core_links(trace_id,event_id,core_trace_id) "
+                                "VALUES(?,?,?)",
+                                (saved["trace_id"], saved["event_id"], core_id),
+                            )
+                    connection.execute(
+                        "INSERT INTO diagnostic_schema_migrations(version,applied_at) VALUES(?,?)",
+                        (8, _timestamp(self.clock())),
+                    )
+                if len(applied) < 9:
+                    connection.execute(
+                        "ALTER TABLE query_diagnostics ADD COLUMN phase_spans_json TEXT"
+                    )
+                    connection.execute(
+                        "INSERT INTO diagnostic_schema_migrations(version,applied_at) VALUES(?,?)",
+                        (9, _timestamp(self.clock())),
+                    )
+                if len(applied) < 10:
+                    connection.execute("ALTER TABLE agent_traces ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1")
+                    connection.execute("ALTER TABLE agent_trace_events ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1")
+                    connection.execute(
+                        "CREATE TABLE IF NOT EXISTS agent_trace_spans ("
+                        "trace_id TEXT NOT NULL REFERENCES agent_traces(id),span_id TEXT NOT NULL,"
+                        "schema_version INTEGER NOT NULL,kind TEXT NOT NULL,parent_span_id TEXT,"
+                        "started_at TEXT,ended_at TEXT,status TEXT NOT NULL,"
+                        "PRIMARY KEY(trace_id,span_id))"
+                    )
+                    connection.execute(
+                        "INSERT INTO diagnostic_schema_migrations(version,applied_at) VALUES(?,?)",
+                        (10, _timestamp(self.clock())),
+                    )
+                if len(applied) < 11:
+                    connection.execute(
+                        "ALTER TABLE agent_trace_spans ADD COLUMN last_event_created_at TEXT"
+                    )
+                    connection.execute(
+                        "ALTER TABLE agent_trace_spans ADD COLUMN terminal_event_at TEXT"
+                    )
+                    connection.execute(
+                        "ALTER TABLE agent_trace_spans ADD COLUMN terminal_event_id TEXT"
+                    )
+                    connection.execute(
+                        "CREATE TABLE IF NOT EXISTS agent_trace_core_claims ("
+                        "core_trace_id TEXT PRIMARY KEY,trace_id TEXT,status TEXT NOT NULL,"
+                        "FOREIGN KEY(trace_id) REFERENCES agent_traces(id))"
+                    )
+                    for saved in connection.execute(
+                        "SELECT trace_id,event_id,event_json,created_at FROM agent_trace_events "
+                        "ORDER BY occurred_at,event_id"
+                    ).fetchall():
+                        event = json.loads(saved["event_json"])
+                        self._upsert_trace_span(
+                            connection, saved["trace_id"], event,
+                            event_created_at=saved["created_at"],
+                        )
+                        core_id = event.get("coreTraceId")
+                        if isinstance(core_id, str):
+                            connection.execute(
+                                "INSERT INTO agent_trace_core_claims(core_trace_id,trace_id,status) "
+                                "VALUES(?,?,?) ON CONFLICT(core_trace_id) DO NOTHING",
+                                (core_id, saved["trace_id"], "verified"),
+                            )
+                    duplicates = connection.execute(
+                        "SELECT core_trace_id FROM agent_trace_core_links GROUP BY core_trace_id "
+                        "HAVING COUNT(DISTINCT trace_id)>1"
+                    ).fetchall()
+                    for claim in duplicates:
+                        # Historical duplicate claims are retained as an
+                        # explicit conflict. Never pick one trace arbitrarily.
+                        connection.execute(
+                            "UPDATE agent_trace_core_claims SET trace_id=NULL,status='ambiguous' "
+                            "WHERE core_trace_id=?", (claim["core_trace_id"],),
+                        )
+                    connection.execute(
+                        "INSERT INTO diagnostic_schema_migrations(version,applied_at) VALUES(?,?)",
+                        (11, _timestamp(self.clock())),
+                    )
         except DiagnosticError:
             raise
         except Exception as exc:
@@ -315,6 +514,7 @@ class DiagnosticStore:
         native_sql: str | None = None,
         evidence_source: str = "server",
         duration_ms: float = 0.0,
+        phase_spans: list[Mapping[str, Any]] | None = None,
         retrieval_explanation: Mapping[str, Any] | None = None,
     ) -> str:
         if status not in {"success", "failure", "cancelled"}:
@@ -329,6 +529,18 @@ class DiagnosticStore:
         bounded_duration = float(duration_ms)
         if not 0 <= bounded_duration <= 86_400_000:
             raise DiagnosticError("INVALID_DIAGNOSTIC", "diagnostic duration is invalid")
+        safe_phases: list[dict[str, Any]] = []
+        for phase in phase_spans or []:
+            if not isinstance(phase, Mapping) or set(phase) != {"name", "status", "durationMs"}:
+                raise DiagnosticError("INVALID_DIAGNOSTIC", "diagnostic phase is invalid")
+            if phase["name"] not in {"authentication", "policy", "runtime"} or phase["status"] not in {"success", "failure"}:
+                raise DiagnosticError("INVALID_DIAGNOSTIC", "diagnostic phase is invalid")
+            elapsed = phase["durationMs"]
+            if isinstance(elapsed, bool) or not isinstance(elapsed, (int, float)) or not 0 <= elapsed <= 86_400_000:
+                raise DiagnosticError("INVALID_DIAGNOSTIC", "diagnostic phase is invalid")
+            safe_phases.append({"name": phase["name"], "status": phase["status"], "durationMs": float(elapsed)})
+        if len(safe_phases) > 3 or len({phase["name"] for phase in safe_phases}) != len(safe_phases):
+            raise DiagnosticError("INVALID_DIAGNOSTIC", "diagnostic phase is invalid")
         safe_question = _safe_text(question) if question is not None else None
         question_hash = (
             hashlib.sha256(safe_question.strip().encode("utf-8")).hexdigest()
@@ -365,6 +577,7 @@ class DiagnosticStore:
             _json(_safe_retrieval_explanation(retrieval_explanation), limit=256_000)
             if method == "context.ask" and retrieval_explanation is not None
             else None,
+            _json(safe_phases, limit=2_048),
         )
         try:
             connect = getattr(self.access_control, "_connect")
@@ -384,9 +597,9 @@ class DiagnosticStore:
                     ).fetchone()
                     if retrieval is not None and isinstance(retrieval["trace_id"], str):
                         retrieval_trace_id = retrieval["trace_id"]
-                        values = (*values[:-2], retrieval_trace_id, values[-1])
+                        values = (*values[:-3], retrieval_trace_id, *values[-2:])
                 connection.execute(
-                    "INSERT OR IGNORE INTO query_diagnostics(id,trace_id,query_id,original_query_id,organization_id,project_id,datasource_id,subject_id,credential_id,transport,method,status,stage,semantic_version,policy_versions_json,error_json,question,semantic_sql,native_sql,evidence_source,created_at,expires_at,duration_ms,question_hash,retrieval_trace_id,retrieval_explanation_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT OR IGNORE INTO query_diagnostics(id,trace_id,query_id,original_query_id,organization_id,project_id,datasource_id,subject_id,credential_id,transport,method,status,stage,semantic_version,policy_versions_json,error_json,question,semantic_sql,native_sql,evidence_source,created_at,expires_at,duration_ms,question_hash,retrieval_trace_id,retrieval_explanation_json,phase_spans_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     values,
                 )
                 row = connection.execute(
@@ -654,13 +867,392 @@ class DiagnosticStore:
 
     def cleanup_expired(self) -> int:
         now = _timestamp(self.clock())
+        trace_cutoff = _timestamp(self.clock() - timedelta(days=TRACE_RETENTION_DAYS))
         connect = getattr(self.access_control, "_connect")
         with connect() as connection:
             cursor = connection.execute(
                 "UPDATE query_diagnostics SET error_json=NULL,question=NULL,semantic_sql=NULL,native_sql=NULL,retrieval_explanation_json=NULL,content_purged_at=? WHERE expires_at<=? AND content_purged_at IS NULL",
                 (now, now),
             )
+            connection.execute(
+                "DELETE FROM agent_trace_core_links WHERE trace_id IN "
+                "(SELECT id FROM agent_traces WHERE expires_at<=?) OR "
+                "NOT EXISTS (SELECT 1 FROM agent_trace_events e WHERE "
+                "e.trace_id=agent_trace_core_links.trace_id AND "
+                "e.event_id=agent_trace_core_links.event_id AND e.created_at>?)",
+                (now, trace_cutoff),
+            )
+            connection.execute("DELETE FROM agent_trace_events WHERE created_at<=?", (trace_cutoff,))
+            connection.execute(
+                "DELETE FROM agent_trace_spans WHERE trace_id IN "
+                "(SELECT id FROM agent_traces WHERE expires_at<=?) OR "
+                "last_event_created_at IS NULL OR last_event_created_at<=?",
+                (now, trace_cutoff),
+            )
+            connection.execute(
+                "DELETE FROM agent_traces WHERE expires_at<=? OR NOT EXISTS "
+                "(SELECT 1 FROM agent_trace_events WHERE trace_id=agent_traces.id)", (now,),
+            )
         return max(int(cursor.rowcount), 0)
+
+    def record_trace_events(
+        self, *, auth: AuthContext, project_id: str, source_session_id: str,
+        source_turn_id: str, events: Any,
+    ) -> dict[str, Any]:
+        session_id = _trace_id(source_session_id, "sourceSessionId")
+        turn_id = _trace_id(source_turn_id, "sourceTurnId")
+        if not isinstance(events, list) or not 1 <= len(events) <= 100:
+            raise DiagnosticError("INVALID_TRACE", "trace event batch is invalid")
+        safe_events = [_trace_event(event) for event in events]
+        if len({event["eventId"] for event in safe_events}) != len(safe_events):
+            raise DiagnosticError("INVALID_TRACE", "trace event batch has duplicate IDs")
+        try:
+            self.cleanup_expired()
+        except Exception:
+            # Cleanup is maintenance. A transient cleanup failure must not
+            # discard newly submitted trace events.
+            _LOGGER.error("trace retention cleanup failed")
+        organization_id = auth.subject.organization_id
+        subject_id = auth.subject.id
+        now = _timestamp(self.clock())
+        trace_id = f"atr_{uuid.uuid4().hex}"
+        accepted = 0
+        duplicates = 0
+        connect = getattr(self.access_control, "_connect")
+        lock = getattr(self.access_control, "_lock")
+        with lock, connect() as connection:
+            for event in safe_events:
+                core_id = event.get("coreTraceId")
+                if core_id is None:
+                    continue
+                owner = connection.execute(
+                    "SELECT organization_id,project_id,subject_id FROM query_diagnostics WHERE trace_id=?",
+                    (core_id,),
+                ).fetchone()
+                if owner is not None and (
+                    owner["organization_id"] != organization_id
+                    or owner["project_id"] != project_id
+                    or owner["subject_id"] != subject_id
+                ):
+                    raise DiagnosticError("TRACE_LINK_FORBIDDEN", "Core trace is outside caller scope", status=403)
+            connection.execute(
+                "INSERT INTO agent_traces(id,organization_id,project_id,subject_id,source,"
+                "source_session_id,source_turn_id,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?) "
+                "ON CONFLICT DO NOTHING",
+                (trace_id, organization_id, project_id, subject_id, "codex", session_id,
+                 turn_id, now, _timestamp(self.clock() + timedelta(days=TRACE_RETENTION_DAYS))),
+            )
+            row = connection.execute(
+                "SELECT id FROM agent_traces WHERE organization_id=? AND project_id=? "
+                "AND subject_id=? AND source='codex' AND source_session_id=? AND source_turn_id=?",
+                (organization_id, project_id, subject_id, session_id, turn_id),
+            ).fetchone()
+            if row is None:
+                raise DiagnosticError("DIAGNOSTIC_STORE_UNAVAILABLE", "diagnostic storage is unavailable", status=503)
+            trace_id = row["id"]
+            count = connection.execute(
+                "SELECT COUNT(*) AS count FROM agent_trace_events WHERE trace_id=?", (trace_id,),
+            ).fetchone()["count"]
+            for event in safe_events:
+                encoded = _json(event, limit=4_096)
+                existing = connection.execute(
+                    "SELECT event_json FROM agent_trace_events WHERE trace_id=? AND event_id=?",
+                    (trace_id, event["eventId"]),
+                ).fetchone()
+                if existing is not None:
+                    if existing["event_json"] != encoded:
+                        raise DiagnosticError("TRACE_EVENT_CONFLICT", "trace event ID has different content", status=409)
+                    duplicates += 1
+                    continue
+                if count + accepted >= 5_000:
+                    raise DiagnosticError("TRACE_EVENT_LIMIT", "trace event limit exceeded", status=413)
+                core_id = event.get("coreTraceId")
+                if isinstance(core_id, str):
+                    claim = connection.execute(
+                        "SELECT trace_id,status FROM agent_trace_core_claims WHERE core_trace_id=?",
+                        (core_id,),
+                    ).fetchone()
+                    if claim is not None and (
+                        claim["status"] != "verified" or claim["trace_id"] != trace_id
+                    ):
+                        raise DiagnosticError(
+                            "TRACE_LINK_CONFLICT", "Core trace is already linked to another turn", status=409
+                        )
+                inserted = connection.execute(
+                    "INSERT INTO agent_trace_events(trace_id,event_id,occurred_at,event_type,event_json,created_at) "
+                    "VALUES(?,?,?,?,?,?) ON CONFLICT(trace_id,event_id) DO NOTHING",
+                    (trace_id, event["eventId"], event["occurredAt"], event["type"], encoded, now),
+                )
+                if inserted.rowcount == 0:
+                    raced = connection.execute(
+                        "SELECT event_json FROM agent_trace_events WHERE trace_id=? AND event_id=?",
+                        (trace_id, event["eventId"]),
+                    ).fetchone()
+                    if raced is None:
+                        raise DiagnosticError(
+                            "DIAGNOSTIC_STORE_UNAVAILABLE", "diagnostic storage is unavailable", status=503
+                        )
+                    if raced["event_json"] != encoded:
+                        raise DiagnosticError(
+                            "TRACE_EVENT_CONFLICT", "trace event ID has different content", status=409
+                        )
+                    duplicates += 1
+                    continue
+                self._upsert_trace_span(connection, trace_id, event, event_created_at=now)
+                if isinstance(core_id, str):
+                    connection.execute(
+                        "INSERT INTO agent_trace_core_claims(core_trace_id,trace_id,status) "
+                        "VALUES(?,?,?) ON CONFLICT(core_trace_id) DO NOTHING",
+                        (core_id, trace_id, "verified"),
+                    )
+                    claim = connection.execute(
+                        "SELECT trace_id,status FROM agent_trace_core_claims WHERE core_trace_id=?",
+                        (core_id,),
+                    ).fetchone()
+                    if claim is None or claim["status"] != "verified" or claim["trace_id"] != trace_id:
+                        raise DiagnosticError(
+                            "TRACE_LINK_CONFLICT", "Core trace is already linked to another turn", status=409
+                        )
+                    connection.execute(
+                        "INSERT INTO agent_trace_core_links(trace_id,event_id,core_trace_id) VALUES(?,?,?)",
+                        (trace_id, event["eventId"], core_id),
+                    )
+                accepted += 1
+            if accepted:
+                connection.execute(
+                    "UPDATE agent_traces SET expires_at=? WHERE id=?",
+                    (_timestamp(self.clock() + timedelta(days=TRACE_RETENTION_DAYS)), trace_id),
+                )
+        return {"id": trace_id, "accepted": accepted, "duplicates": duplicates}
+
+    @staticmethod
+    def _upsert_trace_span(
+        connection: Any,
+        trace_id: str,
+        event: Mapping[str, Any],
+        *,
+        event_created_at: str,
+    ) -> None:
+        kind = event["type"]
+        span_specs: list[tuple[str, str, str | None]] = []
+        if kind.startswith("turn_"):
+            span_specs = [("turn", "turn", None), ("agent:main", "agent", "turn")]
+        elif kind.startswith("subagent_") and event.get("agentId"):
+            parent = event.get("parentAgentId")
+            span_specs = [(f'agent:{event["agentId"]}', "agent", f"agent:{parent}" if parent else "turn")]
+        elif kind.startswith("tool_") and event.get("toolUseId"):
+            parent = event.get("parentAgentId")
+            span_specs = [(f'tool:{event["toolUseId"]}', "tool", f"agent:{parent}" if parent else None)]
+        for span_id, span_kind, parent_id in span_specs:
+            existing = connection.execute(
+                "SELECT started_at,ended_at,status,parent_span_id,last_event_created_at,"
+                "terminal_event_at,terminal_event_id FROM agent_trace_spans "
+                "WHERE trace_id=? AND span_id=?", (trace_id, span_id),
+            ).fetchone()
+            is_start = kind in {"turn_started", "subagent_started", "tool_started"}
+            is_terminal = kind in {"turn_completed", "turn_interrupted", "subagent_completed", "tool_completed"}
+            stamp = event["occurredAt"]
+            start = existing["started_at"] if existing else None
+            end = existing["ended_at"] if existing else None
+            if is_start:
+                if start is None or _trace_time(stamp) < _trace_time(start):
+                    start = stamp
+            if is_terminal and (end is None or _trace_time(stamp) > _trace_time(end)):
+                end = stamp
+            last_event_created_at = existing["last_event_created_at"] if existing else None
+            if (
+                last_event_created_at is None
+                or _trace_time(event_created_at) > _trace_time(last_event_created_at)
+            ):
+                last_event_created_at = event_created_at
+
+            terminal_event_at = existing["terminal_event_at"] if existing else None
+            terminal_event_id = existing["terminal_event_id"] if existing else None
+            status = existing["status"] if existing else "running"
+            if is_start and terminal_event_at is None:
+                status = event.get("status") or "running"
+            if is_terminal:
+                event_order = (_trace_time(stamp), event["eventId"])
+                prior_order = (
+                    (_trace_time(terminal_event_at), terminal_event_id)
+                    if terminal_event_at is not None and terminal_event_id is not None
+                    else None
+                )
+                if prior_order is None or event_order > prior_order:
+                    if "status" in event:
+                        status = event["status"]
+                    elif kind == "turn_interrupted":
+                        status = "cancelled"
+                    elif kind == "turn_completed":
+                        status = "success"
+                    else:
+                        # A stop/completion event proves that the span ended,
+                        # but does not prove that the subagent/tool succeeded.
+                        status = "unknown"
+                    terminal_event_at = stamp
+                    terminal_event_id = event["eventId"]
+            if existing:
+                connection.execute(
+                    "UPDATE agent_trace_spans SET started_at=?,ended_at=?,status=?,parent_span_id=?,"
+                    "last_event_created_at=?,terminal_event_at=?,terminal_event_id=? "
+                    "WHERE trace_id=? AND span_id=?",
+                    (
+                        start, end, status, existing["parent_span_id"] or parent_id,
+                        last_event_created_at, terminal_event_at, terminal_event_id, trace_id, span_id,
+                    ),
+                )
+            else:
+                connection.execute(
+                    "INSERT INTO agent_trace_spans(trace_id,span_id,schema_version,kind,parent_span_id,"
+                    "started_at,ended_at,status,last_event_created_at,terminal_event_at,terminal_event_id) "
+                    "VALUES(?,?,1,?,?,?,?,?,?,?,?)",
+                    (
+                        trace_id, span_id, span_kind, parent_id, start, end, status,
+                        last_event_created_at, terminal_event_at, terminal_event_id,
+                    ),
+                )
+
+    def list_traces(
+        self, *, organization_id: str, project_id: str, limit: int = 50,
+        cursor: str | None = None,
+    ) -> dict[str, Any]:
+        clauses = ["organization_id=?", "project_id=?", "expires_at>?"]
+        params: list[Any] = [organization_id, project_id, _timestamp(self.clock())]
+        connect = getattr(self.access_control, "_connect")
+        with connect() as connection:
+            if cursor is not None:
+                cursor_row = connection.execute(
+                    "SELECT created_at,id FROM agent_traces WHERE id=? AND organization_id=? AND project_id=? AND expires_at>?",
+                    (_trace_id(cursor, "cursor"), organization_id, project_id, _timestamp(self.clock())),
+                ).fetchone()
+                if cursor_row is None:
+                    raise DiagnosticError("INVALID_FILTER", "trace cursor is invalid")
+                clauses.append("(created_at<? OR (created_at=? AND id<?))")
+                params.extend((cursor_row["created_at"], cursor_row["created_at"], cursor_row["id"]))
+            params.append(limit + 1)
+            rows = connection.execute(
+                f"SELECT * FROM agent_traces WHERE {' AND '.join(clauses)} "
+                "ORDER BY created_at DESC,id DESC LIMIT ?", tuple(params),
+            ).fetchall()
+            items = [self._trace_public(connection, row, include_events=False) for row in rows[:limit]]
+        return {"items": items, "nextCursor": items[-1]["id"] if len(rows) > limit else None}
+
+    def trace_detail(self, trace_id: str, *, organization_id: str, project_id: str) -> dict[str, Any]:
+        connect = getattr(self.access_control, "_connect")
+        with connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM agent_traces WHERE id=? AND organization_id=? AND project_id=? AND expires_at>?",
+                (_trace_id(trace_id, "traceId"), organization_id, project_id, _timestamp(self.clock())),
+            ).fetchone()
+            if row is None:
+                raise DiagnosticError("TRACE_NOT_FOUND", "trace was not found", status=404)
+            return self._trace_public(connection, row, include_events=True)
+
+    def trace_for_core(self, core_trace_id: str, *, organization_id: str, project_id: str) -> dict[str, Any]:
+        """Resolve a verified Core association without exposing foreign subjects."""
+        connect = getattr(self.access_control, "_connect")
+        with connect() as connection:
+            safe_core_id = _trace_id(core_trace_id, "coreTraceId")
+            claim = connection.execute(
+                "SELECT trace_id,status FROM agent_trace_core_claims WHERE core_trace_id=?",
+                (safe_core_id,),
+            ).fetchone()
+            if claim is not None and claim["status"] == "ambiguous":
+                raise DiagnosticError(
+                    "TRACE_LINK_AMBIGUOUS", "Core trace is linked to multiple turns", status=409
+                )
+            if claim is None or claim["status"] != "verified" or not isinstance(claim["trace_id"], str):
+                raise DiagnosticError("TRACE_NOT_FOUND", "trace was not found", status=404)
+            row = connection.execute(
+                "SELECT t.* FROM agent_traces t "
+                "JOIN query_diagnostics d ON d.trace_id=? "
+                "AND d.organization_id=t.organization_id AND d.project_id=t.project_id "
+                "AND d.subject_id=t.subject_id "
+                "WHERE t.id=? AND t.organization_id=? AND t.project_id=? AND t.expires_at>?",
+                (
+                    safe_core_id, claim["trace_id"], organization_id, project_id,
+                    _timestamp(self.clock()),
+                ),
+            ).fetchone()
+            if row is None:
+                raise DiagnosticError("TRACE_NOT_FOUND", "trace was not found", status=404)
+            return self._trace_public(connection, row, include_events=True)
+
+    def _trace_public(self, connection: Any, row: Mapping[str, Any], *, include_events: bool) -> dict[str, Any]:
+        event_rows = connection.execute(
+            "SELECT event_json FROM agent_trace_events WHERE trace_id=? AND created_at>? "
+            "ORDER BY occurred_at,event_id",
+            (row["id"], _timestamp(self.clock() - timedelta(days=TRACE_RETENTION_DAYS))),
+        ).fetchall()
+        events = [json.loads(item["event_json"]) for item in event_rows]
+        claimed = sorted({event["coreTraceId"] for event in events if "coreTraceId" in event})
+        verified: set[str] = set()
+        issues: list[str] = []
+        core_diagnostics: list[dict[str, Any]] = []
+        for core_id in claimed:
+            claim = connection.execute(
+                "SELECT trace_id,status FROM agent_trace_core_claims WHERE core_trace_id=?",
+                (core_id,),
+            ).fetchone()
+            if claim is None or claim["status"] != "verified" or claim["trace_id"] != row["id"]:
+                continue
+            diagnostic = connection.execute(
+                "SELECT id,method,status,stage,duration_ms,phase_spans_json FROM query_diagnostics WHERE trace_id=? AND organization_id=? "
+                "AND project_id=? AND subject_id=?",
+                (core_id, row["organization_id"], row["project_id"], row["subject_id"]),
+            ).fetchone()
+            if diagnostic is None:
+                continue
+            verified.add(core_id)
+            feedback = connection.execute(
+                "SELECT id FROM query_feedback WHERE diagnostic_id=? AND organization_id=? "
+                "AND project_id=? ORDER BY created_at,id",
+                (diagnostic["id"], row["organization_id"], row["project_id"]),
+            ).fetchall()
+            diagnostic_issues = [item["id"] for item in feedback]
+            issues.extend(diagnostic_issues)
+            core_diagnostics.append({
+                "traceId": core_id, "method": diagnostic["method"], "status": diagnostic["status"],
+                "stage": diagnostic["stage"], "durationMs": float(diagnostic["duration_ms"] or 0),
+                "phaseSpans": json.loads(diagnostic["phase_spans_json"] or "[]"),
+                "issueIds": diagnostic_issues,
+            })
+        safe_events = [
+            {key: value for key, value in event.items() if key != "coreTraceId" or value in verified}
+            for event in events
+        ]
+        terminals = [event for event in events if event["type"] in {"turn_completed", "turn_interrupted"}]
+        # A child agent's model or counters do not describe the main turn.
+        turn_events = [event for event in events if event["type"].startswith("turn_")]
+        latest_model = next((event["model"] for event in reversed(turn_events) if "model" in event), None)
+        latest_usage = next((event["tokenUsage"] for event in reversed(turn_events) if "tokenUsage" in event), None)
+        result: dict[str, Any] = {
+            "id": row["id"], "source": row["source"], "sourceSessionId": row["source_session_id"],
+            "sourceTurnId": row["source_turn_id"], "subjectId": row["subject_id"],
+            "startedAt": events[0]["occurredAt"] if events else None,
+            "endedAt": terminals[-1]["occurredAt"] if terminals else None,
+            "status": (terminals[-1].get("status") or ("cancelled" if terminals[-1]["type"] == "turn_interrupted" else "success")) if terminals else "running",
+            "model": latest_model, "tokenUsage": latest_usage,
+            "eventCount": len(events), "issueCount": len(issues),
+            "coreTraceIds": sorted(verified), "issueIds": issues,
+            "createdAt": row["created_at"], "expiresAt": row["expires_at"],
+        }
+        if include_events:
+            result["events"] = safe_events
+            result["coreDiagnostics"] = core_diagnostics
+            result["spans"] = [
+                {
+                    "id": span["span_id"], "schemaVersion": span["schema_version"],
+                    "kind": span["kind"], "parentId": span["parent_span_id"],
+                    "startedAt": span["started_at"], "endedAt": span["ended_at"],
+                    "status": span["status"],
+                }
+                for span in connection.execute(
+                    "SELECT * FROM agent_trace_spans WHERE trace_id=? ORDER BY started_at,span_id",
+                    (row["id"],),
+                ).fetchall()
+            ]
+        return result
 
     def list_feedback(
         self,

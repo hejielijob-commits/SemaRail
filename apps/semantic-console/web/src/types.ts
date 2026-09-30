@@ -13,6 +13,7 @@ export type ConsoleSection =
   | "mcp"
   | "access"
   | "diagnostics"
+  | "traces"
   | "regressionCases"
   | "instructions"
   | "mdl";
@@ -99,6 +100,62 @@ export interface DiagnosticFeedback {
     toStatus: FeedbackStatus;
     note?: string | null;
     createdAt: string;
+  }>;
+}
+
+/** Versioned, durable agent trace events returned by the Semantic Console API. */
+export interface AgentTraceEvent {
+  eventId: string;
+  occurredAt: string;
+  type: "turn_started" | "turn_completed" | "turn_interrupted" | "tool_started" | "tool_completed" | "subagent_started" | "subagent_completed" | "output";
+  agentId?: string;
+  parentAgentId?: string;
+  toolUseId?: string;
+  parentToolUseId?: string;
+  toolName?: string;
+  model?: string;
+  status?: "running" | "success" | "failure" | "cancelled" | "unknown";
+  coreTraceId?: string;
+  tokenUsage?: TraceTokenUsage;
+}
+
+export interface TraceTokenUsage {
+  input?: number;
+  output?: number;
+  total?: number;
+}
+
+/** Project-scoped trace summary; metrics remain absent when the source did not collect them. */
+export interface AgentTraceSummary {
+  id: string;
+  source: string;
+  sourceSessionId: string;
+  sourceTurnId: string;
+  subjectId: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  status: "running" | "success" | "failure" | "cancelled";
+  model?: string | null;
+  tokenUsage?: TraceTokenUsage | null;
+  eventCount: number;
+  issueCount: number;
+  coreTraceIds: string[];
+  issueIds: string[];
+  createdAt: string;
+  expiresAt: string;
+}
+
+/** Full trace read model, reconstructed from the stored ordered event stream. */
+export interface AgentTraceDetail extends AgentTraceSummary {
+  events: AgentTraceEvent[];
+  coreDiagnostics?: Array<{
+    traceId: string;
+    method: string;
+    status: "success" | "failure" | "cancelled";
+    stage: string;
+    durationMs: number;
+    phaseSpans: Array<{ name: "authentication" | "policy" | "runtime"; status: "success" | "failure"; durationMs: number }>;
+    issueIds?: string[];
   }>;
 }
 

@@ -397,7 +397,7 @@ class DiagnosticStoreTests(unittest.TestCase):
         self.assertIn("question_hash", columns)
         self.assertIn("retrieval_trace_id", columns)
         self.assertIn("retrieval_explanation_json", columns)
-        self.assertEqual(versions, [1, 2, 3, 4, 5, 6])
+        self.assertEqual(versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
 
     def test_cleanup_removes_content_but_preserves_metadata(self) -> None:
         self._record()
