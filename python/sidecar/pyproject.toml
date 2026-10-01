@@ -23,7 +23,7 @@ wren = ["wrenai[postgres]==0.13.2"]
 mcp = ["wrenai[mcp]==0.13.2", "mcp[cli]==1.28.1"]
 # Optional multilingual embeddings for Context API v2. Without this extra the
 # exact/BM25 path remains available and reports an explicit degraded status.
-retrieval = ["sentence-transformers>=3,<6"]
+retrieval = ["sentence-transformers>=3,<7"]
 
 [project.scripts]
 # SemaRail-owned commands. The DSH-prefixed entries remain compatibility
