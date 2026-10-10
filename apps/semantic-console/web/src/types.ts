@@ -14,6 +14,7 @@ export type ConsoleSection =
   | "access"
   | "diagnostics"
   | "traces"
+  | "traceComparison"
   | "regressionCases"
   | "instructions"
   | "mdl";
@@ -148,15 +149,106 @@ export interface AgentTraceSummary {
 /** Full trace read model, reconstructed from the stored ordered event stream. */
 export interface AgentTraceDetail extends AgentTraceSummary {
   events: AgentTraceEvent[];
-  coreDiagnostics?: Array<{
-    traceId: string;
-    method: string;
-    status: "success" | "failure" | "cancelled";
-    stage: string;
-    durationMs: number;
-    phaseSpans: Array<{ name: "authentication" | "policy" | "runtime"; status: "success" | "failure"; durationMs: number }>;
-    issueIds?: string[];
+  coreDiagnostics?: CoreTraceDiagnostic[];
+}
+
+export interface CoreTraceDiagnostic {
+  traceId: string;
+  method: string;
+  status: "success" | "failure" | "cancelled";
+  stage: string;
+  durationMs: number;
+  phaseSpans: Array<{ name: "authentication" | "policy" | "runtime" | string; status: "success" | "failure" | "cancelled" | "unknown"; durationMs: number }>;
+  issueIds?: string[];
+  semanticVersion?: string | null;
+  policyVersions?: string[];
+  code?: string | null;
+  reasonCode?: string | null;
+  phase?: string | null;
+}
+
+export interface TraceDiagnosis {
+  schemaVersion: 1;
+  traceId: string;
+  rulesVersion: string;
+  status: "healthy" | "issues" | "incomplete";
+  findings: Array<{
+    id: string;
+    category: "authentication" | "policy" | "preparation" | "datasource" | "sqlValidation" | "runtime" | string;
+    code: string;
+    severity: "info" | "warning" | "error";
+    phase: string | null;
+    evidenceIds: string[];
+    rationale: string;
+    suggestedAction: string;
   }>;
+}
+
+export interface TraceCollectorHealthItem {
+  schemaVersion: number;
+  collectorId: string;
+  observedAt: string;
+  pendingCount: number;
+  retryCount: number;
+  droppedCount: number;
+  pausedCount: number;
+  quarantinedCount: number;
+  lastSuccessAt: string | null;
+  dropReasons: { expired: number; capacity: number; invalid: number; conflict: number };
+  subjectId: string;
+  receivedAt: string;
+  stale: boolean;
+}
+
+export interface TraceCollectorHealthResponse {
+  schemaVersion: 1;
+  items: TraceCollectorHealthItem[];
+}
+
+export interface TraceComparisonSide {
+  traceId: string;
+  status: AgentTraceSummary["status"];
+  model: string | null;
+  semanticVersion: string | null;
+  semanticVersions?: string[];
+  policyVersions: string[];
+}
+
+export interface TraceComparisonNode {
+  id: string;
+  status: "running" | "success" | "failure" | "cancelled" | "unknown";
+  durationMs: number | null;
+}
+
+export interface TraceComparisonUnmatchedNode extends TraceComparisonNode {
+  key: string;
+  kind: "turn" | "agent" | "tool";
+  toolName: string | null;
+  agentPath: string[];
+}
+
+export interface TraceComparisonResponse {
+  schemaVersion: 1;
+  left: TraceComparisonSide;
+  right: TraceComparisonSide;
+  aligned: Array<{
+    key: string;
+    kind: "turn" | "agent" | "tool";
+    toolName: string | null;
+    agentPath: string[];
+    left: TraceComparisonNode;
+    right: TraceComparisonNode;
+    stateChanged: boolean;
+    durationDeltaMs: number | null;
+    phaseDurations: Array<{ name: string; leftMs: number | null; rightMs: number | null; deltaMs: number | null }>;
+  }>;
+  leftOnly: TraceComparisonUnmatchedNode[];
+  rightOnly: TraceComparisonUnmatchedNode[];
+  versionChanges: {
+    model: boolean | null;
+    semanticVersion: boolean | null;
+    policyVersions: boolean | null;
+  };
 }
 
 export interface RegressionCaseRecord {
@@ -181,6 +273,134 @@ export interface RegressionCaseExport {
   schemaVersion: 1;
   projectId: string;
   cases: RegressionCaseRecord[];
+}
+
+export type RegressionScalar = string | number | boolean | null;
+
+export interface RegressionCellAssertion {
+  row: number;
+  column: string;
+  expected: RegressionScalar;
+  tolerance?: number;
+}
+
+export interface RegressionCaseV2 {
+  schemaVersion: 2;
+  kind: "deterministic_sql";
+  question: string;
+  semanticSql: string;
+  conditions: Record<string, unknown>;
+  confirmedConditions: string[];
+  testDatasetId: string;
+  assertions: {
+    status: "success" | "failure";
+    error?: { code?: string; reasonCode?: string; phase?: string };
+    rowCount?: number;
+    cells?: RegressionCellAssertion[];
+  };
+}
+
+export interface LegacyRegressionCaseV1 {
+  schemaVersion: 1;
+  kind: "deterministic_sql" | "agent_evidence" | string;
+  question?: string;
+  [key: string]: unknown;
+}
+
+export interface RegressionCaseV2Record {
+  id: string;
+  feedbackId: string;
+  sourceTraceId?: string | null;
+  revision: number;
+  status: "draft" | "enabled";
+  case: RegressionCaseV2 | LegacyRegressionCaseV1;
+  datasetVersion?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface RegressionCasesResponse {
+  schemaVersion: 2;
+  items: RegressionCaseV2Record[];
+}
+
+export interface RegressionCasesExportV2 {
+  schemaVersion: 2;
+  projectId: string;
+  cases: RegressionCaseV2Record[];
+}
+
+export interface TestDatasetRecord {
+  id: string;
+  version: string;
+  datasourceId: string;
+  updatedAt: string;
+}
+
+export interface TestDatasetsResponse {
+  schemaVersion: 1;
+  items: TestDatasetRecord[];
+}
+
+export type RegressionRunStatus = "queued" | "running" | "completed" | "cancelled" | "interrupted";
+export type RegressionResultStatus = "passed" | "failed" | "blocked" | "inconclusive" | "cancelled";
+
+export interface RegressionRunResult {
+  caseId: string;
+  caseRevision: number;
+  status: RegressionResultStatus;
+  reasonCode: string | null;
+  durationMs: number | null;
+  coreTraceIds: string[];
+  queryId?: string | null;
+  assertions: Array<{
+    kind: "status" | "error" | "rowCount" | "cell";
+    status: "passed" | "failed" | "inconclusive";
+    reasonCode: string;
+  }>;
+  environment: {
+    datasourceId: string;
+    datasetVersion: string;
+    semanticVersion: string | null;
+    policyVersions: string[] | null;
+  };
+  feedbackId: string;
+  sourceTraceId: string | null;
+}
+
+export interface RegressionRun {
+  id: string;
+  schemaVersion: 1;
+  status: RegressionRunStatus;
+  subjectId: string;
+  caseIds: string[];
+  results: RegressionRunResult[];
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+}
+
+export interface RegressionRunsResponse {
+  schemaVersion: 1;
+  items: RegressionRun[];
+}
+
+export interface CoreDiagnosticRecord {
+  schemaVersion: 1;
+  traceId: string;
+  method: string;
+  status: "success" | "failure" | "cancelled";
+  stage: string;
+  durationMs: number;
+  phaseSpans: Array<{ name: string; status: "success" | "failure" | "cancelled" | "unknown"; durationMs: number }>;
+  code?: string | null;
+  reasonCode?: string | null;
+  phase?: string | null;
+  semanticVersion?: string | null;
+  policyVersions: string[];
+  issueIds: string[];
+  createdAt: string;
+  expiresAt: string;
 }
 
 export interface AccessCredential {

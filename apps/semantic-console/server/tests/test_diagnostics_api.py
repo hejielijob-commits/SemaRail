@@ -225,6 +225,76 @@ class DiagnosticsApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(result["explanation"]["anomalies"], ["ZERO_RECALL"])
 
+    def test_admin_reads_safe_core_diagnostic_without_agent_trace_link(self) -> None:
+        self.store.record_execution(
+            auth=self.auth,
+            project_id="diagnostic-project",
+            trace_id="trace-core-only",
+            query_id="query-core-only",
+            datasource_id="warehouse",
+            transport="core-http",
+            method="query.run",
+            status="failure",
+            stage="runtime",
+            semantic_version="semantic-v7",
+            policy_versions=["policy-a:2"],
+            error={
+                "code": "RUNTIME_FAILED", "reasonCode": "EXECUTION_ERROR", "phase": "runtime",
+                "message": "private error message", "body": "private raw response",
+            },
+            question="private question",
+            semantic_sql="SELECT private_column FROM private_table",
+            native_sql="SELECT private_column FROM private_table",
+            duration_ms=17.5,
+            phase_spans=[{"name": "runtime", "status": "failure", "durationMs": 15}],
+        )
+        admin = f"Bearer {self.bootstrap}"
+        denied_status, denied = self.api.dispatch(
+            "GET", "/api/v1/diagnostics/core/trace-core-only", {}, None, self.authorization,
+        )
+        status, result = self.api.dispatch(
+            "GET", "/api/v1/diagnostics/core/trace-core-only", {}, None, admin,
+        )
+        self.assertEqual((denied_status, denied["code"]), (403, "FORBIDDEN"))
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            (result["traceId"], result["durationMs"], result["semanticVersion"], result["policyVersions"]),
+            ("trace-core-only", 17.5, "semantic-v7", ["policy-a:2"]),
+        )
+        self.assertEqual(
+            (result["code"], result["reasonCode"], result["phase"]),
+            ("RUNTIME_FAILED", "EXECUTION_ERROR", "runtime"),
+        )
+        self.assertNotIn("private error message", repr(result))
+        self.assertNotIn("private raw response", repr(result))
+        self.assertNotIn("private question", repr(result))
+        self.assertNotIn("private_column", repr(result))
+
+        self.store.record_execution(
+            auth=self.auth,
+            project_id="other-project",
+            trace_id="trace-core-other-project",
+            query_id="query-core-other-project",
+            datasource_id="warehouse",
+            transport="core-http",
+            method="query.run",
+            status="success",
+            stage="complete",
+        )
+        foreign_status, foreign = self.api.dispatch(
+            "GET", "/api/v1/diagnostics/core/trace-core-other-project", {}, None, admin,
+        )
+        self.assertEqual((foreign_status, foreign["code"]), (404, "DIAGNOSTIC_NOT_FOUND"))
+        with self.access._connect() as connection:
+            connection.execute(
+                "UPDATE query_diagnostics SET expires_at=? WHERE trace_id=?",
+                ("2000-01-01T00:00:00Z", "trace-core-only"),
+            )
+        expired_status, expired = self.api.dispatch(
+            "GET", "/api/v1/diagnostics/core/trace-core-only", {}, None, admin,
+        )
+        self.assertEqual((expired_status, expired["code"]), (404, "DIAGNOSTIC_NOT_FOUND"))
+
     def test_query_and_admin_routes_cannot_cross_project_boundary(self) -> None:
         self.store.record_execution(
             auth=self.auth,

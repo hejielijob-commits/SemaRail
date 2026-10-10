@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { ArrowClockwise, Bug, CheckCircle, DownloadSimple, Flask, MagnifyingGlass, PaperPlaneTilt, Plus } from "@phosphor-icons/react";
+import { ArrowClockwise, Bug, CheckCircle, MagnifyingGlass, PaperPlaneTilt, Plus } from "@phosphor-icons/react";
 import { api } from "../api/client";
-import type { DiagnosticFeedback, FeedbackCategory, FeedbackStatus, RegressionCaseExport } from "../types";
-import { Badge, Button, EmptyState, Field, InlineNotice, LoadingRows, Modal, SectionHeading, Select, TextArea, TextInput } from "./ui";
+import type { DiagnosticFeedback, FeedbackCategory, FeedbackStatus } from "../types";
+import { Badge, Button, EmptyState, Field, InlineNotice, LoadingRows, SectionHeading, Select, TextArea, TextInput } from "./ui";
+import RegressionWorkbench from "./RegressionWorkbench";
 import "./diagnostics-workbench.css";
 
 type Locale = "en-US" | "zh-CN";
@@ -48,7 +49,7 @@ function toIso(value: string) {
   return value ? new Date(value).toISOString() : "";
 }
 
-export default function DiagnosticsWorkbench({ locale, mode, authToken, adminToken, feedbackReference = "", initialFeedbackId = "", onOpenTrace }: { locale: Locale; mode: Mode; authToken: string; adminToken: string; feedbackReference?: string; initialFeedbackId?: string; onOpenTrace?: (traceId: string) => void }) {
+export default function DiagnosticsWorkbench({ locale, mode, authToken, adminToken, activeDatasourceId = "", feedbackReference = "", initialFeedbackId = "", initialRegressionSeed, onRegressionSeedConsumed, onCreateRegressionCase, onOpenIssue, onOpenTrace }: { locale: Locale; mode: Mode; authToken: string; adminToken: string; activeDatasourceId?: string; feedbackReference?: string; initialFeedbackId?: string; initialRegressionSeed?: { feedbackId: string; sourceTraceId?: string } | null; onRegressionSeedConsumed?: () => void; onCreateRegressionCase?: (item: DiagnosticFeedback) => void; onOpenIssue?: (id: string) => void; onOpenTrace?: (traceId: string) => void }) {
   const c = labels[locale];
   const [items, setItems] = useState<DiagnosticFeedback[]>([]);
   const [selected, setSelected] = useState<DiagnosticFeedback | null>(null);
@@ -58,29 +59,23 @@ export default function DiagnosticsWorkbench({ locale, mode, authToken, adminTok
   const [cursor, setCursor] = useState("");
   const [cursorHistory, setCursorHistory] = useState<string[]>([]);
   const [filters, setFilters] = useState({ category: "", status: "", source: "", datasourceId: "", reasonCode: "", createdAfter: "", createdBefore: "" });
-  const [cases, setCases] = useState<RegressionCaseExport | null>(null);
-
   const load = useCallback(async (pageCursor = "") => {
     if (!adminToken) return;
     setLoading(true); setError("");
     try {
-      if (mode === "regressionCases") {
-        setCases(await api.exportRegressionCases());
-      } else {
-        const response = await api.listDiagnosticFeedback({
-          limit: 50, cursor: pageCursor, category: filters.category as FeedbackCategory | "", status: filters.status as FeedbackStatus | "",
-          source: filters.source, datasourceId: filters.datasourceId, reasonCode: filters.reasonCode,
-          createdAfter: toIso(filters.createdAfter), createdBefore: toIso(filters.createdBefore),
-        });
-        setItems(response.items); setNextCursor(response.nextCursor ?? null); setCursor(pageCursor);
-        const first = response.items[0];
-        setSelected(initialFeedbackId ? await api.getDiagnosticFeedback(initialFeedbackId) : first ? await api.getDiagnosticFeedback(first.id) : null);
-      }
+      const response = await api.listDiagnosticFeedback({
+        limit: 50, cursor: pageCursor, category: filters.category as FeedbackCategory | "", status: filters.status as FeedbackStatus | "",
+        source: filters.source, datasourceId: filters.datasourceId, reasonCode: filters.reasonCode,
+        createdAfter: toIso(filters.createdAfter), createdBefore: toIso(filters.createdBefore),
+      });
+      setItems(response.items); setNextCursor(response.nextCursor ?? null); setCursor(pageCursor);
+      const first = response.items[0];
+      setSelected(initialFeedbackId ? await api.getDiagnosticFeedback(initialFeedbackId) : first ? await api.getDiagnosticFeedback(first.id) : null);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Request failed"); }
     finally { setLoading(false); }
-  }, [adminToken, filters, initialFeedbackId, mode]);
+  }, [adminToken, filters, initialFeedbackId]);
 
-  useEffect(() => { void load(); }, [adminToken, mode]);
+  useEffect(() => { if (mode === "diagnostics") void load(); }, [adminToken, mode]);
 
   async function selectIssue(item: DiagnosticFeedback) {
     setError("");
@@ -98,7 +93,7 @@ export default function DiagnosticsWorkbench({ locale, mode, authToken, adminTok
     finally { setLoading(false); }
   }
 
-  if (mode === "regressionCases") return <RegressionCases locale={locale} token={adminToken} data={cases} loading={loading} error={error} onReload={() => void load()} />;
+  if (mode === "regressionCases") return <RegressionWorkbench locale={locale} adminToken={adminToken} activeDatasourceId={activeDatasourceId} initialSeed={initialRegressionSeed} onSeedConsumed={onRegressionSeedConsumed} onOpenIssue={onOpenIssue} onOpenTrace={onOpenTrace} />;
 
   return <div className="page diagnostics-page">
     <SectionHeading eyebrow={c.eyebrow} title={c.diagnostics} description={c.diagnosticsBody} />
@@ -118,7 +113,7 @@ export default function DiagnosticsWorkbench({ locale, mode, authToken, adminTok
         <section className="panel diagnostic-list">{loading && !items.length ? <LoadingRows count={6} /> : items.length ? items.map((item) => <button key={item.id} className={selected?.id === item.id ? "active" : ""} onClick={() => void selectIssue(item)}><span><Badge tone={item.status === "verified" ? "green" : item.status === "pending" ? "amber" : "blue"} dot>{statusLabels[locale][item.status]}</Badge><small>{item.evidence.source === "server" ? c.server : c.client}</small></span><strong>{item.description}</strong><code>{reasonCode(item)}</code><small>{formatTime(item.createdAt, locale)} · {item.transport} · {item.datasourceId ?? "—"}</small></button>) : <EmptyState icon={Bug} title={c.noIssues} body={c.noIssuesBody} />}
           <footer className="diagnostic-pagination"><Button size="sm" variant="ghost" disabled={!cursorHistory.length || loading} onClick={() => { const history = [...cursorHistory]; const previous = history.pop() ?? ""; setCursorHistory(history); void load(previous); }}>{c.previous}</Button><Button size="sm" variant="secondary" disabled={!nextCursor || loading} onClick={() => { setCursorHistory((history) => [...history, cursor]); void load(nextCursor ?? ""); }}>{c.loadMore}</Button></footer>
         </section>
-        {selected ? <IssueDetail key={selected.id} locale={locale} item={selected} loading={loading} onUpdate={updateIssue} onCaseCreated={() => void load(cursor)} onOpenTrace={onOpenTrace} /> : <section className="panel"><EmptyState icon={Bug} title={c.detail} body={c.noIssuesBody} /></section>}
+        {selected ? <IssueDetail key={selected.id} locale={locale} item={selected} loading={loading} onUpdate={updateIssue} onCreateRegressionCase={onCreateRegressionCase} onOpenTrace={onOpenTrace} /> : <section className="panel"><EmptyState icon={Bug} title={c.detail} body={c.noIssuesBody} /></section>}
       </div>
     </>}
   </div>;
@@ -143,11 +138,11 @@ function FeedbackForm({ locale, reference, authenticated }: { locale: Locale; re
   return <section className="panel feedback-submit"><header><PaperPlaneTilt size={24} weight="duotone" /><div><h2>{c.submitTitle}</h2><p>{c.submitBody}</p></div></header>{!authenticated ? <InlineNotice tone="warning" title={c.locked}>{locale === "zh-CN" ? "请先点击右上角解锁并完成认证。" : "Unlock and authenticate from the top-right control first."}</InlineNotice> : <form onSubmit={(event) => void submit(event)}><div className="feedback-form-grid"><Field label={c.category} required><Select value={category} onChange={(event) => setCategory(event.target.value as FeedbackCategory)}>{categories.map((item) => <option value={item} key={item}>{categoryLabels[locale][item]}</option>)}</Select></Field><Field label={c.description} required><TextArea required maxLength={8000} value={description} onChange={(event) => setDescription(event.target.value)} /></Field><Field label={c.expected}><TextArea maxLength={8000} value={expectedBehavior} onChange={(event) => setExpectedBehavior(event.target.value)} /></Field><Field label={c.question}><TextArea value={question} onChange={(event) => setQuestion(event.target.value)} /></Field><Field label={c.semanticSql}><TextArea className="input textarea code-input" value={semanticSql} onChange={(event) => setSemanticSql(event.target.value)} /></Field></div><p className="feedback-attribution">{c.shared}</p><Button type="submit" variant="primary" icon={PaperPlaneTilt} loading={state.busy} disabled={!description.trim()}>{c.submit}</Button></form>}{state.result ? <InlineNotice tone="success" title={c.submitted}>{state.result}</InlineNotice> : null}{state.error ? <InlineNotice tone="error" title={c.retry}>{state.error}</InlineNotice> : null}</section>;
 }
 
-function IssueDetail({ locale, item, loading, onUpdate, onCaseCreated, onOpenTrace }: { locale: Locale; item: DiagnosticFeedback; loading: boolean; onUpdate: (status: FeedbackStatus, category: FeedbackCategory, duplicate: string, note: string) => Promise<void>; onCaseCreated: () => void; onOpenTrace?: (traceId: string) => void }) {
+function IssueDetail({ locale, item, loading, onUpdate, onCreateRegressionCase, onOpenTrace }: { locale: Locale; item: DiagnosticFeedback; loading: boolean; onUpdate: (status: FeedbackStatus, category: FeedbackCategory, duplicate: string, note: string) => Promise<void>; onCreateRegressionCase?: (item: DiagnosticFeedback) => void; onOpenTrace?: (traceId: string) => void }) {
   const c = labels[locale];
-  const [status, setStatus] = useState(item.status); const [category, setCategory] = useState(item.category); const [duplicate, setDuplicate] = useState(item.duplicateOf ?? ""); const [note, setNote] = useState(""); const [showCase, setShowCase] = useState(false);
+  const [status, setStatus] = useState(item.status); const [category, setCategory] = useState(item.category); const [duplicate, setDuplicate] = useState(item.duplicateOf ?? ""); const [note, setNote] = useState("");
   return <section className="panel diagnostic-detail">
-    <header><div><p className="panel-kicker">{c.detail}</p><h2>{item.description}</h2><code>{item.id}</code></div><div className="heading-actions">{onOpenTrace ? <Button size="sm" variant="secondary" onClick={() => onOpenTrace(item.traceId)}>{c.openTrace}</Button> : null}<Button size="sm" icon={Plus} onClick={() => setShowCase(true)}>{c.createCase}</Button></div></header>
+    <header><div><p className="panel-kicker">{c.detail}</p><h2>{item.description}</h2><code>{item.id}</code></div><div className="heading-actions">{onOpenTrace ? <Button size="sm" variant="secondary" onClick={() => onOpenTrace(item.traceId)}>{c.openTrace}</Button> : null}{onCreateRegressionCase ? <Button size="sm" icon={Plus} onClick={() => onCreateRegressionCase(item)}>{c.createCase}</Button> : null}</div></header>
     <dl className="diagnostic-meta">
       <div><dt>Trace</dt><dd><code>{item.traceId}</code></dd></div>
       <div><dt>Query</dt><dd><code>{item.queryId ?? "—"}</code></dd></div>
@@ -161,20 +156,7 @@ function IssueDetail({ locale, item, loading, onUpdate, onCaseCreated, onOpenTra
     <div className="diagnostic-workflow"><Field label={c.status}><Select value={status} onChange={(event) => setStatus(event.target.value as FeedbackStatus)}>{statuses.map((value) => <option value={value} key={value}>{statusLabels[locale][value]}</option>)}</Select></Field><Field label={c.category}><Select value={category} onChange={(event) => setCategory(event.target.value as FeedbackCategory)}>{categories.map((value) => <option value={value} key={value}>{categoryLabels[locale][value]}</option>)}</Select></Field><Field label={c.duplicate}><TextInput value={duplicate} onChange={(event) => setDuplicate(event.target.value)} /></Field><Field label={c.note}><TextArea value={note} onChange={(event) => setNote(event.target.value)} /></Field><Button size="sm" variant="primary" loading={loading} onClick={() => void onUpdate(status, category, duplicate, note)}>{c.update}</Button></div>
     <h3>{c.evidence}</h3>{item.evidence.contentPurgedAt ? <InlineNotice tone="warning" title={c.purged} /> : <div className="diagnostic-evidence"><Evidence label={c.question} value={item.evidence.question} /><Evidence label={c.semanticSql} value={item.evidence.semanticSql} code /><Evidence label="Native SQL" value={item.evidence.nativeSql} code /><Evidence label={c.reason} value={item.evidence.error ? JSON.stringify(item.evidence.error, null, 2) : null} code /></div>}
     <h3>{c.history}</h3><div className="diagnostic-history">{item.history?.length ? item.history.map((entry) => <div key={entry.id}><CheckCircle size={16} /><span><strong>{statusLabels[locale][entry.toStatus]}</strong><small>{entry.note || "—"} · {formatTime(entry.createdAt, locale)}</small></span></div>) : <small>—</small>}</div>
-    <RegressionModal locale={locale} item={item} open={showCase} onClose={() => setShowCase(false)} onCreated={() => { setShowCase(false); onCaseCreated(); }} />
   </section>;
 }
 
 function Evidence({ label, value, code = false }: { label: string; value?: string | null; code?: boolean }) { return value ? <div><strong>{label}</strong>{code ? <pre>{value}</pre> : <p>{value}</p>}</div> : null; }
-
-function RegressionModal({ locale, item, open, onClose, onCreated }: { locale: Locale; item: DiagnosticFeedback; open: boolean; onClose: () => void; onCreated: () => void }) {
-  const c = labels[locale]; const [kind, setKind] = useState<"deterministic_sql" | "agent_evidence">("deterministic_sql"); const [question, setQuestion] = useState(item.evidence.question ?? ""); const [sql, setSql] = useState(item.evidence.semanticSql ?? ""); const [dataset, setDataset] = useState(""); const [assertion, setAssertion] = useState(() => JSON.stringify(item.evidence.error ? { reasonCode: item.evidence.error.reasonCode, resources: item.evidence.error.resources } : {}, null, 2)); const [enable, setEnable] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  async function create() { setBusy(true); setError(""); try { const expectedError = assertion.trim() ? JSON.parse(assertion) as Record<string, unknown> : undefined; await api.createRegressionCase(item.id, { enable, case: { kind, question, semanticSql: sql || undefined, testDatasetId: dataset || undefined, expectedError } }); onCreated(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Request failed"); } finally { setBusy(false); } }
-  return <Modal open={open} title={c.createCase} description={c.draftHint} onClose={onClose} footer={<><Button variant="ghost" onClick={onClose}>{locale === "zh-CN" ? "取消" : "Cancel"}</Button><Button variant="primary" loading={busy} onClick={() => void create()}>{c.create}</Button></>}><div className="regression-form"><Field label={c.caseKind}><Select value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}><option value="deterministic_sql">Deterministic SQL</option><option value="agent_evidence">Agent evidence</option></Select></Field><Field label={c.question} required><TextArea value={question} onChange={(event) => setQuestion(event.target.value)} /></Field>{kind === "deterministic_sql" ? <Field label={c.semanticSql}><TextArea className="input textarea code-input" value={sql} onChange={(event) => setSql(event.target.value)} /></Field> : null}<Field label={c.dataset}><TextInput value={dataset} onChange={(event) => setDataset(event.target.value)} /></Field><Field label={c.assertion}><TextArea className="input textarea code-input" value={assertion} onChange={(event) => setAssertion(event.target.value)} /></Field><label className="regression-enable"><input type="checkbox" checked={enable} onChange={(event) => setEnable(event.target.checked)} />{c.enable}</label>{error ? <InlineNotice tone="error" title="Request failed">{error}</InlineNotice> : null}</div></Modal>;
-}
-
-function RegressionCases({ locale, token, data, loading, error, onReload }: { locale: Locale; token: string; data: RegressionCaseExport | null; loading: boolean; error: string; onReload: () => void }) {
-  const c = labels[locale]; const cases = data?.cases ?? [];
-  const download = useMemo(() => () => { if (!data) return; const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `semarail-regression-cases-v${data.schemaVersion}.json`; anchor.click(); URL.revokeObjectURL(url); }, [data]);
-  return <div className="page regression-page"><SectionHeading eyebrow={c.eyebrow} title={c.regressions} description={c.regressionsBody} action={token ? <div className="heading-actions"><Button variant="secondary" icon={ArrowClockwise} loading={loading} onClick={onReload}>{locale === "zh-CN" ? "刷新" : "Refresh"}</Button><Button variant="primary" icon={DownloadSimple} disabled={!data} onClick={download}>{c.export}</Button></div> : null} />{!token ? <InlineNotice tone="warning" title={c.locked}>{c.lockedBody}</InlineNotice> : error ? <InlineNotice tone="error" title="Request failed">{error}</InlineNotice> : loading && !data ? <section className="panel"><LoadingRows count={5} /></section> : cases.length ? <section className="regression-grid">{cases.map((item) => <article className="panel regression-card" key={item.id}><header><Flask size={20} weight="duotone" /><Badge tone={item.status === "enabled" ? "green" : "amber"} dot>{item.status}</Badge></header><h2>{item.question}</h2><code>{item.id}</code><dl><div><dt>Kind</dt><dd>{item.kind}</dd></div><div><dt>{c.dataset}</dt><dd>{item.testDatasetId ?? "—"}</dd></div><div><dt>Feedback</dt><dd>{item.feedbackId}</dd></div></dl></article>)}</section> : <section className="panel"><EmptyState icon={Flask} title={c.noCases} body={c.noCasesBody} /></section>}</div>;
-}

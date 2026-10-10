@@ -22,6 +22,21 @@ serves a built SPA and falls back to its `index.html` for non-API routes.
 
 ## API contract
 
+Trace v2 adds authenticated rule diagnosis, structural comparison, collector
+health and manual query regression endpoints. See
+[the Trace v2 contract](https://github.com/hejielijob-commits/SemaRail/blob/main/docs/trace-v2.md)
+for schemas, execution permissions, evidence limits and retention. Run history
+stores assertion status and Core links, never query result bodies. Trace event
+schema v1 and Core RPC v1/v2/v3 remain compatible.
+
+When a new regression case supplies `sourceTraceId`, the Trace must be in the
+same organization/project and carry a verified Core association to the selected
+feedback's diagnostic. Editing a saved case does not require its Trace to remain
+unexpired. Runs and Console configuration writes share a per-project
+cross-process lock: SQLite uses an OS file lock and PostgreSQL a dedicated
+session advisory lock. The lock is held through the return of the Core call;
+unsupported or unavailable lock storage fails closed.
+
 `openapi.json` is the machine-readable contract. HTTP success responses return
 the resource or list directly. Errors return:
 
@@ -38,8 +53,21 @@ The primary routes are:
 | `POST /api/v1/feedback` | Idempotent caller-owned explicit query feedback submission |
 | `GET /api/v1/diagnostics/feedback` | Project-administrator issue queue with server-side filters and cursor pagination |
 | `GET/PUT /api/v1/diagnostics/feedback/{id}` | Diagnostic evidence, classification, workflow history, and duplicate linkage |
+| `GET /api/v1/traces` | Cursor page with session, subject, time, turn-status, and linked-issue filters |
+| `GET /api/v1/traces/{id}/diagnosis` | Versioned rule findings with evidence references |
+| `GET /api/v1/traces/compare?leftTraceId=…&rightTraceId=…` | Project-scoped activity, metadata, and Core phase comparison |
+| `GET /api/v1/traces/by-core/{coreTraceId}` | Resolve a verified Core correlation to its Agent Trace |
+| `POST/GET /api/v1/traces/collector-status` | Write bounded health with `trace:write`; read freshness with `console:admin` |
+| `GET /api/v1/diagnostics/core/{coreTraceId}` | Read safe Core phases, codes, versions, and issue references |
+| `GET/POST /api/v1/diagnostics/test-datasets` | List/register a declared project datasource and dataset version |
+| `PUT/DELETE /api/v1/diagnostics/test-datasets/{id}` | Update a test binding or remove it |
+| `GET/POST /api/v1/diagnostics/regression-cases` | List v2 and legacy cases; create a v2 draft only |
+| `GET/PUT/DELETE /api/v1/diagnostics/regression-cases/{id}` | Read, revise, or delete a case |
+| `GET /api/v1/diagnostics/regression-cases/export?schemaVersion=2` | Export the v2 bundle; omission or `schemaVersion=1` preserves the v1 bundle |
+| `GET/POST /api/v1/diagnostics/regression-runs` | List recent runs or start a serial batch of up to 20 cases |
+| `GET /api/v1/diagnostics/regression-runs/{id}` | Read a durable metadata-only run record |
+| `POST /api/v1/diagnostics/regression-runs/{id}/cancel` | Request cancellation and poll the run until terminal |
 | `POST /api/v1/diagnostics/feedback/{id}/regression-cases` | Create a reviewed deterministic SQL or external Agent-evidence regression case |
-| `GET /api/v1/diagnostics/regression-cases/export` | Export enabled project cases as versioned JSON without executing them |
 | `GET /api/v1/artifacts/{id}/download?token=...` | Core-owned, short-lived query artifact download (`attachment`, `no-store`; invalid token is 404 and expired token is 410) |
 | `GET /api/v1/auth/providers` | Public list of configured identity provider ids and labels |
 | `POST /api/v1/auth/device/start` | Create a bounded one-time browser/device login transaction |
@@ -87,9 +115,15 @@ The primary routes are:
 
 The bootstrap administrator token is accepted by the Console management APIs and the read-only Core health check, but intentionally rejected by semantic/query runtime methods, remote MCP, and the authenticated stdio bridge. Create a scoped service-account key or use an employee session for Agent access. Configure `SEMARAIL_REMOTE_MCP_URL` when the public MCP endpoint differs from the loopback default; the value must be an HTTP(S) URL without embedded credentials, query parameters, or fragments.
 
-`POST /api/v1/feedback` and the write-declared `semarail_submit_feedback` MCP tool submit explicit feedback for a query or trace owned by the authenticated caller. Use a stable idempotency key when retrying. Query failures are captured automatically in independent diagnostic tables; successful queries retain metadata only until explicit feedback supplies bounded question/SQL evidence. Diagnostic bodies are redacted and expire after 30 days. Project administrators manage feedback through `/api/v1/diagnostics/feedback` and export reviewed cases from `/api/v1/diagnostics/regression-cases/export`.
+`POST /api/v1/feedback` and the write-declared `semarail_submit_feedback` MCP tool submit explicit feedback for a query or trace owned by the authenticated caller. Use a stable idempotency key when retrying. Query failures are captured automatically in independent diagnostic tables; successful queries retain metadata only until explicit feedback supplies bounded question/SQL evidence. Core diagnostic bodies, Trace event/collector records, and regression run records expire or are purged after 30 days. Manual feedback follows its existing persistence rules; Trace v2 adds no feedback-body retention or deletion behavior. Project administrators manage feedback through `/api/v1/diagnostics/feedback` and export reviewed cases from `/api/v1/diagnostics/regression-cases/export`.
 
 `query.prepare` and `semarail_prepare_query` validate Agent-extracted metric, time-range, grain, and business-definition conditions against the currently published rules. A ready preparation is bound to the caller, project, SQL, conditions, and rule versions for 30 minutes. When applicable required conditions are missing or unconfirmed, `query.run` returns clarification-required without entering the Sidecar; an old v1 caller cannot bypass the guard. Natural-language ambiguity recognition and answer extraction remain Agent responsibilities.
+
+Regression environment checks cover the active datasource, semantic project
+configuration, and registered test-dataset version/binding. External changes
+during a run are reported as inconclusive. Core reauthenticates the current
+caller and checks current access policy on every RPC, including cancellation;
+the regression runner does not freeze or simulate policy.
 
 ### Query artifacts
 

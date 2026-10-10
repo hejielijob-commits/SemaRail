@@ -1,0 +1,47 @@
+{
+  "before": {
+    "schemaVersion": 1,
+    "traceId": "atr_fixture",
+    "rulesVersion": "trace-diagnosis-v1",
+    "status": "incomplete",
+    "findings": [
+      {
+        "id": "finding_missing_core_link",
+        "category": "runtime",
+        "code": "CORE_LINK_NOT_RECORDED",
+        "severity": "info",
+        "phase": null,
+        "evidenceIds": ["turn-start"],
+        "rationale": "The persisted stream has no Core trace link for the selected tool event.",
+        "suggestedAction": "Inspect the trace again after the collector receives late events."
+      }
+    ]
+  },
+  "lateEvent": {
+    "eventId": "tool-end:call-late",
+    "occurredAt": "2026-09-30T08:00:09Z",
+    "type": "tool_completed",
+    "toolUseId": "call-late",
+    "toolName": "mcp__semarail__query",
+    "status": "failure",
+    "coreTraceId": "trace_core_late"
+  },
+  "after": {
+    "schemaVersion": 1,
+    "traceId": "atr_fixture",
+    "rulesVersion": "trace-diagnosis-v1",
+    "status": "issues",
+    "findings": [
+      {
+        "id": "finding_core_failure",
+        "category": "runtime",
+        "code": "CORE_FAILURE_RECORDED",
+        "severity": "error",
+        "phase": "execution",
+        "evidenceIds": ["tool-end:call-late", "trace_core_late"],
+        "rationale": "The late tool completion now links to a persisted Core failure diagnosis.",
+        "suggestedAction": "Open the linked issue and inspect the whitelisted Core reason code."
+      }
+    ]
+  }
+}

@@ -720,6 +720,17 @@ class SemanticConsoleService:
     # ---- request dispatch ------------------------------------------------
 
     def dispatch(self, method: str, path: str, query: Mapping[str, Any] | None = None, body: Any = None) -> tuple[int, dict[str, Any]]:
+        # Regression readers pin Console configuration without blocking Core
+        # cancellation or current-state authorization. Every Console mutation
+        # uses the same project lock for its check and write.
+        if method.upper() in {"POST", "PUT", "PATCH", "DELETE"}:
+            with self.project._lock:
+                if getattr(self.project, "_regression_readers", 0):
+                    return 409, {"__error__": {"code": "REGRESSION_ENVIRONMENT_BUSY", "message": "configuration cannot change during a regression batch"}}
+                return self._dispatch_unlocked(method, path, query, body)
+        return self._dispatch_unlocked(method, path, query, body)
+
+    def _dispatch_unlocked(self, method: str, path: str, query: Mapping[str, Any] | None = None, body: Any = None) -> tuple[int, dict[str, Any]]:
         """Dispatch one REST request and return ``(status, data)``.
 
         The HTTP adapter serializes this direct resource/error shape; keeping

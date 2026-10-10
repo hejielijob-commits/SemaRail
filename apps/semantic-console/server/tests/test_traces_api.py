@@ -263,9 +263,21 @@ class TraceApiTests(unittest.TestCase):
         event = {"eventId": "e-1", "occurredAt": "2026-09-30T08:00:00Z", "type": "turn_started"}
         _, first = self._post([event], sourceTurnId="turn-a")
         _, second = self._post([event], sourceTurnId="turn-b")
-        self.store.record_trace_events(
+        foreign = self.store.record_trace_events(
             auth=self.auth, project_id="project-b", source_session_id="session-1",
             source_turn_id="turn-c", events=[event],
+        )
+        with self.access._connect() as connection:
+            connection.execute(
+                "INSERT INTO organizations(id,name,created_at) VALUES(?,?,?)",
+                ("org-foreign", "Foreign organization", "2026-09-01T00:00:00Z"),
+            )
+        foreign_subject = self.access.create_service_account("Foreign writer", organization_id="org-foreign")
+        foreign_key = self.access.issue_api_key(foreign_subject.id)
+        foreign_auth = self.access.authenticate(f"Bearer {foreign_key['apiKey']}")
+        foreign_org_trace = self.store.record_trace_events(
+            auth=foreign_auth, project_id="project-a", source_session_id="session-1",
+            source_turn_id="turn-foreign-org", events=[event],
         )
         admin = f"Bearer {self.bootstrap}"
         _, page = self.api.dispatch("GET", "/api/v1/traces", {"limit": "1"}, None, admin)
@@ -274,6 +286,347 @@ class TraceApiTests(unittest.TestCase):
         )
         self.assertEqual({page["items"][0]["id"], next_page["items"][0]["id"]}, {first["id"], second["id"]})
         self.assertIsNone(next_page["nextCursor"])
+        admin = f"Bearer {self.bootstrap}"
+        diagnosis_status, diagnosis = self.api.dispatch(
+            "GET", f"/api/v1/traces/{foreign['id']}/diagnosis", {}, None, admin,
+        )
+        compare_status, comparison = self.api.dispatch(
+            "GET", "/api/v1/traces/compare",
+            {"leftTraceId": first["id"], "rightTraceId": foreign["id"]}, None, admin,
+        )
+        foreign_org_status, foreign_org = self.api.dispatch(
+            "GET", f"/api/v1/traces/{foreign_org_trace['id']}", {}, None, admin,
+        )
+        self.assertEqual((diagnosis_status, diagnosis["code"]), (404, "TRACE_NOT_FOUND"))
+        self.assertEqual((compare_status, comparison["code"]), (404, "TRACE_NOT_FOUND"))
+        self.assertEqual((foreign_org_status, foreign_org["code"]), (404, "TRACE_NOT_FOUND"))
+
+    def test_trace_list_filters_are_scoped_and_use_persisted_issue_evidence(self) -> None:
+        admin = f"Bearer {self.bootstrap}"
+        started = "2026-09-30T08:00:00Z"
+        self._post([
+            {"eventId": "success-start", "occurredAt": started, "type": "turn_started"},
+            {"eventId": "success-end", "occurredAt": "2026-09-30T08:00:01Z", "type": "turn_completed", "status": "success"},
+        ], sourceSessionId="session-success", sourceTurnId="turn-success")
+        self.store.record_execution(
+            auth=self.auth, project_id="project-a", trace_id="core-filtered", query_id="query-filtered",
+            datasource_id="warehouse", transport="core-http", method="query.run",
+            status="failure", stage="datasource", error={"code": "DATASOURCE_UNAVAILABLE"},
+        )
+        _, failed = self._post([
+            {"eventId": "failed-start", "occurredAt": started, "type": "turn_started"},
+            {"eventId": "failed-end", "occurredAt": "2026-09-30T08:00:02Z", "type": "turn_completed", "status": "failure"},
+            {"eventId": "failed-tool", "occurredAt": "2026-09-30T08:00:01Z", "type": "tool_completed", "toolUseId": "tool-failed", "coreTraceId": "core-filtered"},
+        ], sourceSessionId="session-failure", sourceTurnId="turn-failure")
+
+        status, filtered = self.api.dispatch(
+            "GET", "/api/v1/traces",
+            {
+                "createdAfter": started, "createdBefore": started, "sourceSessionId": "session-failure",
+                "subjectId": self.auth.subject.id, "status": "failure", "hasIssues": "true",
+            },
+            None, admin,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual([item["id"] for item in filtered["items"]], [failed["id"]])
+        self.assertEqual(filtered["items"][0]["issueCount"], 1)
+
+        no_issues_status, no_issues = self.api.dispatch(
+            "GET", "/api/v1/traces", {"hasIssues": "false", "sourceSessionId": "session-success"}, None, admin,
+        )
+        self.assertEqual(no_issues_status, 200)
+        self.assertEqual([item["sourceSessionId"] for item in no_issues["items"]], ["session-success"])
+
+        invalid_status, invalid = self.api.dispatch(
+            "GET", "/api/v1/traces", {"hasIssues": "yes"}, None, admin,
+        )
+        self.assertEqual((invalid_status, invalid["code"]), (400, "INVALID_FILTER"))
+
+    def test_diagnosis_uses_only_safe_verified_core_metadata_and_marks_gaps_incomplete(self) -> None:
+        self.store.record_execution(
+            auth=self.auth, project_id="project-a", trace_id="core-diagnosis", query_id="query-diagnosis",
+            datasource_id="warehouse", transport="core-http", method="query.run",
+            status="failure", stage="sql_validation", semantic_version="semantic-v4",
+            policy_versions=["policy-a:3"],
+            error={
+                "code": "SQL_VALIDATION_FAILED", "reasonCode": "UNSAFE_QUERY",
+                "phase": "sqlValidation", "message": "private message sentinel",
+                "body": "private body sentinel",
+            },
+            phase_spans=[{"name": "runtime", "status": "success", "durationMs": 5_001}],
+        )
+        _, accepted = self._post([
+            {"eventId": "diag-start", "occurredAt": "2026-09-30T08:00:00Z", "type": "turn_started"},
+            {"eventId": "diag-tool", "occurredAt": "2026-09-30T08:00:01Z", "type": "tool_completed", "toolUseId": "diag-tool-use", "coreTraceId": "core-diagnosis"},
+            {"eventId": "diag-end", "occurredAt": "2026-09-30T08:00:02Z", "type": "turn_completed", "status": "success"},
+        ], sourceTurnId="turn-diagnosis")
+        admin = f"Bearer {self.bootstrap}"
+        detail_status, detail = self.api.dispatch(
+            "GET", f"/api/v1/traces/{accepted['id']}", {}, None, admin,
+        )
+        diagnosis_status, diagnosis = self.api.dispatch(
+            "GET", f"/api/v1/traces/{accepted['id']}/diagnosis", {}, None, admin,
+        )
+        self.assertEqual((detail_status, diagnosis_status), (200, 200))
+        core = detail["coreDiagnostics"][0]
+        self.assertEqual(
+            (core["code"], core["reasonCode"], core["phase"], core["semanticVersion"], core["policyVersions"]),
+            ("SQL_VALIDATION_FAILED", "UNSAFE_QUERY", "sqlValidation", "semantic-v4", ["policy-a:3"]),
+        )
+        self.assertNotIn("private message sentinel", repr(detail))
+        self.assertNotIn("private body sentinel", repr(detail))
+        self.assertEqual(diagnosis["status"], "issues")
+        sql_failure = next(item for item in diagnosis["findings"] if item["code"] == "SQL_VALIDATION_FAILED")
+        slow = next(item for item in diagnosis["findings"] if item["code"] == "SLOW_CORE_PHASE")
+        self.assertEqual(sql_failure["category"], "sqlValidation")
+        self.assertEqual(sql_failure["evidenceIds"], ["core-diagnosis"] + core["issueIds"])
+        self.assertEqual((slow["severity"], slow["phase"]), ("info", "runtime"))
+        self.assertNotIn("private message sentinel", repr(diagnosis))
+
+        _, incomplete_trace = self._post([
+            {"eventId": "gap-start", "occurredAt": "2026-09-30T08:00:00Z", "type": "turn_started"},
+            {"eventId": "gap-tool", "occurredAt": "2026-09-30T08:00:01Z", "type": "tool_completed", "toolUseId": "gap-tool-use"},
+        ], sourceTurnId="turn-incomplete")
+        incomplete_status, incomplete = self.api.dispatch(
+            "GET", f"/api/v1/traces/{incomplete_trace['id']}/diagnosis", {}, None, admin,
+        )
+        self.assertEqual((incomplete_status, incomplete["status"]), (200, "incomplete"))
+        self.assertEqual({item["severity"] for item in incomplete["findings"]}, {"info"})
+        self.assertEqual(
+            {item["code"] for item in incomplete["findings"]},
+            {"MISSING_TURN_END", "MISSING_TOOL_START"},
+        )
+
+    def test_core_error_phases_remain_visible_without_error_bodies(self) -> None:
+        for phase in ("database", "authorization", "validation", "cancel"):
+            with self.subTest(phase=phase):
+                core_id = f"core-phase-{phase}"
+                self.store.record_execution(
+                    auth=self.auth, project_id="project-a", trace_id=core_id,
+                    query_id=f"query-phase-{phase}", datasource_id="warehouse",
+                    transport="core-http", method="query.run", status="failure",
+                    stage=phase, error={"code": "DATABASE_ERROR", "phase": phase,
+                                        "message": "private phase detail sentinel"},
+                )
+                _, accepted = self._post([
+                    {"eventId": f"phase-event-{phase}", "occurredAt": "2026-09-30T08:00:01Z",
+                     "type": "tool_completed", "toolUseId": f"phase-tool-{phase}", "coreTraceId": core_id},
+                ], sourceTurnId=f"turn-phase-{phase}")
+                for path in (f"/api/v1/traces/{accepted['id']}", f"/api/v1/diagnostics/core/{core_id}"):
+                    status, detail = self.api.dispatch("GET", path, {}, None, f"Bearer {self.bootstrap}")
+                    self.assertEqual(status, 200)
+                    metadata = detail["coreDiagnostics"][0] if "coreDiagnostics" in detail else detail
+                    self.assertEqual(metadata["phase"], phase)
+                    self.assertNotIn("private phase detail sentinel", repr(detail))
+
+    def test_diagnosis_distinguishes_non_core_tools_and_late_span_events(self) -> None:
+        from server.trace_analysis import diagnose_trace
+        events = [
+            {"eventId": "start", "type": "turn_started"},
+            {"eventId": "tool-start", "type": "tool_started", "toolUseId": "shell", "toolName": "exec_command"},
+            {"eventId": "tool-end", "type": "tool_completed", "toolUseId": "shell", "status": "success"},
+            {"eventId": "agent-start", "type": "subagent_started", "agentId": "child"},
+            {"eventId": "end", "type": "turn_completed", "status": "success"},
+        ]
+        trace = {"id": "sample", "events": events, "coreDiagnostics": []}
+        diagnosis = diagnose_trace(trace)
+        self.assertEqual({item["code"] for item in diagnosis["findings"]}, {"MISSING_AGENT_END"})
+        self.assertEqual(diagnosis["status"], "incomplete")
+        events.append({"eventId": "agent-end", "type": "subagent_completed", "agentId": "child", "status": "success"})
+        self.assertEqual(diagnose_trace(trace)["status"], "healthy")
+        events[2]["coreTraceId"] = "expired-core"
+        self.assertEqual({item["code"] for item in diagnose_trace(trace)["findings"]}, {"MISSING_CORE_EVIDENCE"})
+        trace["coreDiagnostics"] = [{"traceId": "expired-core", "status": "failure", "stage": "runtime", "reasonCode": "CONNECTION_FAILED"}]
+        failure = next(item for item in diagnose_trace(trace)["findings"] if item["severity"] == "error")
+        self.assertEqual(failure["category"], "datasource")
+
+    def test_comparison_does_not_infer_version_equality_from_missing_metadata(self) -> None:
+        from server.trace_analysis import compare_traces
+        empty = {"id": "empty", "events": [], "spans": [], "coreDiagnostics": []}
+        present = {**empty, "id": "present", "model": "model-a", "coreDiagnostics": [
+            {"semanticVersion": "revision-a", "policyVersions": ["policy-a:1"]},
+            {"semanticVersion": "revision-b", "policyVersions": ["policy-a:1"]},
+        ]}
+        missing = compare_traces(empty, present)
+        self.assertEqual(missing["versionChanges"], {"model": None, "semanticVersion": None, "policyVersions": None})
+        self.assertEqual(missing["right"]["semanticVersions"], ["revision-a", "revision-b"])
+        self.assertEqual(compare_traces(present, {**present, "id": "other"})["versionChanges"],
+                         {"model": False, "semanticVersion": False, "policyVersions": False})
+
+    def test_trace_comparison_aligns_structural_tool_identity_and_reports_versions(self) -> None:
+        admin = f"Bearer {self.bootstrap}"
+        self.store.record_execution(
+            auth=self.auth, project_id="project-a", trace_id="core-left", query_id="query-left",
+            datasource_id="warehouse", transport="core-http", method="query.run",
+            status="success", stage="complete", semantic_version="semantic-v1",
+            policy_versions=["policy-a:1"],
+            phase_spans=[{"name": "runtime", "status": "success", "durationMs": 1_000}],
+        )
+        self.store.record_execution(
+            auth=self.auth, project_id="project-a", trace_id="core-right", query_id="query-right",
+            datasource_id="warehouse", transport="core-http", method="query.run",
+            status="success", stage="complete", semantic_version="semantic-v2",
+            policy_versions=["policy-a:2"],
+            phase_spans=[{"name": "runtime", "status": "success", "durationMs": 1_800}],
+        )
+        left_events = [
+            {"eventId": "l-turn-start", "occurredAt": "2026-09-30T08:00:00Z", "type": "turn_started", "model": "model-a"},
+            {"eventId": "l-agent-start", "occurredAt": "2026-09-30T08:00:01Z", "type": "subagent_started", "agentId": "left-agent"},
+            {"eventId": "l-tool-start", "occurredAt": "2026-09-30T08:00:10Z", "type": "tool_started", "toolUseId": "left-use", "toolName": "wren.query", "parentAgentId": "left-agent"},
+            {"eventId": "l-tool-end", "occurredAt": "2026-09-30T08:00:11Z", "type": "tool_completed", "toolUseId": "left-use", "toolName": "wren.query", "parentAgentId": "left-agent", "status": "success", "coreTraceId": "core-left"},
+            {"eventId": "l-agent-end", "occurredAt": "2026-09-30T08:00:12Z", "type": "subagent_completed", "agentId": "left-agent", "status": "success"},
+            {"eventId": "l-turn-end", "occurredAt": "2026-09-30T08:00:13Z", "type": "turn_completed", "status": "success"},
+        ]
+        right_events = [
+            {"eventId": "r-turn-start", "occurredAt": "2026-09-30T08:01:00Z", "type": "turn_started", "model": "model-b"},
+            {"eventId": "r-agent-start", "occurredAt": "2026-09-30T08:01:01Z", "type": "subagent_started", "agentId": "right-agent"},
+            {"eventId": "r-tool-start", "occurredAt": "2026-09-30T08:01:10Z", "type": "tool_started", "toolUseId": "right-use", "toolName": "wren.query", "parentAgentId": "right-agent"},
+            {"eventId": "r-tool-end", "occurredAt": "2026-09-30T08:01:12Z", "type": "tool_completed", "toolUseId": "right-use", "toolName": "wren.query", "parentAgentId": "right-agent", "status": "failure", "coreTraceId": "core-right"},
+            {"eventId": "r-other-start", "occurredAt": "2026-09-30T08:01:13Z", "type": "tool_started", "toolUseId": "right-other", "toolName": "wren.describe"},
+            {"eventId": "r-other-end", "occurredAt": "2026-09-30T08:01:14Z", "type": "tool_completed", "toolUseId": "right-other", "toolName": "wren.describe", "status": "success"},
+            {"eventId": "r-agent-end", "occurredAt": "2026-09-30T08:01:15Z", "type": "subagent_completed", "agentId": "right-agent", "status": "success"},
+            {"eventId": "r-turn-end", "occurredAt": "2026-09-30T08:01:16Z", "type": "turn_completed", "status": "success"},
+        ]
+        _, left = self._post(left_events, sourceTurnId="turn-left")
+        _, right = self._post(right_events, sourceTurnId="turn-right")
+        status, comparison = self.api.dispatch(
+            "GET", "/api/v1/traces/compare",
+            {"leftTraceId": left["id"], "rightTraceId": right["id"]}, None, admin,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(comparison["versionChanges"], {
+            "model": True, "semanticVersion": True, "policyVersions": True,
+        })
+        aligned_tool = next(item for item in comparison["aligned"] if item["kind"] == "tool")
+        self.assertEqual((aligned_tool["toolName"], aligned_tool["agentPath"]), ("wren.query", ["agent#1"]))
+        self.assertEqual((aligned_tool["left"]["status"], aligned_tool["right"]["status"]), ("success", "failure"))
+        self.assertEqual(aligned_tool["durationDeltaMs"], 1_000)
+        self.assertEqual(aligned_tool["phaseDurations"], [{
+            "name": "runtime", "leftMs": 1_000.0, "rightMs": 1_800.0, "deltaMs": 800.0,
+        }])
+        self.assertEqual([item["toolName"] for item in comparison["rightOnly"]], ["wren.describe"])
+
+    def test_trace_comparison_keeps_parallel_indistinguishable_agents_unmatched(self) -> None:
+        def events(prefix: str, agent_order: list[str], minute: str) -> list[dict]:
+            values = [{
+                "eventId": f"{prefix}-turn-start", "occurredAt": f"2026-09-30T08:{minute}:00Z",
+                "type": "turn_started",
+            }]
+            for offset, agent_id in enumerate(agent_order, start=1):
+                values.append({
+                    "eventId": f"{prefix}-{agent_id}-start",
+                    "occurredAt": f"2026-09-30T08:{minute}:{offset:02}Z",
+                    "type": "subagent_started", "agentId": agent_id,
+                })
+            for agent_id in agent_order:
+                values.extend([
+                    {
+                        "eventId": f"{prefix}-{agent_id}-tool-start",
+                        "occurredAt": f"2026-09-30T08:{minute}:02Z", "type": "tool_started",
+                        "toolUseId": f"{prefix}-{agent_id}-tool", "toolName": "wren.query",
+                        "parentAgentId": agent_id,
+                    },
+                    {
+                        "eventId": f"{prefix}-{agent_id}-tool-end",
+                        "occurredAt": f"2026-09-30T08:{minute}:03Z", "type": "tool_completed",
+                        "toolUseId": f"{prefix}-{agent_id}-tool", "toolName": "wren.query",
+                        "parentAgentId": agent_id, "status": "success",
+                    },
+                ])
+            for agent_id in ("agent-a", "agent-b"):
+                values.append({
+                    "eventId": f"{prefix}-{agent_id}-end",
+                    "occurredAt": f"2026-09-30T08:{minute}:{'05' if agent_id == 'agent-a' else '04'}Z",
+                    "type": "subagent_completed", "agentId": agent_id, "status": "success",
+                })
+            values.append({
+                "eventId": f"{prefix}-turn-end", "occurredAt": f"2026-09-30T08:{minute}:06Z",
+                "type": "turn_completed", "status": "success",
+            })
+            return values
+
+        _, left = self._post(
+            events("parallel-left", ["agent-a", "agent-b"], "00"),
+            sourceTurnId="turn-parallel-left",
+        )
+        _, right = self._post(
+            events("parallel-right", ["agent-b", "agent-a"], "01"),
+            sourceTurnId="turn-parallel-right",
+        )
+        status, comparison = self.api.dispatch(
+            "GET", "/api/v1/traces/compare",
+            {"leftTraceId": left["id"], "rightTraceId": right["id"]}, None,
+            f"Bearer {self.bootstrap}",
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual([node["kind"] for node in comparison["aligned"]], ["turn"])
+        self.assertEqual(len(comparison["leftOnly"]), 4)
+        self.assertEqual(len(comparison["rightOnly"]), 4)
+        self.assertEqual({node["kind"] for node in comparison["leftOnly"]}, {"agent", "tool"})
+
+    def test_collector_status_auth_strict_payload_staleness_and_retention(self) -> None:
+        body = {
+            "schemaVersion": 1, "collectorId": "collector-main", "observedAt": "2026-09-30T08:00:00Z",
+            "pendingCount": 4, "retryCount": 2, "droppedCount": 1, "pausedCount": 0,
+            "quarantinedCount": 3, "lastSuccessAt": "2026-09-30T07:59:00Z",
+            "dropReasons": {"expired": 1, "capacity": 0, "invalid": 0, "conflict": 0},
+        }
+        admin = f"Bearer {self.bootstrap}"
+        rejected_status, rejected = self.api.dispatch(
+            "POST", "/api/v1/traces/collector-status", {},
+            {**body, "rawMessages": ["sensitive payload"]}, self.token,
+        )
+        self.assertEqual((rejected_status, rejected["code"]), (400, "INVALID_REQUEST"))
+        missing_status, missing = self.api.dispatch(
+            "POST", "/api/v1/traces/collector-status", {},
+            {key: value for key, value in body.items() if key != "lastSuccessAt"}, self.token,
+        )
+        self.assertEqual((missing_status, missing["code"]), (400, "INVALID_COLLECTOR_STATUS"))
+        denied_status, denied = self.api.dispatch(
+            "POST", "/api/v1/traces/collector-status", {}, body, admin,
+        )
+        self.assertEqual((denied_status, denied["code"]), (403, "FORBIDDEN"))
+        unbound = self.access.create_service_account("Unbound collector")
+        unbound_key = self.access.issue_api_key(unbound.id)
+        unbound_status, unbound_response = self.api.dispatch(
+            "POST", "/api/v1/traces/collector-status", {}, body,
+            f"Bearer {unbound_key['apiKey']}",
+        )
+        self.assertEqual((unbound_status, unbound_response["code"]), (403, "FORBIDDEN"))
+
+        accepted_status, accepted = self.api.dispatch(
+            "POST", "/api/v1/traces/collector-status", {}, body, self.token,
+        )
+        self.assertEqual(accepted_status, 201)
+        self.assertEqual(accepted["subjectId"], self.auth.subject.id)
+        listed_status, listed = self.api.dispatch(
+            "GET", "/api/v1/traces/collector-status", {}, None, admin,
+        )
+        self.assertEqual(listed_status, 200)
+        self.assertEqual(len(listed["items"]), 1)
+        item = listed["items"][0]
+        self.assertEqual(item["dropReasons"], body["dropReasons"])
+        update = {**body, "observedAt": "2026-09-30T08:00:30Z", "pendingCount": 5}
+        updated_status, _ = self.api.dispatch(
+            "POST", "/api/v1/traces/collector-status", {}, update, self.token,
+        )
+        updated_list_status, updated_list = self.api.dispatch(
+            "GET", "/api/v1/traces/collector-status", {}, None, admin,
+        )
+        self.assertEqual((updated_status, updated_list_status), (201, 200))
+        self.assertEqual(len(updated_list["items"]), 1)
+        self.assertEqual(updated_list["items"][0]["pendingCount"], 5)
+        self.assertFalse(item["stale"])
+        self.assertNotIn("rawMessages", item)
+
+        self.now += timedelta(minutes=6)
+        _, stale = self.api.dispatch("GET", "/api/v1/traces/collector-status", {}, None, admin)
+        self.assertTrue(stale["items"][0]["stale"])
+        self.now += timedelta(days=31)
+        self.store.cleanup_expired()
+        _, expired = self.api.dispatch("GET", "/api/v1/traces/collector-status", {}, None, admin)
+        self.assertEqual(expired["items"], [])
 
     def test_write_requires_project_scoped_trace_permission(self) -> None:
         event = {"eventId": "e-1", "occurredAt": "2026-09-30T08:00:00Z", "type": "turn_started"}

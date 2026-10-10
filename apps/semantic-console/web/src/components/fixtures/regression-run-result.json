@@ -1,0 +1,33 @@
+{
+  "id": "run_20261010_001",
+  "schemaVersion": 1,
+  "status": "completed",
+  "subjectId": "subject_current_operator",
+  "caseIds": ["42"],
+  "results": [
+    {
+      "caseId": "42",
+      "caseRevision": 3,
+      "status": "failed",
+      "reasonCode": "ROW_COUNT_MISMATCH",
+      "durationMs": 28,
+      "coreTraceIds": ["trace_core_regression_42"],
+      "queryId": "query_regression_42",
+      "assertions": [
+        { "kind": "status", "status": "passed", "reasonCode": "STATUS_MATCH" },
+        { "kind": "rowCount", "status": "failed", "reasonCode": "ROW_COUNT_MISMATCH" }
+      ],
+      "environment": {
+        "datasourceId": "warehouse-test",
+        "datasetVersion": "dataset-v4",
+        "semanticVersion": "semantic-13",
+        "policyVersions": null
+      },
+      "feedbackId": "feedback_42",
+      "sourceTraceId": "atr_fixture"
+    }
+  ],
+  "createdAt": "2026-10-10T01:20:00Z",
+  "updatedAt": "2026-10-10T01:20:01Z",
+  "expiresAt": "2026-11-09T01:20:00Z"
+}

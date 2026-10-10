@@ -48,11 +48,6 @@ MAX_CONTEXT_KNOWLEDGE_ITEMS = 20
 MAX_CONTEXT_KNOWLEDGE_BYTES = 64 * 1024
 MAX_CONTEXT_TEXT_BYTES = 16 * 1024
 _PROJECT_FILE = "wren_project.yml"
-_IGNORED_REVISION_DIRS = frozenset({
-    ".git", ".wren", "__pycache__", "target", ".semantic-console",
-    "node_modules", ".venv", "venv", "dist", "build", "state",
-})
-
 ModuleLoader = Callable[[str], ModuleType]
 VersionProvider = Callable[[], str | None]
 ContextRetriever = Callable[[dict[str, Any], str, Path], Any]
@@ -1590,34 +1585,19 @@ def _project_revision(
     *,
     phase: str = "project.validate",
 ) -> str:
-    """Hash source file names/content deterministically without exposing paths."""
+    """Use the index/publisher's shared source-tree revision algorithm."""
 
-    digest = hashlib.sha256()
+    from .semantic_index import SemanticIndexError, project_revision
+
     try:
-        files: list[tuple[str, Path]] = []
-        for candidate in project_path.rglob("*"):
-            if candidate.is_symlink() or not candidate.is_file():
-                continue
-            relative = candidate.relative_to(project_path)
-            if any(part in _IGNORED_REVISION_DIRS for part in relative.parts):
-                continue
-            files.append((relative.as_posix(), candidate))
-        for relative_name, candidate in sorted(files, key=lambda item: item[0]):
-            name_bytes = relative_name.encode("utf-8")
-            digest.update(len(name_bytes).to_bytes(4, "big"))
-            digest.update(name_bytes)
-            with candidate.open("rb") as source:
-                while chunk := source.read(1024 * 1024):
-                    digest.update(len(chunk).to_bytes(4, "big"))
-                    digest.update(chunk)
-    except (OSError, RuntimeError, UnicodeError) as exc:
+        return project_revision(project_path)
+    except SemanticIndexError as exc:
         raise RpcFault(
             PROJECT_VALIDATION_FAILED,
             phase,
             "project revision could not be computed",
             retryable=False,
         ) from exc
-    return f"sha256:{digest.hexdigest()}"
 
 
 WrenAdapter = LazyWrenAdapter

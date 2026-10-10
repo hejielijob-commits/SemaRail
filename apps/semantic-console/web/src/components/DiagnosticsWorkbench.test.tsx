@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import "../i18n";
@@ -106,58 +106,16 @@ describe("DiagnosticsWorkbench", () => {
     await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: "cursor-page-2" })));
   });
 
-  it("creates an enabled reviewed regression case from issue evidence", async () => {
+  it("hands issue metadata to the manual regression form without creating a case from evidence", async () => {
     vi.spyOn(api, "listDiagnosticFeedback").mockResolvedValue({ items: [issue], nextCursor: null });
     vi.spyOn(api, "getDiagnosticFeedback").mockResolvedValue(issue);
-    const create = vi.spyOn(api, "createRegressionCase").mockResolvedValue({
-      id: "case_1", status: "enabled",
-      case: {
-        schemaVersion: 1, kind: "deterministic_sql", question: "Show salary",
-        semanticSql: "SELECT salary FROM hr.compensation", testDatasetId: "hr-policy-fixture",
-        expectedError: { reasonCode: "TABLE_PERMISSION_REQUIRED" },
-      },
-    });
+    const onCreateRegressionCase = vi.fn();
+    const create = vi.spyOn(api, "createRegressionCase");
 
-    render(<DiagnosticsWorkbench locale="en-US" mode="diagnostics" authToken="admin" adminToken="admin" />);
+    render(<DiagnosticsWorkbench locale="en-US" mode="diagnostics" authToken="admin" adminToken="admin" onCreateRegressionCase={onCreateRegressionCase} />);
     await screen.findByText("semantic-v3");
     fireEvent.click(screen.getByRole("button", { name: "Create regression case" }));
-    const dialog = screen.getByRole("dialog");
-    const fields = within(dialog).getAllByRole("textbox");
-    fireEvent.change(fields[2]!, { target: { value: "hr-policy-fixture" } });
-    fireEvent.click(within(dialog).getByRole("checkbox"));
-    fireEvent.click(within(dialog).getByRole("button", { name: "Create case" }));
-
-    await waitFor(() => expect(create).toHaveBeenCalledWith(issue.id, expect.objectContaining({
-      enable: true,
-      case: expect.objectContaining({ testDatasetId: "hr-policy-fixture", question: "Show salary" }),
-    })));
-  });
-
-  it("shows draft and enabled cases and exports versioned JSON", async () => {
-    const exported = {
-      schemaVersion: 1 as const,
-      projectId: "hr-project",
-      cases: [
-        { id: "case_draft", feedbackId: "fb_1", status: "draft" as const, schemaVersion: 1 as const, kind: "agent_evidence" as const, question: "Draft ambiguity case" },
-        { id: "case_enabled", feedbackId: "fb_2", status: "enabled" as const, schemaVersion: 1 as const, kind: "deterministic_sql" as const, question: "Enabled salary policy case", testDatasetId: "hr-fixture", expectedError: { reasonCode: "COLUMN_PERMISSION_REQUIRED" } },
-      ],
-    };
-    vi.spyOn(api, "exportRegressionCases").mockResolvedValue(exported);
-    const createObjectURL = vi.fn().mockReturnValue("blob:regression-export");
-    const revokeObjectURL = vi.fn();
-    vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL });
-    let downloadName = "";
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) { downloadName = this.download; });
-
-    render(<DiagnosticsWorkbench locale="en-US" mode="regressionCases" authToken="admin" adminToken="admin" />);
-    expect(await screen.findByText("Draft ambiguity case")).toBeInTheDocument();
-    expect(screen.getByText("Enabled salary policy case")).toBeInTheDocument();
-    expect(screen.getByText("draft")).toBeInTheDocument();
-    expect(screen.getByText("enabled")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Export versioned JSON" }));
-
-    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
-    expect(downloadName).toBe("semarail-regression-cases-v1.json");
-    expect(revokeObjectURL).toHaveBeenCalledWith("blob:regression-export");
+    expect(onCreateRegressionCase).toHaveBeenCalledWith(issue);
+    expect(create).not.toHaveBeenCalled();
   });
 });
