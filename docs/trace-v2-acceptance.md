@@ -116,6 +116,7 @@ Final verification on 2026-10-11:
 | --- | --- |
 | Complete Semantic Console server suite | 281 tests passed |
 | Complete Console frontend suite | 143 tests passed |
+| Trace date-filter portability | 7 workbench tests passed in UTC and 7 in Asia/Shanghai |
 | Independent Codex adapter suite | 57 tests passed |
 | Core CLI and distribution gate | 6 tests passed; production build and 72-file package verification passed |
 | Workspace lint and typecheck | Passed |

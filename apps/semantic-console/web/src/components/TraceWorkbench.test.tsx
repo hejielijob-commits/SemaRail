@@ -171,7 +171,8 @@ describe("TraceWorkbench durable replay", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
 
     await waitFor(() => expect(listTraces).toHaveBeenLastCalledWith(expect.objectContaining({
-      createdAfter: "2026-10-01T00:30:00.000Z",
+      // A datetime-local input represents 08:30 in the browser's own timezone.
+      createdAfter: new Date(2026, 9, 1, 8, 30).toISOString(),
       sourceSessionId: "session-42",
       subjectId: "subject-7",
       status: "failure",
