@@ -10,17 +10,21 @@ try:
     from .access_control import AccessControlError, AccessControlStore, AuthContext, BOOTSTRAP_SUBJECT_ID
     from .authorization import PolicyEngine
     from .diagnostics import DiagnosticError, DiagnosticStore
+    from .trace_analysis import compare_traces, diagnose_trace
 except ImportError:  # pragma: no cover
     from access_control import AccessControlError, AccessControlStore, AuthContext, BOOTSTRAP_SUBJECT_ID  # type: ignore[no-redef]
     from authorization import PolicyEngine  # type: ignore[no-redef]
     from diagnostics import DiagnosticError, DiagnosticStore  # type: ignore[no-redef]
+    from trace_analysis import compare_traces, diagnose_trace  # type: ignore[no-redef]
 
 
 _FEEDBACK_DETAIL = re.compile(r"/api/v1/diagnostics/feedback/([^/]+)\Z")
+_CORE_DIAGNOSTIC = re.compile(r"/api/v1/diagnostics/core/([^/]+)\Z")
 _REGRESSION_CREATE = re.compile(r"/api/v1/diagnostics/feedback/([^/]+)/regression-cases\Z")
 _RETRIEVAL_DETAIL = re.compile(r"/api/v1/diagnostics/retrievals/([^/]+)\Z")
 _TRACE_DETAIL = re.compile(r"/api/v1/traces/([^/]+)\Z")
 _TRACE_CORE_DETAIL = re.compile(r"/api/v1/traces/by-core/([^/]+)\Z")
+_TRACE_DIAGNOSIS = re.compile(r"/api/v1/traces/([^/]+)/diagnosis\Z")
 
 
 class DiagnosticsApi:
@@ -66,12 +70,64 @@ class DiagnosticsApi:
                     source_session_id=payload.get("sourceSessionId"),
                     source_turn_id=payload.get("sourceTurnId"), events=payload.get("events"),
                 )
+            if method == "POST" and path == "/api/v1/traces/collector-status":
+                self._require_trace_write(auth)
+                collector_fields = {
+                    "schemaVersion", "collectorId", "observedAt", "pendingCount", "retryCount",
+                    "droppedCount", "pausedCount", "quarantinedCount", "lastSuccessAt", "dropReasons",
+                }
+                payload = self._body(body, collector_fields)
+                if set(payload) != collector_fields:
+                    raise DiagnosticError("INVALID_COLLECTOR_STATUS", "collector status fields are incomplete")
+                if type(payload.get("schemaVersion")) is not int or payload["schemaVersion"] != 1:
+                    raise DiagnosticError("INVALID_COLLECTOR_STATUS", "collector schema version is invalid")
+                return 201, self.store.record_collector_status(
+                    auth=auth, project_id=self.project_id, payload=payload,
+                )
             self._require_admin(auth, path)
+            core_diagnostic = _CORE_DIAGNOSTIC.fullmatch(path)
+            if core_diagnostic and method == "GET":
+                return 200, self.store.core_diagnostic(
+                    core_diagnostic.group(1),
+                    organization_id=auth.subject.organization_id,
+                    project_id=self.project_id,
+                )
             if method == "GET" and path == "/api/v1/traces":
                 return 200, self.store.list_traces(
                     organization_id=auth.subject.organization_id, project_id=self.project_id,
                     limit=self._limit(query.get("limit", 50)), cursor=self._optional(query.get("cursor")),
+                    source_session_id=self._optional(query.get("sourceSessionId")),
+                    subject_id=self._optional(query.get("subjectId")),
+                    created_after=self._optional(query.get("createdAfter")),
+                    created_before=self._optional(query.get("createdBefore")),
+                    status=self._optional(query.get("status")),
+                    has_issues=self._boolean(query.get("hasIssues")),
                 )
+            if method == "GET" and path == "/api/v1/traces/collector-status":
+                return 200, self.store.list_collector_statuses(
+                    organization_id=auth.subject.organization_id, project_id=self.project_id,
+                )
+            if method == "GET" and path == "/api/v1/traces/compare":
+                left_id = self._optional(query.get("leftTraceId"))
+                right_id = self._optional(query.get("rightTraceId"))
+                if left_id is None or right_id is None:
+                    raise DiagnosticError("INVALID_FILTER", "both trace IDs are required")
+                left = self.store.trace_detail(
+                    left_id, organization_id=auth.subject.organization_id,
+                    project_id=self.project_id,
+                )
+                right = self.store.trace_detail(
+                    right_id, organization_id=auth.subject.organization_id,
+                    project_id=self.project_id,
+                )
+                return 200, compare_traces(left, right)
+            diagnosis = _TRACE_DIAGNOSIS.fullmatch(path)
+            if diagnosis and method == "GET":
+                trace = self.store.trace_detail(
+                    diagnosis.group(1), organization_id=auth.subject.organization_id,
+                    project_id=self.project_id,
+                )
+                return 200, diagnose_trace(trace)
             core_trace = _TRACE_CORE_DETAIL.fullmatch(path)
             if core_trace and method == "GET":
                 return 200, self.store.trace_for_core(
@@ -213,6 +269,16 @@ class DiagnosticsApi:
     @staticmethod
     def _optional(value: Any) -> str | None:
         return value if isinstance(value, str) and value else None
+
+    @staticmethod
+    def _boolean(value: Any) -> bool | None:
+        if value is None or value == "":
+            return None
+        if value is True or value == "true":
+            return True
+        if value is False or value == "false":
+            return False
+        raise DiagnosticError("INVALID_FILTER", "trace issue filter is invalid")
 
 
 __all__ = ["DiagnosticsApi"]

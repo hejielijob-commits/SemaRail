@@ -362,6 +362,58 @@ class AccessControlAdminApiTests(unittest.TestCase):
             },
         )
 
+    def test_openapi_trace_v2_response_and_version_contracts(self) -> None:
+        specification = json.loads(
+            (Path(__file__).resolve().parents[1] / "openapi.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(specification["security"], [{"RuntimeBearer": []}])
+        paths = specification["paths"]
+
+        def response_schema(route: str, method: str, status: str) -> dict:
+            return paths[route][method]["responses"][status]["content"]["application/json"]["schema"]
+
+        expected = {
+            ("/api/v1/traces/{id}/diagnosis", "get", "200"): "TraceDiagnosis",
+            ("/api/v1/traces/compare", "get", "200"): "TraceComparison",
+            ("/api/v1/traces/collector-status", "post", "201"): "TraceCollectorStatusReceipt",
+            ("/api/v1/traces/collector-status", "get", "200"): "TraceCollectorStatusList",
+            ("/api/v1/diagnostics/core/{coreTraceId}", "get", "200"): "CoreDiagnostic",
+            ("/api/v1/diagnostics/test-datasets", "get", "200"): "RegressionTestDatasetList",
+            ("/api/v1/diagnostics/test-datasets", "post", "201"): "RegressionTestDatasetRecord",
+            ("/api/v1/diagnostics/test-datasets/{id}", "put", "200"): "RegressionTestDatasetRecord",
+            ("/api/v1/diagnostics/test-datasets/{id}", "delete", "200"): "DeletedResource",
+            ("/api/v1/diagnostics/regression-cases", "get", "200"): "RegressionCaseList",
+            ("/api/v1/diagnostics/regression-cases", "post", "201"): "RegressionCaseRecord",
+            ("/api/v1/diagnostics/regression-cases/{id}", "get", "200"): "RegressionCaseRecord",
+            ("/api/v1/diagnostics/regression-cases/{id}", "put", "200"): "RegressionCaseRecord",
+            ("/api/v1/diagnostics/regression-cases/{id}", "delete", "200"): "DeletedResource",
+            ("/api/v1/diagnostics/regression-runs", "get", "200"): "RegressionRunList",
+            ("/api/v1/diagnostics/regression-runs", "post", "202"): "RegressionRunRecord",
+            ("/api/v1/diagnostics/regression-runs/{id}/cancel", "post", "202"): "RegressionRunRecord",
+        }
+        for (route, method, status), schema_name in expected.items():
+            self.assertEqual(response_schema(route, method, status)["$ref"], f"#/components/schemas/{schema_name}")
+            self.assertNotEqual(paths[route][method].get("security"), [])
+
+        schemas = specification["components"]["schemas"]
+        trace_filters = {item["name"] for item in paths["/api/v1/traces"]["get"]["parameters"]}
+        self.assertTrue({"sourceSessionId", "subjectId", "createdAfter", "createdBefore", "status", "hasIssues"} <= trace_filters)
+        comparison = schemas["TraceComparison"]
+        side = comparison["properties"]["left"]
+        self.assertEqual(side["properties"]["semanticVersions"]["type"], "array")
+        self.assertTrue(side["properties"]["semanticVersion"]["nullable"])
+        for field in ("model", "semanticVersion", "policyVersions"):
+            self.assertTrue(comparison["properties"]["versionChanges"]["properties"][field]["nullable"])
+        self.assertEqual(schemas["RegressionCaseV2"]["properties"]["conditions"]["maxProperties"], 100)
+        self.assertEqual(paths["/api/v1/diagnostics/regression-cases"]["post"]["requestBody"]["content"]["application/json"]["schema"]["properties"]["enable"]["enum"], [False])
+        export_parameter = paths["/api/v1/diagnostics/regression-cases/export"]["get"]["parameters"][0]
+        self.assertEqual(export_parameter["name"], "schemaVersion")
+        self.assertEqual(export_parameter["schema"]["enum"], ["1", "2"])
+        self.assertEqual(schemas["CoreDiagnostic"]["properties"]["status"]["enum"], ["success", "failure", "cancelled"])
+        self.assertEqual(schemas["TraceCollectorStatusV1"]["properties"]["dropReasons"]["required"], ["expired", "capacity", "invalid", "conflict"])
+        self.assertEqual(schemas["RegressionRunRecord"]["properties"]["status"]["enum"], ["queued", "running", "completed", "cancelled", "interrupted"])
+        self.assertEqual(schemas["RegressionRunRecord"]["properties"]["results"]["items"]["properties"]["status"]["enum"], ["passed", "failed", "blocked", "inconclusive", "cancelled"])
+
     def test_management_api_rejects_invalid_policy_before_persistence(self) -> None:
         status, response = self.app.request(
             "POST", "/api/v1/access/policies",

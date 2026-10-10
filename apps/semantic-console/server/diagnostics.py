@@ -28,7 +28,7 @@ except ImportError:  # pragma: no cover - direct module loading
     )
 
 
-DIAGNOSTIC_SCHEMA_VERSION = 11
+DIAGNOSTIC_SCHEMA_VERSION = 12
 _DIAGNOSTIC_MIGRATION_LOCK_ID = 8_341_972_315_443_002
 DEFAULT_RETENTION_DAYS = 30
 TRACE_RETENTION_DAYS = 30
@@ -65,6 +65,16 @@ _TRACE_EVENT_FIELDS = frozenset({
     "parentToolUseId", "toolName", "model", "status", "coreTraceId", "tokenUsage",
 })
 _TRACE_TOOL_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,127}\Z")
+_COLLECTOR_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}\Z")
+_SAFE_CORE_METADATA = re.compile(r"[A-Za-z0-9._:-]{1,256}\Z")
+_SAFE_CORE_PHASES = frozenset({
+    "authentication", "policy", "preparation", "datasource", "sqlValidation", "sql_validation", "runtime",
+    # Error phases and measured boundary names are distinct Core metadata.
+    "authorization", "validation", "database", "cancel", "protocol", "dispatch",
+    "concurrency", "diagnostics", "project.describe", "project.validate", "context.ask",
+    "query.dryPlan", "query.run",
+})
+_COLLECTOR_DROP_REASONS = ("expired", "capacity", "invalid", "conflict")
 _LOGGER = logging.getLogger("semarail-core.diagnostics")
 
 
@@ -209,6 +219,18 @@ def _trace_time(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
 
 
+def _collector_timestamp(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not 1 <= len(value) <= 64:
+        raise DiagnosticError("INVALID_COLLECTOR_STATUS", f"collector {field} is invalid")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise DiagnosticError("INVALID_COLLECTOR_STATUS", f"collector {field} is invalid") from exc
+    if parsed.tzinfo is None:
+        raise DiagnosticError("INVALID_COLLECTOR_STATUS", f"collector {field} needs a timezone")
+    return _timestamp(parsed.astimezone(UTC))
+
+
 def _trace_event(value: Any) -> dict[str, Any]:
     if not isinstance(value, Mapping) or set(value) - _TRACE_EVENT_FIELDS:
         raise DiagnosticError("INVALID_TRACE", "trace event is invalid")
@@ -258,6 +280,71 @@ def _trace_event(value: Any) -> dict[str, Any]:
             key: usage[key] for key in ("input", "output", "total") if key in usage
         }
     return event
+
+
+def _safe_core_phase_spans(value: Any) -> list[dict[str, Any]]:
+    try:
+        phases = json.loads(value or "[]")
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(phases, list):
+        return []
+    result: list[dict[str, Any]] = []
+    for item in phases:
+        if not isinstance(item, Mapping) or set(item) != {"name", "status", "durationMs"}:
+            continue
+        name = item.get("name")
+        elapsed = item.get("durationMs")
+        if (
+            name not in {
+                "authentication", "policy", "preparation", "datasource",
+                "sqlValidation", "sql_validation", "runtime",
+            }
+            or item.get("status") not in {"success", "failure"}
+            or isinstance(elapsed, bool) or not isinstance(elapsed, (int, float))
+            or not 0 <= elapsed <= 86_400_000
+        ):
+            continue
+        result.append({"name": name, "status": item["status"], "durationMs": float(elapsed)})
+    return result
+
+
+def _safe_core_metadata(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Expose only bounded identifier metadata from a persisted Core error."""
+
+    values = dict(row)
+    result: dict[str, Any] = {}
+    semantic_version = values.get("semantic_version")
+    if (
+        isinstance(semantic_version, str) and _SAFE_CORE_METADATA.fullmatch(semantic_version)
+        and _SECRET.sub("[REDACTED]", semantic_version) == semantic_version
+    ):
+        result["semanticVersion"] = semantic_version
+    try:
+        policy_versions = json.loads(values.get("policy_versions_json") or "[]")
+    except (TypeError, ValueError):
+        policy_versions = []
+    if isinstance(policy_versions, list):
+        result["policyVersions"] = [
+            item for item in policy_versions
+            if isinstance(item, str) and _SAFE_CORE_METADATA.fullmatch(item)
+            and _SECRET.sub("[REDACTED]", item) == item
+        ][:64]
+    try:
+        error = json.loads(values.get("error_json") or "{}")
+    except (TypeError, ValueError):
+        error = {}
+    if not isinstance(error, Mapping):
+        return result
+    for field in ("code", "reasonCode", "phase"):
+        value = error.get(field)
+        if (
+            isinstance(value, str) and _SAFE_CORE_METADATA.fullmatch(value)
+            and _SECRET.sub("[REDACTED]", value) == value
+            and (field != "phase" or value in _SAFE_CORE_PHASES)
+        ):
+            result[field] = value
+    return result
 
 
 class DiagnosticStore:
@@ -486,6 +573,24 @@ class DiagnosticStore:
                         "INSERT INTO diagnostic_schema_migrations(version,applied_at) VALUES(?,?)",
                         (11, _timestamp(self.clock())),
                     )
+                if len(applied) < 12:
+                    connection.execute(
+                        "CREATE TABLE IF NOT EXISTS agent_trace_collector_status ("
+                        "organization_id TEXT NOT NULL,project_id TEXT NOT NULL,subject_id TEXT NOT NULL,"
+                        "collector_id TEXT NOT NULL,schema_version INTEGER NOT NULL,observed_at TEXT NOT NULL,"
+                        "pending_count INTEGER NOT NULL,retry_count INTEGER NOT NULL,dropped_count INTEGER NOT NULL,"
+                        "paused_count INTEGER NOT NULL,quarantined_count INTEGER NOT NULL,last_success_at TEXT,"
+                        "drop_reasons_json TEXT NOT NULL,received_at TEXT NOT NULL,expires_at TEXT NOT NULL,"
+                        "PRIMARY KEY(organization_id,project_id,subject_id,collector_id))"
+                    )
+                    connection.execute(
+                        "CREATE INDEX IF NOT EXISTS trace_collector_scope_time_idx "
+                        "ON agent_trace_collector_status(organization_id,project_id,received_at)"
+                    )
+                    connection.execute(
+                        "INSERT INTO diagnostic_schema_migrations(version,applied_at) VALUES(?,?)",
+                        (12, _timestamp(self.clock())),
+                    )
         except DiagnosticError:
             raise
         except Exception as exc:
@@ -533,7 +638,10 @@ class DiagnosticStore:
         for phase in phase_spans or []:
             if not isinstance(phase, Mapping) or set(phase) != {"name", "status", "durationMs"}:
                 raise DiagnosticError("INVALID_DIAGNOSTIC", "diagnostic phase is invalid")
-            if phase["name"] not in {"authentication", "policy", "runtime"} or phase["status"] not in {"success", "failure"}:
+            if phase["name"] not in {
+                "authentication", "policy", "preparation", "datasource",
+                "sqlValidation", "sql_validation", "runtime",
+            } or phase["status"] not in {"success", "failure"}:
                 raise DiagnosticError("INVALID_DIAGNOSTIC", "diagnostic phase is invalid")
             elapsed = phase["durationMs"]
             if isinstance(elapsed, bool) or not isinstance(elapsed, (int, float)) or not 0 <= elapsed <= 86_400_000:
@@ -865,6 +973,49 @@ class DiagnosticStore:
             ),
         }
 
+    def core_diagnostic(
+        self, trace_id: str, *, organization_id: str, project_id: str,
+    ) -> dict[str, Any]:
+        """Return a safe Core diagnostic independent of an agent trace link."""
+
+        safe_trace_id = _trace_id(trace_id, "coreTraceId")
+        connect = getattr(self.access_control, "_connect")
+        with connect() as connection:
+            row = connection.execute(
+                "SELECT id,trace_id,method,status,stage,duration_ms,phase_spans_json,"
+                "semantic_version,policy_versions_json,error_json,created_at,expires_at "
+                "FROM query_diagnostics WHERE trace_id=? AND organization_id=? AND project_id=? "
+                "AND expires_at>? ORDER BY created_at DESC,id DESC LIMIT 1",
+                (safe_trace_id, organization_id, project_id, _timestamp(self.clock())),
+            ).fetchone()
+            if row is None:
+                raise DiagnosticError(
+                    "DIAGNOSTIC_NOT_FOUND", "Core diagnostic was not found", status=404,
+                )
+            issues = connection.execute(
+                "SELECT id FROM query_feedback WHERE diagnostic_id=? AND organization_id=? "
+                "AND project_id=? ORDER BY created_at,id",
+                (row["id"], organization_id, project_id),
+            ).fetchall()
+        safe_metadata = _safe_core_metadata(row)
+        return {
+            "schemaVersion": 1,
+            "traceId": row["trace_id"],
+            "method": row["method"],
+            "status": row["status"],
+            "stage": row["stage"],
+            "durationMs": float(row["duration_ms"] or 0),
+            "phaseSpans": _safe_core_phase_spans(row["phase_spans_json"]),
+            "policyVersions": safe_metadata.get("policyVersions", []),
+            "issueIds": [issue["id"] for issue in issues],
+            "createdAt": row["created_at"],
+            "expiresAt": row["expires_at"],
+            **{
+                key: value for key, value in safe_metadata.items()
+                if key in {"code", "reasonCode", "phase", "semanticVersion"}
+            },
+        }
+
     def cleanup_expired(self) -> int:
         now = _timestamp(self.clock())
         trace_cutoff = _timestamp(self.clock() - timedelta(days=TRACE_RETENTION_DAYS))
@@ -892,6 +1043,9 @@ class DiagnosticStore:
             connection.execute(
                 "DELETE FROM agent_traces WHERE expires_at<=? OR NOT EXISTS "
                 "(SELECT 1 FROM agent_trace_events WHERE trace_id=agent_traces.id)", (now,),
+            )
+            connection.execute(
+                "DELETE FROM agent_trace_collector_status WHERE expires_at<=?", (now,),
             )
         return max(int(cursor.rowcount), 0)
 
@@ -1114,10 +1268,51 @@ class DiagnosticStore:
 
     def list_traces(
         self, *, organization_id: str, project_id: str, limit: int = 50,
-        cursor: str | None = None,
+        cursor: str | None = None, source_session_id: str | None = None,
+        subject_id: str | None = None, created_after: str | None = None,
+        created_before: str | None = None, status: str | None = None,
+        has_issues: bool | None = None,
     ) -> dict[str, Any]:
         clauses = ["organization_id=?", "project_id=?", "expires_at>?"]
         params: list[Any] = [organization_id, project_id, _timestamp(self.clock())]
+        if source_session_id is not None:
+            clauses.append("source_session_id=?")
+            params.append(_trace_id(source_session_id, "sourceSessionId"))
+        if subject_id is not None:
+            clauses.append("subject_id=?")
+            params.append(_trace_id(subject_id, "subjectId"))
+        if created_after is not None:
+            clauses.append("created_at>=?")
+            params.append(_filter_timestamp(created_after))
+        if created_before is not None:
+            clauses.append("created_at<=?")
+            params.append(_filter_timestamp(created_before))
+        if created_after is not None and created_before is not None:
+            if _filter_timestamp(created_after) > _filter_timestamp(created_before):
+                raise DiagnosticError("INVALID_FILTER", "trace time filter is invalid")
+        if status is not None:
+            if status not in _TRACE_STATUSES:
+                raise DiagnosticError("INVALID_FILTER", "trace status filter is invalid")
+            clauses.append(
+                "EXISTS (SELECT 1 FROM agent_trace_spans s WHERE s.trace_id=agent_traces.id "
+                "AND s.kind='turn' AND s.status=?)"
+            )
+            params.append(status)
+        if has_issues is not None:
+            if type(has_issues) is not bool:
+                raise DiagnosticError("INVALID_FILTER", "trace issue filter is invalid")
+            issue_exists = (
+                "EXISTS (SELECT 1 FROM agent_trace_core_links l "
+                "JOIN agent_trace_core_claims c ON c.core_trace_id=l.core_trace_id "
+                "AND c.trace_id=l.trace_id AND c.status='verified' "
+                "JOIN query_diagnostics d ON d.trace_id=c.core_trace_id "
+                "AND d.organization_id=agent_traces.organization_id "
+                "AND d.project_id=agent_traces.project_id AND d.subject_id=agent_traces.subject_id "
+                "JOIN query_feedback f ON f.diagnostic_id=d.id "
+                "AND f.organization_id=agent_traces.organization_id "
+                "AND f.project_id=agent_traces.project_id WHERE l.trace_id=agent_traces.id)"
+            )
+            clauses.append(issue_exists if has_issues else f"NOT {issue_exists}")
         connect = getattr(self.access_control, "_connect")
         with connect() as connection:
             if cursor is not None:
@@ -1136,6 +1331,107 @@ class DiagnosticStore:
             ).fetchall()
             items = [self._trace_public(connection, row, include_events=False) for row in rows[:limit]]
         return {"items": items, "nextCursor": items[-1]["id"] if len(rows) > limit else None}
+
+    def record_collector_status(
+        self, *, auth: AuthContext, project_id: str, payload: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Retain the latest safe collector heartbeat for this authenticated subject."""
+
+        collector_id = payload.get("collectorId")
+        if (
+            not isinstance(collector_id, str) or not _COLLECTOR_ID.fullmatch(collector_id)
+            or _SECRET.sub("[REDACTED]", collector_id) != collector_id
+        ):
+            raise DiagnosticError("INVALID_COLLECTOR_STATUS", "collector ID is invalid")
+        observed_at = _collector_timestamp(payload.get("observedAt"), "observedAt")
+        last_success = payload.get("lastSuccessAt")
+        last_success_at = (
+            _collector_timestamp(last_success, "lastSuccessAt") if last_success is not None else None
+        )
+        counters: dict[str, int] = {}
+        for field in ("pendingCount", "retryCount", "droppedCount", "pausedCount", "quarantinedCount"):
+            value = payload.get(field)
+            if type(value) is not int or not 0 <= value <= 1_000_000_000:
+                raise DiagnosticError("INVALID_COLLECTOR_STATUS", "collector counters are invalid")
+            counters[field] = value
+        reasons = payload.get("dropReasons")
+        if not isinstance(reasons, Mapping) or set(reasons) != set(_COLLECTOR_DROP_REASONS):
+            raise DiagnosticError("INVALID_COLLECTOR_STATUS", "collector drop reasons are invalid")
+        safe_reasons: dict[str, int] = {}
+        for field in _COLLECTOR_DROP_REASONS:
+            value = reasons[field]
+            if type(value) is not int or not 0 <= value <= 1_000_000_000:
+                raise DiagnosticError("INVALID_COLLECTOR_STATUS", "collector drop reasons are invalid")
+            safe_reasons[field] = value
+
+        now = self.clock().astimezone(UTC)
+        received_at = _timestamp(now)
+        expires_at = _timestamp(now + timedelta(days=TRACE_RETENTION_DAYS))
+        organization_id, subject_id = auth.subject.organization_id, auth.subject.id
+        connect = getattr(self.access_control, "_connect")
+        try:
+            with connect() as connection:
+                connection.execute(
+                    "INSERT INTO agent_trace_collector_status(organization_id,project_id,subject_id,collector_id,"
+                    "schema_version,observed_at,pending_count,retry_count,dropped_count,paused_count,"
+                    "quarantined_count,last_success_at,drop_reasons_json,received_at,expires_at) "
+                    "VALUES(?,?,?,?,1,?,?,?,?,?,?,?,?,?,?) "
+                    "ON CONFLICT(organization_id,project_id,subject_id,collector_id) DO UPDATE SET "
+                    "schema_version=1,observed_at=excluded.observed_at,pending_count=excluded.pending_count,"
+                    "retry_count=excluded.retry_count,dropped_count=excluded.dropped_count,"
+                    "paused_count=excluded.paused_count,quarantined_count=excluded.quarantined_count,"
+                    "last_success_at=excluded.last_success_at,drop_reasons_json=excluded.drop_reasons_json,"
+                    "received_at=excluded.received_at,expires_at=excluded.expires_at",
+                    (
+                        organization_id, project_id, subject_id, collector_id,
+                        observed_at, counters["pendingCount"], counters["retryCount"],
+                        counters["droppedCount"], counters["pausedCount"], counters["quarantinedCount"],
+                        last_success_at, _json(safe_reasons, limit=1_024), received_at, expires_at,
+                    ),
+                )
+        except DiagnosticError:
+            raise
+        except Exception as exc:
+            raise DiagnosticError(
+                "DIAGNOSTIC_STORE_UNAVAILABLE", "collector status could not be saved", status=503,
+            ) from exc
+        return {
+            "schemaVersion": 1, "collectorId": collector_id,
+            "subjectId": subject_id, "receivedAt": received_at,
+        }
+
+    def list_collector_statuses(self, *, organization_id: str, project_id: str) -> dict[str, Any]:
+        now = self.clock().astimezone(UTC)
+        connect = getattr(self.access_control, "_connect")
+        with connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM agent_trace_collector_status WHERE organization_id=? AND project_id=? "
+                "AND expires_at>? ORDER BY collector_id,subject_id",
+                (organization_id, project_id, _timestamp(now)),
+            ).fetchall()
+        items = []
+        for row in rows:
+            try:
+                drop_reasons = json.loads(row["drop_reasons_json"])
+            except (TypeError, ValueError):
+                drop_reasons = {key: 0 for key in _COLLECTOR_DROP_REASONS}
+            observed = _trace_time(row["observed_at"])
+            items.append({
+                "schemaVersion": int(row["schema_version"]),
+                "collectorId": row["collector_id"],
+                "observedAt": row["observed_at"],
+                "pendingCount": int(row["pending_count"]),
+                "retryCount": int(row["retry_count"]),
+                "droppedCount": int(row["dropped_count"]),
+                "pausedCount": int(row["paused_count"]),
+                "quarantinedCount": int(row["quarantined_count"]),
+                "lastSuccessAt": row["last_success_at"],
+                "dropReasons": drop_reasons,
+                "subjectId": row["subject_id"],
+                "receivedAt": row["received_at"],
+                "stale": now - observed > timedelta(minutes=5),
+            })
+        return {"schemaVersion": 1, "items": items}
 
     def trace_detail(self, trace_id: str, *, organization_id: str, project_id: str) -> dict[str, Any]:
         connect = getattr(self.access_control, "_connect")
@@ -1197,7 +1493,8 @@ class DiagnosticStore:
             if claim is None or claim["status"] != "verified" or claim["trace_id"] != row["id"]:
                 continue
             diagnostic = connection.execute(
-                "SELECT id,method,status,stage,duration_ms,phase_spans_json FROM query_diagnostics WHERE trace_id=? AND organization_id=? "
+                "SELECT id,method,status,stage,duration_ms,phase_spans_json,semantic_version,"
+                "policy_versions_json,error_json FROM query_diagnostics WHERE trace_id=? AND organization_id=? "
                 "AND project_id=? AND subject_id=?",
                 (core_id, row["organization_id"], row["project_id"], row["subject_id"]),
             ).fetchone()
@@ -1214,8 +1511,9 @@ class DiagnosticStore:
             core_diagnostics.append({
                 "traceId": core_id, "method": diagnostic["method"], "status": diagnostic["status"],
                 "stage": diagnostic["stage"], "durationMs": float(diagnostic["duration_ms"] or 0),
-                "phaseSpans": json.loads(diagnostic["phase_spans_json"] or "[]"),
+                "phaseSpans": _safe_core_phase_spans(diagnostic["phase_spans_json"]),
                 "issueIds": diagnostic_issues,
+                **_safe_core_metadata(diagnostic),
             })
         safe_events = [
             {key: value for key, value in event.items() if key != "coreTraceId" or value in verified}

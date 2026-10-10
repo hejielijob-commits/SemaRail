@@ -876,15 +876,19 @@ class RuntimeRpcGateway:
                     phase="authorization",
                 )
             try:
-                artifact_reservation = self.artifacts.reserve(
-                    subject_id=auth.subject.id,
-                    organization_id=auth.subject.organization_id,
-                    credential_id=auth.credential_id,
-                    query_id=str(normalized["queryId"]),
-                    datasource_id=datasource_id,
-                    policy_versions=artifact_versions,
-                )
-                normalized["artifactRequest"] = self.artifacts.request_for_sidecar(artifact_reservation)
+                # Regression is trusted in-process context, never a public
+                # request parameter. Evaluate its bounded preview in memory;
+                # do not retain a full-result CSV as a side effect of testing.
+                if transport != "regression":
+                    artifact_reservation = self.artifacts.reserve(
+                        subject_id=auth.subject.id,
+                        organization_id=auth.subject.organization_id,
+                        credential_id=auth.credential_id,
+                        query_id=str(normalized["queryId"]),
+                        datasource_id=datasource_id,
+                        policy_versions=artifact_versions,
+                    )
+                    normalized["artifactRequest"] = self.artifacts.request_for_sidecar(artifact_reservation)
             except ArtifactError:
                 self._audit(
                     auth,

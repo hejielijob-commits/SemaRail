@@ -214,6 +214,70 @@ describe("ApiClient", () => {
     expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "POST", body: expect.stringContaining("opaque-query-id") });
     expect(String(fetchMock.mock.calls[1]?.[0])).not.toContain("Wrong metric");
   });
+
+  it("uses the versioned Trace filters, diagnosis, collector, and comparison routes", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ items: [], nextCursor: null }))
+      .mockResolvedValueOnce(jsonResponse({ schemaVersion: 1, traceId: "trace/a", rulesVersion: "trace-diagnosis-v1", status: "incomplete", findings: [] }))
+      .mockResolvedValueOnce(jsonResponse({ schemaVersion: 1, items: [] }))
+      .mockResolvedValueOnce(jsonResponse({ schemaVersion: 1, left: {}, right: {}, aligned: [], leftOnly: [], rightOnly: [], versionChanges: {} }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient();
+
+    await client.listTraces({
+      limit: 20,
+      createdAfter: "2026-10-01T00:00:00.000Z",
+      createdBefore: "2026-10-02T00:00:00.000Z",
+      sourceSessionId: "session/a",
+      subjectId: "subject-1",
+      status: "failure",
+      hasIssues: false,
+    });
+    await client.getTraceDiagnosis("trace/a");
+    await client.getTraceCollectorStatus();
+    await client.compareTraces("trace/a", "trace b");
+
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      "/api/v1/traces?limit=20&createdAfter=2026-10-01T00%3A00%3A00.000Z&createdBefore=2026-10-02T00%3A00%3A00.000Z&sourceSessionId=session%2Fa&subjectId=subject-1&status=failure&hasIssues=false",
+      "/api/v1/traces/trace%2Fa/diagnosis",
+      "/api/v1/traces/collector-status",
+      "/api/v1/traces/compare?leftTraceId=trace%2Fa&rightTraceId=trace+b",
+    ]);
+  });
+
+  it("uses versioned dataset, regression case, run, and Core diagnostic routes", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({}));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient();
+    const testCase = {
+      schemaVersion: 2 as const, kind: "deterministic_sql" as const, question: "Count active users", semanticSql: "SELECT count(*) FROM users",
+      conditions: {}, confirmedConditions: [], testDatasetId: "dataset/a", assertions: { status: "success" as const, rowCount: 1 },
+    };
+
+    await client.listTestDatasets();
+    await client.createTestDataset({ id: "dataset/a", version: "v1", datasourceId: "warehouse" });
+    await client.createRegressionCaseV2({ feedbackId: "feedback-1", sourceTraceId: "atr_1", case: testCase, enable: false });
+    await client.updateRegressionCase("case/a", { expectedRevision: 2, case: testCase, enable: true });
+    await client.exportRegressionCasesV2();
+    await client.createRegressionRun(["case/a"]);
+    await client.cancelRegressionRun("run/a");
+    await client.getCoreDiagnostic("trace_core_1");
+
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      "/api/v1/diagnostics/test-datasets",
+      "/api/v1/diagnostics/test-datasets",
+      "/api/v1/diagnostics/regression-cases",
+      "/api/v1/diagnostics/regression-cases/case%2Fa",
+      "/api/v1/diagnostics/regression-cases/export?schemaVersion=2",
+      "/api/v1/diagnostics/regression-runs",
+      "/api/v1/diagnostics/regression-runs/run%2Fa/cancel",
+      "/api/v1/diagnostics/core/trace_core_1",
+    ]);
+    expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: "POST", body: JSON.stringify({ feedbackId: "feedback-1", sourceTraceId: "atr_1", case: testCase, enable: false }) });
+    expect(fetchMock.mock.calls[3]?.[1]).toMatchObject({ method: "PUT", body: JSON.stringify({ expectedRevision: 2, case: testCase, enable: true }) });
+    expect(fetchMock.mock.calls[5]?.[1]).toMatchObject({ method: "POST", body: JSON.stringify({ caseIds: ["case/a"] }) });
+    expect(fetchMock.mock.calls[6]?.[1]).toMatchObject({ method: "POST", body: "{}" });
+  });
 });
 
 function jsonResponse(body: unknown, status = 200) {

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "left": {
+    "traceId": "atr_fixture_left",
+    "status": "failure",
+    "model": "gpt-6-luna",
+    "semanticVersion": "semantic-12",
+    "policyVersions": ["policy-3"]
+  },
+  "right": {
+    "traceId": "atr_fixture_right",
+    "status": "success",
+    "model": "gpt-6-luna",
+    "semanticVersion": "semantic-13",
+    "policyVersions": ["policy-3", "policy-4"]
+  },
+  "aligned": [
+    {
+      "key": "tool:mcp__semarail__query:1",
+      "kind": "tool",
+      "toolName": "mcp__semarail__query",
+      "agentPath": ["planner", "query-agent"],
+      "left": { "id": "call-failed", "status": "failure", "durationMs": 18.0 },
+      "right": { "id": "call-success", "status": "success", "durationMs": 12.0 },
+      "stateChanged": true,
+      "durationDeltaMs": -6.0,
+      "phaseDurations": [
+        { "name": "authentication", "leftMs": 1.0, "rightMs": 1.0, "deltaMs": 0.0 },
+        { "name": "runtime", "leftMs": 12.0, "rightMs": 6.0, "deltaMs": -6.0 }
+      ]
+    }
+  ],
+  "leftOnly": [
+    { "key": "tool:mcp__semarail__query:2", "kind": "tool", "toolName": "mcp__semarail__query", "agentPath": ["planner", "query-agent"], "id": "call-retry", "status": "cancelled", "durationMs": null }
+  ],
+  "rightOnly": [
+    { "key": "agent:repair-agent:1", "kind": "agent", "toolName": null, "agentPath": ["repair-agent"], "id": "agent-repair", "status": "success", "durationMs": 31.0 }
+  ],
+  "versionChanges": { "model": false, "semanticVersion": true, "policyVersions": true }
+}

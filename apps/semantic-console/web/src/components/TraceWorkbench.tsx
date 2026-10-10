@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowClockwise, ArrowRight, ClockCounterClockwise, GitBranch, LinkSimple, MagnifyingGlass, Wrench } from "@phosphor-icons/react";
 import { api } from "../api/client";
-import type { AgentTraceDetail, AgentTraceEvent, AgentTraceSummary, TraceTokenUsage } from "../types";
-import { Badge, Button, EmptyState, InlineNotice, LoadingRows, SectionHeading } from "./ui";
+import type { AgentTraceDetail, AgentTraceEvent, AgentTraceSummary, TraceCollectorHealthItem, TraceDiagnosis, TraceTokenUsage } from "../types";
+import { Badge, Button, EmptyState, Field, InlineNotice, LoadingRows, SectionHeading, Select, TextInput } from "./ui";
 import "./trace-workbench.css";
 
 type Locale = "en-US" | "zh-CN";
@@ -14,12 +14,18 @@ const labels = {
     locked: "Console administrator authentication required", lockedBody: "Unlock the Console with a project-scoped administrator credential to inspect traces.",
     refresh: "Refresh", loadMore: "Load more", empty: "No traces yet", emptyBody: "Durable agent traces will appear here after an integration records events.",
     details: "Trace details", select: "Select a trace to inspect its event timeline.", requestFailed: "Trace request failed", session: "Session", turn: "Turn", agent: "Agent", subagent: "Subagent", unknownOwner: "Unknown owner", tool: "Tool", core: "Core trace", stage: "Stage", unknown: "Unknown", notCollected: "Not collected", incomplete: "Incomplete", running: "Running", success: "Succeeded", failure: "Failed", cancelled: "Cancelled", completedUnknown: "Completed · outcome unknown", status: "Status", source: "Source", started: "Started", ended: "Ended", duration: "Observed turn duration", observedDuration: "Observed duration", llmDuration: "LLM duration", parallelActivity: "Parallel activity from recorded timestamps", overlap: "overlap", model: "Model", tokens: "Tokens", events: "Events", issues: "Related issues", noIssues: "No linked issues", noEvents: "No events were returned for this trace.", evidence: "Core evidence", event: "Event", toolOwnerUnknown: "Tool ownership was not recorded.", parentUnavailable: "Parent agent event is unavailable.", ownerUnknown: "Ownership unavailable", parentToolUnavailable: "Parent tool event is unavailable.", input: "Input", output: "Output", total: "Total", openIssue: "Open issue", traceId: "Trace", search: "Search traces",
+    filters: "Trace filters", after: "From", before: "To", sessionFilter: "Session ID", subjectFilter: "Subject ID", issueFilter: "Issues", anyIssues: "Any", withIssues: "With issues", withoutIssues: "Without issues", apply: "Apply filters", clear: "Clear", statusAny: "Any status",
+    collector: "Collector health", collectorEmpty: "No collector health reports", observed: "Observed", received: "Received", pending: "Pending", retries: "Retries", dropped: "Dropped", paused: "Paused", quarantined: "Quarantined", lastSuccess: "Last success", dropReasons: "Drop reason counts", stale: "Stale report", current: "Current report",
+    diagnosis: "Diagnosis from current evidence", diagnosisHealthy: "No issue found", diagnosisIssues: "Issues found", diagnosisIncomplete: "Evidence incomplete", rulesVersion: "Rules version", findings: "Findings", noFindings: "No findings for this trace.", category: "Category", phase: "Phase", evidenceIds: "Evidence IDs", rationale: "Why this was flagged", suggestedAction: "Suggested action", code: "Code", reasonCode: "Reason code", semanticVersion: "Semantic version", policyVersions: "Policy versions", diagnosisFailed: "Diagnosis could not be loaded.", coreContext: "Current Core evidence",
   },
   "zh-CN": {
     eyebrow: "质量闭环", title: "Agent 追踪", description: "根据持久化事件流重建会话与工具活动。",
     locked: "需要 Console 管理员认证", lockedBody: "请使用当前项目范围内的管理员凭证解锁 Console 后查看追踪记录。",
     refresh: "刷新", loadMore: "加载更多", empty: "暂无追踪记录", emptyBody: "集成开始记录持久化事件后，Agent 追踪会显示在此处。",
     details: "追踪详情", select: "选择一条追踪记录以查看事件时间线。", requestFailed: "追踪请求失败", session: "会话", turn: "轮次", agent: "Agent", subagent: "子 Agent", unknownOwner: "归属未知", tool: "工具", core: "Core 追踪", stage: "阶段", unknown: "未知", notCollected: "未采集", incomplete: "未完成", running: "运行中", success: "成功", failure: "失败", cancelled: "已取消", completedUnknown: "已完成 · 结果未知", status: "状态", source: "来源", started: "开始时间", ended: "结束时间", duration: "观测到的轮次耗时", observedDuration: "观测耗时", llmDuration: "LLM 耗时", parallelActivity: "根据已记录时间戳显示并行活动", overlap: "重叠", model: "模型", tokens: "Token 用量", events: "事件", issues: "关联问题", noIssues: "没有关联问题", noEvents: "此追踪记录没有返回事件。", evidence: "Core 证据", event: "事件", toolOwnerUnknown: "未记录工具归属。", parentUnavailable: "父 Agent 事件不可用。", ownerUnknown: "归属不可用", parentToolUnavailable: "父工具事件不可用。", input: "输入", output: "输出", total: "总计", openIssue: "打开问题", traceId: "追踪", search: "搜索追踪记录",
+    filters: "追踪筛选", after: "开始时间", before: "结束时间", sessionFilter: "会话 ID", subjectFilter: "主体 ID", issueFilter: "关联问题", anyIssues: "全部", withIssues: "有问题", withoutIssues: "无问题", apply: "应用筛选", clear: "清空", statusAny: "全部状态",
+    collector: "采集器健康状态", collectorEmpty: "没有采集器健康报告", observed: "观测时间", received: "接收时间", pending: "待处理", retries: "重试", dropped: "丢弃计数", paused: "暂停", quarantined: "隔离", lastSuccess: "上次成功", dropReasons: "丢弃原因计数", stale: "报告已过期", current: "当前报告",
+    diagnosis: "基于当前证据的诊断", diagnosisHealthy: "未发现问题", diagnosisIssues: "发现问题", diagnosisIncomplete: "证据不完整", rulesVersion: "规则版本", findings: "诊断结果", noFindings: "此追踪记录没有诊断结果。", category: "类别", phase: "阶段", evidenceIds: "证据 ID", rationale: "判断依据", suggestedAction: "建议操作", code: "代码", reasonCode: "原因代码", semanticVersion: "语义版本", policyVersions: "策略版本", diagnosisFailed: "无法加载诊断结果。", coreContext: "当前 Core 证据",
   },
 } as const;
 
@@ -248,92 +254,184 @@ function clockTime(value: number, locale: Locale) {
   return new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit", second: "2-digit" }).format(value);
 }
 
-export default function TraceWorkbench({ locale, adminToken, focusCoreTraceId, onOpenIssue }: { locale: Locale; adminToken: string; focusCoreTraceId?: string; onOpenIssue: (id: string) => void }) {
+interface TraceFilters {
+  createdAfter: string;
+  createdBefore: string;
+  sourceSessionId: string;
+  subjectId: string;
+  status: AgentTraceSummary["status"] | "";
+  hasIssues: "" | "true" | "false";
+}
+
+const emptyTraceFilters: TraceFilters = { createdAfter: "", createdBefore: "", sourceSessionId: "", subjectId: "", status: "", hasIssues: "" };
+
+function toIso(value: string) {
+  if (!value) return "";
+  const milliseconds = Date.parse(value);
+  return Number.isFinite(milliseconds) ? new Date(milliseconds).toISOString() : "";
+}
+
+function diagnosisStatusLabel(diagnosis: TraceDiagnosis, locale: Locale) {
+  const c = labels[locale];
+  return diagnosis.status === "healthy" ? c.diagnosisHealthy : diagnosis.status === "issues" ? c.diagnosisIssues : c.diagnosisIncomplete;
+}
+
+function diagnosisStatusTone(diagnosis: TraceDiagnosis): "green" | "red" | "amber" {
+  return diagnosis.status === "healthy" ? "green" : diagnosis.status === "issues" ? "red" : "amber";
+}
+
+export default function TraceWorkbench({ locale, adminToken, focusCoreTraceId, focusTraceId, onOpenIssue }: { locale: Locale; adminToken: string; focusCoreTraceId?: string; focusTraceId?: string; onOpenIssue: (id: string) => void }) {
   const c = labels[locale];
   const [items, setItems] = useState<AgentTraceSummary[]>([]);
   const [detail, setDetail] = useState<AgentTraceDetail | null>(null);
+  const [diagnosis, setDiagnosis] = useState<TraceDiagnosis | null>(null);
+  const [diagnosisError, setDiagnosisError] = useState("");
+  const [collectorItems, setCollectorItems] = useState<TraceCollectorHealthItem[]>([]);
+  const [collectorError, setCollectorError] = useState("");
+  const [collectorLoading, setCollectorLoading] = useState(false);
   const [selectedId, setSelectedId] = useState("");
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [listLoaded, setListLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<TraceFilters>(emptyTraceFilters);
   const detailRequestRef = useRef(0);
+  const selectedIdRef = useRef("");
 
-  const loadTraces = useCallback(async (cursor?: string, append = false) => {
+  const loadTraces = useCallback(async (cursor?: string, append = false, activeFilters: TraceFilters = emptyTraceFilters) => {
     if (!adminToken) return;
     setLoading(true);
     setError("");
     try {
-      const response = await api.listTraces({ limit: 50, cursor });
+      const response = await api.listTraces({
+        limit: 50,
+        cursor,
+        createdAfter: toIso(activeFilters.createdAfter),
+        createdBefore: toIso(activeFilters.createdBefore),
+        sourceSessionId: activeFilters.sourceSessionId.trim(),
+        subjectId: activeFilters.subjectId.trim(),
+        status: activeFilters.status,
+        hasIssues: activeFilters.hasIssues === "" ? undefined : activeFilters.hasIssues === "true",
+      });
       setItems((current) => append ? [...current, ...response.items.filter((trace) => !current.some((item) => item.id === trace.id))] : response.items);
       setNextCursor(response.nextCursor ?? null);
+      if (!append && selectedIdRef.current && !response.items.some((trace) => trace.id === selectedIdRef.current)) {
+        detailRequestRef.current += 1;
+        selectedIdRef.current = "";
+        setSelectedId("");
+        setDetail(null);
+        setDiagnosis(null);
+        setDiagnosisError("");
+        setDetailLoading(false);
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : c.requestFailed);
     } finally {
+      setListLoaded(true);
       setLoading(false);
+    }
+  }, [adminToken, c.requestFailed]);
+
+  const loadCollectorStatus = useCallback(async () => {
+    if (!adminToken) return;
+    setCollectorLoading(true);
+    setCollectorError("");
+    try {
+      const response = await api.getTraceCollectorStatus();
+      setCollectorItems(response.items);
+    } catch (cause) {
+      setCollectorError(cause instanceof Error ? cause.message : c.requestFailed);
+    } finally {
+      setCollectorLoading(false);
     }
   }, [adminToken, c.requestFailed]);
 
   const openTrace = useCallback(async (id: string) => {
     if (!adminToken || !id) return;
     const requestId = ++detailRequestRef.current;
+    selectedIdRef.current = id;
     setSelectedId(id);
+    setDetail(null);
+    setDiagnosis(null);
+    setDiagnosisError("");
     setDetailLoading(true);
     setError("");
-    try {
-      const resolved = await api.getTrace(id);
-      if (detailRequestRef.current === requestId) setDetail(resolved);
-    } catch (cause) {
-      if (detailRequestRef.current === requestId) {
-        setDetail(null);
-        setError(cause instanceof Error ? cause.message : c.requestFailed);
-      }
-    } finally {
-      if (detailRequestRef.current === requestId) setDetailLoading(false);
+    const [traceResult, diagnosisResult] = await Promise.allSettled([api.getTrace(id), api.getTraceDiagnosis(id)]);
+    if (detailRequestRef.current !== requestId) return;
+    if (traceResult.status === "fulfilled") setDetail(traceResult.value);
+    else {
+      setDetail(null);
+      setError(traceResult.reason instanceof Error ? traceResult.reason.message : c.requestFailed);
     }
-  }, [adminToken, c.requestFailed]);
+    if (diagnosisResult.status === "fulfilled") setDiagnosis(diagnosisResult.value);
+    else setDiagnosisError(diagnosisResult.reason instanceof Error ? diagnosisResult.reason.message : c.diagnosisFailed);
+    setDetailLoading(false);
+  }, [adminToken, c.diagnosisFailed, c.requestFailed]);
 
-  useEffect(() => { void loadTraces(); }, [loadTraces]);
   useEffect(() => {
-    if (!focusCoreTraceId || !adminToken) {
-      setDetailLoading(false);
-      return;
-    }
+    void loadTraces(undefined, false, emptyTraceFilters);
+    void loadCollectorStatus();
+  }, [loadCollectorStatus, loadTraces]);
+  useEffect(() => {
+    if (!focusCoreTraceId || !adminToken || !listLoaded) return;
+    let active = true;
     const requestId = ++detailRequestRef.current;
     setDetailLoading(true);
     void api.getTraceByCore(focusCoreTraceId).then((resolved) => {
-      if (detailRequestRef.current === requestId) {
-        setSelectedId(resolved.id);
-        setDetail(resolved);
-        setError("");
-      }
+      if (!active || detailRequestRef.current !== requestId) return;
+      selectedIdRef.current = resolved.id;
+      setSelectedId(resolved.id);
+      setDetail(resolved);
+      setError("");
+      setDiagnosis(null);
+      setDiagnosisError("");
+      setDetailLoading(false);
+      void api.getTraceDiagnosis(resolved.id).then((value) => {
+        if (active && detailRequestRef.current === requestId) setDiagnosis(value);
+      }).catch((cause: unknown) => {
+        if (active && detailRequestRef.current === requestId) setDiagnosisError(cause instanceof Error ? cause.message : c.diagnosisFailed);
+      });
     }).catch((cause: unknown) => {
-      if (detailRequestRef.current === requestId) {
+      if (active && detailRequestRef.current === requestId) {
         setDetail(null);
         setError(cause instanceof Error ? cause.message : c.requestFailed);
+        setDetailLoading(false);
       }
-    }).finally(() => {
-      if (detailRequestRef.current === requestId) setDetailLoading(false);
     });
-    return () => {
-      if (detailRequestRef.current === requestId) detailRequestRef.current += 1;
-    };
-  }, [focusCoreTraceId, adminToken, c.requestFailed]);
-
+    return () => { active = false; if (detailRequestRef.current === requestId) detailRequestRef.current += 1; };
+  }, [focusCoreTraceId, adminToken, listLoaded, c.diagnosisFailed, c.requestFailed]);
+  useEffect(() => {
+    if (!focusTraceId || !adminToken || !listLoaded) return;
+    void openTrace(focusTraceId);
+  }, [focusTraceId, adminToken, listLoaded, openTrace]);
   useEffect(() => () => { detailRequestRef.current += 1; }, []);
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return items;
-    return items.filter((trace) => [trace.id, trace.source, trace.sourceSessionId, trace.sourceTurnId, trace.model ?? ""].some((value) => value.toLowerCase().includes(query)));
+    return items.filter((trace) => [trace.id, trace.source, trace.sourceSessionId, trace.sourceTurnId, trace.subjectId, trace.model ?? ""].some((value) => value.toLowerCase().includes(query)));
   }, [items, search]);
 
   if (!adminToken) return <div className="page trace-page"><SectionHeading eyebrow={c.eyebrow} title={c.title} description={c.description} /><InlineNotice tone="warning" title={c.locked}>{c.lockedBody}</InlineNotice></div>;
 
   return <div className="page trace-page">
-    <SectionHeading eyebrow={c.eyebrow} title={c.title} description={c.description} action={<Button variant="secondary" icon={ArrowClockwise} loading={loading} onClick={() => void loadTraces()}>{c.refresh}</Button>} />
+    <SectionHeading eyebrow={c.eyebrow} title={c.title} description={c.description} action={<Button variant="secondary" icon={ArrowClockwise} loading={loading || collectorLoading} onClick={() => { void loadTraces(undefined, false, filters); void loadCollectorStatus(); if (selectedId) void openTrace(selectedId); }}>{c.refresh}</Button>} />
     {error ? <InlineNotice tone="error" title={c.requestFailed}>{error}</InlineNotice> : null}
+    <section className="panel trace-filters" aria-label={c.filters}>
+      <header><strong>{c.filters}</strong></header>
+      <div className="trace-filter-grid">
+        <Field label={c.after} htmlFor="trace-created-after"><TextInput id="trace-created-after" type="datetime-local" value={filters.createdAfter} onChange={(event) => setFilters({ ...filters, createdAfter: event.target.value })} /></Field>
+        <Field label={c.before} htmlFor="trace-created-before"><TextInput id="trace-created-before" type="datetime-local" value={filters.createdBefore} onChange={(event) => setFilters({ ...filters, createdBefore: event.target.value })} /></Field>
+        <Field label={c.sessionFilter} htmlFor="trace-source-session"><TextInput id="trace-source-session" value={filters.sourceSessionId} onChange={(event) => setFilters({ ...filters, sourceSessionId: event.target.value })} /></Field>
+        <Field label={c.subjectFilter} htmlFor="trace-subject"><TextInput id="trace-subject" value={filters.subjectId} onChange={(event) => setFilters({ ...filters, subjectId: event.target.value })} /></Field>
+        <Field label={c.status} htmlFor="trace-status"><Select id="trace-status" value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value as TraceFilters["status"] })}><option value="">{c.statusAny}</option>{(["running", "success", "failure", "cancelled"] as const).map((status) => <option key={status} value={status}>{stateLabel(status, locale)}</option>)}</Select></Field>
+        <Field label={c.issueFilter} htmlFor="trace-has-issues"><Select id="trace-has-issues" value={filters.hasIssues} onChange={(event) => setFilters({ ...filters, hasIssues: event.target.value as TraceFilters["hasIssues"] })}><option value="">{c.anyIssues}</option><option value="true">{c.withIssues}</option><option value="false">{c.withoutIssues}</option></Select></Field>
+      </div>
+      <footer><Button size="sm" variant="ghost" onClick={() => { setFilters(emptyTraceFilters); void loadTraces(undefined, false, emptyTraceFilters); }}>{c.clear}</Button><Button size="sm" variant="primary" icon={MagnifyingGlass} onClick={() => void loadTraces(undefined, false, filters)} loading={loading}>{c.apply}</Button></footer>
+    </section>
+    <CollectorHealth items={collectorItems} loading={collectorLoading} error={collectorError} locale={locale} />
     <div className="trace-layout">
       <section className="panel trace-list" aria-label={c.title}>
         <label className="trace-search"><MagnifyingGlass size={16} /><input aria-label={c.search} placeholder={c.search} value={search} onChange={(event) => setSearch(event.target.value)} /></label>
@@ -343,16 +441,60 @@ export default function TraceWorkbench({ locale, adminToken, focusCoreTraceId, o
           <code>{trace.id}</code>
           <span className="trace-list-meta"><span>{trace.model ?? c.unknown}</span><span>{tokenUsageLabel(trace.tokenUsage, locale)}</span><span>{trace.issueCount} {c.issues.toLowerCase()}</span></span>
         </button>)}</div> : <EmptyState icon={GitBranch} title={c.empty} body={c.emptyBody} />}
-        {nextCursor ? <footer className="trace-list-footer"><Button size="sm" variant="ghost" loading={loading} onClick={() => void loadTraces(nextCursor, true)}>{c.loadMore}</Button></footer> : null}
+        {nextCursor ? <footer className="trace-list-footer"><Button size="sm" variant="ghost" loading={loading} onClick={() => void loadTraces(nextCursor, true, filters)}>{c.loadMore}</Button></footer> : null}
       </section>
       <section className="panel trace-detail" aria-label={c.details}>
-        {detailLoading ? <LoadingRows count={7} /> : detail ? <TraceDetail detail={detail} locale={locale} onOpenIssue={onOpenIssue} /> : <EmptyState icon={ClockCounterClockwise} title={c.details} body={c.select} />}
+        {detailLoading ? <LoadingRows count={7} /> : detail ? <TraceDetail detail={detail} diagnosis={diagnosis} diagnosisError={diagnosisError} locale={locale} onOpenIssue={onOpenIssue} /> : <EmptyState icon={ClockCounterClockwise} title={c.details} body={c.select} />}
       </section>
     </div>
   </div>;
 }
 
-function TraceDetail({ detail, locale, onOpenIssue }: { detail: AgentTraceDetail; locale: Locale; onOpenIssue: (id: string) => void }) {
+function CollectorHealth({ items, loading, error, locale }: { items: TraceCollectorHealthItem[]; loading: boolean; error: string; locale: Locale }) {
+  const c = labels[locale];
+  return <section className="panel trace-collector-health" aria-label={c.collector}>
+    <header><div><p className="panel-kicker">{c.collector}</p><h2>{c.collector}</h2></div>{loading ? <span className="trace-collector-updating">{locale === "zh-CN" ? "更新中…" : "Updating…"}</span> : null}</header>
+    {error ? <InlineNotice tone="error" title={c.requestFailed}>{error}</InlineNotice> : null}
+    {loading && !items.length ? <LoadingRows count={2} /> : items.length ? <div className="trace-collector-grid">{items.map((item) => <article className="trace-collector-card" key={`${item.collectorId}:${item.observedAt}`}>
+      <div className="trace-collector-title"><strong>{item.collectorId}</strong><Badge tone={item.stale ? "amber" : "green"} dot>{item.stale ? c.stale : c.current}</Badge></div>
+      <dl>
+        <Meta label={c.observed} value={formatTime(item.observedAt, locale)} />
+        <Meta label={c.received} value={formatTime(item.receivedAt, locale)} />
+        <Meta label={c.pending} value={String(item.pendingCount)} />
+        <Meta label={c.retries} value={String(item.retryCount)} />
+        <Meta label={c.dropped} value={String(item.droppedCount)} />
+        <Meta label={c.paused} value={String(item.pausedCount)} />
+        <Meta label={c.quarantined} value={String(item.quarantinedCount)} />
+        <Meta label={c.lastSuccess} value={formatTime(item.lastSuccessAt, locale)} />
+      </dl>
+      <div className="trace-drop-reasons"><strong>{c.dropReasons}</strong>{Object.entries(item.dropReasons).map(([reason, count]) => <span key={reason}><code>{reason}</code><b>{count}</b></span>)}</div>
+    </article>)}</div> : !error ? <p className="trace-collector-empty">{c.collectorEmpty}</p> : null}
+  </section>;
+}
+
+function TraceDiagnosisPanel({ detail, diagnosis, error, locale }: { detail: AgentTraceDetail; diagnosis: TraceDiagnosis | null; error: string; locale: Locale }) {
+  const c = labels[locale];
+  return <section className="trace-current-evidence" aria-label={c.diagnosis}>
+    <header><div><p className="panel-kicker">{c.coreContext}</p><h3>{c.diagnosis}</h3></div>{diagnosis ? <Badge tone={diagnosisStatusTone(diagnosis)} dot>{diagnosisStatusLabel(diagnosis, locale)}</Badge> : null}</header>
+    {error ? <InlineNotice tone="warning" title={c.diagnosisFailed}>{error}</InlineNotice> : null}
+    {diagnosis ? <>
+      <div className="trace-diagnosis-meta"><span>{c.rulesVersion}<code>{diagnosis.rulesVersion}</code></span><span>{c.findings}<b>{diagnosis.findings.length}</b></span></div>
+      {diagnosis.findings.length ? <div className="trace-diagnosis-findings">{diagnosis.findings.map((finding) => <article className="trace-diagnosis-finding" key={finding.id}>
+        <header><strong>{finding.code}</strong><Badge tone={finding.severity === "error" ? "red" : finding.severity === "warning" ? "amber" : "blue"}>{finding.severity}</Badge></header>
+        <dl><Meta label={c.category} value={finding.category} /><Meta label={c.phase} value={finding.phase ?? c.notCollected} /></dl>
+        <p><strong>{c.rationale}</strong>{finding.rationale}</p><p><strong>{c.suggestedAction}</strong>{finding.suggestedAction}</p>
+        {finding.evidenceIds.length > 3 ? <details className="trace-finding-evidence"><summary>{c.evidenceIds} · {finding.evidenceIds.length}</summary><small>{finding.evidenceIds.map((id) => <code key={id}>{id}</code>)}</small></details> : <small>{c.evidenceIds}: {finding.evidenceIds.length ? finding.evidenceIds.map((id) => <code key={id}>{id}</code>) : c.notCollected}</small>}
+      </article>)}</div> : <p className="trace-no-findings">{c.noFindings}</p>}
+    </> : null}
+    {detail.coreDiagnostics?.length ? <div className="trace-current-core">{detail.coreDiagnostics.map((diagnostic) => <article key={diagnostic.traceId}>
+      <div className="trace-current-core-heading"><strong>{c.core}</strong><code>{diagnostic.traceId}</code><Badge tone={stateTone(diagnostic.status)}>{stateLabel(diagnostic.status, locale)}</Badge></div>
+      <dl><Meta label={c.semanticVersion} value={diagnostic.semanticVersion ?? c.notCollected} /><Meta label={c.policyVersions} value={diagnostic.policyVersions?.join(", ") || c.notCollected} /><Meta label={c.stage} value={diagnostic.stage} /><Meta label={c.phase} value={diagnostic.phase ?? c.notCollected} /><Meta label={c.code} value={diagnostic.code ?? c.notCollected} /><Meta label={c.reasonCode} value={diagnostic.reasonCode ?? c.notCollected} /></dl>
+      {diagnostic.phaseSpans.length ? <div className="trace-core-phases">{diagnostic.phaseSpans.map((phase, index) => <span key={`${phase.name}:${index}`}>{phase.name}: {phase.durationMs.toFixed(1)} ms · {stateLabel(phase.status, locale)}</span>)}</div> : null}
+    </article>)}</div> : null}
+  </section>;
+}
+
+function TraceDetail({ detail, diagnosis, diagnosisError, locale, onOpenIssue }: { detail: AgentTraceDetail; diagnosis: TraceDiagnosis | null; diagnosisError: string; locale: Locale; onOpenIssue: (id: string) => void }) {
   const c = labels[locale];
   const events = useMemo(() => sortedEvents(detail.events ?? []), [detail.events]);
   const { roots, turnEvents } = useMemo(() => groupAgents(events), [events]);
@@ -367,6 +509,7 @@ function TraceDetail({ detail, locale, onOpenIssue }: { detail: AgentTraceDetail
       <Meta label={c.duration} value={formatObservedDuration(activitySpans.find((span) => span.id === "__main__")?.durationMs ?? null, locale)} />
       <Meta label={c.llmDuration} value={c.notCollected} /><Meta label={c.model} value={detail.model ?? c.unknown} /><Meta label={c.tokens} value={tokenUsageLabel(detail.tokenUsage, locale)} /><Meta label={c.events} value={String(detail.eventCount)} />
     </dl>
+    <TraceDiagnosisPanel detail={detail} diagnosis={diagnosis} error={diagnosisError} locale={locale} />
     {detail.issueIds.length ? <section className="trace-evidence"><h3>{c.issues}</h3><div>{detail.issueIds.map((id) => <button key={id} type="button" className="trace-evidence-link" onClick={() => onOpenIssue(id)}><LinkSimple size={14} />{c.openIssue}<code>{id}</code></button>)}</div></section> : null}
     {detail.coreTraceIds.length ? <section className="trace-evidence" id="trace-core-evidence"><h3>{c.evidence}</h3><div>{detail.coreTraceIds.map((id) => {
       const event = events.find((item) => item.coreTraceId === id);

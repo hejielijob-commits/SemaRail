@@ -49,6 +49,18 @@ describe("Semantic Console interactions", () => {
     expect(screen.getByText("No model files")).toBeInTheDocument();
   });
 
+  it("exposes Trace comparison as a separate Quality page", async () => {
+    const fetchMock = emptyWorkspaceFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+
+    await screen.findByRole("heading", { name: "Semantic project" });
+    fireEvent.click(screen.getByRole("button", { name: "Trace comparison" }));
+    expect(await screen.findByRole("heading", { name: "Trace comparison" })).toBeInTheDocument();
+    expect(screen.getByText(/administrator authentication required/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Left trace ID/)).not.toBeInTheDocument();
+  });
+
   it("surfaces publish failures without claiming a publish", async () => {
     const fetchMock = emptyWorkspaceFetch();
     fetchMock.mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {

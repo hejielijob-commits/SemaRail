@@ -6,6 +6,17 @@ All notable user-visible changes to this project are documented here. The format
 
 ### Added
 
+- Trace v2 collector health, scoped filters, evidence-based diagnosis and an
+  independent comparison page with explicit unmatched and unavailable states.
+- Reviewed schema v2 query regression cases, registered test datasets, manual
+  batches, cancellation, durable metadata-only history and Core/issue links.
+- Cross-process project execution/configuration locks for SQLite and PostgreSQL,
+  verified source Trace associations, and inconclusive result assertions when
+  ordering, completeness or the environment cannot be established.
+- Durable delivery in the optional Codex adapter: bounded SQLite outbox,
+  background lease, retry/pause/quarantine handling, credential identity checks
+  and local status/flush/cleanup commands.
+
 - Agent Trace workbench in the Console quality section, with a persisted
   Session/turn/Agent/subagent/tool/Core timeline, parallel activity, observed
   durations, explicit missing/unknown states, and bidirectional issue links.

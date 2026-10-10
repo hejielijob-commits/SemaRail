@@ -46,6 +46,18 @@ import type {
   RegressionCaseRecord,
   AgentTraceDetail,
   AgentTraceSummary,
+  TraceCollectorHealthResponse,
+  TraceComparisonResponse,
+  TraceDiagnosis,
+  TestDatasetRecord,
+  CoreDiagnosticRecord,
+  RegressionCaseV2,
+  RegressionCaseV2Record,
+  RegressionCasesExportV2,
+  RegressionCasesResponse,
+  RegressionRun,
+  RegressionRunsResponse,
+  TestDatasetsResponse,
 } from "../types";
 
 export class ApiClientError extends Error {
@@ -269,8 +281,73 @@ export class ApiClient {
     return this.request("/api/v1/diagnostics/regression-cases/export");
   }
 
+  listTestDatasets(): Promise<TestDatasetsResponse> {
+    return this.request("/api/v1/diagnostics/test-datasets");
+  }
+
+  createTestDataset(payload: { id: string; version: string; datasourceId: string }): Promise<TestDatasetRecord> {
+    return this.request("/api/v1/diagnostics/test-datasets", { method: "POST", body: JSON.stringify(payload) });
+  }
+
+  updateTestDataset(id: string, payload: { version: string; datasourceId: string }): Promise<TestDatasetRecord> {
+    return this.request(`/api/v1/diagnostics/test-datasets/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(payload) });
+  }
+
+  deleteTestDataset(id: string): Promise<{ deleted: true }> {
+    return this.request(`/api/v1/diagnostics/test-datasets/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  listRegressionCases(): Promise<RegressionCasesResponse> {
+    return this.request("/api/v1/diagnostics/regression-cases");
+  }
+
+  exportRegressionCasesV2(): Promise<RegressionCasesExportV2> {
+    return this.request("/api/v1/diagnostics/regression-cases/export?schemaVersion=2");
+  }
+
+  createRegressionCaseV2(payload: { feedbackId: string; sourceTraceId?: string; case: RegressionCaseV2; enable: false }): Promise<RegressionCaseV2Record> {
+    return this.request("/api/v1/diagnostics/regression-cases", { method: "POST", body: JSON.stringify(payload) });
+  }
+
+  updateRegressionCase(id: string, payload: { expectedRevision: number; case: RegressionCaseV2; enable: boolean }): Promise<RegressionCaseV2Record> {
+    return this.request(`/api/v1/diagnostics/regression-cases/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(payload) });
+  }
+
+  deleteRegressionCase(id: string): Promise<{ deleted: true }> {
+    return this.request(`/api/v1/diagnostics/regression-cases/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  listRegressionRuns(): Promise<RegressionRunsResponse> {
+    return this.request("/api/v1/diagnostics/regression-runs");
+  }
+
+  createRegressionRun(caseIds: string[]): Promise<RegressionRun> {
+    return this.request("/api/v1/diagnostics/regression-runs", { method: "POST", body: JSON.stringify({ caseIds }) });
+  }
+
+  getRegressionRun(id: string): Promise<RegressionRun> {
+    return this.request(`/api/v1/diagnostics/regression-runs/${encodeURIComponent(id)}`);
+  }
+
+  cancelRegressionRun(id: string): Promise<RegressionRun> {
+    return this.request(`/api/v1/diagnostics/regression-runs/${encodeURIComponent(id)}/cancel`, { method: "POST", body: "{}" });
+  }
+
+  getCoreDiagnostic(id: string): Promise<CoreDiagnosticRecord> {
+    return this.request(`/api/v1/diagnostics/core/${encodeURIComponent(id)}`);
+  }
+
   /** List durable, project-scoped agent trace summaries. */
-  listTraces(filters: { limit?: number; cursor?: string } = {}): Promise<{ items: AgentTraceSummary[]; nextCursor?: string | null }> {
+  listTraces(filters: {
+    limit?: number;
+    cursor?: string;
+    createdAfter?: string;
+    createdBefore?: string;
+    sourceSessionId?: string;
+    subjectId?: string;
+    status?: AgentTraceSummary["status"] | "";
+    hasIssues?: boolean;
+  } = {}): Promise<{ items: AgentTraceSummary[]; nextCursor?: string | null }> {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(filters)) {
       if (value !== undefined && value !== "") query.set(key, String(value));
@@ -286,6 +363,22 @@ export class ApiClient {
 
   getTraceByCore(coreTraceId: string): Promise<AgentTraceDetail> {
     return this.request(`/api/v1/traces/by-core/${encodeURIComponent(coreTraceId)}`);
+  }
+
+  /** Read findings derived from the selected trace's persisted events and current Core evidence. */
+  getTraceDiagnosis(id: string): Promise<TraceDiagnosis> {
+    return this.request(`/api/v1/traces/${encodeURIComponent(id)}/diagnosis`);
+  }
+
+  /** Read collector counters with their observation timestamps and stale marker. */
+  getTraceCollectorStatus(): Promise<TraceCollectorHealthResponse> {
+    return this.request("/api/v1/traces/collector-status");
+  }
+
+  /** Compare two manually selected traces within the current project. */
+  compareTraces(leftTraceId: string, rightTraceId: string): Promise<TraceComparisonResponse> {
+    const query = new URLSearchParams({ leftTraceId, rightTraceId });
+    return this.request(`/api/v1/traces/compare?${query.toString()}`);
   }
 
   /** Load the structured business-model projection used by the visual editor. */

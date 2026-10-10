@@ -82,9 +82,57 @@ Session; each main Agent turn is one Trace.
   30 days. Core RPC v3 supplies correlation IDs on success and failure while
   retaining v1/v2 compatibility.
 
-This first version provides structural replay and error location. See
+The first version provides structural replay and error location. See
 [Trace v1 setup, API, boundaries, and desktop verification](docs/trace-v1.md)
 for configuration and acceptance details.
+
+### Trace v2: diagnosis, comparison, and query regression
+
+The **Quality** section adds an independent **Trace comparison** page and
+extends **Agent traces** with session/subject/time/status/issue filters, rule
+diagnosis and collector health. Findings link to observed evidence; slow Core
+phases are inspection items. Comparison preserves all observed semantic
+versions and reports a version change as unknown when either Trace lacks the
+metadata. Parallel or incomplete activity stays unmatched when correspondence
+cannot be established.
+
+**Regression cases** supports registering test datasets, reviewing manual
+question/SQL/clarification inputs, creating drafts, then editing and enabling
+versioned assertions, running up to twenty cases serially, cancellation and
+durable run history.
+Execution uses the current managed caller through Core, and only runs when the
+active datasource matches the registered test environment. History links to
+safe Core diagnostics and the source issue/Trace. Result values are not retained
+in runs; incomplete or ambiguous results are marked inconclusive. Creating a
+case from an issue opens a blank manual form; it seeds only the feedback ID and
+an Agent Trace ID when its Core association is verified. Cancel is asynchronous
+and run history reports the terminal status after the worker settles.
+
+The optional Codex plugin persists safe events before background delivery,
+retries recoverable failures, and exposes local queue status/flush/cleanup
+commands. Console health reports show backlog and freshness without estimating
+unobserved losses. See [Trace v2 setup, contracts and boundaries](docs/trace-v2.md).
+
+The following pages show the isolated synthetic HR acceptance environment.
+
+**Agent traces: delivery backlog, retries and report freshness**
+
+![Trace collector health](docs/images/trace-v2-collector.jpg)
+
+**Trace detail: evidence-based diagnosis**
+
+![Trace collector health and diagnosis](docs/images/trace-v2-diagnosis.jpg)
+
+**Trace comparison: failed execution and manually corrected execution**
+
+![Trace comparison](docs/images/trace-v2-comparison.jpg)
+
+**Regression cases: reviewed assertions, run history and Core evidence**
+
+![Query regression run](docs/images/trace-v2-regression.jpg)
+
+See the [Trace v2 acceptance record](docs/trace-v2-acceptance.md) for delivery
+recovery, desktop correlation, privacy and regression verification.
 
 ## Project roadmap
 
@@ -101,6 +149,7 @@ see [CHANGELOG.md](CHANGELOG.md).
 | 2026-09-04 | Completed | Added bounded query-result delivery: up to 50 rows and 128 KiB inline, otherwise a revocable 15-minute CSV artifact with a 20-row Agent preview and 16 MiB ceiling. |
 | 2026-09-10 | Completed | Added versioned detailed query errors and traces, independent 30-day diagnostics, explicit feedback and reviewed regression cases, and Core-enforced query clarification rules. |
 | 2026-09-30 | Completed | Added the Agent Trace workbench, metadata-only Codex lifecycle collection, Core RPC v3 correlation, parallel replay, and bidirectional issue navigation; verified enabled and unenabled desktop chats. |
+| 2026-10-11 | Completed | Added Trace v2 delivery recovery, collector health, evidence-based rules, independent Trace comparison, and reviewed manual query regression with durable history and Core evidence links. |
 | Next | Planned | Extend governed query execution beyond PostgreSQL while preserving the same policy, limits, audit, and cancellation contract. |
 | Next | Planned | Add a managed CSV/Excel ingestion workflow backed by DuckDB, without exposing uploaded files or local paths to Agents. |
 | Later | Planned | Publish versioned SemaRail Core packages after the alpha installation and upgrade flow is stable. |

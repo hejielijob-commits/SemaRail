@@ -23,8 +23,10 @@ try:  # Package import when started with ``python -m server``.
     from .access_control import AccessControlError, AuthContext, BOOTSTRAP_SUBJECT_ID
     from .access_api import AccessControlAdminApi
     from .artifact_store import ArtifactDownload, ArtifactError
+    from .diagnostics import DiagnosticError
     from .identity_api import IdentityApi
     from .diagnostics_api import DiagnosticsApi
+    from .regression_api import RegressionApi
     from .service import SemanticConsoleService
     from .project import ProjectStore
     from .runtime_rpc import RuntimeRpcGateway
@@ -32,8 +34,10 @@ except ImportError:  # Direct ``python app.py`` / test loading by file path.
     from access_control import AccessControlError, AuthContext, BOOTSTRAP_SUBJECT_ID  # type: ignore[no-redef]
     from access_api import AccessControlAdminApi  # type: ignore[no-redef]
     from artifact_store import ArtifactDownload, ArtifactError  # type: ignore[no-redef]
+    from diagnostics import DiagnosticError  # type: ignore[no-redef]
     from identity_api import IdentityApi  # type: ignore[no-redef]
     from diagnostics_api import DiagnosticsApi  # type: ignore[no-redef]
+    from regression_api import RegressionApi  # type: ignore[no-redef]
     from service import SemanticConsoleService  # type: ignore[no-redef]
     from project import ProjectStore  # type: ignore[no-redef]
     from runtime_rpc import RuntimeRpcGateway  # type: ignore[no-redef]
@@ -106,6 +110,7 @@ class SemanticConsoleApplication:
             self.runtime_rpc.policy_engine,
             project_id=project_id,
         )
+        self.regression_api = RegressionApi(self.runtime_rpc)
 
     def request(
         self,
@@ -158,6 +163,9 @@ class SemanticConsoleApplication:
         access_response = self.access_api.dispatch(method.upper(), parsed.path, body, authorization, query)
         if access_response is not None:
             return access_response
+        regression_response = self.regression_api.dispatch(method.upper(), parsed.path, query, body, authorization)
+        if regression_response is not None:
+            return regression_response
         diagnostics_response = self.diagnostics_api.dispatch(
             method.upper(), parsed.path, query, body, authorization
         )
@@ -184,7 +192,17 @@ class SemanticConsoleApplication:
                     return 403, {"code": "FORBIDDEN", "message": "console administrator permission is required"}
             except AccessControlError as exc:
                 return exc.status, {"code": exc.code, "message": exc.safe_message}
-        status, result = self.service.dispatch(method.upper(), parsed.path, query, body)
+        configuration_guard = None
+        if auth is not None and normalized_method in {"POST", "PUT", "PATCH", "DELETE"}:
+            try:
+                configuration_guard = self.regression_api.acquire_configuration_guard(auth, project_id)
+            except (AccessControlError, DiagnosticError) as exc:
+                return exc.status, {"code": exc.code, "message": exc.safe_message}
+        try:
+            status, result = self.service.dispatch(method.upper(), parsed.path, query, body)
+        finally:
+            if configuration_guard is not None:
+                configuration_guard.release()
         if auth is not None:
             try:
                 self.runtime_rpc.access_control.record_audit(
@@ -495,6 +513,12 @@ class SemanticConsoleHTTPServer(ThreadingHTTPServer):
             cleanup()
         except Exception:
             _LOGGER.error("diagnostic retention cleanup failed")
+        regression = getattr(getattr(self.application, "regression_api", None), "store", None)
+        if regression is not None:
+            try:
+                regression.recover()
+            except Exception:
+                _LOGGER.error("regression retention cleanup failed")
 
 
 def serve(
