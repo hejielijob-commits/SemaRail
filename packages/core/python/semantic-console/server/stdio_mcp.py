@@ -75,6 +75,7 @@ class _CoreToolError(ToolError):
     def __init__(self, error: Mapping[str, Any], trace_id: str) -> None:
         super().__init__(json.dumps(dict(error), ensure_ascii=False, separators=(",", ":")))
         self.trace_id = trace_id
+        self.query_id: str | None = None
 
 
 def _mcp_result(result: Mapping[str, Any]) -> CallToolResult:
@@ -91,7 +92,7 @@ def _mcp_failure(error: _CoreToolError) -> CallToolResult:
     return CallToolResult(
         content=[TextContent(type="text", text=str(error))],
         isError=True,
-        _meta={"traceId": error.trace_id},
+        _meta={"traceId": error.trace_id, **({"queryId": error.query_id} if getattr(error, "query_id", None) else {})},
     )
 
 
@@ -506,12 +507,20 @@ def create_stdio_mcp_server(transport: CoreTransport) -> FastMCP:
                     **({"preparationId": preparation_id} if preparation_id is not None else {}),
                 },
             ))
+        except _CoreToolError as error:
+            error.query_id = query_id
+            raise
         except asyncio.CancelledError:
             try:
                 await asyncio.shield(transport.call("query.cancel", {"queryId": query_id}))
             except Exception:
                 pass
             raise
+
+    @server.tool(annotations=_readonly("Read Core-generated business query evidence"))
+    async def semarail_get_query_evidence(query_id: str) -> CallToolResult:
+        """Read caller-owned evidence through Core's current authorization checks."""
+        return _mcp_result(await transport.call("query.evidence", {"queryId": query_id}))
 
     @server.tool(annotations=_write("Submit SemaRail query feedback"))
     async def semarail_submit_feedback(

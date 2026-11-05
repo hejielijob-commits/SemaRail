@@ -47,6 +47,7 @@ _METHOD_SCOPE = {
     "context.ask": "semantic:read",
     "query.dryPlan": "query:plan",
     "query.run": "query:execute",
+    "query.evidence": "query:execute",
     "query.prepare": "query:plan",
     "query.cancel": "query:cancel",
 }

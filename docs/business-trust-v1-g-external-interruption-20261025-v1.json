@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-10-25T04:16:19.897125+00:00",
+  "runId": "formal-20261020-business-trust-v1-g",
+  "manifestSha256": "3494d53422feb6748bf65799a0072812ec2f95ee46fff62503b7bbc9da535b68",
+  "status": "runtime_recovered_waiting_for_workspace_credits",
+  "denominator": 180,
+  "spawnReturns": 153,
+  "independentReviews": 153,
+  "unspawnedPositions": 27,
+  "nextUnspawnedPosition": "job-154",
+  "platformFailures": [
+    {
+      "jobId": "job-152",
+      "sourceSessionId": "01a16f05-3bbc-7070-bdf8-db0b356a27ed",
+      "errorCode": "usage_limit_exceeded",
+      "limitType": "workspace_member_credits_depleted",
+      "terminalAppEventType": "task_complete",
+      "completedAtEpoch": 1792864162,
+      "actualToolCalls": 5,
+      "businessToolEvents": 3,
+      "governedQueryAttempts": 0,
+      "brokerStatus": "timeout",
+      "sourceTraceSha256": "b92838e1db4daa083cd69ec6c3fe55c618cf65054003d94086e9cf369bc74755",
+      "recordSha256": "ec0e04f863fd6baa9a979479c68735d6ceb542cda68677eea9cf8e1adaae1dfe",
+      "reviewSha256": "aec91cd095ad9cebee7c08427529a9c9c90ac9094ade96dfd0a5f21e7baf83a9",
+      "contentReviewSha256": "f5a3bb9637a8f8e499c7bfc4ef22301b764af57a320b96002e897bfc0d15b4e8",
+      "officialImportPerformed": true,
+      "retried": false
+    },
+    {
+      "jobId": "job-153",
+      "sourceSessionId": "01a16f07-41bf-7893-ac98-10ae6656de21",
+      "errorCode": "usage_limit_exceeded",
+      "limitType": "workspace_member_credits_depleted",
+      "terminalAppEventType": "task_complete",
+      "completedAtEpoch": 1792864224,
+      "actualToolCalls": 0,
+      "businessToolEvents": 0,
+      "governedQueryAttempts": 0,
+      "brokerStatus": "missing",
+      "sourceTraceSha256": "ed5e7d18c99150b8024404a0643b7653257224e3df62a0c36fd3b2a579dded35",
+      "recordSha256": "60d8fa980a3ea547a221920d0eb1007b2e6706477f53d459009189680a77cb2f",
+      "reviewSha256": "cd3be97ecea1e7c12134e16b4a336ca610c1cb9a4e4aad7a3c8927705c1dc831",
+      "contentReviewSha256": "e7763a4495d7473bd637a8d2c6d4e1a3814e28ee0290d2bac33185a1eade23a4",
+      "officialImportPerformed": false,
+      "retried": false
+    }
+  ],
+  "sourceFilesUnchanged": 291,
+  "runtimeObservation": {
+    "observedAt": "2026-10-25T04:10:49.9087616Z",
+    "lastBootUpTime": "2026-10-25T04:03:58.5000000Z",
+    "previousOwnedProcesses": [],
+    "listeners": [],
+    "ownedWorkerCandidates": []
+  },
+  "runtimeRecovery": {
+    "record": "docs/business-trust-v1-g-runtime-recovery-20261025-v1.json",
+    "sha256": "4ac53c54fea3628e541fcc9cc411200da7dda9679fc1fdb87d08ebfa00bd224b"
+  },
+  "dispatchHoldAcceptance": {
+    "record": ".benchmark-data/business-trust-v1/g-credit-hold-acceptance-20261025-v1.json",
+    "sha256": "0e62943912b30f3fc6ce72c5a82b36d5e02a49cb204d03a2d570281cdac9e6a1"
+  },
+  "attemptsWillNotBeRetried": [
+    "job-152",
+    "job-153"
+  ],
+  "frozenScoringChanged": false,
+  "campaignClosed": false,
+  "goalComplete": false,
+  "promotionEstablished": false,
+  "resumeRequirement": "A new officially audited disposable gpt-6-luna/max transport smoke started after both retained credit failures; no formal position may be used as an availability probe.",
+  "limitations": [
+    "Actual workspace credit failure is external platform evidence, not a demonstrated Core defect.",
+    "Job 152 retained three business events, no query and no final answer; recovery expired its original deadline without retry.",
+    "Job 153 retained zero tools and its original missing broker record, with detached negative review and no official import.",
+    "Runtime recovery and Agent credit availability are separate prerequisites; ordinaryUsageAllowed is not proof of Luna/max availability."
+  ]
+}

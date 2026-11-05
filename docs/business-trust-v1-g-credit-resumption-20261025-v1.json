@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "acceptedAt": "2026-10-25T04:23:47.857095+00:00",
+  "runId": "formal-20261020-business-trust-v1-g",
+  "manifestSha256": "3494d53422feb6748bf65799a0072812ec2f95ee46fff62503b7bbc9da535b68",
+  "status": "runtime_and_fresh_model_probe_accepted",
+  "failedPositionsNotRetried": [
+    "job-152",
+    "job-153"
+  ],
+  "freshSmokeId": "transport-alpha9-credit-20261025-a",
+  "freshSmokeActualSessionId": "01a17148-dc3c-7353-8fc3-202e17b246c9",
+  "freshSmokeTraceSha256": "416943be99a7a28b32ec04fad27b4f6dda94131bdd180df3723344e20af9f656",
+  "freshSmokeStartsAfterBothFailures": true,
+  "freshSmokeExcludedFrom180": true,
+  "publicPromptReceiptVerified": true,
+  "nextUnspawnedPosition": "job-154",
+  "checkOnlyDispatchReady": true,
+  "metadataAppended": false,
+  "ledgerSha256Unchanged": "52943d5c0473d17ef3af94137bd47d7cae96a1891c77905bb2f135d582d09334",
+  "references": {
+    ".benchmark-data/business-trust-v1/transport-smokes/transport-alpha9-credit-20261025-a/verification.json": "56630f447a3be576ee0a63b3905633127d0c3d63fbaf4402ddbc8dae6c8fc254",
+    "docs/business-trust-v1-g-external-interruption-20261025-v1.json": "1070c86608d94834b7143deffed894f0839fbffa9a8578a93cc2a73c6c5ad938",
+    "docs/business-trust-v1-g-runtime-recovery-20261025-v1.json": "4ac53c54fea3628e541fcc9cc411200da7dda9679fc1fdb87d08ebfa00bd224b",
+    ".benchmark-data/business-trust-v1/g-runtime-recovery-controller-acceptance-20261025-v1.json": "9cef9af1cfc8f69549f73d6a67999ebba4596be10fd8c4e7e46e00fdc3ddde80",
+    ".benchmark-data/business-trust-v1/smoke-alpha9-credit-20261025-owned-host-stop-v1.json": "74992e428e115a58df7b3563f9cb1247782bb69e39fcde23ffc531cb2d83de5a"
+  },
+  "guaranteesFutureAvailability": false,
+  "frozenScoringChanged": false,
+  "goalComplete": false
+}

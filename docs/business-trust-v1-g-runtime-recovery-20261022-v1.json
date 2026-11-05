@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-22T14:58:24.402548+00:00",
+  "phase": "after",
+  "runId": "formal-20261020-business-trust-v1-g",
+  "manifestSha256": "3494d53422feb6748bf65799a0072812ec2f95ee46fff62503b7bbc9da535b68",
+  "beforeSnapshotSha256": "59e6d36da9e2ee63097519cef21872e827f2c5865037d4e2f9e9670964daa845",
+  "runtimeObservation": {
+    "at": "2026-10-22T14:58:23.0351227Z",
+    "listeners": [
+      {
+        "LocalPort": 55433,
+        "OwningProcess": 32188
+      },
+      {
+        "LocalPort": 48785,
+        "OwningProcess": 10900
+      },
+      {
+        "LocalPort": 48784,
+        "OwningProcess": 26276
+      },
+      {
+        "LocalPort": 48783,
+        "OwningProcess": 29068
+      },
+      {
+        "LocalPort": 48782,
+        "OwningProcess": 41876
+      },
+      {
+        "LocalPort": 48781,
+        "OwningProcess": 9852
+      }
+    ],
+    "workers": [
+      {
+        "ProcessId": 25456,
+        "CreationDate": "2026-10-22T14:47:01.9612940Z",
+        "CommandLine": "\"C:\\Users\\20786\\AppData\\Local\\Programs\\Python\\Python312\\python.exe\" -X utf8 \"D:\\xiaohe\\wrenAI\\semarail-trace-v2\\.benchmark-data\\business-trust-v1\\background\\owned-host-worker-20261022-v1.py\" postgres resume-20261022-campaign-g-v2"
+      },
+      {
+        "ProcessId": 12428,
+        "CreationDate": "2026-10-22T14:51:25.1965540Z",
+        "CommandLine": "\"C:\\Users\\20786\\AppData\\Local\\Programs\\Python\\Python312\\python.exe\" -X utf8 \"D:\\xiaohe\\wrenAI\\semarail-trace-v2\\.benchmark-data\\business-trust-v1\\background\\owned-host-worker-20261022-v2.py\" resume formal-20261020-business-trust-v1-g"
+      }
+    ]
+  },
+  "sourceFilesUnchanged": 291,
+  "retainedFileCount": 985,
+  "retainedFilesUnchanged": true,
+  "originalFrozenInputsAndGatesUnchanged": true,
+  "originalDispatchLedgerPrefixUnchanged": true,
+  "newDispatchRequestsDuringRecovery": 0,
+  "privateCheckpointCiphertextUnchanged": true,
+  "samePostgresClusterAndLoadReport": true,
+  "spawnReturns": 68,
+  "independentReviews": 68,
+  "nextUnspawnedPosition": "job-069",
+  "recoveryAttempt": {
+    "record": ".benchmark-data/business-trust-v1/runs/formal-20261020-business-trust-v1-g/recovery-attempts/attempt-6156b99ff07747f5bee687329f6b5197.json",
+    "sha256": "986bf983a571078fa9ea54f9aa0f34abd3db9970255607ea8fb1799a4349af61",
+    "passed": true,
+    "authenticatedContextChecks": 60,
+    "authenticatedRoleCatalogChecks": 10,
+    "brokerConsumedPositions": 61,
+    "runningPositions": 0
+  },
+  "ownedHostPid": 12428,
+  "ownedPostgresWorkerPid": 25456,
+  "actualCimIdentityVerified": true,
+  "childKillOnWorkerExit": true,
+  "brokerHealthReady": true,
+  "interruptedJobsRetainedWithoutRetry": [
+    "job-067",
+    "job-068"
+  ],
+  "frozenScoringChanged": false,
+  "goalComplete": false,
+  "promotionEstablished": false,
+  "status": "runtime_recovered_revalidated",
+  "privateAfterSnapshotSha256": "d06e83a1d056a8f7ef1c3393568508464368fb83b27fea05d61c4da8cb690257",
+  "limitations": [
+    "The original worker turn_aborted events remain negative outcomes; no worker is retried.",
+    "The first PostgreSQL worker used the system interpreter without psycopg and failed readiness; it was replaced with a project-venv launch without resetting or loading data.",
+    "The first campaign recovery completed MCP/context checks but exited after readiness with PermissionError; its timeout append and actual failure logs are retained. A later unchanged frozen resume reconciled the record prefix and is live. The exact first PermissionError cause remains unconfirmed.",
+    "This recovery proves runtime continuity and frozen-input preservation, not Agent quality improvement."
+  ]
+}

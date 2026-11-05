@@ -12,6 +12,8 @@ export * from './feedback.js'
 
 import type { RpcRequest, RpcResponse } from './rpc.js'
 import type { SemanticContext } from './context.js'
+export { parseBusinessEvidenceV1, businessEvidenceV1Schema, BUSINESS_EVIDENCE_V1_JSON_SCHEMA } from './business_evidence.js'
+export type { BusinessEvidenceV1, BusinessCheckV1, BusinessCheckStatus } from './business_evidence.js'
 import type { SemanticContextV2 } from './context_v2.js'
 import type { ChartSpecV1 } from './chart.js'
 import type { DataQueryErrorPresentationV3, DataQueryInput, DataQueryPresentation, DataQueryPresentationV1, DataQueryPresentationV2 } from './query.js'
@@ -51,3 +53,4 @@ export const safeParseDataQueryPresentationV2 = (value: unknown): SafeParseResul
 
 /** Parse a v3 detailed error query presentation without throwing. */
 export const safeParseDataQueryPresentationV3 = (value: unknown): SafeParseResult<DataQueryErrorPresentationV3> => dataQueryPresentationV3Schema.safeParse(value)
+export type { EvaluationCase, EvaluationSuite, AgentProfile, EvaluationAttempt, EvaluationRun, EvaluationReview, EvaluationComparison } from './evaluation.js'

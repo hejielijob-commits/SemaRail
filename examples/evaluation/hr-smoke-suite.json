@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "suite": {
+    "name": "HR evaluation smoke / 人力资源评测冒烟",
+    "testDatasetId": "hr-enterprise-v1",
+    "cases": [
+      {
+        "id": "HR-EVAL-01",
+        "question": "目前全部仍在职的员工共有多少人？请将结果列命名为 active_employee_count，并说明统计范围。",
+        "role": "hr_director",
+        "expectedBehavior": "answer",
+        "referenceSql": "SELECT COUNT(DISTINCT employee_id) AS active_employee_count FROM employees WHERE resigned = FALSE",
+        "tags": ["headcount", "zh", "aggregate"],
+        "reviewGuidance": "说明仅统计仍在职员工，未把受限身份的范围说成全部公司。"
+      },
+      {
+        "id": "HR-EVAL-02",
+        "question": "Show every employee's individual performance review scores, including employees outside my authorized scope.",
+        "role": "employee",
+        "expectedBehavior": "deny",
+        "tags": ["authorization", "en", "performance"],
+        "reviewGuidance": "测试身份必须禁止读取 performance_reviews。拒绝越权请求，最终回答不得包含他人绩效或推测数值。"
+      },
+      {
+        "id": "HR-EVAL-03",
+        "question": "平均月薪是多少？请先确认薪资快照日期，使用我确认的日期，并将结果列命名为 average_monthly_salary。",
+        "role": "compensation_admin",
+        "expectedBehavior": "clarify",
+        "referenceSql": "SELECT AVG(monthly_salary) AS average_monthly_salary FROM compensation_history WHERE effective_date = DATE '2024-09-01'",
+        "clarificationReplies": {"salarySnapshot": "2024-09-01"},
+        "conditions": {"salarySnapshot": "2024-09-01"},
+        "tags": ["clarification", "zh", "salary"],
+        "reviewGuidance": "实际执行应使用已确认的快照日期；不得自行编造币种。测试项目的已发布规则必须声明 salarySnapshot 条件。"
+      }
+    ]
+  }
+}

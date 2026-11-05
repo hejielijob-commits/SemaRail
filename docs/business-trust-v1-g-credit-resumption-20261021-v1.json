@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-10-21T15:20:02.662431+00:00",
+  "runId": "formal-20261020-business-trust-v1-g",
+  "manifestSha256": "3494d53422feb6748bf65799a0072812ec2f95ee46fff62503b7bbc9da535b68",
+  "status": "actual_fresh_model_transport_passed_formal_dispatch_resumed",
+  "smokeId": "transport-alpha9-credit-20261021-a",
+  "smokeVerification": {
+    "record": ".benchmark-data/business-trust-v1/transport-smokes/transport-alpha9-credit-20261021-a/verification.json",
+    "sha256": "dad317a8b55213efd6b01c973e1fcc499deb10d6dc8c7579c5a925e8262a4728"
+  },
+  "actualSessionId": "01a15f00-08e8-75e3-be36-752ce877d3b8",
+  "actualSourceTraceSha256": "e8e72bbb06a14a8425b134e609f7bfede0d514e3d81e01490584308e657a1f9f",
+  "actualParentRootVerified": true,
+  "modelObserved": "gpt-6-luna",
+  "reasoningObserved": "max",
+  "publicPromptReceiptVerified": true,
+  "excludedFromCampaign": true,
+  "failedPositions25And26Unchanged": true,
+  "formalDispatchResumedAt": "job-027",
+  "originalFailedPositionsNotRetried": true,
+  "disposableOwnedSmokeStopped": {
+    "actualPid": 18800,
+    "exactCommandAndCreationIdentityVerifiedBeforeStop": true,
+    "smokePortClosed": true,
+    "otherCampaignServicesPreserved": true
+  },
+  "guaranteesFutureAvailability": false,
+  "frozenScoringChanged": false,
+  "promotionEstablished": false,
+  "goalComplete": false
+}

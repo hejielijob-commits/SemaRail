@@ -1,0 +1,2097 @@
+{
+  "schemaVersion": 1,
+  "runId": "formal-20261016-business-trust-v1-d",
+  "status": "invalid_supervisor_prompt_transcription",
+  "recordedAt": "2026-10-15T16:59:28.502201+00:00",
+  "manifestSha256": "856b47d6e39ebcab9404e4eef4d1234039548066baebc432b8f79b65ffd95f5e",
+  "expectedPositions": 180,
+  "allPositionsRetainedInDenominator": true,
+  "dispatchAttempts": 3,
+  "begunPositions": 3,
+  "latestStatusCounts": {
+    "timeout": 3,
+    "missing": 177
+  },
+  "reason": "Supervisor explicitly confirmed its job003 spawn message changed the frozen client path and malformed the poll wrapper. Exact frozen input delivery was not preserved.",
+  "supervisorDeviations": [
+    "job003 tool client path changed from semarail-trace-v2 to absent semarail-trace-v1",
+    "job003 poll placeholder omitted required comma",
+    "earlier job001 prebegin observation was inaccurate because supervisor looked outside versioned record files; append-only correction retained"
+  ],
+  "actualSessionFindings": "All three sessions successfully began, then tool commands used the absent v1 client path and exited1 before context, SQL, result or final answer. Job003 is attributable to the confirmed supervisor transcription; exact sent input for job001/002 remains independently unverified.",
+  "sentInputIndependentlyByteVerified": false,
+  "frozenSourcePromptsUnchanged": true,
+  "attemptedSessions": [
+    {
+      "jobId": "job-001",
+      "status": "timeout",
+      "began": true,
+      "traceSha256": "367614dda6ad96d3ccc6482df29261d6097b07809ec287fee0a93300a1cab5b2",
+      "reviewSha256": "6f9087a995b370709fc57644ae1de50805c885208ea12a7f384ce18653eea22f",
+      "auditStatus": "failed",
+      "answerCorrect": false,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ]
+    },
+    {
+      "jobId": "job-002",
+      "status": "timeout",
+      "began": true,
+      "traceSha256": "0fa4e4614b115389b8dc04d03052563b1fa4082dc183df031ff6f07a364461c2",
+      "reviewSha256": "28fd99ccf94af8a11011ad5f9737ae9d61528f84d97ddc75a05b230b48fb462f",
+      "auditStatus": "failed",
+      "answerCorrect": false,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ]
+    },
+    {
+      "jobId": "job-003",
+      "status": "timeout",
+      "began": true,
+      "traceSha256": "b7e9a1704f26a2fccc01847a5d5c2a95bffbdc994f41de0f415c1a81369e109b",
+      "reviewSha256": "15aff715fd96b5c1953335446a2cc64faa1a0d1544e2035a7709ba73bab7fad8",
+      "auditStatus": "failed",
+      "answerCorrect": false,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ]
+    }
+  ],
+  "recordInventory": [
+    {
+      "jobId": "job-001",
+      "status": "timeout",
+      "latestRecordSha256": "48dc43b537e522c48ad04ebbff42e376f1cc78824926ce92b6033de1215fe3f7",
+      "snapshots": [
+        {
+          "path": "records/job-001/0000.json",
+          "sha256": "ac95d9ab2074b231ddb24ee65babc0d0dad2bd7f8bad733fcbd1ded5dfe49dcc"
+        },
+        {
+          "path": "records/job-001/0001.json",
+          "sha256": "5712e4ac16057f6f0b42601740bf482a3db4d6f0ab000731ca0fdae392ef46c1"
+        },
+        {
+          "path": "records/job-001/0002.json",
+          "sha256": "48dc43b537e522c48ad04ebbff42e376f1cc78824926ce92b6033de1215fe3f7"
+        }
+      ]
+    },
+    {
+      "jobId": "job-002",
+      "status": "timeout",
+      "latestRecordSha256": "d185aee8c70f1aed03f0f02cbe07b34a97c94ff693c96ec8f26eb93a35198980",
+      "snapshots": [
+        {
+          "path": "records/job-002/0000.json",
+          "sha256": "6b592b7f70cabefb40dc8619257243132c1a2725a2175e9d6c9f5462b377c6c0"
+        },
+        {
+          "path": "records/job-002/0001.json",
+          "sha256": "592637d8b194a4d8eb383a659366d8abe17a17715261d55bd9ad0cf11626c7dd"
+        },
+        {
+          "path": "records/job-002/0002.json",
+          "sha256": "d185aee8c70f1aed03f0f02cbe07b34a97c94ff693c96ec8f26eb93a35198980"
+        }
+      ]
+    },
+    {
+      "jobId": "job-003",
+      "status": "timeout",
+      "latestRecordSha256": "49fb15cf62e641e38b79c5689f84474861f497613580ee1f951c3b7dfdc4611e",
+      "snapshots": [
+        {
+          "path": "records/job-003/0000.json",
+          "sha256": "2dd1a06cb1aeaf7a6c0a4809f493f88da05d81dac3e45acbd4fa8491840a1fb6"
+        },
+        {
+          "path": "records/job-003/0001.json",
+          "sha256": "465f4a3111acf897fab75644e1d19040f8617e90ce73d79adc0b15082c43991e"
+        },
+        {
+          "path": "records/job-003/0002.json",
+          "sha256": "49fb15cf62e641e38b79c5689f84474861f497613580ee1f951c3b7dfdc4611e"
+        }
+      ]
+    },
+    {
+      "jobId": "job-004",
+      "status": "missing",
+      "latestRecordSha256": "933e5b2d819c8cc8ed398c9907b6da0c7140bf308587ce305b25776bcbcdd36b",
+      "snapshots": [
+        {
+          "path": "records/job-004/0000.json",
+          "sha256": "933e5b2d819c8cc8ed398c9907b6da0c7140bf308587ce305b25776bcbcdd36b"
+        }
+      ]
+    },
+    {
+      "jobId": "job-005",
+      "status": "missing",
+      "latestRecordSha256": "281aeb57b0a2f0466b931b1cd17d5de0f81246a8fa61cf4dafa2aae479f86391",
+      "snapshots": [
+        {
+          "path": "records/job-005/0000.json",
+          "sha256": "281aeb57b0a2f0466b931b1cd17d5de0f81246a8fa61cf4dafa2aae479f86391"
+        }
+      ]
+    },
+    {
+      "jobId": "job-006",
+      "status": "missing",
+      "latestRecordSha256": "bace63c5bcc8a50f799b2e18c51f6579c785f8cdad07cd928aaf83febd5589c2",
+      "snapshots": [
+        {
+          "path": "records/job-006/0000.json",
+          "sha256": "bace63c5bcc8a50f799b2e18c51f6579c785f8cdad07cd928aaf83febd5589c2"
+        }
+      ]
+    },
+    {
+      "jobId": "job-007",
+      "status": "missing",
+      "latestRecordSha256": "367246790102aec0ef2498e10490c21d0f7f55d7c4d48cd5c267fce206223ac8",
+      "snapshots": [
+        {
+          "path": "records/job-007/0000.json",
+          "sha256": "367246790102aec0ef2498e10490c21d0f7f55d7c4d48cd5c267fce206223ac8"
+        }
+      ]
+    },
+    {
+      "jobId": "job-008",
+      "status": "missing",
+      "latestRecordSha256": "f13af86f04f291b45a10589c496917d915a272a48a42874983ce8e1c893b306f",
+      "snapshots": [
+        {
+          "path": "records/job-008/0000.json",
+          "sha256": "f13af86f04f291b45a10589c496917d915a272a48a42874983ce8e1c893b306f"
+        }
+      ]
+    },
+    {
+      "jobId": "job-009",
+      "status": "missing",
+      "latestRecordSha256": "e999d85dc0d6cfab1886aade31c58f102d159b498476e61786e3e4d1ef558fcd",
+      "snapshots": [
+        {
+          "path": "records/job-009/0000.json",
+          "sha256": "e999d85dc0d6cfab1886aade31c58f102d159b498476e61786e3e4d1ef558fcd"
+        }
+      ]
+    },
+    {
+      "jobId": "job-010",
+      "status": "missing",
+      "latestRecordSha256": "04d12d1196174f22cf775fd55611a8b460a638f2db850ec41a688da9cc77ca94",
+      "snapshots": [
+        {
+          "path": "records/job-010/0000.json",
+          "sha256": "04d12d1196174f22cf775fd55611a8b460a638f2db850ec41a688da9cc77ca94"
+        }
+      ]
+    },
+    {
+      "jobId": "job-011",
+      "status": "missing",
+      "latestRecordSha256": "05305fc481badd42446ddde7cb2edf1f5dc1915ed4c6fca13584fca468ae816c",
+      "snapshots": [
+        {
+          "path": "records/job-011/0000.json",
+          "sha256": "05305fc481badd42446ddde7cb2edf1f5dc1915ed4c6fca13584fca468ae816c"
+        }
+      ]
+    },
+    {
+      "jobId": "job-012",
+      "status": "missing",
+      "latestRecordSha256": "eee0361c26c0859bc00d3814483a9c1ebc05521cbcb579242af6d74902308560",
+      "snapshots": [
+        {
+          "path": "records/job-012/0000.json",
+          "sha256": "eee0361c26c0859bc00d3814483a9c1ebc05521cbcb579242af6d74902308560"
+        }
+      ]
+    },
+    {
+      "jobId": "job-013",
+      "status": "missing",
+      "latestRecordSha256": "8b605493fcd526a2d2b74a89d6683a104f8986136978d4322f098f2343906668",
+      "snapshots": [
+        {
+          "path": "records/job-013/0000.json",
+          "sha256": "8b605493fcd526a2d2b74a89d6683a104f8986136978d4322f098f2343906668"
+        }
+      ]
+    },
+    {
+      "jobId": "job-014",
+      "status": "missing",
+      "latestRecordSha256": "d1017edfb00607015e470132a4554cf02a48d334a6762ab4a0d9b80b1712d64f",
+      "snapshots": [
+        {
+          "path": "records/job-014/0000.json",
+          "sha256": "d1017edfb00607015e470132a4554cf02a48d334a6762ab4a0d9b80b1712d64f"
+        }
+      ]
+    },
+    {
+      "jobId": "job-015",
+      "status": "missing",
+      "latestRecordSha256": "06cbefec696b25bdd3301339808615d22f9c468c4054840a2af454731b3a0a4b",
+      "snapshots": [
+        {
+          "path": "records/job-015/0000.json",
+          "sha256": "06cbefec696b25bdd3301339808615d22f9c468c4054840a2af454731b3a0a4b"
+        }
+      ]
+    },
+    {
+      "jobId": "job-016",
+      "status": "missing",
+      "latestRecordSha256": "4f5b76a68f412288820466c80639b9056acac976028a79f12ec50ece5d40b29c",
+      "snapshots": [
+        {
+          "path": "records/job-016/0000.json",
+          "sha256": "4f5b76a68f412288820466c80639b9056acac976028a79f12ec50ece5d40b29c"
+        }
+      ]
+    },
+    {
+      "jobId": "job-017",
+      "status": "missing",
+      "latestRecordSha256": "37fa984762b7f08f8b2a1d35849d53c7145382fe9a2e8eb580c79b33a8d53ea4",
+      "snapshots": [
+        {
+          "path": "records/job-017/0000.json",
+          "sha256": "37fa984762b7f08f8b2a1d35849d53c7145382fe9a2e8eb580c79b33a8d53ea4"
+        }
+      ]
+    },
+    {
+      "jobId": "job-018",
+      "status": "missing",
+      "latestRecordSha256": "0f30bd81277d606ae6f31a2db17b30b491f0cb3077655ed85dd0cd2f0d3e0e6f",
+      "snapshots": [
+        {
+          "path": "records/job-018/0000.json",
+          "sha256": "0f30bd81277d606ae6f31a2db17b30b491f0cb3077655ed85dd0cd2f0d3e0e6f"
+        }
+      ]
+    },
+    {
+      "jobId": "job-019",
+      "status": "missing",
+      "latestRecordSha256": "d51dae581f00e1d53f9abb7e10678a2a025fa7a073e3584c6e80843d345c6f17",
+      "snapshots": [
+        {
+          "path": "records/job-019/0000.json",
+          "sha256": "d51dae581f00e1d53f9abb7e10678a2a025fa7a073e3584c6e80843d345c6f17"
+        }
+      ]
+    },
+    {
+      "jobId": "job-020",
+      "status": "missing",
+      "latestRecordSha256": "2cf1f6994575b917cb72e92fe9a66b7b77738023bf4b3d671ed7f165a5b8e983",
+      "snapshots": [
+        {
+          "path": "records/job-020/0000.json",
+          "sha256": "2cf1f6994575b917cb72e92fe9a66b7b77738023bf4b3d671ed7f165a5b8e983"
+        }
+      ]
+    },
+    {
+      "jobId": "job-021",
+      "status": "missing",
+      "latestRecordSha256": "7f41950c3efe0b7cdc52d455ab12de684a8ffce47f832625a791ecc8a4b071d2",
+      "snapshots": [
+        {
+          "path": "records/job-021/0000.json",
+          "sha256": "7f41950c3efe0b7cdc52d455ab12de684a8ffce47f832625a791ecc8a4b071d2"
+        }
+      ]
+    },
+    {
+      "jobId": "job-022",
+      "status": "missing",
+      "latestRecordSha256": "e81aeef190c106d336481125ac7b43c0435be75ae519b2005c0c97db5e0dd4b8",
+      "snapshots": [
+        {
+          "path": "records/job-022/0000.json",
+          "sha256": "e81aeef190c106d336481125ac7b43c0435be75ae519b2005c0c97db5e0dd4b8"
+        }
+      ]
+    },
+    {
+      "jobId": "job-023",
+      "status": "missing",
+      "latestRecordSha256": "9cb0cd4093acbd1ca8567a1df3b11b61c34fb57c8235e7c2e65ecce2f32bd7f6",
+      "snapshots": [
+        {
+          "path": "records/job-023/0000.json",
+          "sha256": "9cb0cd4093acbd1ca8567a1df3b11b61c34fb57c8235e7c2e65ecce2f32bd7f6"
+        }
+      ]
+    },
+    {
+      "jobId": "job-024",
+      "status": "missing",
+      "latestRecordSha256": "12de6e1327a7c068aabc22011e13d12845681f4c8363b4e28a8904a68c7019e4",
+      "snapshots": [
+        {
+          "path": "records/job-024/0000.json",
+          "sha256": "12de6e1327a7c068aabc22011e13d12845681f4c8363b4e28a8904a68c7019e4"
+        }
+      ]
+    },
+    {
+      "jobId": "job-025",
+      "status": "missing",
+      "latestRecordSha256": "a263c64319d742ead85acbedb6bdfd7ebb768209788c5a68ae3385d9e0733ddf",
+      "snapshots": [
+        {
+          "path": "records/job-025/0000.json",
+          "sha256": "a263c64319d742ead85acbedb6bdfd7ebb768209788c5a68ae3385d9e0733ddf"
+        }
+      ]
+    },
+    {
+      "jobId": "job-026",
+      "status": "missing",
+      "latestRecordSha256": "852a4a99b1080205ef4a4bc49d447a3a52564153f15906b34cfd27975e1d8e7c",
+      "snapshots": [
+        {
+          "path": "records/job-026/0000.json",
+          "sha256": "852a4a99b1080205ef4a4bc49d447a3a52564153f15906b34cfd27975e1d8e7c"
+        }
+      ]
+    },
+    {
+      "jobId": "job-027",
+      "status": "missing",
+      "latestRecordSha256": "e8179c525c94997f3fc1a5a016a82855af6762ab39f74a016b78ba409a0b17d9",
+      "snapshots": [
+        {
+          "path": "records/job-027/0000.json",
+          "sha256": "e8179c525c94997f3fc1a5a016a82855af6762ab39f74a016b78ba409a0b17d9"
+        }
+      ]
+    },
+    {
+      "jobId": "job-028",
+      "status": "missing",
+      "latestRecordSha256": "f5798e0f1e586b2d1da121c26733c91629944e41d7c8cee3c87ff50a1349f64d",
+      "snapshots": [
+        {
+          "path": "records/job-028/0000.json",
+          "sha256": "f5798e0f1e586b2d1da121c26733c91629944e41d7c8cee3c87ff50a1349f64d"
+        }
+      ]
+    },
+    {
+      "jobId": "job-029",
+      "status": "missing",
+      "latestRecordSha256": "2003be1403d635ff859db0e7f25e5ee243428647465ca39d9940394ef71812a5",
+      "snapshots": [
+        {
+          "path": "records/job-029/0000.json",
+          "sha256": "2003be1403d635ff859db0e7f25e5ee243428647465ca39d9940394ef71812a5"
+        }
+      ]
+    },
+    {
+      "jobId": "job-030",
+      "status": "missing",
+      "latestRecordSha256": "51cec168655a380ac53737a83c2a4a76afd98e5b7cedd0d6d86127b22a80b3fe",
+      "snapshots": [
+        {
+          "path": "records/job-030/0000.json",
+          "sha256": "51cec168655a380ac53737a83c2a4a76afd98e5b7cedd0d6d86127b22a80b3fe"
+        }
+      ]
+    },
+    {
+      "jobId": "job-031",
+      "status": "missing",
+      "latestRecordSha256": "27cce0a007facbf576d1e6153abf708b8393575dec1fc293475f2bc8d8d1210b",
+      "snapshots": [
+        {
+          "path": "records/job-031/0000.json",
+          "sha256": "27cce0a007facbf576d1e6153abf708b8393575dec1fc293475f2bc8d8d1210b"
+        }
+      ]
+    },
+    {
+      "jobId": "job-032",
+      "status": "missing",
+      "latestRecordSha256": "2e5ad4c16d0cd62a85805bb8c603cb0beb5f31568cc759883b4689699c2131aa",
+      "snapshots": [
+        {
+          "path": "records/job-032/0000.json",
+          "sha256": "2e5ad4c16d0cd62a85805bb8c603cb0beb5f31568cc759883b4689699c2131aa"
+        }
+      ]
+    },
+    {
+      "jobId": "job-033",
+      "status": "missing",
+      "latestRecordSha256": "69fb29d2b8f558a9160737f3de16973b46eca2a2acfe688269f0697d30e4d3b1",
+      "snapshots": [
+        {
+          "path": "records/job-033/0000.json",
+          "sha256": "69fb29d2b8f558a9160737f3de16973b46eca2a2acfe688269f0697d30e4d3b1"
+        }
+      ]
+    },
+    {
+      "jobId": "job-034",
+      "status": "missing",
+      "latestRecordSha256": "b592d809f24dd2fa6155d556b6d275cc6714ab341e6f1b85fa4fac95101a5a0a",
+      "snapshots": [
+        {
+          "path": "records/job-034/0000.json",
+          "sha256": "b592d809f24dd2fa6155d556b6d275cc6714ab341e6f1b85fa4fac95101a5a0a"
+        }
+      ]
+    },
+    {
+      "jobId": "job-035",
+      "status": "missing",
+      "latestRecordSha256": "c6edbcdbae909349c9d72ded0afcf3f00dde087b96021627f6331b44172f743d",
+      "snapshots": [
+        {
+          "path": "records/job-035/0000.json",
+          "sha256": "c6edbcdbae909349c9d72ded0afcf3f00dde087b96021627f6331b44172f743d"
+        }
+      ]
+    },
+    {
+      "jobId": "job-036",
+      "status": "missing",
+      "latestRecordSha256": "35b2103a041c828d79b939ae173afd5bdd06339f0b008cbb53abd713bebeb4d3",
+      "snapshots": [
+        {
+          "path": "records/job-036/0000.json",
+          "sha256": "35b2103a041c828d79b939ae173afd5bdd06339f0b008cbb53abd713bebeb4d3"
+        }
+      ]
+    },
+    {
+      "jobId": "job-037",
+      "status": "missing",
+      "latestRecordSha256": "1eabf051fee4144cd56390e5323d2240d9fe964cce45a47f981ce06d178e9b07",
+      "snapshots": [
+        {
+          "path": "records/job-037/0000.json",
+          "sha256": "1eabf051fee4144cd56390e5323d2240d9fe964cce45a47f981ce06d178e9b07"
+        }
+      ]
+    },
+    {
+      "jobId": "job-038",
+      "status": "missing",
+      "latestRecordSha256": "4ef44fe9d7c9473872e278a6c45f18c49a83ca8ae6e98784cc2fc8af20b1bb48",
+      "snapshots": [
+        {
+          "path": "records/job-038/0000.json",
+          "sha256": "4ef44fe9d7c9473872e278a6c45f18c49a83ca8ae6e98784cc2fc8af20b1bb48"
+        }
+      ]
+    },
+    {
+      "jobId": "job-039",
+      "status": "missing",
+      "latestRecordSha256": "62214e8329cf3b4adf1eb48bb7ca3fd99cba2b13b9543551e77c8d221acc13a2",
+      "snapshots": [
+        {
+          "path": "records/job-039/0000.json",
+          "sha256": "62214e8329cf3b4adf1eb48bb7ca3fd99cba2b13b9543551e77c8d221acc13a2"
+        }
+      ]
+    },
+    {
+      "jobId": "job-040",
+      "status": "missing",
+      "latestRecordSha256": "d08557bb3712e8e12cf5be7c05080d95ec4dbf496d25c5b12f9babcb3178e78b",
+      "snapshots": [
+        {
+          "path": "records/job-040/0000.json",
+          "sha256": "d08557bb3712e8e12cf5be7c05080d95ec4dbf496d25c5b12f9babcb3178e78b"
+        }
+      ]
+    },
+    {
+      "jobId": "job-041",
+      "status": "missing",
+      "latestRecordSha256": "91bf6c47cf593491a83a05229eddff2a80a9d28b8bdf54c2e70cbb1c0c526f9e",
+      "snapshots": [
+        {
+          "path": "records/job-041/0000.json",
+          "sha256": "91bf6c47cf593491a83a05229eddff2a80a9d28b8bdf54c2e70cbb1c0c526f9e"
+        }
+      ]
+    },
+    {
+      "jobId": "job-042",
+      "status": "missing",
+      "latestRecordSha256": "5777ba1c1e6699f58e7f41fdceb91029f659f3199e88f2e3f28da63f79f386cc",
+      "snapshots": [
+        {
+          "path": "records/job-042/0000.json",
+          "sha256": "5777ba1c1e6699f58e7f41fdceb91029f659f3199e88f2e3f28da63f79f386cc"
+        }
+      ]
+    },
+    {
+      "jobId": "job-043",
+      "status": "missing",
+      "latestRecordSha256": "667914dfd4e8148f6e8c73247e75a7cd252e8240bdbd0bcce7cbc495a9a04651",
+      "snapshots": [
+        {
+          "path": "records/job-043/0000.json",
+          "sha256": "667914dfd4e8148f6e8c73247e75a7cd252e8240bdbd0bcce7cbc495a9a04651"
+        }
+      ]
+    },
+    {
+      "jobId": "job-044",
+      "status": "missing",
+      "latestRecordSha256": "113cbabef76182f62f017cd7c74dffb0efca7b4dbf287d37004ccc60610763b7",
+      "snapshots": [
+        {
+          "path": "records/job-044/0000.json",
+          "sha256": "113cbabef76182f62f017cd7c74dffb0efca7b4dbf287d37004ccc60610763b7"
+        }
+      ]
+    },
+    {
+      "jobId": "job-045",
+      "status": "missing",
+      "latestRecordSha256": "6a2f8ac2960a8359f177ec6c9ccf316c94f91f88ae6d34f2fa7badfaf60be6a1",
+      "snapshots": [
+        {
+          "path": "records/job-045/0000.json",
+          "sha256": "6a2f8ac2960a8359f177ec6c9ccf316c94f91f88ae6d34f2fa7badfaf60be6a1"
+        }
+      ]
+    },
+    {
+      "jobId": "job-046",
+      "status": "missing",
+      "latestRecordSha256": "0e74a2fc0c1db580e060d7cfb3686589a1e8ab1f89587971ff91684a4f5ee9ed",
+      "snapshots": [
+        {
+          "path": "records/job-046/0000.json",
+          "sha256": "0e74a2fc0c1db580e060d7cfb3686589a1e8ab1f89587971ff91684a4f5ee9ed"
+        }
+      ]
+    },
+    {
+      "jobId": "job-047",
+      "status": "missing",
+      "latestRecordSha256": "38cd13d9c6f34a26778dbcb05ed236a5dbdfce24429e1eba464d6a9687e23e24",
+      "snapshots": [
+        {
+          "path": "records/job-047/0000.json",
+          "sha256": "38cd13d9c6f34a26778dbcb05ed236a5dbdfce24429e1eba464d6a9687e23e24"
+        }
+      ]
+    },
+    {
+      "jobId": "job-048",
+      "status": "missing",
+      "latestRecordSha256": "878b913118b0e455de885e9cf0d5ddf6a678f8e86c546091d71bc55ebe985d88",
+      "snapshots": [
+        {
+          "path": "records/job-048/0000.json",
+          "sha256": "878b913118b0e455de885e9cf0d5ddf6a678f8e86c546091d71bc55ebe985d88"
+        }
+      ]
+    },
+    {
+      "jobId": "job-049",
+      "status": "missing",
+      "latestRecordSha256": "010ddf7fb4c6311b131452a6c468abb3f78753873ef4e2f5df5fd956b2a3346c",
+      "snapshots": [
+        {
+          "path": "records/job-049/0000.json",
+          "sha256": "010ddf7fb4c6311b131452a6c468abb3f78753873ef4e2f5df5fd956b2a3346c"
+        }
+      ]
+    },
+    {
+      "jobId": "job-050",
+      "status": "missing",
+      "latestRecordSha256": "5f63caa3afeda0a2cd7e61fe1e8271d880014fe0f887ac98258de8141fd9468b",
+      "snapshots": [
+        {
+          "path": "records/job-050/0000.json",
+          "sha256": "5f63caa3afeda0a2cd7e61fe1e8271d880014fe0f887ac98258de8141fd9468b"
+        }
+      ]
+    },
+    {
+      "jobId": "job-051",
+      "status": "missing",
+      "latestRecordSha256": "c51a3e24db53a2b50ce1457752852278e48fd971e3fbf18d4b95535cdd762311",
+      "snapshots": [
+        {
+          "path": "records/job-051/0000.json",
+          "sha256": "c51a3e24db53a2b50ce1457752852278e48fd971e3fbf18d4b95535cdd762311"
+        }
+      ]
+    },
+    {
+      "jobId": "job-052",
+      "status": "missing",
+      "latestRecordSha256": "d9c226414205892714af44a647e6cd17567eb9eace852741cf96ec535a8a5f07",
+      "snapshots": [
+        {
+          "path": "records/job-052/0000.json",
+          "sha256": "d9c226414205892714af44a647e6cd17567eb9eace852741cf96ec535a8a5f07"
+        }
+      ]
+    },
+    {
+      "jobId": "job-053",
+      "status": "missing",
+      "latestRecordSha256": "69ae3a6fc218f7e7aa4232d94b130703198ba888db58aa4a5fe56af07903a03c",
+      "snapshots": [
+        {
+          "path": "records/job-053/0000.json",
+          "sha256": "69ae3a6fc218f7e7aa4232d94b130703198ba888db58aa4a5fe56af07903a03c"
+        }
+      ]
+    },
+    {
+      "jobId": "job-054",
+      "status": "missing",
+      "latestRecordSha256": "61559dfdf1f0a4d63e0496cf6f59baf93d9df82d36c4ca58d4946c70b076b2bb",
+      "snapshots": [
+        {
+          "path": "records/job-054/0000.json",
+          "sha256": "61559dfdf1f0a4d63e0496cf6f59baf93d9df82d36c4ca58d4946c70b076b2bb"
+        }
+      ]
+    },
+    {
+      "jobId": "job-055",
+      "status": "missing",
+      "latestRecordSha256": "e75f997d7b074bd11f8b551f4900a42d3d4f3d2decec7cbf0ec047f83ea2236e",
+      "snapshots": [
+        {
+          "path": "records/job-055/0000.json",
+          "sha256": "e75f997d7b074bd11f8b551f4900a42d3d4f3d2decec7cbf0ec047f83ea2236e"
+        }
+      ]
+    },
+    {
+      "jobId": "job-056",
+      "status": "missing",
+      "latestRecordSha256": "958e2df1475b0f84eab280e6cb15f30a21b5975e07121c85e913b20bd67fc5bc",
+      "snapshots": [
+        {
+          "path": "records/job-056/0000.json",
+          "sha256": "958e2df1475b0f84eab280e6cb15f30a21b5975e07121c85e913b20bd67fc5bc"
+        }
+      ]
+    },
+    {
+      "jobId": "job-057",
+      "status": "missing",
+      "latestRecordSha256": "3fcf5b12e09c65406fba0e48d601cdfb4897bc27d8fc37f37026115e49bee490",
+      "snapshots": [
+        {
+          "path": "records/job-057/0000.json",
+          "sha256": "3fcf5b12e09c65406fba0e48d601cdfb4897bc27d8fc37f37026115e49bee490"
+        }
+      ]
+    },
+    {
+      "jobId": "job-058",
+      "status": "missing",
+      "latestRecordSha256": "b0b1a3f7b3867ee07cb590b8718919ed66e7274de08a2bd7a2fd5da61f0483ca",
+      "snapshots": [
+        {
+          "path": "records/job-058/0000.json",
+          "sha256": "b0b1a3f7b3867ee07cb590b8718919ed66e7274de08a2bd7a2fd5da61f0483ca"
+        }
+      ]
+    },
+    {
+      "jobId": "job-059",
+      "status": "missing",
+      "latestRecordSha256": "0cf857111756e02cdc052cf81394ef6547f1c739f58fbb239ebf6ab40df2ccaa",
+      "snapshots": [
+        {
+          "path": "records/job-059/0000.json",
+          "sha256": "0cf857111756e02cdc052cf81394ef6547f1c739f58fbb239ebf6ab40df2ccaa"
+        }
+      ]
+    },
+    {
+      "jobId": "job-060",
+      "status": "missing",
+      "latestRecordSha256": "fde811fa879e8b7ba1bacc63f44e4c7123efa093c06bc7365b318a640ddf078c",
+      "snapshots": [
+        {
+          "path": "records/job-060/0000.json",
+          "sha256": "fde811fa879e8b7ba1bacc63f44e4c7123efa093c06bc7365b318a640ddf078c"
+        }
+      ]
+    },
+    {
+      "jobId": "job-061",
+      "status": "missing",
+      "latestRecordSha256": "57fa7469192d537341963b9b24cf6083a50421c33c3a8b7237cd162b65eeee08",
+      "snapshots": [
+        {
+          "path": "records/job-061/0000.json",
+          "sha256": "57fa7469192d537341963b9b24cf6083a50421c33c3a8b7237cd162b65eeee08"
+        }
+      ]
+    },
+    {
+      "jobId": "job-062",
+      "status": "missing",
+      "latestRecordSha256": "0e234183655705a8ade210b756b3ba7a075356deee674c4f9c43b521fd2907fc",
+      "snapshots": [
+        {
+          "path": "records/job-062/0000.json",
+          "sha256": "0e234183655705a8ade210b756b3ba7a075356deee674c4f9c43b521fd2907fc"
+        }
+      ]
+    },
+    {
+      "jobId": "job-063",
+      "status": "missing",
+      "latestRecordSha256": "9ea4e771dfe6d5b2b6d5124e0bf3fb61f160e73a5507915ec70beb2877fd3f58",
+      "snapshots": [
+        {
+          "path": "records/job-063/0000.json",
+          "sha256": "9ea4e771dfe6d5b2b6d5124e0bf3fb61f160e73a5507915ec70beb2877fd3f58"
+        }
+      ]
+    },
+    {
+      "jobId": "job-064",
+      "status": "missing",
+      "latestRecordSha256": "f34ae52adef125098146b36fd5fb99ff684d2d8d571f9ab257faf08e45cafbb4",
+      "snapshots": [
+        {
+          "path": "records/job-064/0000.json",
+          "sha256": "f34ae52adef125098146b36fd5fb99ff684d2d8d571f9ab257faf08e45cafbb4"
+        }
+      ]
+    },
+    {
+      "jobId": "job-065",
+      "status": "missing",
+      "latestRecordSha256": "ea7d7a089bc6cfc6bd13fbb4186fa44667ec0bbe583d08ad8ac404ae5c4b71a7",
+      "snapshots": [
+        {
+          "path": "records/job-065/0000.json",
+          "sha256": "ea7d7a089bc6cfc6bd13fbb4186fa44667ec0bbe583d08ad8ac404ae5c4b71a7"
+        }
+      ]
+    },
+    {
+      "jobId": "job-066",
+      "status": "missing",
+      "latestRecordSha256": "832baab2bfa5c3fbe64d990ba53b762b3f4a4b5bae2e66482800d0bad1393cae",
+      "snapshots": [
+        {
+          "path": "records/job-066/0000.json",
+          "sha256": "832baab2bfa5c3fbe64d990ba53b762b3f4a4b5bae2e66482800d0bad1393cae"
+        }
+      ]
+    },
+    {
+      "jobId": "job-067",
+      "status": "missing",
+      "latestRecordSha256": "99d78975ea2dd36c860b14a8d078dc8da53c3d79dc8a0825e7ef15f257fe1c47",
+      "snapshots": [
+        {
+          "path": "records/job-067/0000.json",
+          "sha256": "99d78975ea2dd36c860b14a8d078dc8da53c3d79dc8a0825e7ef15f257fe1c47"
+        }
+      ]
+    },
+    {
+      "jobId": "job-068",
+      "status": "missing",
+      "latestRecordSha256": "908772d30335f5a71ef66674477ce5da1bba201dc78f3afc3f804b5f6a4d1a1b",
+      "snapshots": [
+        {
+          "path": "records/job-068/0000.json",
+          "sha256": "908772d30335f5a71ef66674477ce5da1bba201dc78f3afc3f804b5f6a4d1a1b"
+        }
+      ]
+    },
+    {
+      "jobId": "job-069",
+      "status": "missing",
+      "latestRecordSha256": "55488f205273336325d42f93559f9705b3f7cf86b1730b88e89e7f1f2fb298dc",
+      "snapshots": [
+        {
+          "path": "records/job-069/0000.json",
+          "sha256": "55488f205273336325d42f93559f9705b3f7cf86b1730b88e89e7f1f2fb298dc"
+        }
+      ]
+    },
+    {
+      "jobId": "job-070",
+      "status": "missing",
+      "latestRecordSha256": "23b83c291299012b3e7b6ab9dfb897dc69c8e2688f2dfe95bfd71a0f1451e0ed",
+      "snapshots": [
+        {
+          "path": "records/job-070/0000.json",
+          "sha256": "23b83c291299012b3e7b6ab9dfb897dc69c8e2688f2dfe95bfd71a0f1451e0ed"
+        }
+      ]
+    },
+    {
+      "jobId": "job-071",
+      "status": "missing",
+      "latestRecordSha256": "4086932963a868496fd0ee8c7f9e8b82d7379f7fc82b9fb45e6114166fa0dbde",
+      "snapshots": [
+        {
+          "path": "records/job-071/0000.json",
+          "sha256": "4086932963a868496fd0ee8c7f9e8b82d7379f7fc82b9fb45e6114166fa0dbde"
+        }
+      ]
+    },
+    {
+      "jobId": "job-072",
+      "status": "missing",
+      "latestRecordSha256": "772161bafe4b98802760e2fd6100776365aaae3285e4214d86268aa7008ef6f1",
+      "snapshots": [
+        {
+          "path": "records/job-072/0000.json",
+          "sha256": "772161bafe4b98802760e2fd6100776365aaae3285e4214d86268aa7008ef6f1"
+        }
+      ]
+    },
+    {
+      "jobId": "job-073",
+      "status": "missing",
+      "latestRecordSha256": "2428bd45b1b382cb9710a4cae4f33a9e527a8a798662d1053263a85ac37d7c28",
+      "snapshots": [
+        {
+          "path": "records/job-073/0000.json",
+          "sha256": "2428bd45b1b382cb9710a4cae4f33a9e527a8a798662d1053263a85ac37d7c28"
+        }
+      ]
+    },
+    {
+      "jobId": "job-074",
+      "status": "missing",
+      "latestRecordSha256": "eafbb988542c332f2e74864403c550189221e710368cebef88eaca68d222684f",
+      "snapshots": [
+        {
+          "path": "records/job-074/0000.json",
+          "sha256": "eafbb988542c332f2e74864403c550189221e710368cebef88eaca68d222684f"
+        }
+      ]
+    },
+    {
+      "jobId": "job-075",
+      "status": "missing",
+      "latestRecordSha256": "63570b6f74179bfb50ceccc12ae87f58df4f1f0136c23a24e1d1ae1794627571",
+      "snapshots": [
+        {
+          "path": "records/job-075/0000.json",
+          "sha256": "63570b6f74179bfb50ceccc12ae87f58df4f1f0136c23a24e1d1ae1794627571"
+        }
+      ]
+    },
+    {
+      "jobId": "job-076",
+      "status": "missing",
+      "latestRecordSha256": "6355a8ab0d92971980b78fb6b2ef8a451c9a1762157d0cde8ead2b1f39067360",
+      "snapshots": [
+        {
+          "path": "records/job-076/0000.json",
+          "sha256": "6355a8ab0d92971980b78fb6b2ef8a451c9a1762157d0cde8ead2b1f39067360"
+        }
+      ]
+    },
+    {
+      "jobId": "job-077",
+      "status": "missing",
+      "latestRecordSha256": "3fdc780efc870b9786caad09d2f6df68d4d001b105f8529e923af0bc89d09b6c",
+      "snapshots": [
+        {
+          "path": "records/job-077/0000.json",
+          "sha256": "3fdc780efc870b9786caad09d2f6df68d4d001b105f8529e923af0bc89d09b6c"
+        }
+      ]
+    },
+    {
+      "jobId": "job-078",
+      "status": "missing",
+      "latestRecordSha256": "ab920abce5a8dc6c6f38fd886fa2fd458f5f3c30fd28b2860889683d31ffade4",
+      "snapshots": [
+        {
+          "path": "records/job-078/0000.json",
+          "sha256": "ab920abce5a8dc6c6f38fd886fa2fd458f5f3c30fd28b2860889683d31ffade4"
+        }
+      ]
+    },
+    {
+      "jobId": "job-079",
+      "status": "missing",
+      "latestRecordSha256": "e729abe15a085f0af92a20f8c6fa207ec29a2e52b919d31f87498e0c8116cbdd",
+      "snapshots": [
+        {
+          "path": "records/job-079/0000.json",
+          "sha256": "e729abe15a085f0af92a20f8c6fa207ec29a2e52b919d31f87498e0c8116cbdd"
+        }
+      ]
+    },
+    {
+      "jobId": "job-080",
+      "status": "missing",
+      "latestRecordSha256": "f5819bae7c9da90fc4ecbeb5315e4c8a008e92a660bc6fee094749b3af5ebd7e",
+      "snapshots": [
+        {
+          "path": "records/job-080/0000.json",
+          "sha256": "f5819bae7c9da90fc4ecbeb5315e4c8a008e92a660bc6fee094749b3af5ebd7e"
+        }
+      ]
+    },
+    {
+      "jobId": "job-081",
+      "status": "missing",
+      "latestRecordSha256": "e299edae2537795649757ecf0df3107d1cea1f11083664ea03e8ea5ea799c580",
+      "snapshots": [
+        {
+          "path": "records/job-081/0000.json",
+          "sha256": "e299edae2537795649757ecf0df3107d1cea1f11083664ea03e8ea5ea799c580"
+        }
+      ]
+    },
+    {
+      "jobId": "job-082",
+      "status": "missing",
+      "latestRecordSha256": "18503a231d7eac30d833f4c7f410e54122b732bd9fcba26a935ee56624ef9c56",
+      "snapshots": [
+        {
+          "path": "records/job-082/0000.json",
+          "sha256": "18503a231d7eac30d833f4c7f410e54122b732bd9fcba26a935ee56624ef9c56"
+        }
+      ]
+    },
+    {
+      "jobId": "job-083",
+      "status": "missing",
+      "latestRecordSha256": "19c098f1bf1c29dadc2c459f649d64d9ff46c569c836ac97ff053203c317ace8",
+      "snapshots": [
+        {
+          "path": "records/job-083/0000.json",
+          "sha256": "19c098f1bf1c29dadc2c459f649d64d9ff46c569c836ac97ff053203c317ace8"
+        }
+      ]
+    },
+    {
+      "jobId": "job-084",
+      "status": "missing",
+      "latestRecordSha256": "c66d3495b7449ff1bbae9086ba6423a3f9ff78b558ded08bf58faa6587563fb3",
+      "snapshots": [
+        {
+          "path": "records/job-084/0000.json",
+          "sha256": "c66d3495b7449ff1bbae9086ba6423a3f9ff78b558ded08bf58faa6587563fb3"
+        }
+      ]
+    },
+    {
+      "jobId": "job-085",
+      "status": "missing",
+      "latestRecordSha256": "68878129b638dd0d69d93851ad8e3786f4eed98950fc5771a2109046b3cf790d",
+      "snapshots": [
+        {
+          "path": "records/job-085/0000.json",
+          "sha256": "68878129b638dd0d69d93851ad8e3786f4eed98950fc5771a2109046b3cf790d"
+        }
+      ]
+    },
+    {
+      "jobId": "job-086",
+      "status": "missing",
+      "latestRecordSha256": "7854b3ccdcd5dd63d322aa0e263f20966392a1ed12639a828e0bb9596b5486fd",
+      "snapshots": [
+        {
+          "path": "records/job-086/0000.json",
+          "sha256": "7854b3ccdcd5dd63d322aa0e263f20966392a1ed12639a828e0bb9596b5486fd"
+        }
+      ]
+    },
+    {
+      "jobId": "job-087",
+      "status": "missing",
+      "latestRecordSha256": "69f703502c296f770e48e976bae63e40154a146060e861c530289d8babb8cde8",
+      "snapshots": [
+        {
+          "path": "records/job-087/0000.json",
+          "sha256": "69f703502c296f770e48e976bae63e40154a146060e861c530289d8babb8cde8"
+        }
+      ]
+    },
+    {
+      "jobId": "job-088",
+      "status": "missing",
+      "latestRecordSha256": "ee551ee9ba4c0b75032414703c573e43e1345859656ce6ce1b17942e1cad929c",
+      "snapshots": [
+        {
+          "path": "records/job-088/0000.json",
+          "sha256": "ee551ee9ba4c0b75032414703c573e43e1345859656ce6ce1b17942e1cad929c"
+        }
+      ]
+    },
+    {
+      "jobId": "job-089",
+      "status": "missing",
+      "latestRecordSha256": "d07cef9298e57bd513fab9518e1c8d49cbb108a5a3adbfef0cdb88fb759206e1",
+      "snapshots": [
+        {
+          "path": "records/job-089/0000.json",
+          "sha256": "d07cef9298e57bd513fab9518e1c8d49cbb108a5a3adbfef0cdb88fb759206e1"
+        }
+      ]
+    },
+    {
+      "jobId": "job-090",
+      "status": "missing",
+      "latestRecordSha256": "9b4df3e23ecf40da0a73f94c373f60c191172428ad2f6ddb9c3f5c8bd55634ac",
+      "snapshots": [
+        {
+          "path": "records/job-090/0000.json",
+          "sha256": "9b4df3e23ecf40da0a73f94c373f60c191172428ad2f6ddb9c3f5c8bd55634ac"
+        }
+      ]
+    },
+    {
+      "jobId": "job-091",
+      "status": "missing",
+      "latestRecordSha256": "caa42fd060392a90df865f254087dd0d627f9877ae2a6956e3df3a40c562e6e9",
+      "snapshots": [
+        {
+          "path": "records/job-091/0000.json",
+          "sha256": "caa42fd060392a90df865f254087dd0d627f9877ae2a6956e3df3a40c562e6e9"
+        }
+      ]
+    },
+    {
+      "jobId": "job-092",
+      "status": "missing",
+      "latestRecordSha256": "e86209a8ac84fcfc7bb87bfbd0eb171954582b1ef9312ef6afccc7fa451d06ce",
+      "snapshots": [
+        {
+          "path": "records/job-092/0000.json",
+          "sha256": "e86209a8ac84fcfc7bb87bfbd0eb171954582b1ef9312ef6afccc7fa451d06ce"
+        }
+      ]
+    },
+    {
+      "jobId": "job-093",
+      "status": "missing",
+      "latestRecordSha256": "17d03e0d06902ccf8c42d2948e3946cc13d096226b98b6b588e13415e9c19b1e",
+      "snapshots": [
+        {
+          "path": "records/job-093/0000.json",
+          "sha256": "17d03e0d06902ccf8c42d2948e3946cc13d096226b98b6b588e13415e9c19b1e"
+        }
+      ]
+    },
+    {
+      "jobId": "job-094",
+      "status": "missing",
+      "latestRecordSha256": "b6a125547d2d7cf6b5e72288e38372adf744c668abd65c2535215bd0dffa4d0f",
+      "snapshots": [
+        {
+          "path": "records/job-094/0000.json",
+          "sha256": "b6a125547d2d7cf6b5e72288e38372adf744c668abd65c2535215bd0dffa4d0f"
+        }
+      ]
+    },
+    {
+      "jobId": "job-095",
+      "status": "missing",
+      "latestRecordSha256": "2db84a6c963cbc1663c5920e65f3cf1887f9d1d873297bb42560edf771d842a1",
+      "snapshots": [
+        {
+          "path": "records/job-095/0000.json",
+          "sha256": "2db84a6c963cbc1663c5920e65f3cf1887f9d1d873297bb42560edf771d842a1"
+        }
+      ]
+    },
+    {
+      "jobId": "job-096",
+      "status": "missing",
+      "latestRecordSha256": "6801f6acde7473c3bcdc8de59968951977be2eb4d12365a1cbcf300d58d39d05",
+      "snapshots": [
+        {
+          "path": "records/job-096/0000.json",
+          "sha256": "6801f6acde7473c3bcdc8de59968951977be2eb4d12365a1cbcf300d58d39d05"
+        }
+      ]
+    },
+    {
+      "jobId": "job-097",
+      "status": "missing",
+      "latestRecordSha256": "ab8b5c24ace04ad3e4fa83ca50701e1b928ec02d82cb9e4c1dbf061e177cbad8",
+      "snapshots": [
+        {
+          "path": "records/job-097/0000.json",
+          "sha256": "ab8b5c24ace04ad3e4fa83ca50701e1b928ec02d82cb9e4c1dbf061e177cbad8"
+        }
+      ]
+    },
+    {
+      "jobId": "job-098",
+      "status": "missing",
+      "latestRecordSha256": "a5a98c44e63eb7c9ec7a81ece55a24b75c153dd4c1fcb831d17f084687b58cc0",
+      "snapshots": [
+        {
+          "path": "records/job-098/0000.json",
+          "sha256": "a5a98c44e63eb7c9ec7a81ece55a24b75c153dd4c1fcb831d17f084687b58cc0"
+        }
+      ]
+    },
+    {
+      "jobId": "job-099",
+      "status": "missing",
+      "latestRecordSha256": "13cd0221cda3c94d189843bf84d747545a4617342338194600b8429668f8dc49",
+      "snapshots": [
+        {
+          "path": "records/job-099/0000.json",
+          "sha256": "13cd0221cda3c94d189843bf84d747545a4617342338194600b8429668f8dc49"
+        }
+      ]
+    },
+    {
+      "jobId": "job-100",
+      "status": "missing",
+      "latestRecordSha256": "e1ab5c62caa8cce87849f48b5376074a7b165038645637347dbb034f5373e401",
+      "snapshots": [
+        {
+          "path": "records/job-100/0000.json",
+          "sha256": "e1ab5c62caa8cce87849f48b5376074a7b165038645637347dbb034f5373e401"
+        }
+      ]
+    },
+    {
+      "jobId": "job-101",
+      "status": "missing",
+      "latestRecordSha256": "5e98a23e99154f4f4eff12513c415d6a1c68b6ed213bbb84b6e77b6fe4cadd9a",
+      "snapshots": [
+        {
+          "path": "records/job-101/0000.json",
+          "sha256": "5e98a23e99154f4f4eff12513c415d6a1c68b6ed213bbb84b6e77b6fe4cadd9a"
+        }
+      ]
+    },
+    {
+      "jobId": "job-102",
+      "status": "missing",
+      "latestRecordSha256": "94a18c54034f3bb611988e658ab4c5e262634b3a7309e45a9547808646c088a6",
+      "snapshots": [
+        {
+          "path": "records/job-102/0000.json",
+          "sha256": "94a18c54034f3bb611988e658ab4c5e262634b3a7309e45a9547808646c088a6"
+        }
+      ]
+    },
+    {
+      "jobId": "job-103",
+      "status": "missing",
+      "latestRecordSha256": "69123322b02a545691dbf02668e52c6f00f95d4ecea4e780055a59eec53ead12",
+      "snapshots": [
+        {
+          "path": "records/job-103/0000.json",
+          "sha256": "69123322b02a545691dbf02668e52c6f00f95d4ecea4e780055a59eec53ead12"
+        }
+      ]
+    },
+    {
+      "jobId": "job-104",
+      "status": "missing",
+      "latestRecordSha256": "dc5c3224fc054a637f6282326cd231b99528ea9d17695d24357477a272544c41",
+      "snapshots": [
+        {
+          "path": "records/job-104/0000.json",
+          "sha256": "dc5c3224fc054a637f6282326cd231b99528ea9d17695d24357477a272544c41"
+        }
+      ]
+    },
+    {
+      "jobId": "job-105",
+      "status": "missing",
+      "latestRecordSha256": "565225f26debd9cf48f10aa6e0696f54bfb40edd0d79eaef2dc3934d0321f81d",
+      "snapshots": [
+        {
+          "path": "records/job-105/0000.json",
+          "sha256": "565225f26debd9cf48f10aa6e0696f54bfb40edd0d79eaef2dc3934d0321f81d"
+        }
+      ]
+    },
+    {
+      "jobId": "job-106",
+      "status": "missing",
+      "latestRecordSha256": "5edca06880ad538f71be47865a7979f2d0f53c706c90a7cfe55edcae3315b04a",
+      "snapshots": [
+        {
+          "path": "records/job-106/0000.json",
+          "sha256": "5edca06880ad538f71be47865a7979f2d0f53c706c90a7cfe55edcae3315b04a"
+        }
+      ]
+    },
+    {
+      "jobId": "job-107",
+      "status": "missing",
+      "latestRecordSha256": "adedc656dc5644a3a77de51fd94119292519650bc6ab31e799cbf3301ea50176",
+      "snapshots": [
+        {
+          "path": "records/job-107/0000.json",
+          "sha256": "adedc656dc5644a3a77de51fd94119292519650bc6ab31e799cbf3301ea50176"
+        }
+      ]
+    },
+    {
+      "jobId": "job-108",
+      "status": "missing",
+      "latestRecordSha256": "678cf15fe9184524aa748a95868dc6745d31555064944bca1e55c1741ac6199c",
+      "snapshots": [
+        {
+          "path": "records/job-108/0000.json",
+          "sha256": "678cf15fe9184524aa748a95868dc6745d31555064944bca1e55c1741ac6199c"
+        }
+      ]
+    },
+    {
+      "jobId": "job-109",
+      "status": "missing",
+      "latestRecordSha256": "b35b3de71f73bc56be321fa0216cd448239d7febc87ee436b6cfc27fc38f1f59",
+      "snapshots": [
+        {
+          "path": "records/job-109/0000.json",
+          "sha256": "b35b3de71f73bc56be321fa0216cd448239d7febc87ee436b6cfc27fc38f1f59"
+        }
+      ]
+    },
+    {
+      "jobId": "job-110",
+      "status": "missing",
+      "latestRecordSha256": "5f0c0f1782b866fc8e15994253e06dad20f1d33ef94f73bb05008d2b730f8ccf",
+      "snapshots": [
+        {
+          "path": "records/job-110/0000.json",
+          "sha256": "5f0c0f1782b866fc8e15994253e06dad20f1d33ef94f73bb05008d2b730f8ccf"
+        }
+      ]
+    },
+    {
+      "jobId": "job-111",
+      "status": "missing",
+      "latestRecordSha256": "0253d3d3fb7d0f111f394997436ce5b60102ec67189ad1b3302c699a5cef1328",
+      "snapshots": [
+        {
+          "path": "records/job-111/0000.json",
+          "sha256": "0253d3d3fb7d0f111f394997436ce5b60102ec67189ad1b3302c699a5cef1328"
+        }
+      ]
+    },
+    {
+      "jobId": "job-112",
+      "status": "missing",
+      "latestRecordSha256": "033e011c055af91e514160ff678a325e50a8be9050fe3bff98205ed12b244e21",
+      "snapshots": [
+        {
+          "path": "records/job-112/0000.json",
+          "sha256": "033e011c055af91e514160ff678a325e50a8be9050fe3bff98205ed12b244e21"
+        }
+      ]
+    },
+    {
+      "jobId": "job-113",
+      "status": "missing",
+      "latestRecordSha256": "eac36cb2bfa5c8cd7c682c379f27b6af12028657cfd7aefd7edf23a0b97ccbba",
+      "snapshots": [
+        {
+          "path": "records/job-113/0000.json",
+          "sha256": "eac36cb2bfa5c8cd7c682c379f27b6af12028657cfd7aefd7edf23a0b97ccbba"
+        }
+      ]
+    },
+    {
+      "jobId": "job-114",
+      "status": "missing",
+      "latestRecordSha256": "57a1259a64c185f800ad941e11ec0316b0a3512da3ed0abc99123783fdef1fec",
+      "snapshots": [
+        {
+          "path": "records/job-114/0000.json",
+          "sha256": "57a1259a64c185f800ad941e11ec0316b0a3512da3ed0abc99123783fdef1fec"
+        }
+      ]
+    },
+    {
+      "jobId": "job-115",
+      "status": "missing",
+      "latestRecordSha256": "198ff06652929a093845785abd7d1dedd4a0180a6fe5a0686069695d48a02476",
+      "snapshots": [
+        {
+          "path": "records/job-115/0000.json",
+          "sha256": "198ff06652929a093845785abd7d1dedd4a0180a6fe5a0686069695d48a02476"
+        }
+      ]
+    },
+    {
+      "jobId": "job-116",
+      "status": "missing",
+      "latestRecordSha256": "7dedd15559a37985b97757268d6a990a5425b966038a9ce63c7033a3f57552fa",
+      "snapshots": [
+        {
+          "path": "records/job-116/0000.json",
+          "sha256": "7dedd15559a37985b97757268d6a990a5425b966038a9ce63c7033a3f57552fa"
+        }
+      ]
+    },
+    {
+      "jobId": "job-117",
+      "status": "missing",
+      "latestRecordSha256": "b0298fa6e349c5cad8e8d27be9dfd1d3b83e31c0dcdb54a8371a2196fe100e41",
+      "snapshots": [
+        {
+          "path": "records/job-117/0000.json",
+          "sha256": "b0298fa6e349c5cad8e8d27be9dfd1d3b83e31c0dcdb54a8371a2196fe100e41"
+        }
+      ]
+    },
+    {
+      "jobId": "job-118",
+      "status": "missing",
+      "latestRecordSha256": "d23894a9e197b658aeb5159ead9cf7a9a84e1fec91ec82cb83e8a3e23b5227b7",
+      "snapshots": [
+        {
+          "path": "records/job-118/0000.json",
+          "sha256": "d23894a9e197b658aeb5159ead9cf7a9a84e1fec91ec82cb83e8a3e23b5227b7"
+        }
+      ]
+    },
+    {
+      "jobId": "job-119",
+      "status": "missing",
+      "latestRecordSha256": "f70a00a0803168f5177e9433b51bbdef895867914e56d716db79547db3d4740b",
+      "snapshots": [
+        {
+          "path": "records/job-119/0000.json",
+          "sha256": "f70a00a0803168f5177e9433b51bbdef895867914e56d716db79547db3d4740b"
+        }
+      ]
+    },
+    {
+      "jobId": "job-120",
+      "status": "missing",
+      "latestRecordSha256": "5a736aeefac2039475876401c5382ad3c4b043d64dc4b3e7c08bf4e3fc3f534c",
+      "snapshots": [
+        {
+          "path": "records/job-120/0000.json",
+          "sha256": "5a736aeefac2039475876401c5382ad3c4b043d64dc4b3e7c08bf4e3fc3f534c"
+        }
+      ]
+    },
+    {
+      "jobId": "job-121",
+      "status": "missing",
+      "latestRecordSha256": "d5e7394b7515e85c73de0e86cd3f58c5fd4822c173129e1098c0d4378c29ff95",
+      "snapshots": [
+        {
+          "path": "records/job-121/0000.json",
+          "sha256": "d5e7394b7515e85c73de0e86cd3f58c5fd4822c173129e1098c0d4378c29ff95"
+        }
+      ]
+    },
+    {
+      "jobId": "job-122",
+      "status": "missing",
+      "latestRecordSha256": "389cd6fb4783588d34ee6c38109ccf29aad8005a5e5dce1592fb1d68d832524b",
+      "snapshots": [
+        {
+          "path": "records/job-122/0000.json",
+          "sha256": "389cd6fb4783588d34ee6c38109ccf29aad8005a5e5dce1592fb1d68d832524b"
+        }
+      ]
+    },
+    {
+      "jobId": "job-123",
+      "status": "missing",
+      "latestRecordSha256": "d78a6b3b4c512e773892a298cb0ffc12b3c07947ff2fbf4db8d2f630a53ac618",
+      "snapshots": [
+        {
+          "path": "records/job-123/0000.json",
+          "sha256": "d78a6b3b4c512e773892a298cb0ffc12b3c07947ff2fbf4db8d2f630a53ac618"
+        }
+      ]
+    },
+    {
+      "jobId": "job-124",
+      "status": "missing",
+      "latestRecordSha256": "f55f00c6cd9778f8d5bbf7bf61b4cd2fb4e2a646192a33176b0e006c73a6f3dc",
+      "snapshots": [
+        {
+          "path": "records/job-124/0000.json",
+          "sha256": "f55f00c6cd9778f8d5bbf7bf61b4cd2fb4e2a646192a33176b0e006c73a6f3dc"
+        }
+      ]
+    },
+    {
+      "jobId": "job-125",
+      "status": "missing",
+      "latestRecordSha256": "49907a7af0c892b6288eee6813963a806df45f333ecebbde2c651bfb1989e89b",
+      "snapshots": [
+        {
+          "path": "records/job-125/0000.json",
+          "sha256": "49907a7af0c892b6288eee6813963a806df45f333ecebbde2c651bfb1989e89b"
+        }
+      ]
+    },
+    {
+      "jobId": "job-126",
+      "status": "missing",
+      "latestRecordSha256": "30c3bc67b0f3cc33c1585e9647c16840a37bcc6be2ea2e2c24677d5484daae02",
+      "snapshots": [
+        {
+          "path": "records/job-126/0000.json",
+          "sha256": "30c3bc67b0f3cc33c1585e9647c16840a37bcc6be2ea2e2c24677d5484daae02"
+        }
+      ]
+    },
+    {
+      "jobId": "job-127",
+      "status": "missing",
+      "latestRecordSha256": "aab8af9c90f3029817fd123e1cf077543529714172538802e75656d1b8a181be",
+      "snapshots": [
+        {
+          "path": "records/job-127/0000.json",
+          "sha256": "aab8af9c90f3029817fd123e1cf077543529714172538802e75656d1b8a181be"
+        }
+      ]
+    },
+    {
+      "jobId": "job-128",
+      "status": "missing",
+      "latestRecordSha256": "e26a6beba83c660893f1bdd86c82019d9a6e80e2c4d67a602ca29dcdbc8e7ac0",
+      "snapshots": [
+        {
+          "path": "records/job-128/0000.json",
+          "sha256": "e26a6beba83c660893f1bdd86c82019d9a6e80e2c4d67a602ca29dcdbc8e7ac0"
+        }
+      ]
+    },
+    {
+      "jobId": "job-129",
+      "status": "missing",
+      "latestRecordSha256": "dfaa109548bf681c2a43607ce6e1d75a744d6a2fa09c2a1c09cd8e765b0387f4",
+      "snapshots": [
+        {
+          "path": "records/job-129/0000.json",
+          "sha256": "dfaa109548bf681c2a43607ce6e1d75a744d6a2fa09c2a1c09cd8e765b0387f4"
+        }
+      ]
+    },
+    {
+      "jobId": "job-130",
+      "status": "missing",
+      "latestRecordSha256": "914b36271fcfbdd4dadee9a6f7fe902f9740470243c8f1c2c0dec5176c7b4b09",
+      "snapshots": [
+        {
+          "path": "records/job-130/0000.json",
+          "sha256": "914b36271fcfbdd4dadee9a6f7fe902f9740470243c8f1c2c0dec5176c7b4b09"
+        }
+      ]
+    },
+    {
+      "jobId": "job-131",
+      "status": "missing",
+      "latestRecordSha256": "659e870cadd3b2be9187caf48518a095bd93996c760cd03f707833520e6f7b15",
+      "snapshots": [
+        {
+          "path": "records/job-131/0000.json",
+          "sha256": "659e870cadd3b2be9187caf48518a095bd93996c760cd03f707833520e6f7b15"
+        }
+      ]
+    },
+    {
+      "jobId": "job-132",
+      "status": "missing",
+      "latestRecordSha256": "e987deb8de47b0868c692d287ff3f799b1e48fe7f0acbddae456fd6ef1153b25",
+      "snapshots": [
+        {
+          "path": "records/job-132/0000.json",
+          "sha256": "e987deb8de47b0868c692d287ff3f799b1e48fe7f0acbddae456fd6ef1153b25"
+        }
+      ]
+    },
+    {
+      "jobId": "job-133",
+      "status": "missing",
+      "latestRecordSha256": "ea8455d5f630206a52c966efc94150780d508088171834c8b04ff01f2b96c3b8",
+      "snapshots": [
+        {
+          "path": "records/job-133/0000.json",
+          "sha256": "ea8455d5f630206a52c966efc94150780d508088171834c8b04ff01f2b96c3b8"
+        }
+      ]
+    },
+    {
+      "jobId": "job-134",
+      "status": "missing",
+      "latestRecordSha256": "22182c2cf93ed309afb49f91c263acaf316da46d0becfdddfafbe3d150f5e15f",
+      "snapshots": [
+        {
+          "path": "records/job-134/0000.json",
+          "sha256": "22182c2cf93ed309afb49f91c263acaf316da46d0becfdddfafbe3d150f5e15f"
+        }
+      ]
+    },
+    {
+      "jobId": "job-135",
+      "status": "missing",
+      "latestRecordSha256": "04ca692ea143c5330a3328ae630423e5cb4af9634fb7e582ac6a953734b1736a",
+      "snapshots": [
+        {
+          "path": "records/job-135/0000.json",
+          "sha256": "04ca692ea143c5330a3328ae630423e5cb4af9634fb7e582ac6a953734b1736a"
+        }
+      ]
+    },
+    {
+      "jobId": "job-136",
+      "status": "missing",
+      "latestRecordSha256": "64af536518097b1a19b4587400612a90c31dfe32b51954db02de2a2ea7cf3a55",
+      "snapshots": [
+        {
+          "path": "records/job-136/0000.json",
+          "sha256": "64af536518097b1a19b4587400612a90c31dfe32b51954db02de2a2ea7cf3a55"
+        }
+      ]
+    },
+    {
+      "jobId": "job-137",
+      "status": "missing",
+      "latestRecordSha256": "ae0a13b867bf3e0e5da9521009b134dfa34622c9c2d4786b04a0ebe82d47dae2",
+      "snapshots": [
+        {
+          "path": "records/job-137/0000.json",
+          "sha256": "ae0a13b867bf3e0e5da9521009b134dfa34622c9c2d4786b04a0ebe82d47dae2"
+        }
+      ]
+    },
+    {
+      "jobId": "job-138",
+      "status": "missing",
+      "latestRecordSha256": "39630f4fbd6b23823651fb4822f09c480c9a8d33dd2d6185da001c0c5de4965c",
+      "snapshots": [
+        {
+          "path": "records/job-138/0000.json",
+          "sha256": "39630f4fbd6b23823651fb4822f09c480c9a8d33dd2d6185da001c0c5de4965c"
+        }
+      ]
+    },
+    {
+      "jobId": "job-139",
+      "status": "missing",
+      "latestRecordSha256": "a5f4f6b808277343fc37dbd7fb2dc6d77cbd95a12988c563e8047376db4b6bbc",
+      "snapshots": [
+        {
+          "path": "records/job-139/0000.json",
+          "sha256": "a5f4f6b808277343fc37dbd7fb2dc6d77cbd95a12988c563e8047376db4b6bbc"
+        }
+      ]
+    },
+    {
+      "jobId": "job-140",
+      "status": "missing",
+      "latestRecordSha256": "be720e50994e298d1413e8b9b5c5c845276752bbb48b3fad7d04516e706c14e5",
+      "snapshots": [
+        {
+          "path": "records/job-140/0000.json",
+          "sha256": "be720e50994e298d1413e8b9b5c5c845276752bbb48b3fad7d04516e706c14e5"
+        }
+      ]
+    },
+    {
+      "jobId": "job-141",
+      "status": "missing",
+      "latestRecordSha256": "34339fd6fcc60d3a4b3673342b9dd3d1904064912667cc8e8a0e39719fdc2ea9",
+      "snapshots": [
+        {
+          "path": "records/job-141/0000.json",
+          "sha256": "34339fd6fcc60d3a4b3673342b9dd3d1904064912667cc8e8a0e39719fdc2ea9"
+        }
+      ]
+    },
+    {
+      "jobId": "job-142",
+      "status": "missing",
+      "latestRecordSha256": "34ee09c1008500da83936f65746a754bff4588b831154c6d98546e4e1cee2a32",
+      "snapshots": [
+        {
+          "path": "records/job-142/0000.json",
+          "sha256": "34ee09c1008500da83936f65746a754bff4588b831154c6d98546e4e1cee2a32"
+        }
+      ]
+    },
+    {
+      "jobId": "job-143",
+      "status": "missing",
+      "latestRecordSha256": "5ba98a9f8afa97a5aac57b913a1b97289c5ddd05e16d7b182e0a13636eca4c13",
+      "snapshots": [
+        {
+          "path": "records/job-143/0000.json",
+          "sha256": "5ba98a9f8afa97a5aac57b913a1b97289c5ddd05e16d7b182e0a13636eca4c13"
+        }
+      ]
+    },
+    {
+      "jobId": "job-144",
+      "status": "missing",
+      "latestRecordSha256": "687e82a85f1bc397b09998be85d6119b604913a0e34a004322382b5838d3b674",
+      "snapshots": [
+        {
+          "path": "records/job-144/0000.json",
+          "sha256": "687e82a85f1bc397b09998be85d6119b604913a0e34a004322382b5838d3b674"
+        }
+      ]
+    },
+    {
+      "jobId": "job-145",
+      "status": "missing",
+      "latestRecordSha256": "f17f2590a31807985b3d148695820cb0f24da236551059f75d686259ad03ce31",
+      "snapshots": [
+        {
+          "path": "records/job-145/0000.json",
+          "sha256": "f17f2590a31807985b3d148695820cb0f24da236551059f75d686259ad03ce31"
+        }
+      ]
+    },
+    {
+      "jobId": "job-146",
+      "status": "missing",
+      "latestRecordSha256": "7ce5cc8395cc5e1d2d0bcfbb5fcfde6dcc515a6fb3a5744541cb2f684897d86c",
+      "snapshots": [
+        {
+          "path": "records/job-146/0000.json",
+          "sha256": "7ce5cc8395cc5e1d2d0bcfbb5fcfde6dcc515a6fb3a5744541cb2f684897d86c"
+        }
+      ]
+    },
+    {
+      "jobId": "job-147",
+      "status": "missing",
+      "latestRecordSha256": "1da4694f94c9efb0b8aaf61a255e7a4443bada2d4a5e76b1ad5162d5fb5a22ec",
+      "snapshots": [
+        {
+          "path": "records/job-147/0000.json",
+          "sha256": "1da4694f94c9efb0b8aaf61a255e7a4443bada2d4a5e76b1ad5162d5fb5a22ec"
+        }
+      ]
+    },
+    {
+      "jobId": "job-148",
+      "status": "missing",
+      "latestRecordSha256": "b7cea21c8137f6366dd2e9220f374d63303f53bfad396dd2ff8bd7b77b662a8d",
+      "snapshots": [
+        {
+          "path": "records/job-148/0000.json",
+          "sha256": "b7cea21c8137f6366dd2e9220f374d63303f53bfad396dd2ff8bd7b77b662a8d"
+        }
+      ]
+    },
+    {
+      "jobId": "job-149",
+      "status": "missing",
+      "latestRecordSha256": "ee698a3d58d6f5b42cbf1b8936a6bf5e56d451e5be624d38dff70af6d2423274",
+      "snapshots": [
+        {
+          "path": "records/job-149/0000.json",
+          "sha256": "ee698a3d58d6f5b42cbf1b8936a6bf5e56d451e5be624d38dff70af6d2423274"
+        }
+      ]
+    },
+    {
+      "jobId": "job-150",
+      "status": "missing",
+      "latestRecordSha256": "d6cb25e67912a2753df2f91c48b89674b2014c92a255ed6e1c0a50bee29c0282",
+      "snapshots": [
+        {
+          "path": "records/job-150/0000.json",
+          "sha256": "d6cb25e67912a2753df2f91c48b89674b2014c92a255ed6e1c0a50bee29c0282"
+        }
+      ]
+    },
+    {
+      "jobId": "job-151",
+      "status": "missing",
+      "latestRecordSha256": "da92a2147ac5bf100e21fa4db3872aad7dd58e076aaef4bdfa7285f10dc8eae4",
+      "snapshots": [
+        {
+          "path": "records/job-151/0000.json",
+          "sha256": "da92a2147ac5bf100e21fa4db3872aad7dd58e076aaef4bdfa7285f10dc8eae4"
+        }
+      ]
+    },
+    {
+      "jobId": "job-152",
+      "status": "missing",
+      "latestRecordSha256": "123972724569657c81477aa4c87eb044db772bacc80ba96ba21c1b2344b5c525",
+      "snapshots": [
+        {
+          "path": "records/job-152/0000.json",
+          "sha256": "123972724569657c81477aa4c87eb044db772bacc80ba96ba21c1b2344b5c525"
+        }
+      ]
+    },
+    {
+      "jobId": "job-153",
+      "status": "missing",
+      "latestRecordSha256": "60d8fa980a3ea547a221920d0eb1007b2e6706477f53d459009189680a77cb2f",
+      "snapshots": [
+        {
+          "path": "records/job-153/0000.json",
+          "sha256": "60d8fa980a3ea547a221920d0eb1007b2e6706477f53d459009189680a77cb2f"
+        }
+      ]
+    },
+    {
+      "jobId": "job-154",
+      "status": "missing",
+      "latestRecordSha256": "7595507c008678e9d2af401493cecdd458d1c7b5d429c1afb1719b79817ef446",
+      "snapshots": [
+        {
+          "path": "records/job-154/0000.json",
+          "sha256": "7595507c008678e9d2af401493cecdd458d1c7b5d429c1afb1719b79817ef446"
+        }
+      ]
+    },
+    {
+      "jobId": "job-155",
+      "status": "missing",
+      "latestRecordSha256": "952324f4043a2e9a7082d5fa2ff61fc18db12c0b20297583f96f74e8d7c9aa1d",
+      "snapshots": [
+        {
+          "path": "records/job-155/0000.json",
+          "sha256": "952324f4043a2e9a7082d5fa2ff61fc18db12c0b20297583f96f74e8d7c9aa1d"
+        }
+      ]
+    },
+    {
+      "jobId": "job-156",
+      "status": "missing",
+      "latestRecordSha256": "7fcd1b8ed43b04c225e8760cfc3ad9995c313b631e2b87e72de1e38554f842c7",
+      "snapshots": [
+        {
+          "path": "records/job-156/0000.json",
+          "sha256": "7fcd1b8ed43b04c225e8760cfc3ad9995c313b631e2b87e72de1e38554f842c7"
+        }
+      ]
+    },
+    {
+      "jobId": "job-157",
+      "status": "missing",
+      "latestRecordSha256": "2683df2c0e0a6eee1dce16950a3791981291f7dee09205212a1d7ce411f1a1c3",
+      "snapshots": [
+        {
+          "path": "records/job-157/0000.json",
+          "sha256": "2683df2c0e0a6eee1dce16950a3791981291f7dee09205212a1d7ce411f1a1c3"
+        }
+      ]
+    },
+    {
+      "jobId": "job-158",
+      "status": "missing",
+      "latestRecordSha256": "6c86103c0db62a400182b90d348c46f002a67df204aeb1a156a507fd585eb696",
+      "snapshots": [
+        {
+          "path": "records/job-158/0000.json",
+          "sha256": "6c86103c0db62a400182b90d348c46f002a67df204aeb1a156a507fd585eb696"
+        }
+      ]
+    },
+    {
+      "jobId": "job-159",
+      "status": "missing",
+      "latestRecordSha256": "171fb41f7357f06bdb869294f3ace18780bfbb083b0ec5508cb4fe72aef6e3e7",
+      "snapshots": [
+        {
+          "path": "records/job-159/0000.json",
+          "sha256": "171fb41f7357f06bdb869294f3ace18780bfbb083b0ec5508cb4fe72aef6e3e7"
+        }
+      ]
+    },
+    {
+      "jobId": "job-160",
+      "status": "missing",
+      "latestRecordSha256": "608210d543911d63aced2d254c64aa255e009ff58a5c99180e6401aca336681b",
+      "snapshots": [
+        {
+          "path": "records/job-160/0000.json",
+          "sha256": "608210d543911d63aced2d254c64aa255e009ff58a5c99180e6401aca336681b"
+        }
+      ]
+    },
+    {
+      "jobId": "job-161",
+      "status": "missing",
+      "latestRecordSha256": "521acd07c83f9335ac5e12aba901c7ca69192d07880f66fa2180e974e8e5bee8",
+      "snapshots": [
+        {
+          "path": "records/job-161/0000.json",
+          "sha256": "521acd07c83f9335ac5e12aba901c7ca69192d07880f66fa2180e974e8e5bee8"
+        }
+      ]
+    },
+    {
+      "jobId": "job-162",
+      "status": "missing",
+      "latestRecordSha256": "acb60006c7396637382129763319e692d73e7c02b3651341523e90157e947e0d",
+      "snapshots": [
+        {
+          "path": "records/job-162/0000.json",
+          "sha256": "acb60006c7396637382129763319e692d73e7c02b3651341523e90157e947e0d"
+        }
+      ]
+    },
+    {
+      "jobId": "job-163",
+      "status": "missing",
+      "latestRecordSha256": "ebc1a9edb97786e3c54003b130257338bae1c63f1455332696571b3b3a2e7651",
+      "snapshots": [
+        {
+          "path": "records/job-163/0000.json",
+          "sha256": "ebc1a9edb97786e3c54003b130257338bae1c63f1455332696571b3b3a2e7651"
+        }
+      ]
+    },
+    {
+      "jobId": "job-164",
+      "status": "missing",
+      "latestRecordSha256": "3cd84ccb6180a30fbeea91848d08853f0482c314878fbf950a1559e9fafe7c94",
+      "snapshots": [
+        {
+          "path": "records/job-164/0000.json",
+          "sha256": "3cd84ccb6180a30fbeea91848d08853f0482c314878fbf950a1559e9fafe7c94"
+        }
+      ]
+    },
+    {
+      "jobId": "job-165",
+      "status": "missing",
+      "latestRecordSha256": "3d98f206b5aa749f66c64d205bb8a2115210bd23cc5d8455d8884b96f7939e81",
+      "snapshots": [
+        {
+          "path": "records/job-165/0000.json",
+          "sha256": "3d98f206b5aa749f66c64d205bb8a2115210bd23cc5d8455d8884b96f7939e81"
+        }
+      ]
+    },
+    {
+      "jobId": "job-166",
+      "status": "missing",
+      "latestRecordSha256": "bc1dbe9fb6c1d5e110f76e95c058111f17861bb19e6b92c19fa0518fd2836648",
+      "snapshots": [
+        {
+          "path": "records/job-166/0000.json",
+          "sha256": "bc1dbe9fb6c1d5e110f76e95c058111f17861bb19e6b92c19fa0518fd2836648"
+        }
+      ]
+    },
+    {
+      "jobId": "job-167",
+      "status": "missing",
+      "latestRecordSha256": "d8ae084517269b5f1450b21ce08f20f479e8082a909ed45620cfceb17a661041",
+      "snapshots": [
+        {
+          "path": "records/job-167/0000.json",
+          "sha256": "d8ae084517269b5f1450b21ce08f20f479e8082a909ed45620cfceb17a661041"
+        }
+      ]
+    },
+    {
+      "jobId": "job-168",
+      "status": "missing",
+      "latestRecordSha256": "e977236ef2560d414044161fc50145b1cffb1210ac1578f3d87f372095d7f97c",
+      "snapshots": [
+        {
+          "path": "records/job-168/0000.json",
+          "sha256": "e977236ef2560d414044161fc50145b1cffb1210ac1578f3d87f372095d7f97c"
+        }
+      ]
+    },
+    {
+      "jobId": "job-169",
+      "status": "missing",
+      "latestRecordSha256": "2cc717c1f60d98c4c82bc2f8d6ff507cd12dddce1f25ce4b80ca09988fb81f5d",
+      "snapshots": [
+        {
+          "path": "records/job-169/0000.json",
+          "sha256": "2cc717c1f60d98c4c82bc2f8d6ff507cd12dddce1f25ce4b80ca09988fb81f5d"
+        }
+      ]
+    },
+    {
+      "jobId": "job-170",
+      "status": "missing",
+      "latestRecordSha256": "2d10e4ce7ab4d78e70fcc891deacda64beef7b22af5182cf20a9d496373b5700",
+      "snapshots": [
+        {
+          "path": "records/job-170/0000.json",
+          "sha256": "2d10e4ce7ab4d78e70fcc891deacda64beef7b22af5182cf20a9d496373b5700"
+        }
+      ]
+    },
+    {
+      "jobId": "job-171",
+      "status": "missing",
+      "latestRecordSha256": "32e72f799cf69a64f1952c0be8f05d062de3fca2f83af0658a617f75126485d6",
+      "snapshots": [
+        {
+          "path": "records/job-171/0000.json",
+          "sha256": "32e72f799cf69a64f1952c0be8f05d062de3fca2f83af0658a617f75126485d6"
+        }
+      ]
+    },
+    {
+      "jobId": "job-172",
+      "status": "missing",
+      "latestRecordSha256": "189a89005f3085e28a75f4852cc206b6c898ed79de52810bfcf420f7d78adb16",
+      "snapshots": [
+        {
+          "path": "records/job-172/0000.json",
+          "sha256": "189a89005f3085e28a75f4852cc206b6c898ed79de52810bfcf420f7d78adb16"
+        }
+      ]
+    },
+    {
+      "jobId": "job-173",
+      "status": "missing",
+      "latestRecordSha256": "3799e0a7a6ab7322638f3d9bfce276f08e75a4b1cde3e4ce4f3ad1454a207750",
+      "snapshots": [
+        {
+          "path": "records/job-173/0000.json",
+          "sha256": "3799e0a7a6ab7322638f3d9bfce276f08e75a4b1cde3e4ce4f3ad1454a207750"
+        }
+      ]
+    },
+    {
+      "jobId": "job-174",
+      "status": "missing",
+      "latestRecordSha256": "26446f038fde90bd5f966ed45805b761c3e6ad587f0b85b28fe208242f2a081b",
+      "snapshots": [
+        {
+          "path": "records/job-174/0000.json",
+          "sha256": "26446f038fde90bd5f966ed45805b761c3e6ad587f0b85b28fe208242f2a081b"
+        }
+      ]
+    },
+    {
+      "jobId": "job-175",
+      "status": "missing",
+      "latestRecordSha256": "f63a987a6452cb9b019f76c3dfae21c5995b704a0ecc47e5fa816ef8016bdaf5",
+      "snapshots": [
+        {
+          "path": "records/job-175/0000.json",
+          "sha256": "f63a987a6452cb9b019f76c3dfae21c5995b704a0ecc47e5fa816ef8016bdaf5"
+        }
+      ]
+    },
+    {
+      "jobId": "job-176",
+      "status": "missing",
+      "latestRecordSha256": "533e058d01a27bc40d6de01ce1ce7ac5123d4ac629b9420dea4825f9f23ac442",
+      "snapshots": [
+        {
+          "path": "records/job-176/0000.json",
+          "sha256": "533e058d01a27bc40d6de01ce1ce7ac5123d4ac629b9420dea4825f9f23ac442"
+        }
+      ]
+    },
+    {
+      "jobId": "job-177",
+      "status": "missing",
+      "latestRecordSha256": "7030073a317eecf4359e341dac778d0223130fc3b1d8e33d0da3b38aac371483",
+      "snapshots": [
+        {
+          "path": "records/job-177/0000.json",
+          "sha256": "7030073a317eecf4359e341dac778d0223130fc3b1d8e33d0da3b38aac371483"
+        }
+      ]
+    },
+    {
+      "jobId": "job-178",
+      "status": "missing",
+      "latestRecordSha256": "02e9671b8fe34d5fd47b1446aa46fc824db36b97bbcf724e8d82c580a8057cca",
+      "snapshots": [
+        {
+          "path": "records/job-178/0000.json",
+          "sha256": "02e9671b8fe34d5fd47b1446aa46fc824db36b97bbcf724e8d82c580a8057cca"
+        }
+      ]
+    },
+    {
+      "jobId": "job-179",
+      "status": "missing",
+      "latestRecordSha256": "1c1fe26492799dab2573a7ebf0f1cc465bfb55cb36b336d68a2b97727254557f",
+      "snapshots": [
+        {
+          "path": "records/job-179/0000.json",
+          "sha256": "1c1fe26492799dab2573a7ebf0f1cc465bfb55cb36b336d68a2b97727254557f"
+        }
+      ]
+    },
+    {
+      "jobId": "job-180",
+      "status": "missing",
+      "latestRecordSha256": "3d22c71cf0c6a80cd49f9f2eb6ac3b385ea2b2993e5e16d077bc0f4036486b0d",
+      "snapshots": [
+        {
+          "path": "records/job-180/0000.json",
+          "sha256": "3d22c71cf0c6a80cd49f9f2eb6ac3b385ea2b2993e5e16d077bc0f4036486b0d"
+        }
+      ]
+    }
+  ],
+  "gateReportHashes": {
+    "regression.json": "71b806d0c9e0a63c3ee7e757b9419d952c00a9725c7719b5189591e32817c70a",
+    "context-delivery-validation.json": "5e5b9be0eba3d66a7ecb7ee057f249c2d4fc4ea3704f1c5144cf12ebfc2a369d",
+    "execution-check-validation.json": "e26ec1e230867bbd3b47937b86a79175bc54aa29f7b7077e776f38da45c5307d",
+    "oracle-validation.json": "70db8106524752a37494c301ec626472ca1a944c0244abb77597e06802ebd9bf"
+  },
+  "retainedAggregateReportHashes": {
+    "reports/console-feedback-8edfa2b932b043cdbe9a0df646f25ecf.json": "941b4005a7af5fab016e82799c0ed07d8d0377d5049f8e5c1d84c81d8ea512d7",
+    "reports/report-57e4e300e52244a8a17480e68778e325.json": "3cfbf62d28e2d25182adddb24051f1e7f64f63c6e210ce5dbd50bd1d6224d0ea"
+  },
+  "dispatchLedgerSha256": "b6da0e51497aaf6ec3a89412bb5a5eedb8e3bba2699f5fa67afd23743c2bd5bc",
+  "qualityComparisonClaimed": false,
+  "promotionAllowed": false,
+  "replacementRequired": true,
+  "selectedRetriesAllowed": false,
+  "nextAction": "Independently prove machine-delivered frozen public prompts outside official runs, then freeze an entirely fresh180-position campaign.",
+  "limitations": [
+    "No SQL, result rows, answers, credentials, private policies or physical paths exported.",
+    "A runtime gate pass does not rescue an experiment with invalid supervisor input delivery."
+  ]
+}

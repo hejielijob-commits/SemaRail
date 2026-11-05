@@ -15,6 +15,7 @@ export type ConsoleSection =
   | "diagnostics"
   | "traces"
   | "traceComparison"
+  | "evaluations"
   | "regressionCases"
   | "instructions"
   | "mdl";
@@ -102,6 +103,80 @@ export interface DiagnosticFeedback {
     note?: string | null;
     createdAt: string;
   }>;
+}
+
+export type EvidenceCheckStatus = "passed" | "conflict" | "unverified" | "stale";
+
+/** Safe query-context metadata for the feedback repair workbench. */
+export type BusinessJsonValue = string | number | boolean | null | BusinessJsonValue[] | { [key: string]: BusinessJsonValue };
+
+export interface BusinessEvidenceV1 {
+  schemaVersion: 1;
+  rulesVersion: string;
+  projectRevision: string;
+  references: Array<{ ruleId: string; model: string; column: string }>;
+  models: BusinessJsonValue[];
+  columns: BusinessJsonValue[];
+  metrics: BusinessJsonValue[];
+  unit: { status: "verified" | "unverified"; value?: string | null };
+  grain: BusinessJsonValue[];
+  time: { field?: string | null; value?: BusinessJsonValue; source: "confirmed" | "publishedDefault" | "sql" | "unknown"; groupedByOriginal?: boolean | null };
+  defaultsApplied: Record<string, BusinessJsonValue>;
+  conditions: Record<string, BusinessJsonValue>;
+  confirmations: Record<string, "confirmed" | "defaulted" | "missing">;
+  checks: Array<{
+    id: string;
+    ruleId: string;
+    mandatory: boolean;
+    status: EvidenceCheckStatus;
+    reasonCode: string;
+  }>;
+  queryId: string;
+  datasourceId: string;
+  outcome: "success" | "failure" | "blocked";
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface FeedbackResolutionCheck {
+  key: "feedbackEvidence" | "semanticAsset" | "regressionCase" | "sqlRun" | "agentEvaluation" | string;
+  status: EvidenceCheckStatus;
+  reasonCode: string;
+}
+
+export interface ExternalAgentEvaluationSummary {
+  schemaVersion: 1;
+  id: string;
+  feedbackId: string;
+  campaignId: string;
+  reportSha256: string;
+  source: string;
+  model: string;
+  reasoning: string;
+  datasetVersion: string;
+  semanticVersion: string;
+  verdictAggregates: { passed: number; failed: number; inconclusive: number; total: number };
+  revision: number;
+  importedBy: string;
+  importedAt: string;
+  review: { decision: "approved" | "rejected"; reviewerSubjectId: string; reviewedAt: string } | null;
+}
+
+export interface FeedbackResolution {
+  schemaVersion: 1;
+  feedbackId: string;
+  revision: number;
+  assetPath: string | null;
+  baseVersionId: string | null;
+  publishedVersionId: string | null;
+  assetSha256: string | null;
+  caseId: string | null;
+  caseRevision: number | null;
+  runId: string | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  agentEvaluations: ExternalAgentEvaluationSummary[];
+  verification: { schemaVersion: 1; status: "verified" | "incomplete" | "conflict" | "stale"; checks: FeedbackResolutionCheck[] };
 }
 
 /** Versioned, durable agent trace events returned by the Semantic Console API. */
@@ -748,10 +823,23 @@ export interface KnowledgeRuleRecord {
   scope?: string[];
   tags?: string[];
   confirmationRule?: QueryConfirmationRule;
+  executionChecks?: ExecutionChecksV1;
   updatedAt?: string;
   draft?: boolean;
   sourceContent?: string;
   diff?: string;
+}
+
+export type ExecutionCheckV1 =
+  | { id?: string; kind: "metric"; model: string; column: string; aggregation: "count" | "avg"; distinct?: boolean; mandatory?: boolean; unit?: string; grain?: string }
+  | { id?: string; kind: "predicate"; model: string; column: string; operator: "="; value: string | number | boolean; mandatory?: boolean }
+  | { id?: string; kind: "timeFilter"; model: string; column: string; conditionKey: string; valueType: "date" | "dateRange"; confirmation: "confirmed" | "confirmedOrDefault"; defaultValue?: string | { start: string; end: string }; mandatory?: boolean }
+  | { id?: string; kind: "timeGrouping"; model: string; column: string; mode: "original"; whenGrouped?: boolean; conditionKey?: string; mandatory?: boolean }
+  | { id?: string; kind: "reference"; model: string; column: string; mandatory?: boolean };
+
+export interface ExecutionChecksV1 {
+  schemaVersion: 1;
+  checks: ExecutionCheckV1[];
 }
 
 export interface QueryConfirmationRule {

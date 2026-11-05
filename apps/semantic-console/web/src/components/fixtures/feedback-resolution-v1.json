@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "feedbackId": "fb_business_trust_1",
+  "revision": 4,
+  "assetPath": "knowledge/rules/trusted-revenue.md",
+  "baseVersionId": "version-before",
+  "publishedVersionId": "version-after",
+  "assetSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "caseId": "case_business_trust_1",
+  "caseRevision": 3,
+  "runId": "rr_business_trust_1",
+  "updatedAt": "2026-10-12T02:00:00Z",
+  "updatedBy": "subject-console-admin",
+  "agentEvaluations": [
+    {
+      "schemaVersion": 1,
+      "id": "aeval_business_trust_1",
+      "feedbackId": "fb_business_trust_1",
+      "campaignId": "campaign-business-trust-7",
+      "reportSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source": "external-agent-evaluator",
+      "model": "agent-review-v2",
+      "reasoning": "high",
+      "datasetVersion": "dataset-2026-10",
+      "semanticVersion": "sha256:published-v4",
+      "verdictAggregates": { "passed": 14, "failed": 0, "inconclusive": 0, "total": 14 },
+      "revision": 2,
+      "importedBy": "subject-console-admin",
+      "importedAt": "2026-10-12T02:00:00Z",
+      "review": { "decision": "approved", "reviewerSubjectId": "subject-reviewer", "reviewedAt": "2026-10-12T02:05:00Z" }
+    }
+  ],
+  "verification": {
+    "schemaVersion": 1,
+    "status": "verified",
+    "checks": [
+      { "key": "feedbackEvidence", "status": "passed", "reasonCode": "FEEDBACK_EVIDENCE_AVAILABLE" },
+      { "key": "semanticAsset", "status": "passed", "reasonCode": "PUBLISHED_ASSET_CHANGED" },
+      { "key": "regressionCase", "status": "passed", "reasonCode": "CASE_REVISION_LINKED" },
+      { "key": "sqlRun", "status": "passed", "reasonCode": "SQL_RUN_PASSED_SAME_VERSION" },
+      { "key": "agentEvaluation", "status": "passed", "reasonCode": "REVIEWED_AGENT_EVALUATION_SAME_VERSION" }
+    ]
+  }
+}

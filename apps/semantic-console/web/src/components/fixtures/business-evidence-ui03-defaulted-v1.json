@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "rulesVersion": "business-trust-v1",
+  "projectRevision": "published-v4",
+  "references": [
+    { "ruleId": "rule-revenue", "model": "orders", "column": "net_amount" }
+  ],
+  "models": [{ "name": "orders" }],
+  "columns": [{ "model": "orders", "column": "created_at" }],
+  "metrics": [],
+  "unit": { "status": "unverified", "value": null },
+  "grain": [],
+  "time": { "field": "created_at", "value": { "start": "2026-10-01", "end": "2026-10-31" }, "source": "publishedDefault", "groupedByOriginal": false },
+  "defaultsApplied": { "reporting_period": { "start": "2026-10-01", "end": "2026-10-31" } },
+  "conditions": { "reporting_period": { "start": "2026-10-01", "end": "2026-10-31" } },
+  "confirmations": { "reporting_period": "defaulted" },
+  "checks": [
+    { "id": "check-period", "ruleId": "rule-revenue", "mandatory": true, "status": "passed", "reasonCode": "TIME_FILTER_MATCHES" }
+  ],
+  "queryId": "query-business-trust-1",
+  "datasourceId": "warehouse-trusted",
+  "outcome": "success",
+  "createdAt": "2026-10-12T02:00:00Z",
+  "expiresAt": "2026-11-11T02:00:00Z"
+}

@@ -21,6 +21,12 @@ class FakeValidator:
         return {}
 
 
+class FakeIndexLifecycle:
+    def stage(self, _manifest, _project_dir, _revision): pass
+    def activate(self, _revision): pass
+    def status(self, _revision=None): return {"status": "ready"}
+
+
 class KnowledgeGovernanceTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="semantic-console-knowledge-")
@@ -35,7 +41,12 @@ class KnowledgeGovernanceTests(unittest.TestCase):
 
     def service(self) -> SemanticConsoleService:
         return SemanticConsoleService(
-            ProjectStore(self.project_dir, state_dir=self.root / "state", validator=FakeValidator())
+            ProjectStore(
+                self.project_dir,
+                state_dir=self.root / "state",
+                validator=FakeValidator(),
+                semantic_index_lifecycle=FakeIndexLifecycle(),
+            )
         )
 
     def test_legacy_multi_rule_file_can_disable_one_without_loss_and_restore_exactly(self):

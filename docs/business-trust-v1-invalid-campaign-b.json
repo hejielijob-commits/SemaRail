@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "runId": "formal-20261015-business-trust-v1-b",
+  "status": "invalid_experiment",
+  "abortedAt": "2026-10-14T16:42:51.672131+00:00",
+  "reason": "Frozen question text does not satisfy required 20 Chinese / 10 English corpus: BTV-16 is declared zh but is an English question. Metadata-only balance checks did not detect this.",
+  "manifestSha256": "0c5307808ea355ec93a72bfc16c9c01beee2f7b62bfb8b28c673a7fe0e151c0c",
+  "corpusSha256": "889cd8c70dd9268ac012edf7a6e103105fc117ce21fee34d08a0f6b9e4b1b54e",
+  "expectedPositions": 180,
+  "allPositionsRetainedInDenominator": true,
+  "declaredLanguageCounts": {
+    "zh": 20,
+    "en": 10
+  },
+  "observedQuestionLanguageCounts": {
+    "zh": 19,
+    "en": 11
+  },
+  "corpusIssues": [
+    {
+      "questionId": "BTV-16",
+      "declaredLanguage": "zh",
+      "observedQuestionLanguage": "en",
+      "questionTextSha256": "ad48b7158f740a0b725d21754d37136d9652d50ca9ecd303b9fe50ef3a485fd7"
+    }
+  ],
+  "latestStatusCounts": {
+    "timeout": 4,
+    "complete": 1,
+    "missing": 175
+  },
+  "begunPositions": [
+    {
+      "jobId": "job-001",
+      "status": "timeout",
+      "workerThreadId": "01a13b34-184f-7022-a1d4-9908f65272e9",
+      "recordSha256": "46b84f48a4b6ec1d9ff03abc29ca8c6e6863cb231980f00f7fd64a1e8df8ceda"
+    },
+    {
+      "jobId": "job-002",
+      "status": "timeout",
+      "workerThreadId": "01a13b37-97b8-7300-80d4-2953e578e30f",
+      "recordSha256": "bfc624fca0bc9f369804899612062c46ea541052b3bf57f3f60bdef0ddabd9c9"
+    },
+    {
+      "jobId": "job-003",
+      "status": "timeout",
+      "workerThreadId": "01a13b3d-9ef7-7051-a621-dc1944c8b40d",
+      "recordSha256": "318eae96e9ae713bc604c4994f8face9b7fab38df70c53a0916d4c4d5466bf82"
+    },
+    {
+      "jobId": "job-004",
+      "status": "timeout",
+      "workerThreadId": "01a13b40-acb7-7792-8215-2f9408920c19",
+      "recordSha256": "46dee19637134eaa4c08d6c040de5d5655ee1e21313fecc36584d3fe4f1a803f"
+    },
+    {
+      "jobId": "job-005",
+      "status": "complete",
+      "workerThreadId": "01a13b45-4f37-7680-a59e-c781ae52afc0",
+      "recordSha256": "93f16345df2b1f5df7e1acc9462dfe6e61640896181a596c8fb1d5d4e73d6aa4"
+    }
+  ],
+  "dispatchAttempts": 6,
+  "interruptedBeforeBegin": [
+    "job-006"
+  ],
+  "reviewedPositions": 5,
+  "qualityComparisonClaimed": false,
+  "promotionAllowed": false,
+  "rawRecordsPreserved": true,
+  "replacementRequired": "A complete fresh 180-position run after language correction and question-text validation; no selected retries."
+}

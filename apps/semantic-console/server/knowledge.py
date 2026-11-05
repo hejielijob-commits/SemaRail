@@ -224,9 +224,10 @@ def _rule_title(content: str, fallback: str) -> str:
     return fallback[:160]
 
 
-def _read_optional(project: ProjectStore, path: str) -> str | None:
+def _read_optional(project: ProjectStore, path: str, *, published: bool = False) -> str | None:
     try:
-        return str(project.read_file(path)["content"])
+        reader = project.read_published_file if published else project.read_file
+        return str(reader(path)["content"])
     except ProjectError as exc:
         if exc.code == "FILE_NOT_FOUND":
             return None
@@ -316,14 +317,103 @@ def _confirmation_rule(value: Any) -> dict[str, Any]:
     return result
 
 
+_CHECK_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]{0,159}$")
+_CONDITION_KEY = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,127}$")
+
+
+def validate_execution_checks(value: Any) -> dict[str, Any]:
+    """Validate the versioned, declarative checks used before query execution."""
+
+    if not isinstance(value, Mapping):
+        raise ProjectError("INVALID_KNOWLEDGE", "executionChecks must be an object")
+    if set(value) != {"schemaVersion", "checks"} or type(value.get("schemaVersion")) is not int or value.get("schemaVersion") != 1:
+        raise ProjectError("INVALID_KNOWLEDGE", "executionChecks schema version is unsupported")
+    checks = value.get("checks")
+    if not isinstance(checks, list) or not 1 <= len(checks) <= 128:
+        raise ProjectError("INVALID_KNOWLEDGE", "executionChecks checks are invalid")
+    validated: list[dict[str, Any]] = []
+    ids: set[str] = set()
+    allowed_by_kind = {
+        "metric": {"id", "kind", "model", "column", "aggregation", "distinct", "mandatory", "unit", "grain"},
+        "predicate": {"id", "kind", "model", "column", "operator", "value", "mandatory"},
+        "timeFilter": {"id", "kind", "model", "column", "conditionKey", "valueType", "confirmation", "defaultValue", "mandatory"},
+        "timeGrouping": {"id", "kind", "model", "column", "mode", "whenGrouped", "conditionKey", "mandatory"},
+        "reference": {"id", "kind", "model", "column", "mandatory"},
+    }
+    for offset, raw in enumerate(checks):
+        if not isinstance(raw, Mapping):
+            raise ProjectError("INVALID_KNOWLEDGE", "executionChecks contains an invalid check")
+        kind = raw.get("kind")
+        allowed = allowed_by_kind.get(kind) if isinstance(kind, str) else None
+        if allowed is None or set(raw) - allowed:
+            raise ProjectError("INVALID_KNOWLEDGE", "executionChecks contains an unsupported check")
+        check = dict(raw)
+        identifier = check.get("id", f"{kind}-{offset + 1}")
+        if not isinstance(identifier, str) or not _CHECK_IDENTIFIER.fullmatch(identifier) or identifier in ids:
+            raise ProjectError("INVALID_KNOWLEDGE", "executionChecks check id is invalid")
+        ids.add(identifier)
+        check["id"] = identifier
+        check.setdefault("mandatory", True)
+        if type(check["mandatory"]) is not bool:
+            raise ProjectError("INVALID_KNOWLEDGE", "executionChecks mandatory must be a boolean")
+        for name in ("model", "column"):
+            item = check.get(name)
+            if not isinstance(item, str) or not _CHECK_IDENTIFIER.fullmatch(item):
+                raise ProjectError("INVALID_KNOWLEDGE", f"executionChecks {name} is invalid")
+        if kind == "metric":
+            if check.get("aggregation") not in {"count", "avg"}:
+                raise ProjectError("INVALID_KNOWLEDGE", "executionChecks metric aggregation is invalid")
+            if type(check.get("distinct", False)) is not bool:
+                raise ProjectError("INVALID_KNOWLEDGE", "executionChecks metric distinct must be a boolean")
+            check.setdefault("distinct", False)
+            for name in ("unit", "grain"):
+                if name in check and (not isinstance(check[name], str) or not 1 <= len(check[name]) <= 128):
+                    raise ProjectError("INVALID_KNOWLEDGE", f"executionChecks metric {name} is invalid")
+        elif kind == "predicate":
+            if check.get("operator") != "=":
+                raise ProjectError("INVALID_KNOWLEDGE", "executionChecks predicate operator is unsupported")
+            value_item = check.get("value")
+            if value_item is None or isinstance(value_item, (Mapping, list)) or not isinstance(value_item, (str, int, float, bool)):
+                raise ProjectError("INVALID_KNOWLEDGE", "executionChecks predicate value is invalid")
+            _safe_json(value_item, path="executionChecks.predicate.value")
+        elif kind == "timeFilter":
+            key = check.get("conditionKey")
+            if not isinstance(key, str) or not _CONDITION_KEY.fullmatch(key):
+                raise ProjectError("INVALID_KNOWLEDGE", "executionChecks conditionKey is invalid")
+            if check.get("valueType") not in {"date", "dateRange"}:
+                raise ProjectError("INVALID_KNOWLEDGE", "executionChecks timeFilter valueType is invalid")
+            if check.get("confirmation") not in {"confirmed", "confirmedOrDefault"}:
+                raise ProjectError("INVALID_KNOWLEDGE", "executionChecks timeFilter confirmation is invalid")
+            if "defaultValue" in check and (
+                check["confirmation"] != "confirmedOrDefault"
+                or not _valid_confirmation_value(check["defaultValue"], None, check["valueType"])
+            ):
+                raise ProjectError("INVALID_KNOWLEDGE", "executionChecks timeFilter defaultValue is invalid")
+        elif kind == "timeGrouping":
+            if check.get("mode") != "original":
+                raise ProjectError("INVALID_KNOWLEDGE", "executionChecks timeGrouping mode is unsupported")
+            if "whenGrouped" in check and type(check["whenGrouped"]) is not bool:
+                raise ProjectError("INVALID_KNOWLEDGE", "executionChecks timeGrouping whenGrouped must be a boolean")
+            if "conditionKey" in check and (
+                not check.get("whenGrouped")
+                or not isinstance(check["conditionKey"], str)
+                or not _CONDITION_KEY.fullmatch(check["conditionKey"])
+            ):
+                raise ProjectError("INVALID_KNOWLEDGE", "executionChecks timeGrouping conditionKey is invalid")
+        normalized = _safe_json(check, path="rule.executionChecks")
+        assert isinstance(normalized, dict)
+        validated.append(normalized)
+    return {"schemaVersion": 1, "checks": validated}
+
+
 class RuleStore:
     """Project-backed rules with safe enable/disable transitions."""
 
     def __init__(self, project: ProjectStore) -> None:
         self.project = project
 
-    def _index(self) -> dict[str, Any]:
-        raw = _read_optional(self.project, RULE_INDEX_PATH)
+    def _index(self, *, published: bool = False) -> dict[str, Any]:
+        raw = _read_optional(self.project, RULE_INDEX_PATH, published=published)
         if raw is None:
             return {"schemaVersion": KNOWLEDGE_SCHEMA_VERSION, "rules": []}
         try:
@@ -340,17 +430,18 @@ class RuleStore:
         result.setdefault("schemaVersion", KNOWLEDGE_SCHEMA_VERSION)
         return result
 
-    def _active_paths(self) -> list[str]:
+    def _active_paths(self, *, published: bool = False) -> list[str]:
         return sorted(
             str(item["path"])
-            for item in self.project.files()
+            for item in (self.project.published_files() if published else self.project.files())
             if isinstance(item.get("path"), str)
             and str(item["path"]).startswith(RULES_ROOT + "/")
             and str(item["path"]).lower().endswith((".md", ".markdown"))
         )
 
-    def _collect(self) -> list[dict[str, Any]]:
-        index = self._index()
+    def _collect(self, *, published: bool = False) -> list[dict[str, Any]]:
+        read = lambda path: _read_optional(self.project, path, published=published)
+        index = self._index(published=published)
         records = [record for record in index["rules"] if isinstance(record, Mapping)]
         by_id = {str(record.get("id")): dict(record) for record in records if isinstance(record.get("id"), str)}
         by_source_index = {
@@ -379,8 +470,8 @@ class RuleStore:
         }
         result: list[dict[str, Any]] = []
         seen: set[str] = set()
-        for source_path in self._active_paths():
-            content = _read_optional(self.project, source_path) or ""
+        for source_path in self._active_paths(published=published):
+            content = read(source_path) or ""
             if source_path in legacy_sources:
                 source_records = [
                     dict(record)
@@ -391,7 +482,7 @@ class RuleStore:
                     (str(record.get("archivePath")) for record in source_records if isinstance(record.get("archivePath"), str)),
                     None,
                 )
-                archive_content = _read_optional(self.project, archive_path) if archive_path else None
+                archive_content = read(archive_path) if archive_path else None
                 _archive_prefix, archive_blocks, _archive_suffix = _split_bullets(archive_content or content)
                 if archive_blocks:
                     records_by_index = {
@@ -402,7 +493,7 @@ class RuleStore:
                     for block_index, block in enumerate(archive_blocks):
                         record = dict(records_by_index.get(block_index) or {})
                         rule_id = str(record.get("id") or _rule_id_for(source_path, block_index))
-                        disabled_content = _read_optional(self.project, record.get("disabledPath")) if isinstance(record.get("disabledPath"), str) else None
+                        disabled_content = read(record.get("disabledPath")) if isinstance(record.get("disabledPath"), str) else None
                         record.update({
                             "id": rule_id,
                             "sourcePath": source_path,
@@ -458,7 +549,7 @@ class RuleStore:
                 record["missing"] = True
             else:
                 disabled_path = record.get("disabledPath")
-                disabled_content = _read_optional(self.project, disabled_path) if isinstance(disabled_path, str) else None
+                disabled_content = read(disabled_path) if isinstance(disabled_path, str) else None
                 if disabled_content is not None:
                     record["content"] = disabled_content
                 record["missing"] = disabled_content is None
@@ -473,6 +564,18 @@ class RuleStore:
         return {
             "schemaVersion": KNOWLEDGE_SCHEMA_VERSION,
             "revision": self.project.overview()["revision"],
+            "rules": rules,
+            "enabledCount": sum(bool(item.get("enabled")) and not item.get("missing") for item in rules),
+            "disabledCount": sum(not bool(item.get("enabled")) for item in rules),
+        }
+
+    def list_published(self) -> dict[str, Any]:
+        """List rules reconstructed strictly from the currently published tree."""
+
+        rules = [self._public(record) for record in self._collect(published=True)]
+        return {
+            "schemaVersion": KNOWLEDGE_SCHEMA_VERSION,
+            "revision": self.project.published_revision,
             "rules": rules,
             "enabledCount": sum(bool(item.get("enabled")) and not item.get("missing") for item in rules),
             "disabledCount": sum(not bool(item.get("enabled")) for item in rules),
@@ -588,6 +691,8 @@ class RuleStore:
                 record[key] = _safe_json(payload[key], path=f"rule.{key}")
         if "confirmationRule" in payload:
             record["confirmationRule"] = _confirmation_rule(payload["confirmationRule"])
+        if "executionChecks" in payload:
+            record["executionChecks"] = validate_execution_checks(payload["executionChecks"])
         index["schemaVersion"] = KNOWLEDGE_SCHEMA_VERSION
         self._replace_record(index, record)
         files: dict[str, str | None] = {}
@@ -626,6 +731,8 @@ class RuleStore:
                 record[key] = _safe_json(payload[key], path=f"rule.{key}")
         if "confirmationRule" in payload:
             record["confirmationRule"] = _confirmation_rule(payload["confirmationRule"])
+        if "executionChecks" in payload:
+            record["executionChecks"] = validate_execution_checks(payload["executionChecks"])
         record["content"] = content
         record["updatedAt"] = utc_now()
         if "enabled" in payload:

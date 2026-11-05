@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "status": "transport_authenticated_coverage_and_worker_ready_recovery_passed",
+  "checkedAt": "2026-10-18T16:11:44.633706+00:00",
+  "protocol": "public-file-stored-transport-v1",
+  "formalCampaignStarted": false,
+  "promotionEstablished": false,
+  "knowledgeModule": {
+    "source": "benchmarks/business-trust-v1/knowledge_delivery.py",
+    "sha256": "d9720bf3744de10aac3ba0349fb077aa20e3045c31cb7f41f804890207acaa3f",
+    "tests": 15,
+    "testLog": ".benchmark-data/business-trust-v1/knowledge-delivery-v1-tests.log",
+    "testLogSha256": "6b8f2941b9129b35701b73c4581fcfff5f795385b57cb568a13ac1f104e4a817",
+    "authenticatedDeliveryProven": true,
+    "authenticatedDeliveryEvidence": {
+      "runId": "preaccept-20261018-recovery-v2",
+      "manifestSha256": "11c3354becc25d14d886032dc43721880e322141295b1a3fb0d445740dad35d9",
+      "record": "docs/business-trust-v1-preacceptance-recovery-v2.json",
+      "recordSha256": "65ef271da227646aac57d742ec51649d6ae5a75e5cc0e909d94d614d04d5adc3",
+      "gateSha256": "60115aae681e39314446f397265b99ddd57870a951741eb6f2672be0db8503fe",
+      "questions": 60,
+      "catalogFallbacks": 6,
+      "scope": "Current frozen candidate source with successful worker-ready checkpoint and real recovery.",
+      "finalCandidatePreacceptanceProven": true
+    }
+  },
+  "transportFocusedTestsAtFirstSmoke": {
+    "tests": 27,
+    "skipped": 1,
+    "testLog": ".benchmark-data/business-trust-v1/stored-transport-v3-focused-tests.log",
+    "testLogSha256": "7c58bf05d34df5c0bcad4c7977b44ac2a4b087f291f842fc04e655771f4e0659",
+    "scope": "Unit evidence before first real smoke; does not establish current fixed-source acceptance."
+  },
+  "smokeA": {
+    "smokeId": "transport-v3-real-20261018",
+    "status": "failed_verifier_receipt_shape",
+    "workerThreadId": "01a14e8d-9cf3-7fb0-b167-ac155fda1490",
+    "traceSha256": "e4c1225aebdf16751714069d2eddede1083bfcb1509f60bf4db48a372fd28425",
+    "frozenSourceZipSha256": "69cafdf86f1038ceaff5123b5de9fae647e81230cdd6a942348dde168a1e7911",
+    "failedAuditSha256": "57775dff4a27543f8496cb50b5468ef32d5826bb8bceb6bac920e0089fd385ac",
+    "brokerOperations": [
+      "begin",
+      "tool",
+      "final"
+    ],
+    "verificationPassClaimed": false,
+    "excludedFromCampaign": true,
+    "listenerClosed": true
+  },
+  "limitations": [
+    "The failed first smoke remains retained under its original verifier/source and was not relabeled passing.",
+    "The fresh second smoke establishes transport behavior only, not HR correctness or business-quality improvement.",
+    "Encrypted initial launcher-message bytes are not exposed; only the executed canonical launcher and public-read receipt are independently verified.",
+    "No completed Agent comparison or promotion is claimed.",
+    "The recovery rehearsal had no active Agent workers; active deadline cases have deterministic test evidence only."
+  ],
+  "transportSources": {
+    "benchmarks/business-trust-v1/app_dispatch.py": "19c9c2c39e35587cea95e01b4e1db75a9e01cad92fd0024e6b2661fde1d71578",
+    "benchmarks/business-trust-v1/review.py": "957762ca4ad42ec20b61b786896effb9da7f9af9efa25b35c1ffe71c1e9ce511",
+    "benchmarks/business-trust-v1/transport_smoke.py": "932df35e935944f2fb0b4e43ba62718f1b5fe730fad59507bd78429237cef4ec",
+    "benchmarks/business-trust-v1/worker-prompt.md": "5f5abcb71ed33744156996293c3bbd3f609f75969cb19d3e86fc31eed901698e",
+    "benchmarks/business-trust-v1/worker_client.py": "5e4aea6f905a6d7bc04f8475d069e31dd0897f9d92b0ea62407b7400c4a3d06d",
+    "benchmarks/business-trust-v1/tests/test_app_bootstrap.py": "f3f7cfcb6ceb0f7a6c6480025bf76a8eb552cf6b728896222093d118490f3657"
+  },
+  "fixedSourceFocusedTests": {
+    "tests": 27,
+    "skipped": 1,
+    "testLog": ".benchmark-data/business-trust-v1/stored-transport-v3-fixed-tests.log",
+    "sha256": "d25b5ceb0ffca22dcbb11b06a8f5d19edf48f26c9aed82a185c611d9e92031e9"
+  },
+  "smokeB": {
+    "smokeId": "transport-v3-real-20261018-b",
+    "status": "passed",
+    "excludedFromCampaign": true,
+    "workerThreadId": "01a14e93-a560-7bf3-8b5c-beaa25dd6975",
+    "traceSha256": "ce44c15d48db17db229adc5f1e231ad043f04d76fe92e88770fa3d74bcba6986",
+    "verificationSha256": "5f93719602d678b1d174f63446040f02b750b3faa4ade3b45026165a2716a544",
+    "frozenSourceZipSha256": "1a784241dccf15ed2be706eb3445b119c88040832f921f0ec3ac99d536888957",
+    "observedModels": [
+      "gpt-6-luna"
+    ],
+    "observedReasoning": [
+      "max"
+    ],
+    "operations": [
+      "begin",
+      "tool",
+      "final"
+    ],
+    "provenanceBoundEmptyPolls": 1,
+    "publicPromptReceiptVerified": true,
+    "publicPromptSha256": "5d93f27a10c317ca9502737d74558afa74aa6ac7c3e28ae9b374646783a7a1bd",
+    "publicPromptReceiptSha256": "5d93f27a10c317ca9502737d74558afa74aa6ac7c3e28ae9b374646783a7a1bd",
+    "launcherSha256": "ebc2ce8207677a9334138751f0f481fcb37a2e438f4a67463660c57cc1577581",
+    "sentInputIndependentlyByteVerified": false
+  },
+  "recoveryAcceptance": {
+    "record": "docs/business-trust-v1-preacceptance-recovery-v2.json",
+    "sha256": "65ef271da227646aac57d742ec51649d6ae5a75e5cc0e909d94d614d04d5adc3",
+    "passed": true,
+    "activeAgentWorkersDuringRehearsal": 0
+  }
+}

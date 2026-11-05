@@ -35,6 +35,10 @@ class RegressionApi:
     def acquire_configuration_guard(self, auth: Any, project_id: str) -> Any:
         """Hold the same project lock as a regression run for one Console write."""
 
+        evaluation_guard = getattr(self, "evaluation_guard", None)
+        if evaluation_guard is not None:
+            evaluation_guard(auth, project_id)
+
         if self.runner is None:
             raise DiagnosticError(
                 "REGRESSION_STORE_UNAVAILABLE", "regression storage is unavailable", status=503

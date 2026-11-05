@@ -200,6 +200,7 @@ class SemanticConsoleService:
                 "semarail_plan_query",
                 "semarail_prepare_query",
                 "semarail_governed_query",
+                "semarail_get_query_evidence",
                 "semarail_submit_feedback",
             ],
             "clientConfig": client_config,
@@ -231,47 +232,51 @@ class SemanticConsoleService:
             raise ApiServiceError("INVALID_PARAMS", "datasource name is required")
         connection = self._connection_payload(payload)
         record = DatasourceRecord(token_urlsafe(12), name, kind, connection)
-        self.datasources[record.id] = record
-        if self.project.active_datasource_id is None:
-            self.project.active_datasource_id = record.id
-        self.project.save_datasources()
+        with self.project.binding_mutation():
+            self.datasources[record.id] = record
+            if self.project.active_datasource_id is None:
+                self.project.active_datasource_id = record.id
+            self.project.save_datasources()
         return record.public()
 
     def update_datasource(self, datasource_id: str, payload: Mapping[str, Any]) -> dict[str, Any]:
-        record = self._record(datasource_id)
         if not isinstance(payload, Mapping):
             raise ApiServiceError("INVALID_PARAMS", "request body must be an object")
-        if "name" in payload:
-            name = _required_string(payload.get("name"), "name")
-            if len(name) > 120:
-                raise ApiServiceError("INVALID_PARAMS", "datasource name is too long")
-            record.name = name
-        if "type" in payload or "datasource" in payload:
-            record.type = _configured_datasource_type(payload.get("type", payload.get("datasource", record.type)))
         incoming = self._connection_payload(payload)
-        # Updates are patch-like.  Omitted password means "keep existing" and
-        # omitted host/database/etc. preserve the prior profile; a null value
-        # explicitly clears it.  No response path ever emits a secret value.
-        merged = dict(record.connection)
-        merged.update(incoming)
-        record.connection = merged
-        record.updated_at = utc_now()
-        self.project.save_datasources()
+        with self.project.binding_mutation():
+            record = self._record(datasource_id)
+            if "name" in payload:
+                name = _required_string(payload.get("name"), "name")
+                if len(name) > 120:
+                    raise ApiServiceError("INVALID_PARAMS", "datasource name is too long")
+                record.name = name
+            if "type" in payload or "datasource" in payload:
+                record.type = _configured_datasource_type(payload.get("type", payload.get("datasource", record.type)))
+            # Updates are patch-like. Omitted password means "keep existing" and
+            # omitted host/database/etc. preserve the prior profile; a null value
+            # explicitly clears it. No response path ever emits a secret value.
+            merged = dict(record.connection)
+            merged.update(incoming)
+            record.connection = merged
+            record.updated_at = utc_now()
+            self.project.save_datasources()
         return record.public()
 
     def delete_datasource(self, datasource_id: str) -> dict[str, Any]:
-        self._record(datasource_id)
-        del self.datasources[datasource_id]
-        if self.project.active_datasource_id == datasource_id:
-            self.project.active_datasource_id = next(iter(self.datasources), None)
-        self.project.save_datasources()
+        with self.project.binding_mutation():
+            self._record(datasource_id)
+            del self.datasources[datasource_id]
+            if self.project.active_datasource_id == datasource_id:
+                self.project.active_datasource_id = next(iter(self.datasources), None)
+            self.project.save_datasources()
         return {"id": datasource_id, "deleted": True}
 
     def activate_datasource(self, datasource_id: str) -> dict[str, Any]:
-        record = self._record(datasource_id)
-        self.project.active_datasource_id = record.id
-        self.project.save_datasources()
-        return {"activeDatasource": record.public(), "project": self.project.overview()}
+        with self.project.binding_mutation():
+            record = self._record(datasource_id)
+            self.project.active_datasource_id = record.id
+            self.project.save_datasources()
+            return {"activeDatasource": record.public(), "project": self.project.overview()}
 
     def test_datasource(self, datasource_id: str) -> dict[str, Any]:
         record = self._record(datasource_id)

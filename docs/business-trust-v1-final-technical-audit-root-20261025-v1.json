@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "auditId": "final-technical-audit-root-20261025-v1",
+  "checkedAt": "2026-10-25T10:38:11.615511+00:00",
+  "runId": "formal-20261020-business-trust-v1-g",
+  "manifestSha256": "3494d53422feb6748bf65799a0072812ec2f95ee46fff62503b7bbc9da535b68",
+  "independentAuditorReport": {
+    "path": ".benchmark-data/business-trust-v1/final-readonly-technical-audit-20261025-v1.json",
+    "sha256": "8ab849a7dc4a6f2659b1c12d294ece7c82cd5c0e53f3c938df2c463e45f1bafd",
+    "supported": 58,
+    "uncertain": 1,
+    "reportUnmodified": true
+  },
+  "EV02": {
+    "conclusion": "supported_by_root_independent_recomputation",
+    "corpusSha256": "89b1b8c97d326e914db21ab259558907731c927a2df7be3574b0537b030b4f9d",
+    "scheduleFileSha256": "63b1285486011f95c95a84f0fed0934ac21740e07ff492d98ff2c94e8d27a26f",
+    "scheduleCanonicalSha256": "a5a39a025d4920ee42b8cd6c154444b9668874e875ac62a11beeb6a044678df5",
+    "uniqueQuestions": 30,
+    "scenarios": {
+      "current_headcount": 10,
+      "salary_snapshots": 10,
+      "quarterly_performance": 10
+    },
+    "actors": {
+      "employee": 6,
+      "department_manager": 6,
+      "hrbp": 6,
+      "compensation_admin": 6,
+      "hr_director": 6
+    },
+    "languages": {
+      "zh": 20,
+      "en": 10
+    },
+    "uniqueSchedulePositions": 180,
+    "groups": {
+      "baseline": 90,
+      "candidate": 90
+    },
+    "rounds": {
+      "1": 60,
+      "2": 60,
+      "3": 60
+    },
+    "eachQuestionGroupRoundExactlyOnce": true,
+    "all90AdjacentPairsMatchQuestionAndRound": true,
+    "frozenInputHashesMatch": true
+  },
+  "inspectedFilesRechecked": 84,
+  "unchangedInspectedFiles": 82,
+  "changedMutableMetadata": [
+    {
+      "path": "docs/business-trust-v1-delivery-audit.json",
+      "auditorSha256": "612becb7813aae3926f86c822a85b67f996ce10e3905d5211278a582604dc0ea",
+      "currentSha256": "0c10e43496396f20be621adc9a997b276b2aa8f814dee339d7a806e49e646c3c",
+      "classification": "mutable_progress_and_audit_metadata_changed_during_continued_campaign"
+    },
+    {
+      "path": "docs/business-trust-v1-requirement-audit.json",
+      "auditorSha256": "a23683d8af670cfecd40caa6f485338107965f8a4e5d057a512dc02f9a40eb00",
+      "currentSha256": "6b4135e0249231a5475e78210c5d8dfdb80e6850e739f9deee7c05715bbff2ee",
+      "classification": "mutable_progress_and_audit_metadata_changed_during_continued_campaign"
+    }
+  ],
+  "candidateSourceFreeze": {
+    "sourceCount": 291,
+    "archiveAndWorkspaceHashesMatch": true,
+    "archiveSha256": "2013282a5cf4c72f823e97ab2709c1231c2ceaa8af81668ba14dffb36327dfd7"
+  },
+  "adjudications": {
+    "BV04": "Named forbidden SQL shapes are supported by source and behavioral tests. Exhaustive AST grammar closure and natural-language intent equivalence are not claimed; the verifier checks declared finite business constraints.",
+    "EV01": "Use alpha.9 correction and frozen authenticated gates in final audit instead of the old alpha.7 locator.",
+    "QP05_ST02": "SQLite-backed adapter unit coverage and retained real PostgreSQL acceptance are distinct; only the latter establishes real-server behavior.",
+    "LC01_LC02": "Historical genuine repair and current-code reconstruction are separately retained; reconstruction is not a new SQL, authentication or Agent run."
+  },
+  "limits": [
+    "Read-only verification of sources and retained evidence; no broad test rerun or new database, authentication or Agent evaluation by this supplement.",
+    "Full comparison, promotion decision and final 67-requirement audit remain separate."
+  ],
+  "frozenScoringChanged": false,
+  "goalComplete": false
+}

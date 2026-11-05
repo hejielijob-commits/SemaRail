@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-10-24T09:53:55.025964+00:00",
+  "runId": "formal-20261020-business-trust-v1-g",
+  "manifestSha256": "3494d53422feb6748bf65799a0072812ec2f95ee46fff62503b7bbc9da535b68",
+  "status": "waiting_for_workspace_credits_and_runtime_recovery",
+  "denominator": 180,
+  "spawnReturns": 104,
+  "independentReviews": 104,
+  "unspawnedPositions": 76,
+  "nextUnspawnedPosition": "job-105",
+  "platformFailures": [
+    {
+      "jobId": "job-103",
+      "sourceSessionId": "01a1647f-0c30-7053-9240-5eb30fd9c7ab",
+      "errorCode": "usage_limit_exceeded",
+      "limitType": "workspace_member_credits_depleted",
+      "terminalAppEventType": "task_complete",
+      "completedAtEpoch": 1792687602,
+      "actualToolCalls": 7,
+      "businessToolEvents": 5,
+      "governedQueryAttempts": 0,
+      "brokerStatus": "timeout",
+      "sourceTraceSha256": "fe12e92c87c9c970429a0ed1a4937f01b2ae7da601ae4bb549b697f4086b55ae",
+      "recordSha256": "edcc43e59e7a305c877d5f2522c2508d0d093ee3bc8f9c1e652fb3ad7195921e",
+      "reviewSha256": "c2c685c8094da5dd385b62c148d2e6124bb9b3e8df3e78a46baf84e5419ad51d",
+      "contentReviewSha256": "9f0f8dd0d56e587e50c2db697984260888f21c2732c68027bc9ce09aa8c09d74",
+      "officialImportPerformed": true,
+      "retried": false
+    },
+    {
+      "jobId": "job-104",
+      "sourceSessionId": "01a16481-04e5-7d70-b8cb-d20172843702",
+      "errorCode": "usage_limit_exceeded",
+      "limitType": "workspace_member_credits_depleted",
+      "terminalAppEventType": "task_complete",
+      "completedAtEpoch": 1792687656,
+      "actualToolCalls": 0,
+      "businessToolEvents": 0,
+      "governedQueryAttempts": 0,
+      "brokerStatus": "missing",
+      "sourceTraceSha256": "a9dd17f7934b46a5d2a0f1464be8c003420b779c0a19dc5a589499ffbecec30c",
+      "recordSha256": "dc5c3224fc054a637f6282326cd231b99528ea9d17695d24357477a272544c41",
+      "reviewSha256": "759da482b3543ef1d4ce13e03652cea0627a7e31dfe95a3736504879ffe01281",
+      "contentReviewSha256": "73259d8945ec7df4f9ce9ce2a6383981e6040e6dc57b629e8acbc203d669bb90",
+      "officialImportPerformed": false,
+      "retried": false
+    }
+  ],
+  "sourceFilesUnchanged": 291,
+  "runtimeObservation": {
+    "observedAt": "2026-10-24T09:53:54.7486809Z",
+    "lastBootUpTime": "2026-10-24T09:48:09.5000000Z",
+    "previousOwnedProcesses": [],
+    "listeners": [],
+    "previousOwnedPids": [
+      12428,
+      25456
+    ],
+    "allSixCampaignPortsClosed": true,
+    "runtimeRevalidationRequiredBeforeDispatch": true
+  },
+  "dispatchHoldAcceptance": {
+    "record": ".benchmark-data/business-trust-v1/g-credit-hold-acceptance-20261023-v1.json",
+    "sha256": "db988e603d5ed1a076fe97192d0da969e2c25b73eecf026d55f3bc2046bd838a"
+  },
+  "attemptsWillNotBeRetried": [
+    "job-103",
+    "job-104"
+  ],
+  "frozenScoringChanged": false,
+  "campaignClosed": false,
+  "goalComplete": false,
+  "promotionEstablished": false,
+  "resumeRequirement": "A new officially audited disposable gpt-6-luna/max transport smoke completed after both retained credit failures; no formal position may be used as an availability probe.",
+  "limitations": [
+    "External platform failure, not a Core defect or a completed comparison.",
+    "The begun worker retained five business-tool events and expired at its original deadline without a query or final answer.",
+    "The unbegun worker retained its original missing record and detached negative review.",
+    "Both previous service handles are absent and all six owned ports are closed after a later observed Windows boot.",
+    "A service recovery and a fresh disposable model check are separate prerequisites."
+  ]
+}

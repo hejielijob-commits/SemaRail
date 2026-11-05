@@ -1,0 +1,795 @@
+{
+  "schemaVersion": 1,
+  "status": "delivery_complete_not_promoted",
+  "checkedAt": "2026-10-25T15:34:27.939666+00:00",
+  "purpose": "Delivery evidence index; not an Agent-quality report",
+  "package": {
+    "name": "@hejielijob/semarail-core",
+    "version": "0.1.0-alpha.9",
+    "path": "dist/hejielijob-semarail-core-0.1.0-alpha.9.tgz",
+    "sha256": "b9aec5419cef6509998d1f88f1f0c34dbd3c17cd3f393851d81a39bf233dd828",
+    "files": 76
+  },
+  "retainedTechnicalLogs": [
+    {
+      "name": "console-final-tests.log",
+      "sha256": "ffe6671ba8b459ae2e012906fe8ba965d8c9382f84bfb0ed2f6538fb80a93987"
+    },
+    {
+      "name": "sidecar-tests-latest.log",
+      "sha256": "ae15f4c4fa464cf5e41d00e7c3b8d03f881886ff3d91cb660b99df03398b337c"
+    },
+    {
+      "name": "web-tests.log",
+      "sha256": "972dfbe4bd6cf7e1f1754d303e48dd2d1bc18ff75abc1638659b2ff01b7ceebf"
+    },
+    {
+      "name": "contract-tests.log",
+      "sha256": "eaf12bf0509c7685fa08acec5d7eeb9cefcba2647162a7e32b192dfd58790537"
+    },
+    {
+      "name": "typecheck.log",
+      "sha256": "986d1f0ec1c8feb49be6e5cc413c726773f285503bf5ee2dfc82cf879a40c7e4"
+    },
+    {
+      "name": "core-final-build.log",
+      "sha256": "e64d2b8e90e0014848d9d3515b4a588e161088eef4e3c5e8ea16f3cbbf336240"
+    },
+    {
+      "name": "core-final-pack-verify.log",
+      "sha256": "afbb77631ed792fbd609093c4a7c66a551bda6fc0c99ffb9e926801785e5012d"
+    },
+    {
+      "name": "control-postgres-final.log",
+      "sha256": "24bfab52318d6984a1003c059c5d34430db27e6a668d46c2c0e23f97a5840a28"
+    },
+    {
+      "name": "business-postgres-final.log",
+      "sha256": "0af18812f978508c1b38ed9772c7f81b95cb73f4b88e98d7afb6372e888333a5"
+    },
+    {
+      "name": "console-after-opaque-id-r2-tests.log",
+      "sha256": "2fd80c397ad0ea046a8e86a624517d134e71768bc82f41f6b9d4678329827fbe"
+    },
+    {
+      "name": "business-postgres-after-opaque-id.log",
+      "sha256": "0af18812f978508c1b38ed9772c7f81b95cb73f4b88e98d7afb6372e888333a5"
+    },
+    {
+      "name": "core-alpha6-build-verify.log",
+      "sha256": "ffe9fcd8691d4a4bb95387994efe35d0206110b46a6c83aa39e373f3fd1d727d"
+    },
+    {
+      "name": "core-alpha6-cli-version-tests.log",
+      "sha256": "1201362916036bf8896b12a97aab003dd8b1334bbd9ffc3ed4f4c962f9758138"
+    },
+    {
+      "name": "core-alpha6-package-r2.log",
+      "sha256": "fdef65433af89f65cef74595803f2d0e5f67d039b59093ea5d7f6b26b961faeb"
+    },
+    {
+      "name": "core-alpha6-offline-install-r2.log",
+      "sha256": "d80786e240a79fb7d291d0c611581a11f6ccbedce866905399963d32ae01b4ad"
+    },
+    {
+      "name": "console-after-current-case-tests.log",
+      "sha256": "a8fceba51e63f55e887a5c7e5e190c7990e1fe0fc65b18a70a4039b9fc3755af"
+    },
+    {
+      "name": "business-postgres-after-current-case.log",
+      "sha256": "dbeea633c117b8498a7f6bfe4a67f1c9a554cfc4b1e7192f9c91b4308bf3d434"
+    },
+    {
+      "name": "core-alpha7-build-verify.log",
+      "sha256": "bd12fcd4f5dc5bac8fa3ad96e7a36346d2e4c04f08e05d2dd706b4e989931f4c"
+    },
+    {
+      "name": "core-alpha7-package.log",
+      "sha256": "11144be525b723b69e140a12e5c79e67bf3cbe11ac90f294cffc36ee10b886b8"
+    },
+    {
+      "name": "core-alpha7-offline-install.log",
+      "sha256": "de6b7dd819c427ac979819475f783b1aa7024a279d5857489aa1e24a5140b538"
+    },
+    {
+      "name": "core-alpha7-archive-content.json",
+      "sha256": "6dd1b5035eebc44df1d55ba67a3ae7b3b1d10fa8b0e2c5c374799afe65082831"
+    },
+    {
+      "name": "harness-after-attribution-deadline-r2.log",
+      "sha256": "30f89337691fd288b39b302d135e7d5c639812e5160c44a0a0dd5635cef5aa01"
+    },
+    {
+      "name": "alpha7-final-preflight.json",
+      "sha256": "dc21c69d0c6927aaf8aa5936d9a41230f49e17325777619a001f07ba7ec1166f"
+    },
+    {
+      "name": "harness-live-mcp-recovery-r3.log",
+      "sha256": "5f2e485424235bdd43bfb2fdb723c3579b970b7de061ac5d7f82dd78118403f5"
+    },
+    {
+      "name": "console-after-period-fix-v1.log",
+      "sha256": "70cc164078b44f83132aa67229252556deffdd96659e151f00c9103668df9f1d"
+    },
+    {
+      "name": "web-after-period-fix-v1.log",
+      "sha256": "c715254aef3707ea7734b7ed60d0114ee1f116b06dd694f4079292f30ef16005"
+    },
+    {
+      "name": "harness-after-period-gate-v2.log",
+      "sha256": "8b956439291f9b8309a741485660842e94075c4edcb917958d22ba55a9ea1bd6"
+    },
+    {
+      "name": "contract-alpha9-v1.log",
+      "sha256": "c1afbcd75878e4bd548cd2fc37f4a38143766de863f1e8b1a3f655a2a0b894f4"
+    },
+    {
+      "name": "postgres-after-period-fix-v1.log",
+      "sha256": "3daccbe98984dea89119c17f41ec6eb0bf6a996da55ea2a6184e696fcfdfe00e"
+    },
+    {
+      "name": "typecheck-after-period-fix-v1.log",
+      "sha256": "986d1f0ec1c8feb49be6e5cc413c726773f285503bf5ee2dfc82cf879a40c7e4"
+    }
+  ],
+  "technicalCounts": {
+    "consoleTests": 344,
+    "sidecarTests": 145,
+    "webTests": 168,
+    "contractTests": 20,
+    "packageFiles": 76
+  },
+  "formalRun": {
+    "runId": "formal-20261020-business-trust-v1-g",
+    "manifestSha256": "3494d53422feb6748bf65799a0072812ec2f95ee46fff62503b7bbc9da535b68",
+    "expectedPositions": 180,
+    "complete": true,
+    "promotion": "not_promoted",
+    "status": "closed_complete_not_promoted",
+    "workerExportStarted": true,
+    "allStartupGatesPassed": true,
+    "dispatchAttempts": 180,
+    "qualityComparisonClaimed": false,
+    "frozenCandidateSourceArchive": {
+      "path": ".benchmark-data/business-trust-v1/runs/formal-20261020-business-trust-v1-g/frozen-candidate-sources.zip",
+      "sha256": "2013282a5cf4c72f823e97ab2709c1231c2ceaa8af81668ba14dffb36327dfd7",
+      "sourceFiles": 291,
+      "individualMemberHashesMatchFrozenManifest": true
+    },
+    "progress": {
+      "expectedPositions": 180,
+      "genuineSpawnReturns": 180,
+      "notSpawned": 0,
+      "spawnedWithoutIndependentReview": 0,
+      "statuses": {
+        "complete": 150,
+        "missing": 15,
+        "invalid": 11,
+        "timeout": 4
+      },
+      "tracesImported": 165,
+      "detachedPrebeginFailuresRetained": 15,
+      "actualTraceEvidenceRetained": 180,
+      "independentReviews": 180,
+      "auditPassed": 150,
+      "auditFailed": 30,
+      "publicReceiptsVerified": 166,
+      "contentSupplements": 180
+    },
+    "allPositionsAccounted": true,
+    "independentReviews": 180,
+    "finalReports": {
+      "report": "D:\\xiaohe\\wrenAI\\semarail-trace-v2\\.benchmark-data\\business-trust-v1\\runs\\formal-20261020-business-trust-v1-g\\reports\\report-af6dfa6525bf45e2b477a7e1ff0657c4.json",
+      "safeSummary": "D:\\xiaohe\\wrenAI\\semarail-trace-v2\\.benchmark-data\\business-trust-v1\\runs\\formal-20261020-business-trust-v1-g\\reports\\console-feedback-1afc1cb794c44ebd869c7833aa631134.json",
+      "reportSha256": "0dc9b38311ce97a3a41f3a8c9ce67b8648e1e31bea5c62e1fbd09e1f3b8e9175",
+      "safeSummarySha256": "e84c61395cd92e7ff87981a68c78a42db2509c472bcec17ec86d826a0843d5c0",
+      "expected": 180,
+      "recommendation": {
+        "promote": false,
+        "reason": "incomplete evidence or one or more predeclared gates failed"
+      }
+    },
+    "rootFinalIndex": {
+      "record": ".benchmark-data/business-trust-v1/runs/formal-20261020-business-trust-v1-g/reports/root-final-index.json",
+      "sha256": "e9bf7ac8626b9220a581a5804b624c1ee57cdee5df4b1d7f2e8df2b94890e9d1"
+    },
+    "allCallAuditsPassed": false
+  },
+  "realRepair": {
+    "record": "docs/business-trust-v1-lifecycle-acceptance.json",
+    "sha256": "50967c15e98afb5b4def6909b173cec2036c9b1078cd138fd44f2ae3a196fe42",
+    "status": "fully_verified",
+    "scenarios": [
+      "performanceSnapshot",
+      "salarySnapshot"
+    ],
+    "currentCodeReconstruction": {
+      "record": "docs/business-trust-v1-alpha9-final-repair-reconstruction.json",
+      "sha256": "33a4dc95fc00a4780bfc65d33398a9ca97e434a14467b59dfaca5062c616a6b8",
+      "status": "passed",
+      "bothScenesVerified": true,
+      "checksPerScenario": 5,
+      "historicalSourceFilesUnchanged": true,
+      "sourceFilesChecked": 57,
+      "freshSqlOrAgentRun": false
+    },
+    "historicalAlpha7Reconstruction": {
+      "record": "docs/business-trust-v1-current-repair-reconstruction.json",
+      "sha256": "20d5b775ef2d52bef1938cbcfe8f47dcd33fdbec684eaeadd88a1d628cc9082b",
+      "status": "passed",
+      "bothScenesVerified": true,
+      "historicalSourceFilesUnchanged": true
+    },
+    "historicalAlpha9Reconstruction": {
+      "record": "docs/business-trust-v1-alpha9-repair-reconstruction.json",
+      "sha256": "de8ba607ca85a0ef3b0d0f0aead9e647ab0e30eb3e10ba02b116c8bc2a9d84a1",
+      "scenarios": {
+        "performanceSnapshot": "verified",
+        "salarySnapshot": "verified"
+      },
+      "checksPerScenario": 5,
+      "historicalSourceFilesUnchanged": true,
+      "sourceFilesChecked": 57,
+      "candidateCodeBoundToFrozenG": true,
+      "status": "passed",
+      "bothScenesVerified": true
+    }
+  },
+  "interfacesAndRollbackDocument": "docs/business-trust-v1.md",
+  "remaining": [],
+  "limitations": [
+    "Declared finite business constraints are verified; exhaustive AST grammar closure or natural-language intent equivalence is not proven.",
+    "All180 position accounting and Root reviews do not certify all180 passing transport audits.",
+    "Fresh current-date repair reconstruction reads copies of genuine historical records; no new SQL/authentication/Agent run is claimed.",
+    "Technical acceptance and the two genuine repair cases do not establish comparative quality improvement."
+  ],
+  "invalidExperiments": [
+    "docs/business-trust-v1-invalid-campaign-a.json",
+    "docs/business-trust-v1-invalid-campaign-b.json",
+    "docs/business-trust-v1-invalid-campaign-c.json",
+    "docs/business-trust-v1-invalid-campaign-d.json"
+  ],
+  "harnessTests": 63,
+  "rejectedPackageAttempt": {
+    "version": "0.1.0-alpha.6",
+    "sha256": "1118b2a19f38a1024605757487d3f7e1866351c5adc0c11d9fbb1db43581175b",
+    "reason": "Offline installed CLI reported alpha.5 due to hardcoded version; rejected before any freeze. CLI now reads package manifest and exact installed version was rechecked."
+  },
+  "stagedConsoleRuntime": {
+    "files": 35,
+    "allSourceHashesMatch": true
+  },
+  "previousInstallableCandidate": {
+    "name": "@hejielijob/semarail-core",
+    "version": "0.1.0-alpha.6",
+    "archive": "dist/hejielijob-semarail-core-0.1.0-alpha.6.tgz",
+    "sha256": "133bd2577d754ded3024f8e8adfee707d04cac409995c21767ab0835fdf8a7ac"
+  },
+  "scopedIndependentAudit": {
+    "blockingGapFound": "Historical case revisions could satisfy current feedback verification",
+    "fix": "Current scoped case head required; edits and deletion invalidate old SQL/Agent chain",
+    "focusedFeedbackTests": 14,
+    "actualPostgresCurrentHeadGuard": "passed",
+    "otherProductContractBlockerFound": false,
+    "limitation": "Scoped source/test audit; full requirement completion still unproven until formal180 and final audit"
+  },
+  "currentPreacceptance": {
+    "runId": "preaccept-20261020-period-and-clarification-v1",
+    "manifestSha256": "653fe52873fda3928bedd87afcb4ba11c37baec4fa1fffff96a0a5443a157e82",
+    "currentFreezeVerified": true,
+    "workerDispatchAllowed": false,
+    "agentDispatchStarted": false,
+    "sourceFilesBound": 291,
+    "oldRegressionPassed": 120,
+    "contextsPassed": 60,
+    "businessChecksPassed": 21,
+    "groupedConfirmationCounterexamples": 4,
+    "governedExecutionBoundaryCases": 7,
+    "canonicalQuestionsValidated": 30,
+    "physicalOracleChecks": 20,
+    "permissionExecutionChecks": 18,
+    "permissionPlanChecks": 18,
+    "gates": {
+      "regression.json": "d7e01594e16d5b175c2abe233b23f0bb0548c7e180ca1b594aae0c94da11ba8b",
+      "context-delivery-validation.json": "c807d551a838b8fef898f35a8026b09adf5be70fbbff3c30571c8c4171acdfb5",
+      "execution-check-validation.json": "5d467fd359588b24659d0ec36f0117b20978d1f795092f9311d68946e57990de",
+      "oracle-validation.json": "70db8106524752a37494c301ec626472ca1a944c0244abb77597e06802ebd9bf",
+      "tool-capabilities.json": "778f5996fa06045cc54227c8bdcfbb814fefda26ecd8fd9d20cf4759188630ac"
+    },
+    "terminalProof": {
+      "record": ".benchmark-data/business-trust-v1/preaccept-alpha9-v1-result.json",
+      "sha256": "1e3c2902ce8e6e3adbbeccca1515d52a68406f5e8462401f0577e1a718e2981c"
+    },
+    "safeRecord": "docs/business-trust-v1-correction-acceptance-alpha9.json",
+    "safeRecordSha256": "9c9d196ee63ecdf71a587b0247adf4b4f8b59f73e42c64b2c37a2edba73d80e8",
+    "status": "passed"
+  },
+  "previousFormalRun": {
+    "runId": "formal-20261016-business-trust-v1-d",
+    "manifestSha256": "856b47d6e39ebcab9404e4eef4d1234039548066baebc432b8f79b65ffd95f5e",
+    "expectedPositions": 180,
+    "complete": false,
+    "promotion": "not_established",
+    "status": "invalid_supervisor_prompt_transcription",
+    "workerExportStarted": true,
+    "allStartupGatesPassed": true,
+    "dispatchAttempts": 3,
+    "qualityComparisonClaimed": false,
+    "replacementRequired": true,
+    "latestStatusCounts": {
+      "timeout": 3,
+      "missing": 177
+    },
+    "reviewedPositions": 3,
+    "allAttemptedSessionsImported": true,
+    "safeInvalidRecord": "docs/business-trust-v1-invalid-campaign-d.json",
+    "safeInvalidRecordSha256": "81aeee2195b1b35dc761929c619bc5d057a2ecfcaa5016837aece9b43a102c2a",
+    "ownedHostStoppedAfterIdentityVerification": true,
+    "benchmarkListenersClosed": true,
+    "separatePostgresRemainsLive": true
+  },
+  "requirementAudit": {
+    "record": "docs/business-trust-v1-requirement-audit.json",
+    "sha256": "52e0503b5f06ca8466722cfed6c3d46c3cda82e7a1a3c3cb7754ee27830dbfab",
+    "status": "interim_audit_campaign_and_final_review_open",
+    "requirements": 67,
+    "open": 0,
+    "failedPromotionEvidenceGates": 1
+  },
+  "transportRemediation": {
+    "status": "passed_real_smoke_and_adversarial_tests",
+    "mode": "audited_public_prompt_file_bootstrap",
+    "record": "docs/business-trust-v1-bootstrap-acceptance.json",
+    "sha256": "0805c54c27c4c1385e41cfcb60fc45be0a003bbdbb6be340e0a1ac7728afa912",
+    "officialRunStarted": false,
+    "sentInputIndependentlyByteVerified": false,
+    "publicPromptReceiptVerified": true
+  },
+  "environmentRevalidation": {
+    "checkedAt": "2026-10-17T16:27:49.613832+00:00",
+    "record": ".benchmark-data/business-trust-v1/preflight-20261018-bootstrap-a.log",
+    "sha256": "677b770bf9b0cbb3aea3223e4642dc7eb2362b5f6514d3fdda45bcdcb28c2a90",
+    "ready": true,
+    "scope": "Current dependency/data/baseline/cache/database/port preflight only; no new Agent campaign or quality evidence"
+  },
+  "previousPreacceptance": {
+    "runId": "preaccept-20261016-alpha7-v1",
+    "manifestSha256": "f23e24070c973922dcd0db79f98c57c0a3d299b1f54041f044f4ca421f9fd4b9",
+    "freezeVerified": true,
+    "status": "passed",
+    "workerDispatchAllowed": false,
+    "safeRecord": "docs/business-trust-v1-preacceptance-alpha7.json",
+    "safeRecordSha256": "661d18f6879a262ab34ae5e5f56cf1e0459317334b5261a3c9366355504bac75",
+    "ownedHostStoppedAfterIdentityVerification": true
+  },
+  "campaignProgress": {
+    "record": "docs/business-trust-v1-campaign-g-progress.json",
+    "sha256": "e76b7f4543cf52e570c9caf4a6da1bde11e993ba520d94b1f3d03a3a6534986a"
+  },
+  "interruptedCampaignE": {
+    "record": "docs/business-trust-v1-invalid-campaign-e.json",
+    "sha256": "d55ef3f0df1abc56ad7d82611c5c2067d5cbd96c0383c74acc8c297032099ee5"
+  },
+  "storedTransportAcceptance": {
+    "record": "docs/business-trust-v1-stored-transport-acceptance.json",
+    "sha256": "9272c8ad3576cf70218fa50cb20dea6ab782eb349704578600701fac01b0c2ae",
+    "status": "transport_authenticated_coverage_and_worker_ready_recovery_passed"
+  },
+  "recoveryPreacceptanceV1": {
+    "record": "docs/business-trust-v1-preacceptance-recovery-v1.json",
+    "sha256": "8c5add1b2c05d965523b0dbef48a0e86dfc566c5cb0afddc22dc87f3d702b6bb",
+    "status": "failed_worker_ready_checkpoint_initialization"
+  },
+  "recoveryDiagnosis": {
+    "record": "docs/business-trust-v1-recovery-diagnosis.json",
+    "sha256": "1fc1993112169311b00f571c63cdd33eec04f3daf251d7613dced65ec861f484",
+    "status": "fix_verified_authenticated_worker_ready_recovery"
+  },
+  "recoveryPreacceptanceV2": {
+    "record": "docs/business-trust-v1-preacceptance-recovery-v2.json",
+    "sha256": "65ef271da227646aac57d742ec51649d6ae5a75e5cc0e909d94d614d04d5adc3",
+    "status": "passed_worker_ready_recovery"
+  },
+  "previousFormalRunE": {
+    "runId": "formal-20261018-business-trust-v1-e",
+    "manifestSha256": "ec20ed8077bf11701bf59631825974369c8be6c78252cd4f1bb23353235cb85f",
+    "expectedPositions": 180,
+    "complete": false,
+    "promotion": "not_established",
+    "status": "interrupted_nonresumable_protocol",
+    "sameSourceAsPassedPreacceptance": true,
+    "workerExportStarted": true,
+    "qualityComparisonClaimed": false,
+    "dispatchAttempts": 17,
+    "workerExportComplete": true,
+    "startupGates": {
+      "regression": {
+        "report": "regression.json",
+        "sha256": "0ed5d81e136c0311f557130752a9b0083512ed9d2ed983ddeb7d535410dbbcb9",
+        "passed": true,
+        "total": 120,
+        "passedCount": 120
+      },
+      "context-delivery-validation": {
+        "report": "context-delivery-validation.json",
+        "sha256": "cd4bfa48faad13f9fa8f291054784b64f2cae42739b57564194f184da4c40399",
+        "passed": true,
+        "total": 60
+      },
+      "execution-check-validation": {
+        "report": "execution-check-validation.json",
+        "sha256": "e26ec1e230867bbd3b47937b86a79175bc54aa29f7b7077e776f38da45c5307d",
+        "passed": true,
+        "total": 17
+      },
+      "oracle-validation": {
+        "report": "oracle-validation.json",
+        "sha256": "70db8106524752a37494c301ec626472ca1a944c0244abb77597e06802ebd9bf",
+        "passed": true,
+        "total": 30,
+        "physicalPostgresChecked": 20,
+        "permissionPlans": 18,
+        "permissionBoundaries": 18
+      }
+    },
+    "progress": {
+      "expectedPositions": 180,
+      "genuineSpawnReturns": 17,
+      "notSpawned": 163,
+      "statuses": {
+        "complete": 4,
+        "timeout": 12,
+        "missing": 164
+      },
+      "independentReviews": 17,
+      "actualSessionTracesRetained": 17,
+      "officialImports": 16,
+      "detachedPrebeginFailures": 1,
+      "auditPassed": 4,
+      "auditFailed": 13
+    }
+  },
+  "previousCampaignProgressE": {
+    "record": "docs/business-trust-v1-campaign-progress.json",
+    "sha256": "751345039247189582b03710560dd95f1d4b7c461897a420cdb358bc78980a97"
+  },
+  "currentEvidenceReconciliation": {
+    "record": ".benchmark-data/business-trust-v1/current-evidence-reconciliation-f-v1.json",
+    "sha256": "9a90690aa7ff3573d94123037063c3b58979df0f8ffa985d1ace089bac2c1e0c",
+    "goalComplete": false
+  },
+  "interimTestEvidenceLocators": {
+    "record": ".benchmark-data/business-trust-v1/interim-test-evidence-locators-f-v1.json",
+    "sha256": "f6f029ec684bb9816ec8ae77b750ab723de92db4464cbb4d384f004cedab7fab",
+    "namedPythonTestLocatorsChecked": 41,
+    "currentArtifactIdentitiesChecked": 57,
+    "scope": "Source/test locator and retained identity check only; not a fresh behavioral test or final completion audit."
+  },
+  "currentFormalRecovery": {
+    "record": "docs/business-trust-v1-formal-f-recovery-v1.json",
+    "sha256": "e923b1f499192bdb39a200c7f134bafeae5e8a5e7d75a1bc9b5e13f05faa367e",
+    "status": "same_run_authenticated_recovery_passed"
+  },
+  "independentReviewErrata": [
+    {
+      "jobId": "job-046",
+      "record": ".benchmark-data/business-trust-v1/runs/formal-20261019-business-trust-v1-f/review-errata/job-046-reason-v1.json",
+      "sha256": "0965edafbeef5bb82202dd590d8da39c172d639850af27cf82e42975cfc282c4",
+      "scope": "reason_only_original_judgments_and_frozen_scores_unchanged"
+    }
+  ],
+  "isolatedInstallableCandidate": {
+    "record": ".benchmark-data/business-trust-v1/ui03-release-alpha8-verification-v1.json",
+    "sha256": "7665451fb7a18b9d06bdb21f31815c81492e190e745d0d03bf44f9713382ed78",
+    "status": "isolated_installable_candidate_verified_not_applied_or_released"
+  },
+  "interruptedCampaignF": {
+    "record": "docs/business-trust-v1-invalid-campaign-f.json",
+    "sha256": "132e69e6c8e9442c3a6e557eb934cd9eafacc45bd75ff474335001e037d486dd"
+  },
+  "archivedMeasuredCandidateF": {
+    "name": "@hejielijob/semarail-core",
+    "version": "0.1.0-alpha.7",
+    "archive": "dist/hejielijob-semarail-core-0.1.0-alpha.7.tgz",
+    "sha256": "dddc5048cb6cb63f5f15cbe602f6cd8ab0af828611597f5c771cf93d908bfc48"
+  },
+  "historicalOpenPresentationGap": {
+    "requirementId": "UI03",
+    "status": "open",
+    "frozenCampaignSourceChanged": false,
+    "isolatedCorrection": {
+      "record": ".benchmark-data/business-trust-v1/ui03-stage-v1/ui03-root-stage-acceptance-v1.json",
+      "sha256": "afc7d7e2e9f19b74229ce21e7e80299e91fb4bac70621ba08a0eae4cf4434ea8",
+      "status": "isolated_correction_verified_not_applied"
+    }
+  },
+  "historicalValidationDefectF": {
+    "requirementId": "BV13",
+    "record": ".benchmark-data/business-trust-v1/mandatory-period-diagnosis-v1.json",
+    "sha256": "2ae1260c00afddf5ce44eef6ee48ed4e1a5cc66f38e00069d0556d40afcb9164",
+    "status": "confirmed_isolated_repair_in_progress",
+    "newFrozenComparisonRequired": true
+  },
+  "currentPresentationAcceptance": {
+    "record": "docs/business-trust-v1-correction-acceptance-alpha9.json",
+    "sha256": "9c9d196ee63ecdf71a587b0247adf4b4f8b59f73e42c64b2c37a2edba73d80e8"
+  },
+  "currentCorrectionAcceptance": {
+    "record": "docs/business-trust-v1-correction-acceptance-alpha9.json",
+    "sha256": "9c9d196ee63ecdf71a587b0247adf4b4f8b59f73e42c64b2c37a2edba73d80e8"
+  },
+  "previousModelAvailabilityProbe": {
+    "record": ".benchmark-data/business-trust-v1/runs/formal-20261019-business-trust-v1-f/root-model-availability-20261019-v1.json",
+    "sha256": "e1c526df34da8ec89a8e9d959f4deb2e618dc4ac503df28cf2ffedd415fe42af",
+    "actualCompletedResponse": "READY",
+    "excludedFromBenchmark": true
+  },
+  "previousPreacceptanceBeforeAlpha9": {
+    "runId": "preaccept-20261018-bootstrap-v2",
+    "manifestSha256": "f7f31115492663f5718c44dafc8ac7fdcbc5fbaa56b1c50bfd9389fe177a4bb6",
+    "freezeVerified": true,
+    "status": "passed",
+    "workerDispatchAllowed": false,
+    "safeRecord": "docs/business-trust-v1-preacceptance-bootstrap.json",
+    "safeRecordSha256": "fe335091bef8d5d81a19c7e16f134f7f9306280e4ae24e9ec2db67ea6c03201b",
+    "ownedHostStoppedAfterIdentityVerification": true
+  },
+  "previousFormalRunF": {
+    "runId": "formal-20261019-business-trust-v1-f",
+    "manifestSha256": "ae1483f11099fe2c31bf32261eee3623135ab737cb37ef7b066937cb63b878f5",
+    "expectedPositions": 180,
+    "complete": false,
+    "promotion": "not_established",
+    "status": "closed_incomplete_confirmed_validation_defect",
+    "workerExportStarted": true,
+    "allStartupGatesPassed": true,
+    "dispatchAttempts": 60,
+    "qualityComparisonClaimed": false,
+    "replacementRequired": true,
+    "progress": {
+      "expectedPositions": 180,
+      "genuineSpawnReturns": 60,
+      "notSpawned": 120,
+      "spawnedWithoutIndependentReview": 0,
+      "statuses": {
+        "complete": 54,
+        "missing": 124,
+        "invalid": 1,
+        "timeout": 1
+      },
+      "tracesImported": 56,
+      "detachedPrebeginFailuresRetained": 4,
+      "actualTraceEvidenceRetained": 60,
+      "independentReviews": 60,
+      "auditPassed": 54,
+      "auditFailed": 6,
+      "publicReceiptsVerified": 56,
+      "contentSupplements": 60
+    },
+    "frozenPromptPositions": 180,
+    "frozenCandidateSourceArchive": {
+      "path": ".benchmark-data/business-trust-v1/runs/formal-20261019-business-trust-v1-f/frozen-candidate-sources.zip",
+      "sha256": "1e490f20ac77c42527c7de4779760ec4c02ebfba0e335a8518dac24e1ae1cf87",
+      "sourceFiles": 281,
+      "individualMemberHashesMatchFrozenManifest": true
+    },
+    "ownedHostStopped": true
+  },
+  "previousCampaignProgressF": {
+    "record": "docs/business-trust-v1-campaign-f-progress.json",
+    "sha256": "f2ed2d0e4b015823252c750062bb141a6fa787453187185a2f0949e50118e1d2"
+  },
+  "currentFormalStartup": {
+    "record": ".benchmark-data/business-trust-v1/g-startup-acceptance-v1.json",
+    "sha256": "e30601db11efcc6d07ab5a425fee52744840ac6c7f7869789450f8ae5c646f6b"
+  },
+  "candidateInstallAndRollbackGuide": {
+    "record": "docs/business-trust-v1-alpha9-candidate.md",
+    "sha256": "56b878fe4ad9a2f47fbeeb17eb4fb627101f90ee4c69f236bf5056ed61c4190d"
+  },
+  "currentReleaseDocumentationReview": {
+    "record": "docs/business-trust-v1-alpha9-release-review.json",
+    "sha256": "96709b880e21d5ba2e208313d43e5dea2b75717b40a4dbfa0654c792b103d540"
+  },
+  "campaignDiagnostics": {
+    "record": "docs/business-trust-v1-campaign-g-diagnostics.json",
+    "sha256": "add8873093be4ec3c58b63f0437ccf590ac7cf754c5c9b2dada2a81fd6ee0aec",
+    "scope": "Supplementary diagnostic snapshot, not the frozen comparison report or a promotion decision."
+  },
+  "requirementCountReconciliation": {
+    "record": "docs/business-trust-v1-requirement-count-reconciliation.json",
+    "sha256": "3e8ecbe385e28250f87bacf5f89176f4ba0610f098764b3227d1ee9d6d7023ba"
+  },
+  "historicalModelAvailabilityProbes": [
+    {
+      "record": ".benchmark-data/business-trust-v1/transport-smokes/transport-alpha9-20261020-a/verification.json",
+      "sha256": "4f2afa24cb3de1a0a3c427025922402c8e04ca15eea835fac185d52edcd41d6e",
+      "observedModel": "gpt-6-luna",
+      "observedReasoning": "max",
+      "publicPromptReceiptVerified": true,
+      "encryptedInitialLauncherBytesObservable": false,
+      "guaranteesFutureAvailability": false
+    },
+    {
+      "record": "docs/business-trust-v1-g-external-interruption-20261021-v1.json",
+      "sha256": "9db3ba8c62e3fec9d60007425e855858c6e4e6ecbb6363b786ca610c35baf09f",
+      "status": "workspace_credits_depleted_before_tool_calls",
+      "observedModel": "gpt-6-luna",
+      "observedReasoning": "max",
+      "actualFailedSessions": 2,
+      "postRecoveryAvailabilityVerified": false
+    },
+    {
+      "record": ".benchmark-data/business-trust-v1/transport-smokes/transport-alpha9-credit-20261021-a/verification.json",
+      "sha256": "dad317a8b55213efd6b01c973e1fcc499deb10d6dc8c7579c5a925e8262a4728",
+      "observedModel": "gpt-6-luna",
+      "observedReasoning": "max",
+      "actualSessionId": "01a15f00-08e8-75e3-be36-752ce877d3b8",
+      "publicPromptReceiptVerified": true,
+      "guaranteesFutureAvailability": false
+    },
+    {
+      "record": ".benchmark-data/business-trust-v1/transport-smokes/transport-alpha9-credit-20261024-b/verification.json",
+      "sha256": "2de11ffa883792f44bfca2a801ef57168aa4f3da6c2d1bdcb390e92dca074cde",
+      "observedModel": "gpt-6-luna",
+      "observedReasoning": "max",
+      "actualSessionId": "01a16d5a-c409-73d1-b07e-c65b14295913",
+      "publicPromptReceiptVerified": true,
+      "guaranteesFutureAvailability": false
+    }
+  ],
+  "currentDispatchHoldAcceptance": {
+    "record": ".benchmark-data/business-trust-v1/g-runtime-recovery-controller-acceptance-20261025-v2.json",
+    "sha256": "94653acd176b40eee345d0a59f4a8a0e32748f1d2933b4139bc5c540dfabf0eb"
+  },
+  "currentCampaignCreditResumption": {
+    "record": "docs/business-trust-v1-g-credit-resumption-20261025-v1.json",
+    "sha256": "008e543b756a972c5b29fce4624974fef394a6ecc4d267c02fcbc1626d07b263"
+  },
+  "historicalDispatchHoldAcceptances": [
+    {
+      "record": ".benchmark-data/business-trust-v1/g-credit-hold-acceptance-20261021-v1.json",
+      "sha256": "db16e43705855e97027af80d5071d1d646659702298817d3864a7c70ead95e7e",
+      "scope": "Root controller outside frozen harness; known credit outage and a predating smoke cannot dispatch a new formal position."
+    },
+    {
+      "record": ".benchmark-data/business-trust-v1/g-credit-hold-acceptance-20261021-v2.json",
+      "sha256": "82b5fc65480225460172d559ab14e3abc0035d4fd5f5fcc93ddeca0239715da2",
+      "scope": "Current Root controller only, outside frozen harness: known credits require a newer verified disposable smoke and formal slot reservations remain enforced."
+    },
+    {
+      "record": ".benchmark-data/business-trust-v1/g-runtime-recovery-controller-acceptance-20261022-v1.json",
+      "sha256": "dbaf426f62cd13072b3b0da5b8ae348b28e0a0bda9ae16972e60df1cf10557ce"
+    },
+    {
+      "record": ".benchmark-data/business-trust-v1/g-runtime-recovery-controller-acceptance-20261024-v1.json",
+      "sha256": "2ff6eb0ebccc1b47f2e59af4598f2a1ae4402e87cf2bf54aa7a5f5fdff471ea1"
+    },
+    {
+      "record": ".benchmark-data/business-trust-v1/g-runtime-recovery-controller-acceptance-20261025-v1.json",
+      "sha256": "9cef9af1cfc8f69549f73d6a67999ebba4596be10fd8c4e7e46e00fdc3ddde80"
+    }
+  ],
+  "historicalCampaignInterruptions": [
+    {
+      "record": "docs/business-trust-v1-g-external-interruption-20261021-v1.json",
+      "sha256": "9db3ba8c62e3fec9d60007425e855858c6e4e6ecbb6363b786ca610c35baf09f"
+    },
+    {
+      "record": "docs/business-trust-v1-g-external-interruption-20261022-v1.json",
+      "sha256": "0ef2ddc97ed8dc96a8b14208ec06f10fc6c73864fef04dcbf79ddd261f9026b5"
+    },
+    {
+      "record": "docs/business-trust-v1-g-external-interruption-20261023-v1.json",
+      "sha256": "e9de0a8f7f57b35066138642c4c5e68c08ec0f528e764a51e79256d707a178d0"
+    },
+    {
+      "record": "docs/business-trust-v1-g-external-interruption-20261025-v1.json",
+      "sha256": "1070c86608d94834b7143deffed894f0839fbffa9a8578a93cc2a73c6c5ad938"
+    }
+  ],
+  "historicalCampaignRuntimeRecoveries": [
+    {
+      "record": "docs/business-trust-v1-g-runtime-recovery-20261021-v1.json",
+      "sha256": "e96638c9a39ee383dd224bd6d397f41305c80e7c8176221b1c5deb52c243a3f8"
+    },
+    {
+      "record": "docs/business-trust-v1-g-runtime-recovery-20261022-v1.json",
+      "sha256": "bf21c8e375157af6502757611b5d89174543a0a88476626045240845e543f852"
+    },
+    {
+      "record": "docs/business-trust-v1-g-runtime-recovery-20261024-v1.json",
+      "sha256": "8c3d8366e2096a5a7263a3e33384b5a450f960423251d63980683603b25d6fbb"
+    },
+    {
+      "record": "docs/business-trust-v1-g-runtime-recovery-20261025-v1.json",
+      "sha256": "4ac53c54fea3628e541fcc9cc411200da7dda9679fc1fdb87d08ebfa00bd224b"
+    }
+  ],
+  "historicalCreditResumptions": [
+    {
+      "record": "docs/business-trust-v1-g-credit-resumption-20261024-v1.json",
+      "sha256": "a17a41b96d92f54df0fc7660f36fa74494a70973d59217102911198f4dacf83f"
+    },
+    {
+      "record": "docs/business-trust-v1-g-credit-resumption-20261021-v1.json",
+      "sha256": "617a8f261a6f11e363a2c161235d085441bd96f28bd52b71b7295e2a66870535"
+    }
+  ],
+  "historicalModelAvailabilityHolds": [
+    {
+      "status": "waiting_for_workspace_credits",
+      "failedPositions": [
+        "job-152",
+        "job-153"
+      ],
+      "resumeRequiresFreshPassedLunaMaxSmoke": true,
+      "latestPreviousSmokePredatesFailure": true,
+      "newModelAvailabilityVerified": false,
+      "nextUnspawnedPosition": "job-154"
+    }
+  ],
+  "currentModelAvailabilityProbe": {
+    "record": ".benchmark-data/business-trust-v1/transport-smokes/transport-alpha9-credit-20261025-a/verification.json",
+    "sha256": "56630f447a3be576ee0a63b3905633127d0c3d63fbaf4402ddbc8dae6c8fc254",
+    "observedModel": "gpt-6-luna",
+    "observedReasoning": "max",
+    "actualSessionId": "01a17148-dc3c-7353-8fc3-202e17b246c9",
+    "publicPromptReceiptVerified": true,
+    "guaranteesFutureAvailability": false
+  },
+  "currentCreditResumption": {
+    "record": "docs/business-trust-v1-g-credit-resumption-20261025-v1.json",
+    "sha256": "008e543b756a972c5b29fce4624974fef394a6ecc4d267c02fcbc1626d07b263"
+  },
+  "independentTechnicalAudit": {
+    "record": ".benchmark-data/business-trust-v1/final-readonly-technical-audit-20261025-v1.json",
+    "sha256": "8ab849a7dc4a6f2659b1c12d294ece7c82cd5c0e53f3c938df2c463e45f1bafd"
+  },
+  "rootTechnicalAuditSupplement": {
+    "record": "docs/business-trust-v1-final-technical-audit-root-20261025-v1.json",
+    "sha256": "ec6a979a8eed34ef7e48fb102e989e9056b35dd53709ad015f159f017072f640"
+  },
+  "currentCampaignInterruption": {
+    "record": "docs/business-trust-v1-g-external-interruption-20261025-v2.json",
+    "sha256": "19474c85b52e1cfa38aaf8894018a9586da89da28f100e35dc9f21697cfb5be5"
+  },
+  "currentCampaignRuntimeRecovery": {
+    "record": "docs/business-trust-v1-g-runtime-recovery-20261025-v2.json",
+    "sha256": "2e83f4b18d7dfec869f0cb27fb881c03af0399da8a2e5042ea619f485664cce5"
+  },
+  "goalComplete": true,
+  "agentQualityImprovementClaimed": false,
+  "finalRequirementAudit": {
+    "record": "docs/business-trust-v1-final-requirement-audit.json",
+    "sha256": "def6e7d9a9ec9b9820226ae6128509fdc1634a46d7b8a25d86b12a9d0b7be8e5"
+  },
+  "finalResults": {
+    "record": "docs/business-trust-v1-final-results.md",
+    "sha256": "a0664362b3cc497cc78289303bf976ca0fd1fc48b8dd614c6e1bbd1f23efa421"
+  },
+  "promotionDecision": {
+    "record": "docs/business-trust-v1-promotion-decision.json",
+    "sha256": "5122f57421563476342924617f8e2ac9bf1b3a4e6982fcd7642e604534101fdd"
+  },
+  "independentComparisonAudit": {
+    "record": ".benchmark-data/business-trust-v1/final-comparison-readonly-audit-20261025-v1.json",
+    "sha256": "09bc53ee80cef6728abb466f4bbd8d9233ac7e74a85fa06e1106e05f93c72bea"
+  },
+  "finalRootIntegrity": {
+    "record": ".benchmark-data/business-trust-v1/final-root-delivery-integrity-20261025-v1.json",
+    "sha256": "383c49fde3aeb983371ccc01862ad0b6c8993db8280487467995ee9b7127029a"
+  },
+  "finalOwnedServiceStop": {
+    "record": ".benchmark-data/business-trust-v1/g-final-owned-stop-20261025-v1.json",
+    "sha256": "903d772fa23d8a61b4a8d260d02db65e9e029afcde0cde1f8cd8237af3a9cbba"
+  },
+  "historicalOpenValidationGap": {
+    "requirementId": "CMP01",
+    "status": "new_complete180_comparison_required"
+  },
+  "finalReviewAdjudication": {
+    "record": "docs/business-trust-v1-final-review-adjudication.json",
+    "sha256": "7ae73450c7d9edc731fb1c541df5f6180a81cbd29e09dce1fd5990a8cc663656"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-10-19T14:53:45.620412+00:00",
+  "runId": "formal-20261019-business-trust-v1-f",
+  "manifestSha256": "ae1483f11099fe2c31bf32261eee3623135ab737cb37ef7b066937cb63b878f5",
+  "status": "same_run_authenticated_recovery_passed",
+  "recoveryAttempt": {
+    "path": ".benchmark-data/business-trust-v1/runs/formal-20261019-business-trust-v1-f/recovery-attempts/attempt-f6ab5a3ed1e448ea80e40a141f1525df.json",
+    "sha256": "404321620c84a519f287a445d541fa54855a6b506bd506758dcca96620999de8",
+    "mcpObservedRoleCount": 10,
+    "contextQuestionCount": 60,
+    "passed": true
+  },
+  "originalEvidenceFileCount": 390,
+  "allOriginalEvidenceHashesUnchanged": true,
+  "allFiveOriginalGateHashesUnchanged": true,
+  "samePrivateCiphertext": true,
+  "privateCiphertextSha256": "1de02483c8f9e5161c509c080e79fda245357d6d665b81c045a229739b685d0b",
+  "ledgerMacVerified": true,
+  "consumedPositionCount": 26,
+  "actualSpawnedPositionCount": 29,
+  "sameOriginalCredentialsUsed": true,
+  "independentAuthenticatedChecks": [
+    {
+      "group": "baseline",
+      "sameOriginalActorCredentialAuthenticated": true,
+      "publishedRevisionMatchesCurrentCore": true,
+      "liveHybridIndexReady": true,
+      "requiredAuthorizedColumnCount": 4,
+      "catalogFallbackCoveragePassed": true,
+      "contextSha256": "7f62c524f12f359fe22b9f91004c556d03b3fca97d37ab367c593dd513dceac5",
+      "catalogSha256": "d21c67b14b93fc246210ea5eee63efd70fb41b68cddf77b8e534b401f150c762"
+    },
+    {
+      "group": "candidate",
+      "sameOriginalActorCredentialAuthenticated": true,
+      "publishedRevisionMatchesCurrentCore": true,
+      "liveHybridIndexReady": true,
+      "requiredAuthorizedColumnCount": 4,
+      "catalogFallbackCoveragePassed": true,
+      "contextSha256": "21a53cde39273fc7b1f9a4302cd44b4b69994f7d32c9e73e4ce292e4c577a4fa",
+      "catalogSha256": "d21c67b14b93fc246210ea5eee63efd70fb41b68cddf77b8e534b401f150c762"
+    }
+  ],
+  "retriedPositions": 0,
+  "workerPromptsReexported": false,
+  "originalSubjectsOrCredentialsRecreated": false,
+  "privateValuesExported": false,
+  "limitations": [
+    "No Agent worker was active during recovery: jobs 028/029 had already terminated with provider credit errors.",
+    "This is runtime recovery evidence and does not establish answer-quality improvement.",
+    "The stopped services original termination cause was not observed."
+  ]
+}

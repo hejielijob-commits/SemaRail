@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-20T16:19:54.661045+00:00",
+  "scope": "Root source verification of the focused read-only alpha9 release review; documentation clarification only.",
+  "frozenRuntimeSourcesUnchanged": true,
+  "canonicalAndPackagedResolutionBytesEqual": true,
+  "sourceHashes": {
+    "apps/semantic-console/server/feedback_resolution.py": "29418d3f0109bf18e86cedbe4ac31bfa82234ca211f48ca945f2efa979dcd4f8",
+    "packages/core/python/semantic-console/server/feedback_resolution.py": "29418d3f0109bf18e86cedbe4ac31bfa82234ca211f48ca945f2efa979dcd4f8",
+    "apps/semantic-console/server/regression.py": "a653dab70f2506cd77a7a1af8c0dbad30121cdabe9acbb0162ab4dbeeb2fc90e",
+    "apps/semantic-console/server/tests/test_feedback_resolution.py": "4edd7aae9eb4495acb7b6edd75d27e50e41200f526b7c6d6386a004213e24d18"
+  },
+  "findings": [
+    {
+      "topic": "Deleted-case linking",
+      "disposition": "The claimed current-delete API contradiction is rejected; docs clarified to distinguish current physical removal from retained legacy deleted records.",
+      "evidence": "RegressionStore.delete_case removes regression_case_versions; existing test_deleted_case_head_stales_existing_resolution checks stale association and 404 relinking. Legacy deleted records remain stale for verification."
+    },
+    {
+      "topic": "Verification prerequisites",
+      "disposition": "accepted_documentation_clarification",
+      "evidence": "Documented current publication, unexpired source feedback matching base semantics, enabled current case with known dataset, completed non-expired SQL assertions and Core query/trace IDs, matching semantic/dataset versions and approved all-pass external review."
+    }
+  ],
+  "previousDocumentation": {
+    "record": ".benchmark-data/business-trust-v1/alpha9-release-readonly-audit-original-business-trust-doc.md",
+    "sha256": "ca336b268038d2682257bf286d5d252f6f9167c8c456ba0a5e82d931db239eae"
+  },
+  "currentDocumentation": {
+    "record": "docs/business-trust-v1.md",
+    "sha256": "e5d5229fa6d6f3158277d4fbbc7c0c608f3f66a0aac5afcc8333d522337e7f8b"
+  },
+  "runtimeBehaviorChanged": false,
+  "newTestsExecuted": false,
+  "formalComparisonComplete": false
+}

@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-10-20T15:27:11.189446+00:00",
+  "status": "corrected_candidate_technical_and_real_mcp_acceptance_passed_formal_comparison_pending",
+  "packageAcceptance": {
+    "record": "docs/business-trust-v1-candidate-alpha9-acceptance.json",
+    "sha256": "b0e5f08bae43ff84c53066bd9713eb9cfc262c30f098c58ed080ccaca081ada6"
+  },
+  "sourceIntegration": {
+    "record": ".benchmark-data/business-trust-v1/reviewed-corrections-applied-v1.json",
+    "sha256": "1e66cf24cec46f1804ac62dd1ed1d6acfb979e32d4119b4e721f61ab22b2cce2"
+  },
+  "preacceptance": {
+    "runId": "preaccept-20261020-period-and-clarification-v1",
+    "manifestSha256": "653fe52873fda3928bedd87afcb4ba11c37baec4fa1fffff96a0a5443a157e82",
+    "currentFreezeVerified": true,
+    "workerDispatchAllowed": false,
+    "agentDispatchStarted": false,
+    "sourceFilesBound": 291,
+    "oldRegressionPassed": 120,
+    "contextsPassed": 60,
+    "businessChecksPassed": 21,
+    "groupedConfirmationCounterexamples": 4,
+    "governedExecutionBoundaryCases": 7,
+    "canonicalQuestionsValidated": 30,
+    "physicalOracleChecks": 20,
+    "permissionExecutionChecks": 18,
+    "permissionPlanChecks": 18,
+    "gates": {
+      "regression.json": "d7e01594e16d5b175c2abe233b23f0bb0548c7e180ca1b594aae0c94da11ba8b",
+      "context-delivery-validation.json": "c807d551a838b8fef898f35a8026b09adf5be70fbbff3c30571c8c4171acdfb5",
+      "execution-check-validation.json": "5d467fd359588b24659d0ec36f0117b20978d1f795092f9311d68946e57990de",
+      "oracle-validation.json": "70db8106524752a37494c301ec626472ca1a944c0244abb77597e06802ebd9bf",
+      "tool-capabilities.json": "778f5996fa06045cc54227c8bdcfbb814fefda26ecd8fd9d20cf4759188630ac"
+    },
+    "terminalProof": {
+      "record": ".benchmark-data/business-trust-v1/preaccept-alpha9-v1-result.json",
+      "sha256": "1e3c2902ce8e6e3adbbeccca1515d52a68406f5e8462401f0577e1a718e2981c"
+    }
+  },
+  "currentTests": {
+    "consolePassed": 344,
+    "webPassed": 168,
+    "contractPassed": 20,
+    "harnessTestsRun": 111,
+    "harnessSkipped": 1,
+    "isolatedNoModelVerifierTestsPassed": 48,
+    "postgresStorageAcceptance": "passed",
+    "typecheck": "passed"
+  },
+  "logs": {
+    "console-after-period-fix-v1.log": "70cc164078b44f83132aa67229252556deffdd96659e151f00c9103668df9f1d",
+    "web-after-period-fix-v1.log": "c715254aef3707ea7734b7ed60d0114ee1f116b06dd694f4079292f30ef16005",
+    "harness-after-period-gate-v2.log": "8b956439291f9b8309a741485660842e94075c4edcb917958d22ba55a9ea1bd6",
+    "contract-alpha9-v1.log": "c1afbcd75878e4bd548cd2fc37f4a38143766de863f1e8b1a3f655a2a0b894f4",
+    "postgres-after-period-fix-v1.log": "3daccbe98984dea89119c17f41ec6eb0bf6a996da55ea2a6184e696fcfdfe00e",
+    "typecheck-after-period-fix-v1.log": "986d1f0ec1c8feb49be6e5cc413c726773f285503bf5ee2dfc82cf879a40c7e4"
+  },
+  "clarificationProtocolDiagnosis": {
+    "record": "docs/business-trust-v1-clarification-protocol-diagnosis.json",
+    "sha256": "cc79de1e8f64e838b77635fc51f32104bb243c2d9cceb9caaa3c70b55c0c54ec"
+  },
+  "latestModelTransportObservation": {
+    "record": ".benchmark-data/business-trust-v1/transport-smokes/transport-alpha9-20261020-a/verification.json",
+    "sha256": "4f2afa24cb3de1a0a3c427025922402c8e04ca15eea835fac185d52edcd41d6e",
+    "observedModel": "gpt-6-luna",
+    "observedReasoning": "max",
+    "publicPromptReceiptVerified": true,
+    "encryptedInitialLauncherBytesObservable": false,
+    "guaranteesFutureAvailability": false
+  },
+  "ownedHostStopProof": {
+    "record": ".benchmark-data/business-trust-v1/smoke-alpha9-owned-host-stop-v1.json",
+    "sha256": "494f99514459aff7bee1fe71a5eb37a13b7163f07f9514f2f7a4443d6214c515"
+  },
+  "historicalArchivesReverified": [
+    {
+      "verified": true,
+      "runId": "formal-20261018-business-trust-v1-e",
+      "expectedPositions": 180,
+      "actualSessions": 17,
+      "independentReviews": 17,
+      "sourceFilesPreserved": 277,
+      "retainedEvidenceFiles": 308,
+      "currentFilesDifferentFromArchivedSource": 23,
+      "historicalEvaluatorReexecuted": false,
+      "promotionEstablished": false
+    },
+    {
+      "verified": true,
+      "runId": "formal-20261019-business-trust-v1-f",
+      "expectedPositions": 180,
+      "actualSessions": 60,
+      "independentReviews": 60,
+      "sourceFilesPreserved": 281,
+      "retainedEvidenceFiles": 1010,
+      "currentFilesDifferentFromArchivedSource": 19,
+      "historicalEvaluatorReexecuted": false,
+      "promotionEstablished": false
+    }
+  ],
+  "corpusAndScoringUnchanged": true,
+  "coreEvidenceSchemaVersion": 1,
+  "rulesImplementationVersion": "business-trust-v2",
+  "contextDefaultPromoted": false,
+  "formalComparisonComplete": false,
+  "agentQualityImprovementClaimed": false,
+  "goalComplete": false,
+  "remaining": [
+    "Freeze and execute a new complete180 comparison with independent source/content reviews.",
+    "Revalidate final feedback repair associations against the delivered candidate and applicable external evaluation.",
+    "Complete the requirement audit and promotion decision; retain explicit opt-in if gates are unmet."
+  ]
+}

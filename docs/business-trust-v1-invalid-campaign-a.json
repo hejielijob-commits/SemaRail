@@ -1,0 +1,55 @@
+{
+  "all180PositionsRemainInDenominator": true,
+  "begunWorkers": [
+    {
+      "jobId": "job-001",
+      "latestStatus": "timeout",
+      "workerThreadId": "01a13b03-8a05-7592-af94-500934456b7c"
+    },
+    {
+      "jobId": "job-003",
+      "latestStatus": "complete",
+      "workerThreadId": "01a13b0e-27ef-7a61-aaae-dbf8421e3b51"
+    }
+  ],
+  "expectedPositions": 180,
+  "latestRecordedStatuses": {
+    "complete": 1,
+    "missing": 178,
+    "timeout": 1
+  },
+  "modelWorkersBegun": 2,
+  "nextAction": "Full fresh 180-position campaign after a terminal-state fix; no selected successful cases or per-position retries.",
+  "operatorDeviations": [
+    {
+      "failure": "supervisor_modified_frozen_prompt_path_before_begin",
+      "jobId": "job-002"
+    },
+    {
+      "failure": "supervisor_modified_frozen_prompt_path_interrupted_before_begin",
+      "jobId": "job-004"
+    }
+  ],
+  "originalManifestSha256": "458b85b40123991d433c37df7303b1d9f9e76306118edba9321eb99a0cef7977",
+  "reason": "Coordinator incorrectly overwrote a completed result as timeout when a later worker began. Original records preserved; not suitable for answer-quality comparison.",
+  "recommendation": {
+    "promote": false,
+    "qualityImprovementClaim": false
+  },
+  "recordedAt": "2026-10-14T15:54:19.808028+00:00",
+  "retainedReportSha256": "b1bf3b0b91d14aae14b7e92ff5f2a002c824215eb97cf645b813a3739f045fd6",
+  "retainedSafeSummarySha256": "23a321c986e8dd05df01cf39c793186370809ee855f84d5da1fc922bf2710761",
+  "runId": "formal-20261014-business-trust-v1-a",
+  "schemaVersion": 1,
+  "sourceHashesInOriginalManifestRemainUnmodified": true,
+  "status": "aborted_invalid_protocol",
+  "terminalOverwriteEvidence": [
+    {
+      "completeRecordHashes": [
+        "ff8ad7f1dda755356ded9efc3d9d02edf2ef0b1b5a9830b06b44270bfff4c6b5"
+      ],
+      "jobId": "job-001",
+      "laterTimeoutRecordHash": "6aa49ffb318bf5fee98aa25e1487a171d98e7ec8fa7f802c3bac01245c46bc81"
+    }
+  ]
+}

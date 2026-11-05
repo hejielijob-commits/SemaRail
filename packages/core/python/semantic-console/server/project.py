@@ -498,6 +498,12 @@ class ProjectStore:
         )
         self.drafts: dict[str, str | None] = {}
         self._lock = threading.RLock()
+        self._binding_condition = threading.Condition(threading.RLock())
+        self._bound_execution_count = 0
+        self._bound_execution_threads: dict[int, int] = {}
+        self._binding_mutation_owner: int | None = None
+        self._binding_mutation_depth = 0
+        self._binding_mutation_waiters = 0
         self._datasources: dict[str, DatasourceRecord] = {}
         self.active_datasource_id: str | None = None
         self._datasource_secret_file = self.state_dir / "datasources.secrets.json"
@@ -520,6 +526,98 @@ class ProjectStore:
         with self._lock:
             active = self._datasources.get(self.active_datasource_id) if self.active_datasource_id else None
             return active.id if active is not None and active.id == self.active_datasource_id else None
+
+    def datasource_profile_binding_id(self, datasource_id: str | None) -> str | None:
+        """Return an internal fingerprint for one datasource's connection profile.
+
+        The value binds governed preparations to the exact server-side source
+        configuration without returning credential material or putting the
+        fingerprint into a client payload. Presentation-only fields such as
+        the profile name and last connection test are deliberately excluded.
+        """
+
+        if not isinstance(datasource_id, str) or not datasource_id:
+            return None
+        with self._lock:
+            record = self._datasources.get(datasource_id)
+            if record is None or record.id != datasource_id:
+                return None
+            try:
+                encoded = json.dumps(
+                    {"type": record.type, "connection": record.connection},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ).encode("utf-8")
+            except (TypeError, ValueError) as exc:
+                raise ProjectError("INVALID_DATASOURCE_PROFILE", "datasource profile is invalid") from exc
+            return hashlib.sha256(encoded).hexdigest()
+
+    @contextmanager
+    def bound_execution(self) -> Iterator[None]:
+        """Pin published semantics and datasource profiles while a governed query runs.
+
+        This is separate from ``_lock`` so a concurrent query cancellation can
+        still resolve the active datasource and reach the runtime dispatcher.
+        Binding mutations wait for existing executions to finish, while query
+        executions may coexist.
+        """
+
+        owner = threading.get_ident()
+        with self._binding_condition:
+            nested_reader = self._bound_execution_threads.get(owner, 0) > 0
+            while (
+                (self._binding_mutation_owner is not None and self._binding_mutation_owner != owner)
+                or (self._binding_mutation_waiters and self._binding_mutation_owner != owner and not nested_reader)
+            ):
+                self._binding_condition.wait()
+            self._bound_execution_count += 1
+            self._bound_execution_threads[owner] = self._bound_execution_threads.get(owner, 0) + 1
+        try:
+            yield
+        finally:
+            with self._binding_condition:
+                self._bound_execution_count -= 1
+                depth = self._bound_execution_threads.get(owner, 0) - 1
+                if depth > 0:
+                    self._bound_execution_threads[owner] = depth
+                else:
+                    self._bound_execution_threads.pop(owner, None)
+                self._binding_condition.notify_all()
+
+    @contextmanager
+    def binding_mutation(self) -> Iterator[None]:
+        """Serialize publish/datasource changes against bound query execution."""
+
+        owner = threading.get_ident()
+        with self._binding_condition:
+            if self._binding_mutation_owner == owner:
+                self._binding_mutation_depth += 1
+            else:
+                if self._bound_execution_threads.get(owner):
+                    # A same-thread callback cannot upgrade an execution pin;
+                    # failing is safer than deadlocking the query dispatcher.
+                    raise RuntimeError("cannot mutate query bindings during a pinned execution")
+                self._binding_mutation_waiters += 1
+                try:
+                    while self._binding_mutation_owner is not None or self._bound_execution_count:
+                        self._binding_condition.wait()
+                    self._binding_mutation_owner = owner
+                    self._binding_mutation_depth = 1
+                finally:
+                    self._binding_mutation_waiters -= 1
+                    self._binding_condition.notify_all()
+        try:
+            with self._lock:
+                yield
+        finally:
+            with self._binding_condition:
+                if self._binding_mutation_owner == owner:
+                    self._binding_mutation_depth -= 1
+                    if self._binding_mutation_depth == 0:
+                        self._binding_mutation_owner = None
+                        self._binding_condition.notify_all()
 
     # ---- project read/draft operations ---------------------------------
 
@@ -550,6 +648,65 @@ class ProjectStore:
                 "activeDatasource": active.public() if active else None,
                 "wren": self.validator.health(),
             }
+
+    @property
+    def published_revision(self) -> str:
+        """Digest the currently published project tree, excluding drafts."""
+
+        with self._lock:
+            return _file_digest(self.project_dir, exclude=self.state_dir)
+
+    @property
+    def published_version_id(self) -> str | None:
+        """Return the latest successful activation identity for the current tree.
+
+        Re-publishing identical files and rolling back to an older snapshot each
+        create a new version ID. Binding preparations to this value prevents a
+        prior preparation from becoming valid again when a content digest repeats.
+        """
+
+        with self._lock:
+            revision = _file_digest(self.project_dir, exclude=self.state_dir)
+            versions = self.versions()
+            if not versions:
+                # Projects can be used before their first explicit publish.
+                # The sentinel is tied to the initial tree and changes on first
+                # activation, while preserving the existing fresh-project flow.
+                return f"unversioned:{revision}"
+            latest = versions[0]
+            if latest.get("revision") != revision:
+                # The checked-out project tree no longer matches the latest
+                # successful publish, so no trustworthy activation can bind it.
+                return None
+            value = latest.get("id")
+            return value if isinstance(value, str) and value else None
+
+    def published_files(self) -> list[dict[str, Any]]:
+        """List metadata for published files without applying the draft overlay."""
+
+        with self._lock:
+            entries: list[dict[str, Any]] = []
+            if not self.project_dir.is_dir():
+                return entries
+            for candidate in self.project_dir.rglob("*"):
+                if candidate.is_symlink() or not candidate.is_file():
+                    continue
+                relative = candidate.relative_to(self.project_dir).as_posix()
+                if any(part in _IGNORED_DIRS for part in Path(relative).parts) or relative.startswith("target/"):
+                    continue
+                if _secret_file_path(relative):
+                    continue
+                try:
+                    data = candidate.read_bytes()
+                except OSError:
+                    continue
+                entries.append({
+                    "path": relative,
+                    "size": len(data),
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                    "draft": False,
+                })
+            return sorted(entries, key=lambda item: str(item["path"]))
 
     def files(self) -> list[dict[str, Any]]:
         with self._lock:
@@ -608,6 +765,31 @@ class ProjectStore:
             except UnicodeDecodeError as exc:
                 raise ProjectError("FILE_NOT_TEXT", "project file is not UTF-8 text") from exc
             return {"path": relative, "content": content, "draft": False, "revision": _file_digest(self.project_dir, self.drafts, exclude=self.state_dir)}
+
+    def read_published_file(self, relative: str) -> dict[str, Any]:
+        """Read one file from the published tree, ignoring any draft override."""
+
+        relative = _safe_relative(relative, allow_target=False)
+        with self._lock:
+            candidate = self.project_dir / relative
+            if not candidate.is_file() or candidate.is_symlink():
+                raise ProjectError("FILE_NOT_FOUND", "project file was not found")
+            try:
+                data = candidate.read_bytes()
+            except OSError as exc:
+                raise ProjectError("FILE_READ_FAILED", "project file could not be read") from exc
+            if len(data) > _MAX_FILE_BYTES:
+                raise ProjectError("FILE_TOO_LARGE", "project file exceeds the 2 MiB limit")
+            try:
+                content = data.decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise ProjectError("FILE_NOT_TEXT", "project file is not UTF-8 text") from exc
+            return {
+                "path": relative,
+                "content": content,
+                "draft": False,
+                "revision": _file_digest(self.project_dir, exclude=self.state_dir),
+            }
 
     def diff_file(self, relative: str) -> dict[str, Any]:
         """Return a bounded unified diff between the published file and draft."""
@@ -838,7 +1020,7 @@ class ProjectStore:
     # ---- publish/version operations ------------------------------------
 
     def publish(self, *, label: str | None = None) -> dict[str, Any]:
-        with self._lock:
+        with self.binding_mutation():
             stage = self._stage()
             try:
                 result = self.validator.validate(stage)
@@ -882,7 +1064,7 @@ class ProjectStore:
     def rollback(self, version_id: str) -> dict[str, Any]:
         if not re.fullmatch(r"[A-Za-z0-9_-]{6,100}", version_id or ""):
             raise ProjectError("INVALID_VERSION", "version id is invalid")
-        with self._lock:
+        with self.binding_mutation():
             snapshot = self.versions_dir / version_id / "project"
             if not snapshot.is_dir():
                 raise ProjectError("VERSION_NOT_FOUND", "version was not found")
@@ -1050,7 +1232,7 @@ class ProjectStore:
         this small local vault for the host OS keychain.
         """
 
-        with self._lock:
+        with self.binding_mutation():
             records = {
                 key: {
                     "id": record.id,

@@ -1,0 +1,1342 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-18T10:04:04.016009+00:00",
+  "runId": "formal-20261018-business-trust-v1-e",
+  "manifestSha256": "ec20ed8077bf11701bf59631825974369c8be6c78252cd4f1bb23353235cb85f",
+  "status": "interrupted_nonresumable_protocol",
+  "denominator": 180,
+  "counts": {
+    "expectedPositions": 180,
+    "genuineSpawnReturns": 17,
+    "notSpawned": 163,
+    "statuses": {
+      "complete": 4,
+      "timeout": 12,
+      "missing": 164
+    },
+    "independentReviews": 17,
+    "actualSessionTracesRetained": 17,
+    "officialImports": 16,
+    "detachedPrebeginFailures": 1,
+    "auditPassed": 4,
+    "auditFailed": 13
+  },
+  "positions": [
+    {
+      "jobId": "job-001",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "1b833a5bcc7cf5986831dcc41cfc977956538c191c19fafaf65da8babcfefdd0",
+      "traceSha256": "04d2a02aa5a3a559c3ebeed2194aeda241e523a8d2a4971104f84b6c223ce769",
+      "reviewSha256": "725c0286807f791af9ad3344c61bd0f8cd28f414f650ed52df3fac9f714a810b",
+      "contentReviewSha256": "bf8a631150bbce8021883404b4484f7c3cdf5b2d16edfe188236e92825f3f215",
+      "auditStatus": "passed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-002",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "453f85d79661151f980156024b76d24c65d906dc0f96ae73951495ff5ef61a83",
+      "traceSha256": "974467939d58b49b8e6d3eefe17cd800afce4da7d97bf7c2c7f17d5c81ddf3dd",
+      "reviewSha256": "39df6319d886ba43c49c139d8bac9f83cc249819d46435541e2fe833e7629cbc",
+      "contentReviewSha256": "903d7f3d9e25eacc9c0440d9194d0ff120965d5c088e00e87d29844c96d684a3",
+      "auditStatus": "failed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-003",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "66233880ddf8650224e0b3993bc5a3fcc167bb1b657a166cab82568638fcc5c0",
+      "traceSha256": "46da7646b785f33a882ab4bc44c8129f692b5e72e0e0cf15603702fb309369bf",
+      "reviewSha256": "c4ab82a2b6cb4d891724ab89f92e9a1c85fe1bb02cf29692eb42ff6c59478560",
+      "contentReviewSha256": "7acc7afba528dd20545bbc732ed79c86bc27074a981249c36d205f2a5258f5eb",
+      "auditStatus": "passed",
+      "narrativeAnswerCorrect": true,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-004",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "c40c45ea28d2add0f762913ea0214cb2ccdd1da08744ba43d0b392df294d07c0",
+      "traceSha256": "3768960ee2d5e9c12c749ecd27bdf9bc26e5dcae5dbb2a5c5dfb113a26fc97f9",
+      "reviewSha256": "7889bb4b26fef2383a68c720b8fa5ee237abdea194b18af1e449dac4755b8f60",
+      "contentReviewSha256": "4fc8c5910fe74065adec44c6a623d690fb7041bb2fedb0e95c98759fb9737903",
+      "auditStatus": "failed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-005",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "13a4d3fb12a3f93786656bc7ac6d30b2059fb1ecf574b79105ba944e71100622",
+      "traceSha256": "a6e846d8f09f24c4fb11f221b8777aa4e65522edd225a76fc5739eab5ba5eab1",
+      "reviewSha256": "08d613c8bb4db65f9379b31a0da17d4f1daeaa9c29d8b9828e96a5bd433ae6e3",
+      "contentReviewSha256": "4a5c7df220a81d0de516e8981315edf515e3d8e8887636eab72f7bcef3a1bbd4",
+      "auditStatus": "passed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-006",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "45e54728f5d251376eaa1dc0eb3424ba58f13b8bbba1dec776b75c226411e89b",
+      "traceSha256": "6a25233ec8be434b19ffe556ea87511d9673a984457aa2e0a82e422f795db2c6",
+      "reviewSha256": "a292f0ff86a94a1737360715148268c507dd7ab738f9869daf69e80b3f61b7db",
+      "contentReviewSha256": "a0cd7e07422a3dd6339536a1733b574dd0b04e90ddc415ac5aed6313bcd9d372",
+      "auditStatus": "failed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-007",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "6b6f41e05d8c837e2826b359268b4725dda495854490d2027c845cd138d3ada0",
+      "traceSha256": "ec63fd803db173351f4e6ad501689fd779b4855ab2b268955a93be7d1f339a8f",
+      "reviewSha256": "9ebfb0e9cd5a4727841fcd15eaac11f12edacb277afaf73bf94046eb55abac01",
+      "contentReviewSha256": "31b0fa49733ff6920b9301cda797dde3298a12261a0689b1f8e5f00d821ef3b7",
+      "auditStatus": "failed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-008",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "b907d637bb373ed43ff3322f015f66fe17e69cf5e8eb54e618d9c8eb9116fb5c",
+      "traceSha256": "4c3fdcbd401f4f6b137ec458e89b013aab5bc142a0f880d461e92bdfab78a865",
+      "reviewSha256": "ccff59362f60b42d29c83135e3ebb27740b71fc52eaccbb20902bb6526d7e3f5",
+      "contentReviewSha256": "fea56dc3ab6d41945605a0aa328b6b2add600061754ea98581a3bacc449e6cd7",
+      "auditStatus": "failed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-009",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "7fc18b20774f67bb873fdbb6c01f333b2ba369e78019c6264124f2328fe8c9f5",
+      "traceSha256": "608d80f8449fea303e10e46f322f1fb21a1accb0f2813ccbc7b3d4000477d1db",
+      "reviewSha256": "9ea964b1cefbe280bf9809b67b23ef935902bf37d2728fdf3262e7d3a939181f",
+      "contentReviewSha256": "41959b5531c55f5c7b39c1992ee3fea18e01a80eed9545a6c1867e59ee3c6a85",
+      "auditStatus": "failed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-010",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "6ee37d4036c2e8125cc3858dde94aad9325eba641f2e047b9e30e4be0b23af39",
+      "traceSha256": "3ee3fdd913760f3588935580189cee109d033a52314584c56331db8f486d558c",
+      "reviewSha256": "ee7e1c368c2fd5a154ab1840a3638dafb2e253c3acae1c98621e974da84350c5",
+      "contentReviewSha256": "3ea92621c4f32420f6a97d5f6ea2acd5a32bfc8375ca5f48efa2d7382b6ffeb2",
+      "auditStatus": "failed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-011",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "03d476f475238b15ab2363036134837042f4b77e60254da905db83508bd5b213",
+      "traceSha256": "930d2bc25e276d8ce963d8f089cfb4ced1f777514aa805d3d2875ba0e2d0fb9c",
+      "reviewSha256": "625e8f36c4c8eb1221acf1fdffb702caffa03e694694d31496f269e3d1a86496",
+      "contentReviewSha256": "abedffc85a58dbe46f920f16c6ed228445c3531e09abe6c8f71fc7c72bb6359f",
+      "auditStatus": "failed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-012",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "36c42130d765d9b54b665ded812e11a4251fdfaa9799cd99408ab902ee01e60c",
+      "traceSha256": "037812161a5a62687dbe86656a318289261cc6f0e30c360279b0392ea4d9e861",
+      "reviewSha256": "758e1e3b5fb063727afa3dec2401a95dcf752c8c361150290235a5e164e98ae9",
+      "contentReviewSha256": "4a3e198eb9bab7ddfddd00e95c594bc4b7bba303a696330d219d99ed0c975a38",
+      "auditStatus": "passed",
+      "narrativeAnswerCorrect": true,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-013",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "8b605493fcd526a2d2b74a89d6683a104f8986136978d4322f098f2343906668",
+      "traceSha256": "01a077573ce2c79bdf25a55ca623fa968fef7aba4f72483b71440486cfe67069",
+      "reviewSha256": "8d09a4d103012f0fa5a60109915ad8e246f145cf8bb3ce13c4e244d50b01f3cb",
+      "contentReviewSha256": "569438576b91c6e160c3d6c6b34bae345f9fdf59b8ee180f7042a60bbb203150",
+      "auditStatus": "failed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": false
+    },
+    {
+      "jobId": "job-014",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "3cf242682bffb713ea8403a5885522247cecc77413b7e32760b73bd02527754f",
+      "traceSha256": "eabaa3fd0a8d85f84ed033990b9381b69811f6f6c6ec413906cbe9f63919e053",
+      "reviewSha256": "1bb1488ac93731b4c7646eadd05f2dfcf2b4a917e26047befff16335352e7692",
+      "contentReviewSha256": "c46aec9c2c121a01100f4fd34ea1a0a2a0c4c9503e45111a4cc5daad1c52585f",
+      "auditStatus": "failed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-015",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "0b855ca37cbcff70be06b6877c50813828f22d8f54d242210665c35196303bdc",
+      "traceSha256": "22d3c7e6fbba06e52d39ca4a36869aa1c1b496b9d891aa9be287c5f127923833",
+      "reviewSha256": "5ce7c228fc3c069bc17516b6ed46b3888a235440a898a2e9df1bbe2bf02daa08",
+      "contentReviewSha256": "f87642429ed22991057ad1f69a77242b7b9ce800e298ec9be73ab82ccb719803",
+      "auditStatus": "failed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-016",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "dd6c5ef29ff3a2af702408fb442fb178c3fd6db7408951d17b18157493ab21a7",
+      "traceSha256": "7761de4b69a468c7e4f0fb6936b3a5185d6cb383660fe7b11f81ee2c9e17191e",
+      "reviewSha256": "090924b2ee1a474289feb0268dd801f492e2474b5a1f0b685766789dcacb5b03",
+      "contentReviewSha256": "4235096e9fbdc93d39a70db3ee215777ce9033ca0a525c01e6f3be5bfa04bfa0",
+      "auditStatus": "failed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-017",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "8af497e6f7f73bfc41d79883bacc7c5e2fe5b9b6a39049b01e1b402fb7155406",
+      "traceSha256": "089170229a9b4d1afca516d030e7d8af9eddbbb65a9907e2244923639c181758",
+      "reviewSha256": "c2ec881e868ba1b875632dfbb590bf22e5677d669e5012929f21e36eb93c22c9",
+      "contentReviewSha256": "becd55ecd6e55b7ba591d7dc83a16d030344fb0d5c9a7db9021051c9629b3095",
+      "auditStatus": "failed",
+      "narrativeAnswerCorrect": false,
+      "publicPromptReceiptVerified": true,
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "officialImportPerformed": true
+    },
+    {
+      "jobId": "job-018",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "0f30bd81277d606ae6f31a2db17b30b491f0cb3077655ed85dd0cd2f0d3e0e6f"
+    },
+    {
+      "jobId": "job-019",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "d51dae581f00e1d53f9abb7e10678a2a025fa7a073e3584c6e80843d345c6f17"
+    },
+    {
+      "jobId": "job-020",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "2cf1f6994575b917cb72e92fe9a66b7b77738023bf4b3d671ed7f165a5b8e983"
+    },
+    {
+      "jobId": "job-021",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "7f41950c3efe0b7cdc52d455ab12de684a8ffce47f832625a791ecc8a4b071d2"
+    },
+    {
+      "jobId": "job-022",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "e81aeef190c106d336481125ac7b43c0435be75ae519b2005c0c97db5e0dd4b8"
+    },
+    {
+      "jobId": "job-023",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "9cb0cd4093acbd1ca8567a1df3b11b61c34fb57c8235e7c2e65ecce2f32bd7f6"
+    },
+    {
+      "jobId": "job-024",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "12de6e1327a7c068aabc22011e13d12845681f4c8363b4e28a8904a68c7019e4"
+    },
+    {
+      "jobId": "job-025",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "a263c64319d742ead85acbedb6bdfd7ebb768209788c5a68ae3385d9e0733ddf"
+    },
+    {
+      "jobId": "job-026",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "852a4a99b1080205ef4a4bc49d447a3a52564153f15906b34cfd27975e1d8e7c"
+    },
+    {
+      "jobId": "job-027",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "e8179c525c94997f3fc1a5a016a82855af6762ab39f74a016b78ba409a0b17d9"
+    },
+    {
+      "jobId": "job-028",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "f5798e0f1e586b2d1da121c26733c91629944e41d7c8cee3c87ff50a1349f64d"
+    },
+    {
+      "jobId": "job-029",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "2003be1403d635ff859db0e7f25e5ee243428647465ca39d9940394ef71812a5"
+    },
+    {
+      "jobId": "job-030",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "51cec168655a380ac53737a83c2a4a76afd98e5b7cedd0d6d86127b22a80b3fe"
+    },
+    {
+      "jobId": "job-031",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "27cce0a007facbf576d1e6153abf708b8393575dec1fc293475f2bc8d8d1210b"
+    },
+    {
+      "jobId": "job-032",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "2e5ad4c16d0cd62a85805bb8c603cb0beb5f31568cc759883b4689699c2131aa"
+    },
+    {
+      "jobId": "job-033",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "69fb29d2b8f558a9160737f3de16973b46eca2a2acfe688269f0697d30e4d3b1"
+    },
+    {
+      "jobId": "job-034",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "b592d809f24dd2fa6155d556b6d275cc6714ab341e6f1b85fa4fac95101a5a0a"
+    },
+    {
+      "jobId": "job-035",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "c6edbcdbae909349c9d72ded0afcf3f00dde087b96021627f6331b44172f743d"
+    },
+    {
+      "jobId": "job-036",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "35b2103a041c828d79b939ae173afd5bdd06339f0b008cbb53abd713bebeb4d3"
+    },
+    {
+      "jobId": "job-037",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "1eabf051fee4144cd56390e5323d2240d9fe964cce45a47f981ce06d178e9b07"
+    },
+    {
+      "jobId": "job-038",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "4ef44fe9d7c9473872e278a6c45f18c49a83ca8ae6e98784cc2fc8af20b1bb48"
+    },
+    {
+      "jobId": "job-039",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "62214e8329cf3b4adf1eb48bb7ca3fd99cba2b13b9543551e77c8d221acc13a2"
+    },
+    {
+      "jobId": "job-040",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "d08557bb3712e8e12cf5be7c05080d95ec4dbf496d25c5b12f9babcb3178e78b"
+    },
+    {
+      "jobId": "job-041",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "91bf6c47cf593491a83a05229eddff2a80a9d28b8bdf54c2e70cbb1c0c526f9e"
+    },
+    {
+      "jobId": "job-042",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "5777ba1c1e6699f58e7f41fdceb91029f659f3199e88f2e3f28da63f79f386cc"
+    },
+    {
+      "jobId": "job-043",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "667914dfd4e8148f6e8c73247e75a7cd252e8240bdbd0bcce7cbc495a9a04651"
+    },
+    {
+      "jobId": "job-044",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "113cbabef76182f62f017cd7c74dffb0efca7b4dbf287d37004ccc60610763b7"
+    },
+    {
+      "jobId": "job-045",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "6a2f8ac2960a8359f177ec6c9ccf316c94f91f88ae6d34f2fa7badfaf60be6a1"
+    },
+    {
+      "jobId": "job-046",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "0e74a2fc0c1db580e060d7cfb3686589a1e8ab1f89587971ff91684a4f5ee9ed"
+    },
+    {
+      "jobId": "job-047",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "38cd13d9c6f34a26778dbcb05ed236a5dbdfce24429e1eba464d6a9687e23e24"
+    },
+    {
+      "jobId": "job-048",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "878b913118b0e455de885e9cf0d5ddf6a678f8e86c546091d71bc55ebe985d88"
+    },
+    {
+      "jobId": "job-049",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "010ddf7fb4c6311b131452a6c468abb3f78753873ef4e2f5df5fd956b2a3346c"
+    },
+    {
+      "jobId": "job-050",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "5f63caa3afeda0a2cd7e61fe1e8271d880014fe0f887ac98258de8141fd9468b"
+    },
+    {
+      "jobId": "job-051",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "c51a3e24db53a2b50ce1457752852278e48fd971e3fbf18d4b95535cdd762311"
+    },
+    {
+      "jobId": "job-052",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "d9c226414205892714af44a647e6cd17567eb9eace852741cf96ec535a8a5f07"
+    },
+    {
+      "jobId": "job-053",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "69ae3a6fc218f7e7aa4232d94b130703198ba888db58aa4a5fe56af07903a03c"
+    },
+    {
+      "jobId": "job-054",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "61559dfdf1f0a4d63e0496cf6f59baf93d9df82d36c4ca58d4946c70b076b2bb"
+    },
+    {
+      "jobId": "job-055",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "e75f997d7b074bd11f8b551f4900a42d3d4f3d2decec7cbf0ec047f83ea2236e"
+    },
+    {
+      "jobId": "job-056",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "958e2df1475b0f84eab280e6cb15f30a21b5975e07121c85e913b20bd67fc5bc"
+    },
+    {
+      "jobId": "job-057",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "3fcf5b12e09c65406fba0e48d601cdfb4897bc27d8fc37f37026115e49bee490"
+    },
+    {
+      "jobId": "job-058",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "b0b1a3f7b3867ee07cb590b8718919ed66e7274de08a2bd7a2fd5da61f0483ca"
+    },
+    {
+      "jobId": "job-059",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "0cf857111756e02cdc052cf81394ef6547f1c739f58fbb239ebf6ab40df2ccaa"
+    },
+    {
+      "jobId": "job-060",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "fde811fa879e8b7ba1bacc63f44e4c7123efa093c06bc7365b318a640ddf078c"
+    },
+    {
+      "jobId": "job-061",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "57fa7469192d537341963b9b24cf6083a50421c33c3a8b7237cd162b65eeee08"
+    },
+    {
+      "jobId": "job-062",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "0e234183655705a8ade210b756b3ba7a075356deee674c4f9c43b521fd2907fc"
+    },
+    {
+      "jobId": "job-063",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "9ea4e771dfe6d5b2b6d5124e0bf3fb61f160e73a5507915ec70beb2877fd3f58"
+    },
+    {
+      "jobId": "job-064",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "f34ae52adef125098146b36fd5fb99ff684d2d8d571f9ab257faf08e45cafbb4"
+    },
+    {
+      "jobId": "job-065",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "ea7d7a089bc6cfc6bd13fbb4186fa44667ec0bbe583d08ad8ac404ae5c4b71a7"
+    },
+    {
+      "jobId": "job-066",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "832baab2bfa5c3fbe64d990ba53b762b3f4a4b5bae2e66482800d0bad1393cae"
+    },
+    {
+      "jobId": "job-067",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "99d78975ea2dd36c860b14a8d078dc8da53c3d79dc8a0825e7ef15f257fe1c47"
+    },
+    {
+      "jobId": "job-068",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "908772d30335f5a71ef66674477ce5da1bba201dc78f3afc3f804b5f6a4d1a1b"
+    },
+    {
+      "jobId": "job-069",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "55488f205273336325d42f93559f9705b3f7cf86b1730b88e89e7f1f2fb298dc"
+    },
+    {
+      "jobId": "job-070",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "23b83c291299012b3e7b6ab9dfb897dc69c8e2688f2dfe95bfd71a0f1451e0ed"
+    },
+    {
+      "jobId": "job-071",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "4086932963a868496fd0ee8c7f9e8b82d7379f7fc82b9fb45e6114166fa0dbde"
+    },
+    {
+      "jobId": "job-072",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "772161bafe4b98802760e2fd6100776365aaae3285e4214d86268aa7008ef6f1"
+    },
+    {
+      "jobId": "job-073",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "2428bd45b1b382cb9710a4cae4f33a9e527a8a798662d1053263a85ac37d7c28"
+    },
+    {
+      "jobId": "job-074",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "eafbb988542c332f2e74864403c550189221e710368cebef88eaca68d222684f"
+    },
+    {
+      "jobId": "job-075",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "63570b6f74179bfb50ceccc12ae87f58df4f1f0136c23a24e1d1ae1794627571"
+    },
+    {
+      "jobId": "job-076",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "6355a8ab0d92971980b78fb6b2ef8a451c9a1762157d0cde8ead2b1f39067360"
+    },
+    {
+      "jobId": "job-077",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "3fdc780efc870b9786caad09d2f6df68d4d001b105f8529e923af0bc89d09b6c"
+    },
+    {
+      "jobId": "job-078",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "ab920abce5a8dc6c6f38fd886fa2fd458f5f3c30fd28b2860889683d31ffade4"
+    },
+    {
+      "jobId": "job-079",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "e729abe15a085f0af92a20f8c6fa207ec29a2e52b919d31f87498e0c8116cbdd"
+    },
+    {
+      "jobId": "job-080",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "f5819bae7c9da90fc4ecbeb5315e4c8a008e92a660bc6fee094749b3af5ebd7e"
+    },
+    {
+      "jobId": "job-081",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "e299edae2537795649757ecf0df3107d1cea1f11083664ea03e8ea5ea799c580"
+    },
+    {
+      "jobId": "job-082",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "18503a231d7eac30d833f4c7f410e54122b732bd9fcba26a935ee56624ef9c56"
+    },
+    {
+      "jobId": "job-083",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "19c098f1bf1c29dadc2c459f649d64d9ff46c569c836ac97ff053203c317ace8"
+    },
+    {
+      "jobId": "job-084",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "c66d3495b7449ff1bbae9086ba6423a3f9ff78b558ded08bf58faa6587563fb3"
+    },
+    {
+      "jobId": "job-085",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "68878129b638dd0d69d93851ad8e3786f4eed98950fc5771a2109046b3cf790d"
+    },
+    {
+      "jobId": "job-086",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "7854b3ccdcd5dd63d322aa0e263f20966392a1ed12639a828e0bb9596b5486fd"
+    },
+    {
+      "jobId": "job-087",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "69f703502c296f770e48e976bae63e40154a146060e861c530289d8babb8cde8"
+    },
+    {
+      "jobId": "job-088",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "ee551ee9ba4c0b75032414703c573e43e1345859656ce6ce1b17942e1cad929c"
+    },
+    {
+      "jobId": "job-089",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "d07cef9298e57bd513fab9518e1c8d49cbb108a5a3adbfef0cdb88fb759206e1"
+    },
+    {
+      "jobId": "job-090",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "9b4df3e23ecf40da0a73f94c373f60c191172428ad2f6ddb9c3f5c8bd55634ac"
+    },
+    {
+      "jobId": "job-091",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "caa42fd060392a90df865f254087dd0d627f9877ae2a6956e3df3a40c562e6e9"
+    },
+    {
+      "jobId": "job-092",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "e86209a8ac84fcfc7bb87bfbd0eb171954582b1ef9312ef6afccc7fa451d06ce"
+    },
+    {
+      "jobId": "job-093",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "17d03e0d06902ccf8c42d2948e3946cc13d096226b98b6b588e13415e9c19b1e"
+    },
+    {
+      "jobId": "job-094",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "b6a125547d2d7cf6b5e72288e38372adf744c668abd65c2535215bd0dffa4d0f"
+    },
+    {
+      "jobId": "job-095",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "2db84a6c963cbc1663c5920e65f3cf1887f9d1d873297bb42560edf771d842a1"
+    },
+    {
+      "jobId": "job-096",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "6801f6acde7473c3bcdc8de59968951977be2eb4d12365a1cbcf300d58d39d05"
+    },
+    {
+      "jobId": "job-097",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "ab8b5c24ace04ad3e4fa83ca50701e1b928ec02d82cb9e4c1dbf061e177cbad8"
+    },
+    {
+      "jobId": "job-098",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "a5a98c44e63eb7c9ec7a81ece55a24b75c153dd4c1fcb831d17f084687b58cc0"
+    },
+    {
+      "jobId": "job-099",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "13cd0221cda3c94d189843bf84d747545a4617342338194600b8429668f8dc49"
+    },
+    {
+      "jobId": "job-100",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "e1ab5c62caa8cce87849f48b5376074a7b165038645637347dbb034f5373e401"
+    },
+    {
+      "jobId": "job-101",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "5e98a23e99154f4f4eff12513c415d6a1c68b6ed213bbb84b6e77b6fe4cadd9a"
+    },
+    {
+      "jobId": "job-102",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "94a18c54034f3bb611988e658ab4c5e262634b3a7309e45a9547808646c088a6"
+    },
+    {
+      "jobId": "job-103",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "69123322b02a545691dbf02668e52c6f00f95d4ecea4e780055a59eec53ead12"
+    },
+    {
+      "jobId": "job-104",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "dc5c3224fc054a637f6282326cd231b99528ea9d17695d24357477a272544c41"
+    },
+    {
+      "jobId": "job-105",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "565225f26debd9cf48f10aa6e0696f54bfb40edd0d79eaef2dc3934d0321f81d"
+    },
+    {
+      "jobId": "job-106",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "5edca06880ad538f71be47865a7979f2d0f53c706c90a7cfe55edcae3315b04a"
+    },
+    {
+      "jobId": "job-107",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "adedc656dc5644a3a77de51fd94119292519650bc6ab31e799cbf3301ea50176"
+    },
+    {
+      "jobId": "job-108",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "678cf15fe9184524aa748a95868dc6745d31555064944bca1e55c1741ac6199c"
+    },
+    {
+      "jobId": "job-109",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "b35b3de71f73bc56be321fa0216cd448239d7febc87ee436b6cfc27fc38f1f59"
+    },
+    {
+      "jobId": "job-110",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "5f0c0f1782b866fc8e15994253e06dad20f1d33ef94f73bb05008d2b730f8ccf"
+    },
+    {
+      "jobId": "job-111",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "0253d3d3fb7d0f111f394997436ce5b60102ec67189ad1b3302c699a5cef1328"
+    },
+    {
+      "jobId": "job-112",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "033e011c055af91e514160ff678a325e50a8be9050fe3bff98205ed12b244e21"
+    },
+    {
+      "jobId": "job-113",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "eac36cb2bfa5c8cd7c682c379f27b6af12028657cfd7aefd7edf23a0b97ccbba"
+    },
+    {
+      "jobId": "job-114",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "57a1259a64c185f800ad941e11ec0316b0a3512da3ed0abc99123783fdef1fec"
+    },
+    {
+      "jobId": "job-115",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "198ff06652929a093845785abd7d1dedd4a0180a6fe5a0686069695d48a02476"
+    },
+    {
+      "jobId": "job-116",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "7dedd15559a37985b97757268d6a990a5425b966038a9ce63c7033a3f57552fa"
+    },
+    {
+      "jobId": "job-117",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "b0298fa6e349c5cad8e8d27be9dfd1d3b83e31c0dcdb54a8371a2196fe100e41"
+    },
+    {
+      "jobId": "job-118",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "d23894a9e197b658aeb5159ead9cf7a9a84e1fec91ec82cb83e8a3e23b5227b7"
+    },
+    {
+      "jobId": "job-119",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "f70a00a0803168f5177e9433b51bbdef895867914e56d716db79547db3d4740b"
+    },
+    {
+      "jobId": "job-120",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "5a736aeefac2039475876401c5382ad3c4b043d64dc4b3e7c08bf4e3fc3f534c"
+    },
+    {
+      "jobId": "job-121",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "d5e7394b7515e85c73de0e86cd3f58c5fd4822c173129e1098c0d4378c29ff95"
+    },
+    {
+      "jobId": "job-122",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "389cd6fb4783588d34ee6c38109ccf29aad8005a5e5dce1592fb1d68d832524b"
+    },
+    {
+      "jobId": "job-123",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "d78a6b3b4c512e773892a298cb0ffc12b3c07947ff2fbf4db8d2f630a53ac618"
+    },
+    {
+      "jobId": "job-124",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "f55f00c6cd9778f8d5bbf7bf61b4cd2fb4e2a646192a33176b0e006c73a6f3dc"
+    },
+    {
+      "jobId": "job-125",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "49907a7af0c892b6288eee6813963a806df45f333ecebbde2c651bfb1989e89b"
+    },
+    {
+      "jobId": "job-126",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "30c3bc67b0f3cc33c1585e9647c16840a37bcc6be2ea2e2c24677d5484daae02"
+    },
+    {
+      "jobId": "job-127",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "aab8af9c90f3029817fd123e1cf077543529714172538802e75656d1b8a181be"
+    },
+    {
+      "jobId": "job-128",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "e26a6beba83c660893f1bdd86c82019d9a6e80e2c4d67a602ca29dcdbc8e7ac0"
+    },
+    {
+      "jobId": "job-129",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "dfaa109548bf681c2a43607ce6e1d75a744d6a2fa09c2a1c09cd8e765b0387f4"
+    },
+    {
+      "jobId": "job-130",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "914b36271fcfbdd4dadee9a6f7fe902f9740470243c8f1c2c0dec5176c7b4b09"
+    },
+    {
+      "jobId": "job-131",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "659e870cadd3b2be9187caf48518a095bd93996c760cd03f707833520e6f7b15"
+    },
+    {
+      "jobId": "job-132",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "e987deb8de47b0868c692d287ff3f799b1e48fe7f0acbddae456fd6ef1153b25"
+    },
+    {
+      "jobId": "job-133",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "ea8455d5f630206a52c966efc94150780d508088171834c8b04ff01f2b96c3b8"
+    },
+    {
+      "jobId": "job-134",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "22182c2cf93ed309afb49f91c263acaf316da46d0becfdddfafbe3d150f5e15f"
+    },
+    {
+      "jobId": "job-135",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "04ca692ea143c5330a3328ae630423e5cb4af9634fb7e582ac6a953734b1736a"
+    },
+    {
+      "jobId": "job-136",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "64af536518097b1a19b4587400612a90c31dfe32b51954db02de2a2ea7cf3a55"
+    },
+    {
+      "jobId": "job-137",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "ae0a13b867bf3e0e5da9521009b134dfa34622c9c2d4786b04a0ebe82d47dae2"
+    },
+    {
+      "jobId": "job-138",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "39630f4fbd6b23823651fb4822f09c480c9a8d33dd2d6185da001c0c5de4965c"
+    },
+    {
+      "jobId": "job-139",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "a5f4f6b808277343fc37dbd7fb2dc6d77cbd95a12988c563e8047376db4b6bbc"
+    },
+    {
+      "jobId": "job-140",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "be720e50994e298d1413e8b9b5c5c845276752bbb48b3fad7d04516e706c14e5"
+    },
+    {
+      "jobId": "job-141",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "34339fd6fcc60d3a4b3673342b9dd3d1904064912667cc8e8a0e39719fdc2ea9"
+    },
+    {
+      "jobId": "job-142",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "34ee09c1008500da83936f65746a754bff4588b831154c6d98546e4e1cee2a32"
+    },
+    {
+      "jobId": "job-143",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "5ba98a9f8afa97a5aac57b913a1b97289c5ddd05e16d7b182e0a13636eca4c13"
+    },
+    {
+      "jobId": "job-144",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "687e82a85f1bc397b09998be85d6119b604913a0e34a004322382b5838d3b674"
+    },
+    {
+      "jobId": "job-145",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "f17f2590a31807985b3d148695820cb0f24da236551059f75d686259ad03ce31"
+    },
+    {
+      "jobId": "job-146",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "7ce5cc8395cc5e1d2d0bcfbb5fcfde6dcc515a6fb3a5744541cb2f684897d86c"
+    },
+    {
+      "jobId": "job-147",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "1da4694f94c9efb0b8aaf61a255e7a4443bada2d4a5e76b1ad5162d5fb5a22ec"
+    },
+    {
+      "jobId": "job-148",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "b7cea21c8137f6366dd2e9220f374d63303f53bfad396dd2ff8bd7b77b662a8d"
+    },
+    {
+      "jobId": "job-149",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "ee698a3d58d6f5b42cbf1b8936a6bf5e56d451e5be624d38dff70af6d2423274"
+    },
+    {
+      "jobId": "job-150",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "d6cb25e67912a2753df2f91c48b89674b2014c92a255ed6e1c0a50bee29c0282"
+    },
+    {
+      "jobId": "job-151",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "da92a2147ac5bf100e21fa4db3872aad7dd58e076aaef4bdfa7285f10dc8eae4"
+    },
+    {
+      "jobId": "job-152",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "123972724569657c81477aa4c87eb044db772bacc80ba96ba21c1b2344b5c525"
+    },
+    {
+      "jobId": "job-153",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "60d8fa980a3ea547a221920d0eb1007b2e6706477f53d459009189680a77cb2f"
+    },
+    {
+      "jobId": "job-154",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "7595507c008678e9d2af401493cecdd458d1c7b5d429c1afb1719b79817ef446"
+    },
+    {
+      "jobId": "job-155",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "952324f4043a2e9a7082d5fa2ff61fc18db12c0b20297583f96f74e8d7c9aa1d"
+    },
+    {
+      "jobId": "job-156",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "7fcd1b8ed43b04c225e8760cfc3ad9995c313b631e2b87e72de1e38554f842c7"
+    },
+    {
+      "jobId": "job-157",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "2683df2c0e0a6eee1dce16950a3791981291f7dee09205212a1d7ce411f1a1c3"
+    },
+    {
+      "jobId": "job-158",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "6c86103c0db62a400182b90d348c46f002a67df204aeb1a156a507fd585eb696"
+    },
+    {
+      "jobId": "job-159",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "171fb41f7357f06bdb869294f3ace18780bfbb083b0ec5508cb4fe72aef6e3e7"
+    },
+    {
+      "jobId": "job-160",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "608210d543911d63aced2d254c64aa255e009ff58a5c99180e6401aca336681b"
+    },
+    {
+      "jobId": "job-161",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "521acd07c83f9335ac5e12aba901c7ca69192d07880f66fa2180e974e8e5bee8"
+    },
+    {
+      "jobId": "job-162",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "acb60006c7396637382129763319e692d73e7c02b3651341523e90157e947e0d"
+    },
+    {
+      "jobId": "job-163",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "ebc1a9edb97786e3c54003b130257338bae1c63f1455332696571b3b3a2e7651"
+    },
+    {
+      "jobId": "job-164",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "3cd84ccb6180a30fbeea91848d08853f0482c314878fbf950a1559e9fafe7c94"
+    },
+    {
+      "jobId": "job-165",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "3d98f206b5aa749f66c64d205bb8a2115210bd23cc5d8455d8884b96f7939e81"
+    },
+    {
+      "jobId": "job-166",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "bc1dbe9fb6c1d5e110f76e95c058111f17861bb19e6b92c19fa0518fd2836648"
+    },
+    {
+      "jobId": "job-167",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "d8ae084517269b5f1450b21ce08f20f479e8082a909ed45620cfceb17a661041"
+    },
+    {
+      "jobId": "job-168",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "e977236ef2560d414044161fc50145b1cffb1210ac1578f3d87f372095d7f97c"
+    },
+    {
+      "jobId": "job-169",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "2cc717c1f60d98c4c82bc2f8d6ff507cd12dddce1f25ce4b80ca09988fb81f5d"
+    },
+    {
+      "jobId": "job-170",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "2d10e4ce7ab4d78e70fcc891deacda64beef7b22af5182cf20a9d496373b5700"
+    },
+    {
+      "jobId": "job-171",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "32e72f799cf69a64f1952c0be8f05d062de3fca2f83af0658a617f75126485d6"
+    },
+    {
+      "jobId": "job-172",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "189a89005f3085e28a75f4852cc206b6c898ed79de52810bfcf420f7d78adb16"
+    },
+    {
+      "jobId": "job-173",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "3799e0a7a6ab7322638f3d9bfce276f08e75a4b1cde3e4ce4f3ad1454a207750"
+    },
+    {
+      "jobId": "job-174",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "26446f038fde90bd5f966ed45805b761c3e6ad587f0b85b28fe208242f2a081b"
+    },
+    {
+      "jobId": "job-175",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "f63a987a6452cb9b019f76c3dfae21c5995b704a0ecc47e5fa816ef8016bdaf5"
+    },
+    {
+      "jobId": "job-176",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "533e058d01a27bc40d6de01ce1ce7ac5123d4ac629b9420dea4825f9f23ac442"
+    },
+    {
+      "jobId": "job-177",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "7030073a317eecf4359e341dac778d0223130fc3b1d8e33d0da3b38aac371483"
+    },
+    {
+      "jobId": "job-178",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "02e9671b8fe34d5fd47b1446aa46fc824db36b97bbcf724e8d82c580a8057cca"
+    },
+    {
+      "jobId": "job-179",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "1c1fe26492799dab2573a7ebf0f1cc465bfb55cb36b336d68a2b97727254557f"
+    },
+    {
+      "jobId": "job-180",
+      "status": "missing",
+      "spawnReturned": false,
+      "latestRecordSha256": "3d22c71cf0c6a80cd49f9f2eb6ac3b385ea2b2993e5e16d077bc0f4036486b0d"
+    }
+  ],
+  "promotionEstablished": false,
+  "goalComplete": false,
+  "ledgerSha256AtCapture": "306979eba3996b525c84ec8ac9f525704792d36e981b710bf881a3baa3aa1e8b",
+  "limitations": [
+    "Partial progress, not the final comparison report.",
+    "All frozen positions remain in the denominator.",
+    "Actual public-file read receipts do not prove encrypted initial-message bytes.",
+    "Supplementary content omissions are distinguished from the unchanged frozen evaluator omission metric.",
+    "Ended pre-begin failures retain detached actual traces and failed external reviews; absent broker identities are never invented or officially imported.",
+    "The pre-spawn job-004 ledger digest typo is preserved with root correction; files and position were unchanged."
+  ],
+  "dispositionRecord": {
+    "record": "docs/business-trust-v1-invalid-campaign-e.json",
+    "sha256": "d55ef3f0df1abc56ad7d82611c5c2067d5cbd96c0383c74acc8c297032099ee5"
+  }
+}

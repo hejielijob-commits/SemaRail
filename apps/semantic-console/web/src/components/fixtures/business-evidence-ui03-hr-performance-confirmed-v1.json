@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "rulesVersion": "business-trust-v1",
+  "projectRevision": "sha256:d1b7855f48206ee7be0b1767735b66e4271f6217e769ea38f95cd8651898e309",
+  "references": [
+    {
+      "ruleId": "business-trust-v1",
+      "model": "performance_reviews",
+      "column": "performance_score"
+    },
+    {
+      "ruleId": "rule_9ffe03a7be641135033f7868",
+      "model": "performance_reviews",
+      "column": "performance_score"
+    },
+    {
+      "ruleId": "business-trust-v1",
+      "model": "performance_reviews",
+      "column": "review_date"
+    },
+    {
+      "ruleId": "rule_9ffe03a7be641135033f7868",
+      "model": "performance_reviews",
+      "column": "review_date"
+    }
+  ],
+  "models": [
+    "performance_reviews"
+  ],
+  "columns": [
+    {
+      "model": "performance_reviews",
+      "column": "performance_score"
+    },
+    {
+      "model": "performance_reviews",
+      "column": "performance_score"
+    },
+    {
+      "model": "performance_reviews",
+      "column": "review_date"
+    },
+    {
+      "model": "performance_reviews",
+      "column": "review_date"
+    }
+  ],
+  "metrics": [
+    {
+      "ruleId": "rule_9ffe03a7be641135033f7868",
+      "checkId": "average-performance",
+      "model": "performance_reviews",
+      "column": "performance_score",
+      "aggregation": "avg",
+      "distinct": false,
+      "status": "passed",
+      "grain": "employee"
+    }
+  ],
+  "unit": {
+    "status": "unverified",
+    "value": null
+  },
+  "grain": [
+    {
+      "model": "performance_reviews",
+      "column": "performance_score",
+      "value": "employee",
+      "status": "verified"
+    },
+    {
+      "model": "performance_reviews",
+      "column": "review_date",
+      "value": "original",
+      "status": "not_applicable"
+    }
+  ],
+  "time": {
+    "field": "review_date",
+    "value": {
+      "start": "2024-07-01",
+      "end": "2024-09-30"
+    },
+    "source": "confirmed",
+    "groupedByOriginal": false
+  },
+  "defaultsApplied": {},
+  "conditions": {
+    "reviewPeriod": {
+      "start": "2024-07-01",
+      "end": "2024-09-30"
+    },
+    "trend": false
+  },
+  "confirmations": {
+    "reviewPeriod": "confirmed",
+    "trend": "confirmed"
+  },
+  "checks": [
+    {
+      "id": "rule_9ffe03a7be641135033f7868:average-performance",
+      "ruleId": "rule_9ffe03a7be641135033f7868",
+      "mandatory": true,
+      "status": "passed",
+      "reasonCode": "metric_matches"
+    },
+    {
+      "id": "rule_9ffe03a7be641135033f7868:review-period",
+      "ruleId": "rule_9ffe03a7be641135033f7868",
+      "mandatory": true,
+      "status": "passed",
+      "reasonCode": "time_filter_matches"
+    },
+    {
+      "id": "rule_9ffe03a7be641135033f7868:review-trend",
+      "ruleId": "rule_9ffe03a7be641135033f7868",
+      "mandatory": true,
+      "status": "passed",
+      "reasonCode": "time_grouping_not_applicable"
+    }
+  ],
+  "queryId": "query-business-trust-1",
+  "datasourceId": "synthetic-hr-fixture",
+  "outcome": "success",
+  "createdAt": "2026-10-12T02:00:00Z",
+  "expiresAt": "2026-11-11T02:00:00Z"
+}

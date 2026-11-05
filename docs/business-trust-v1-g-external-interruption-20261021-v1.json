@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-10-21T14:53:53.310951+00:00",
+  "runId": "formal-20261020-business-trust-v1-g",
+  "manifestSha256": "3494d53422feb6748bf65799a0072812ec2f95ee46fff62503b7bbc9da535b68",
+  "status": "waiting_for_workspace_credits_and_runtime_recovery",
+  "denominator": 180,
+  "spawnReturns": 26,
+  "independentReviews": 26,
+  "unspawnedPositions": 154,
+  "nextUnspawnedPosition": "job-027",
+  "platformFailures": [
+    {
+      "jobId": "job-025",
+      "sourceSessionId": "01a15a36-ea6a-7910-8193-fead8fbbb0e0",
+      "errorCode": "usage_limit_exceeded",
+      "limitType": "workspace_member_credits_depleted",
+      "actualToolCalls": 0,
+      "proofSha256": "c2117a46489630f79377b25f109cacb9d8860aa936dc6530fb903d9703d3a6b6"
+    },
+    {
+      "jobId": "job-026",
+      "sourceSessionId": "01a15a37-aa94-7940-83ca-49e05fe92470",
+      "errorCode": "usage_limit_exceeded",
+      "limitType": "workspace_member_credits_depleted",
+      "actualToolCalls": 0,
+      "proofSha256": "4d4d564faa6af302c6221f6fc88254627422e17221a1e803a7fc8dfb17b1889d"
+    }
+  ],
+  "runtimeObservation": {
+    "originalOwnedPid": 4816,
+    "originalOwnedPidPresent": false,
+    "lastBootUpTime": "2026-10-21T14:36:29.5000000Z",
+    "observedAt": "2026-10-21T14:53:50.7341942Z",
+    "allFiveCampaignPortsClosed": true,
+    "postgresPortClosed": true
+  },
+  "sourceFilesUnchanged": 291,
+  "sameCampaignMayResumeOnlyAfterRevalidation": true,
+  "attemptsWillNotBeRetried": [
+    "job-025",
+    "job-026"
+  ],
+  "originalMissingRecordsUnchanged": true,
+  "frozenScoringChanged": false,
+  "campaignClosed": false,
+  "goalComplete": false,
+  "promotionEstablished": false,
+  "limitations": [
+    "This is an interruption observation, not a final comparison report or a goal pause.",
+    "Quota failure is proved for the two actual terminal attempts; later credit availability requires new external evidence.",
+    "Closed ports and an absent PID are actual observations. The system boot is later than the original owned-host startup."
+  ]
+}

@@ -42,6 +42,9 @@ import type {
   DiagnosticFeedback,
   FeedbackCategory,
   FeedbackStatus,
+  FeedbackResolution,
+  BusinessEvidenceV1,
+  ExternalAgentEvaluationSummary,
   RegressionCaseExport,
   RegressionCaseRecord,
   AgentTraceDetail,
@@ -72,6 +75,136 @@ export class ApiClientError extends Error {
     this.code = payload?.code;
     this.details = payload?.details;
   }
+}
+
+const BUSINESS_EVIDENCE_FIELDS = [
+  "schemaVersion", "rulesVersion", "projectRevision", "queryId", "datasourceId", "outcome",
+  "createdAt", "expiresAt", "references", "models", "columns", "metrics", "grain", "unit",
+  "time", "defaultsApplied", "conditions", "confirmations", "checks",
+] as const;
+const BUSINESS_EVIDENCE_ID = /^[A-Za-z_][A-Za-z0-9_.:-]{0,255}$/;
+const BUSINESS_EVIDENCE_SECRET = /bearer\s|sr_(?:live|session|key)_|(?:password|token|secret|dsn)\s*[:=]|[a-z]+:\/\/|[A-Z]:[\\/]/i;
+
+function invalidBusinessEvidence(message: string, code = "INVALID_BUSINESS_EVIDENCE"): never {
+  throw new ApiClientError(message, 502, { code, message });
+}
+
+function evidenceRecord(value: unknown, path: string, allowed?: readonly string[]): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) invalidBusinessEvidence(`${path} must be an object.`);
+  const record = value as Record<string, unknown>;
+  if (allowed && Object.keys(record).some((key) => !allowed.includes(key))) invalidBusinessEvidence(`${path} contains an unsupported field.`);
+  return record;
+}
+
+function evidenceText(value: unknown, path: string, identifier = false): string {
+  if (typeof value !== "string" || value.length < 1 || value.length > 256 || (identifier && !BUSINESS_EVIDENCE_ID.test(value))) {
+    invalidBusinessEvidence(`${path} is invalid.`);
+  }
+  return value;
+}
+
+function evidenceJson(value: unknown, depth = 0): unknown {
+  if (depth > 8) invalidBusinessEvidence("Query evidence is too deeply nested.");
+  if (value === null || typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    if (value.length > 2000 || BUSINESS_EVIDENCE_SECRET.test(value) || /[\u0000-\u001f]/.test(value)) invalidBusinessEvidence("Query evidence contains invalid text.");
+    return value;
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) invalidBusinessEvidence("Query evidence contains a non-finite number.");
+    return value;
+  }
+  if (Array.isArray(value)) {
+    if (value.length > 256) invalidBusinessEvidence("Query evidence contains an oversized array.");
+    return value.map((item) => evidenceJson(item, depth + 1));
+  }
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (Object.keys(record).length > 256) invalidBusinessEvidence("Query evidence contains an oversized object.");
+    return Object.fromEntries(Object.entries(record).map(([key, item]) => {
+      if (key.length > 256 || BUSINESS_EVIDENCE_SECRET.test(key) || /[\u0000-\u001f]/.test(key)) invalidBusinessEvidence("Query evidence contains an invalid field name.");
+      return [key, evidenceJson(item, depth + 1)];
+    }));
+  }
+  invalidBusinessEvidence("Query evidence contains a non-JSON value.");
+}
+
+/** Parse safe query evidence at the REST boundary; unknown versions and fields fail closed. */
+function parseBusinessEvidenceV1(value: unknown): BusinessEvidenceV1 {
+  const raw = evidenceRecord(value, "businessEvidence", BUSINESS_EVIDENCE_FIELDS);
+  if (raw.schemaVersion !== 1) invalidBusinessEvidence("Query evidence uses an unsupported schema version.", "UNSUPPORTED_BUSINESS_EVIDENCE_VERSION");
+  if (Object.keys(raw).length !== BUSINESS_EVIDENCE_FIELDS.length || BUSINESS_EVIDENCE_FIELDS.some((key) => !Object.prototype.hasOwnProperty.call(raw, key))) {
+    invalidBusinessEvidence("Query evidence is missing required fields.");
+  }
+  evidenceJson(raw);
+  for (const key of ["rulesVersion", "projectRevision", "queryId", "datasourceId"] as const) evidenceText(raw[key], `businessEvidence.${key}`, true);
+  for (const key of ["createdAt", "expiresAt"] as const) evidenceText(raw[key], `businessEvidence.${key}`);
+  if (!["success", "failure", "blocked"].includes(String(raw.outcome))) invalidBusinessEvidence("Query evidence outcome is invalid.");
+
+  for (const field of ["models", "columns", "metrics", "grain"] as const) {
+    if (!Array.isArray(raw[field]) || raw[field].length > 256) invalidBusinessEvidence(`businessEvidence.${field} is invalid.`);
+  }
+  if (!Array.isArray(raw.references) || raw.references.length > 256) invalidBusinessEvidence("businessEvidence.references is invalid.");
+  const references = raw.references.map((item, index) => {
+    const reference = evidenceRecord(item, `businessEvidence.references[${index}]`, ["ruleId", "model", "column"]);
+    if (Object.keys(reference).length !== 3) invalidBusinessEvidence("Query evidence reference is incomplete.");
+    return {
+      ruleId: evidenceText(reference.ruleId, "businessEvidence.references.ruleId", true),
+      model: evidenceText(reference.model, "businessEvidence.references.model", true),
+      column: evidenceText(reference.column, "businessEvidence.references.column", true),
+    };
+  });
+  const unit = evidenceRecord(raw.unit, "businessEvidence.unit", ["status", "value"]);
+  if (unit.status !== "verified" && unit.status !== "unverified") invalidBusinessEvidence("Query evidence unit status is invalid.");
+  if (Object.keys(unit).some((key) => key !== "status" && key !== "value")) invalidBusinessEvidence("Query evidence unit fields are invalid.");
+  if (Object.prototype.hasOwnProperty.call(unit, "value") && unit.value !== null) evidenceText(unit.value, "businessEvidence.unit.value");
+  const time = evidenceRecord(raw.time, "businessEvidence.time", ["source", "field", "value", "groupedByOriginal"]);
+  if (!["confirmed", "publishedDefault", "sql", "unknown"].includes(String(time.source))) invalidBusinessEvidence("Query evidence time source is invalid.");
+  if (Object.prototype.hasOwnProperty.call(time, "field") && time.field !== null) evidenceText(time.field, "businessEvidence.time.field");
+  if (Object.prototype.hasOwnProperty.call(time, "value")) evidenceJson(time.value);
+  if (Object.prototype.hasOwnProperty.call(time, "groupedByOriginal") && time.groupedByOriginal !== null && typeof time.groupedByOriginal !== "boolean") invalidBusinessEvidence("Query evidence time grouping is invalid.");
+  if (Object.keys(time).some((key) => !["source", "field", "value", "groupedByOriginal"].includes(key))) invalidBusinessEvidence("Query evidence time fields are invalid.");
+
+  for (const key of ["defaultsApplied", "conditions"] as const) evidenceRecord(raw[key], `businessEvidence.${key}`);
+  const confirmations = evidenceRecord(raw.confirmations, "businessEvidence.confirmations");
+  if (Object.keys(confirmations).length > 256 || Object.values(confirmations).some((item) => !["confirmed", "defaulted", "missing"].includes(String(item)))) invalidBusinessEvidence("Query evidence confirmations are invalid.");
+  if (!Array.isArray(raw.checks) || raw.checks.length > 256) invalidBusinessEvidence("Query evidence checks are invalid.");
+  const checks = raw.checks.map((item, index) => {
+    const check = evidenceRecord(item, `businessEvidence.checks[${index}]`, ["id", "ruleId", "mandatory", "status", "reasonCode"]);
+    if (Object.keys(check).length !== 5 || typeof check.mandatory !== "boolean" || !["passed", "conflict", "unverified", "stale"].includes(String(check.status))) invalidBusinessEvidence("Query evidence check fields are invalid.");
+    return {
+      id: evidenceText(check.id, "businessEvidence.checks.id", true),
+      ruleId: evidenceText(check.ruleId, "businessEvidence.checks.ruleId", true),
+      mandatory: check.mandatory,
+      status: check.status as BusinessEvidenceV1["checks"][number]["status"],
+      reasonCode: evidenceText(check.reasonCode, "businessEvidence.checks.reasonCode", true),
+    };
+  });
+
+  let encoded: string;
+  try { encoded = JSON.stringify(raw); } catch { invalidBusinessEvidence("Query evidence is invalid."); }
+  if (new TextEncoder().encode(encoded!).length > 128 * 1024) invalidBusinessEvidence("Query evidence exceeds the size limit.");
+  return {
+    schemaVersion: 1,
+    rulesVersion: raw.rulesVersion as string,
+    projectRevision: raw.projectRevision as string,
+    queryId: raw.queryId as string,
+    datasourceId: raw.datasourceId as string,
+    outcome: raw.outcome as BusinessEvidenceV1["outcome"],
+    createdAt: raw.createdAt as string,
+    expiresAt: raw.expiresAt as string,
+    references,
+    models: raw.models as BusinessEvidenceV1["models"],
+    columns: raw.columns as BusinessEvidenceV1["columns"],
+    metrics: raw.metrics as BusinessEvidenceV1["metrics"],
+    grain: raw.grain as BusinessEvidenceV1["grain"],
+    unit: unit as BusinessEvidenceV1["unit"],
+    time: time as BusinessEvidenceV1["time"],
+    defaultsApplied: raw.defaultsApplied as BusinessEvidenceV1["defaultsApplied"],
+    conditions: raw.conditions as BusinessEvidenceV1["conditions"],
+    confirmations: confirmations as BusinessEvidenceV1["confirmations"],
+    checks,
+  };
 }
 
 /** Typed REST boundary for the semantic console. Secrets are accepted only in request bodies. */
@@ -255,6 +388,62 @@ export class ApiClient {
 
   getDiagnosticFeedback(id: string): Promise<DiagnosticFeedback> {
     return this.request(`/api/v1/diagnostics/feedback/${encodeURIComponent(id)}`);
+  }
+
+  getFeedbackResolution(id: string): Promise<FeedbackResolution> {
+    return this.request(`/api/v1/diagnostics/feedback/${encodeURIComponent(id)}/resolution`);
+  }
+
+  saveFeedbackResolution(id: string, payload: {
+    expectedRevision: number;
+    assetPath: string | null;
+    baseVersionId: string | null;
+    publishedVersionId: string | null;
+    caseId: string | null;
+    caseRevision: number | null;
+    runId: string | null;
+  }): Promise<FeedbackResolution> {
+    return this.request(`/api/v1/diagnostics/feedback/${encodeURIComponent(id)}/resolution`, {
+      method: "PUT", body: JSON.stringify(payload),
+    });
+  }
+
+  verifyFeedbackResolution(id: string): Promise<FeedbackResolution> {
+    return this.request(`/api/v1/diagnostics/feedback/${encodeURIComponent(id)}/resolution/verify`, {
+      method: "POST", body: "{}",
+    });
+  }
+
+  importAgentEvaluation(id: string, payload: {
+    schemaVersion: 1;
+    campaignId: string;
+    reportSha256: string;
+    source: string;
+    model: string;
+    reasoning: string;
+    datasetVersion: string;
+    semanticVersion: string;
+    verdictAggregates: { passed: number; failed: number; inconclusive: number; total: number };
+  }): Promise<ExternalAgentEvaluationSummary> {
+    return this.request(`/api/v1/diagnostics/feedback/${encodeURIComponent(id)}/agent-evaluations`, {
+      method: "POST", body: JSON.stringify(payload),
+    });
+  }
+
+  reviewAgentEvaluation(id: string, evaluationId: string, payload: {
+    expectedRevision: number;
+    decision: "approved" | "rejected";
+  }): Promise<ExternalAgentEvaluationSummary> {
+    return this.request(`/api/v1/diagnostics/feedback/${encodeURIComponent(id)}/agent-evaluations/${encodeURIComponent(evaluationId)}/review`, {
+      method: "POST", body: JSON.stringify(payload),
+    });
+  }
+
+  async getQueryEvidence(queryId: string): Promise<BusinessEvidenceV1> {
+    const value = await this.request<unknown>(`/api/v1/diagnostics/queries/${encodeURIComponent(queryId)}/evidence`);
+    const evidence = parseBusinessEvidenceV1(value);
+    if (evidence.queryId !== queryId) invalidBusinessEvidence("Query evidence does not match the requested query.");
+    return evidence;
   }
 
   updateDiagnosticFeedback(id: string, payload: {

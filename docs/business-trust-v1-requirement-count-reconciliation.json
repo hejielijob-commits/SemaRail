@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-20T16:45:39.770994+00:00",
+  "correctionType": "stale_delivery_index_summary_counts_only",
+  "previousIndexCopy": {
+    "record": ".benchmark-data/business-trust-v1/audit-before-open-count-reconciliation-v1.json",
+    "sha256": "4a9cfa83272bcf979e1b5beb030ed5bec28752ce63450dd17ecb9c2235babc67"
+  },
+  "previousSummary": {
+    "record": "docs/business-trust-v1-requirement-audit.json",
+    "sha256": "acc83cb4d97a51c92aaa6fb006a6acbb63511375184afc71efecb5f63a08f721",
+    "status": "interim_audit_campaign_and_final_review_open",
+    "requirements": 67,
+    "open": 10
+  },
+  "currentSummary": {
+    "record": "docs/business-trust-v1-requirement-audit.json",
+    "sha256": "aae2ce89c300a6dfffb0b1c431898a5783c6931b8a069022b8ca82601ff5ce5f",
+    "status": "interim_audit_campaign_and_final_review_open",
+    "requirements": 67,
+    "open": 8
+  },
+  "openRequirementIds": [
+    "CMP01",
+    "CMP02",
+    "CMP03",
+    "CMP04",
+    "CMP05",
+    "PROM01",
+    "FINAL01",
+    "DISP01"
+  ],
+  "authoritativeRequirementAuditSha256AtCapture": "aae2ce89c300a6dfffb0b1c431898a5783c6931b8a069022b8ca82601ff5ce5f",
+  "previousRequirementJudgmentsChanged": false,
+  "runtimeOrFrozenScoringChanged": false,
+  "promotionEstablished": false
+}

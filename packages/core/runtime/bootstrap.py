@@ -14,9 +14,10 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
-BOOTSTRAP_VERSION = "2"
+BOOTSTRAP_VERSION = "4"
 LOCK_WAIT_SECONDS = 900
 LOCK_STALE_SECONDS = 3600
 LOCK_POLL_SECONDS = 0.2
@@ -95,18 +96,26 @@ def _install(package_root: Path, venv: Path, fingerprint: str) -> None:
         shutil.rmtree(venv)
     venv_module.EnvBuilder(with_pip=True, clear=True).create(venv)
     python = _python_in(venv)
-    command = [
-        str(python), "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
-        "--constraint", str(package_root / "runtime" / "constraints.txt"),
-        str(package_root / "python" / "sidecar") + "[wren,mcp]",
-        str(package_root / "python" / "semantic-console") + "[wren]",
-    ]
-    completed = subprocess.run(
-        command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL, env=os.environ.copy(), check=False,
-    )
-    if completed.returncode != 0:
-        raise RuntimeError("Python dependencies could not be installed; check network and package-index settings")
+    # setuptools builds local projects in-place. Deep npm prefixes can exceed
+    # Windows MAX_PATH, and globally installed sources may be read-only. Build
+    # public package sources in a short private directory instead.
+    with tempfile.TemporaryDirectory(prefix="sr-") as temporary:
+        stage = Path(temporary)
+        for name in ("sidecar", "semantic-console"):
+            shutil.copytree(package_root / "python" / name, stage / name,
+                            ignore=shutil.ignore_patterns("build", "dist", "*.egg-info", "__pycache__"))
+        command = [
+            str(python), "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
+            "--constraint", str(package_root / "runtime" / "constraints.txt"),
+            str(stage / "sidecar") + "[wren,mcp]",
+            str(stage / "semantic-console") + "[wren]",
+        ]
+        completed = subprocess.run(
+            command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, env=os.environ.copy(), check=False,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError("Python dependencies could not be installed; check network and package-index settings")
     (venv / ".semarail-runtime.json").write_text(
         json.dumps({"bootstrapVersion": BOOTSTRAP_VERSION, "fingerprint": fingerprint}), encoding="utf-8"
     )
@@ -144,6 +153,10 @@ def main() -> int:
     except Exception:
         print("SemaRail runtime initialization failed. Check Python, network, and package-index settings.", file=sys.stderr)
         return 1
+    if os.name == "nt":
+        # Windows execv starts a replacement PID and exits this launcher early.
+        # Keep the supervised process alive and propagate the runtime exit code.
+        return subprocess.call([str(python), *module_args])
     os.execv(str(python), [str(python), *module_args])
     return 1
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import uuid
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -48,6 +49,7 @@ class _CoreToolError(ToolError):
     def __init__(self, error: Mapping[str, Any], trace_id: str) -> None:
         super().__init__(json.dumps(dict(error), ensure_ascii=False, separators=(",", ":")))
         self.trace_id = trace_id
+        self.query_id: str | None = None
 
 
 def _mcp_result(result: Mapping[str, Any]) -> CallToolResult:
@@ -64,7 +66,7 @@ def _mcp_failure(error: _CoreToolError) -> CallToolResult:
     return CallToolResult(
         content=[TextContent(type="text", text=str(error))],
         isError=True,
-        _meta={"traceId": error.trace_id},
+        _meta={"traceId": error.trace_id, **({"queryId": error.query_id} if getattr(error, "query_id", None) else {})},
     )
 
 
@@ -349,14 +351,29 @@ def create_remote_mcp_server(
             },
         ))
 
+    # All stateless HTTP requests share this server-owned execution registry.
+    # A cancellation notification can arrive in a different MCP session, so
+    # callers may preallocate a correlation ID and cancel via the same runtime.
+    active_queries: dict[str, str] = {}
+
     @server.tool(annotations=_readonly("Run a governed SemaRail query", idempotent=False))
     async def semarail_governed_query(
         question: str,
         semantic_sql: str,
         chart_intent: Literal["auto", "table", "line", "bar", "pie"] = "auto",
         preparation_id: str | None = None,
+        query_id: str | None = None,
     ) -> CallToolResult:
-        query_id = f"remote-mcp-query-{uuid.uuid4().hex}"
+        """Run a query with an optional caller-owned cancellation correlation ID."""
+        if query_id is not None and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", query_id):
+            raise ToolError("query_id must be a bounded query identifier")
+        query_id = query_id or f"remote-mcp-query-{uuid.uuid4().hex}"
+        access = get_access_token()
+        if access is None or not access.client_id:
+            raise ToolError("authentication is required")
+        if query_id in active_queries:
+            raise ToolError("query identifier is already active")
+        active_queries[query_id] = access.client_id
         try:
             return _mcp_result(await bridge.call(
                 "query.run",
@@ -368,12 +385,31 @@ def create_remote_mcp_server(
                     **({"preparationId": preparation_id} if preparation_id is not None else {}),
                 },
             ))
+        except _CoreToolError as error:
+            # Keep a denied/blocked query addressable by the independent evidence tool.
+            error.query_id = query_id
+            raise
         except asyncio.CancelledError:
             try:
                 await asyncio.shield(bridge.call("query.cancel", {"queryId": query_id}))
             except Exception:
                 pass
             raise
+        finally:
+            active_queries.pop(query_id, None)
+
+    @server.tool(annotations=_write("Cancel the caller's active SemaRail query"))
+    async def semarail_cancel_query(query_id: str) -> CallToolResult:
+        """Best-effort cancellation in the originating MCP runtime and identity."""
+        access = get_access_token()
+        if access is None or active_queries.get(query_id) != access.client_id:
+            raise ToolError("query is not active for this identity")
+        return _mcp_result(await bridge.call("query.cancel", {"queryId": query_id}))
+
+    @server.tool(annotations=_readonly("Read Core-generated business query evidence"))
+    async def semarail_get_query_evidence(query_id: str) -> CallToolResult:
+        """Read the original caller's current-permission-checked evidence; no result rows."""
+        return _mcp_result(await bridge.call("query.evidence", {"queryId": query_id}))
 
     @server.tool(annotations=_write("Submit SemaRail query feedback"))
     async def semarail_submit_feedback(

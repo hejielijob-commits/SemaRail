@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "adjudicatedAt": "2026-10-25T15:34:27.939666+00:00",
+  "reviewer": "root-independent",
+  "independentComparisonAudit": {
+    "record": ".benchmark-data/business-trust-v1/final-comparison-readonly-audit-20261025-v1.json",
+    "sha256": "09bc53ee80cef6728abb466f4bbd8d9233ac7e74a85fa06e1106e05f93c72bea"
+  },
+  "finalRequirementAudit": {
+    "record": "docs/business-trust-v1-final-requirement-audit.json",
+    "sha256": "def6e7d9a9ec9b9820226ae6128509fdc1634a46d7b8a25d86b12a9d0b7be8e5"
+  },
+  "independentAuditVerdictAccepted": true,
+  "requiredRepairResolution": {
+    "reportedGap": "Final67-item audit and reconciliation of eight interim open items plus the guide link were pending at independent-audit observation time.",
+    "resolution": "Final audit created; intermediate requirement/index/progress metadata reconciled; guide target exists and hashes match.",
+    "resolved": true,
+    "primaryReportsAndFrozenScoringChanged": false
+  },
+  "finalReadback": {
+    "requirementsChecked": 67,
+    "verifiedDeliveryAndDecisionItems": 66,
+    "failedConditionalPromotionEvidenceGateAccounted": 1,
+    "artifactHashReferencesChecked": 95,
+    "sourceFilesFrozenAndUnchanged": 291,
+    "documentationLinksValid": true,
+    "all180AttemptedAndIndependentlyReviewed": true
+  },
+  "promotionDecision": "not_promoted",
+  "contextDefaultVersion": 1,
+  "businessChecks": "explicit_opt_in",
+  "agentQualityImprovementClaimed": false,
+  "all180ExactPromptDeliveryCertified": false,
+  "remainingRequiredDeliveryWork": [],
+  "completionInterpretation": "The requested implementation, complete180-position report, real repair case, installable candidate and documentation are delivered. Promotion and exact-transport evidence gates failed and are preserved as negative results; the explicitly requested opt-in fallback is applied."
+}

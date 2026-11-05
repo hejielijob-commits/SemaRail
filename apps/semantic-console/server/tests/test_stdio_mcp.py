@@ -112,6 +112,7 @@ class StdioMcpTests(unittest.TestCase):
                 "semarail_plan_query",
                 "semarail_prepare_query",
                 "semarail_governed_query",
+                "semarail_get_query_evidence",
                 "semarail_submit_feedback",
             ],
         )
@@ -249,7 +250,7 @@ class StdioMcpTests(unittest.TestCase):
                     return [tool.name for tool in tools.tools], called
 
         tools, called = asyncio.run(exercise())
-        self.assertEqual(len(tools), 7)
+        self.assertEqual(len(tools), 8)
         self.assertFalse(called.isError)
         self.assertEqual(called.meta, {"traceId": "trace-stdio-success"})
         self.assertNotIn("traceId", called.structuredContent)

@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "decidedAt": "2026-10-25T10:59:18.103465+00:00",
+  "runId": "formal-20261020-business-trust-v1-g",
+  "manifestSha256": "3494d53422feb6748bf65799a0072812ec2f95ee46fff62503b7bbc9da535b68",
+  "denominator": 180,
+  "decision": "not_promoted",
+  "contextDefaultVersion": 1,
+  "businessChecks": "explicit_opt_in",
+  "agentQualityImprovementClaimed": false,
+  "all180GenuinelyAttemptedAndRootReviewed": true,
+  "all180CallAuditsPassed": false,
+  "primaryFrozenGates": {
+    "completeReviewedEvidence": false,
+    "allRoleDenialsClean": false,
+    "candidateWinsAtLeastTwoRounds": false,
+    "roundWins": 0,
+    "firstSqlAtLeastBaseline": false,
+    "finalAnswerAboveBaseline": false,
+    "silentErrorsAndOmissionsDoNotIncrease": false,
+    "deterministicAcrossThreeCandidateRounds": false,
+    "noPermissionLeaks": true,
+    "determinismFailures": [
+      "BTV-01",
+      "BTV-04",
+      "BTV-08",
+      "BTV-11",
+      "BTV-12",
+      "BTV-17",
+      "BTV-18",
+      "BTV-19",
+      "BTV-21",
+      "BTV-23",
+      "BTV-24",
+      "BTV-25",
+      "BTV-28",
+      "BTV-29",
+      "BTV-30"
+    ]
+  },
+  "primaryGroups": {
+    "baseline": {
+      "expected": 90,
+      "finalCorrect": 51,
+      "firstSqlExpected": 60,
+      "firstSqlCorrect": 41,
+      "silentErrors": 9,
+      "omissions": 10,
+      "reviewPending": 10,
+      "permissionFailures": 0
+    },
+    "candidate": {
+      "expected": 90,
+      "finalCorrect": 38,
+      "firstSqlExpected": 60,
+      "firstSqlCorrect": 32,
+      "silentErrors": 11,
+      "omissions": 20,
+      "reviewPending": 20,
+      "permissionFailures": 0
+    }
+  },
+  "rootSupplementalGroups": {
+    "baseline": {
+      "expected": 90,
+      "actualIndependentReviews": 90,
+      "statuses": {
+        "complete": 80,
+        "missing": 8,
+        "timeout": 1,
+        "invalid": 1
+      },
+      "narrativeAnswersCorrect": 66,
+      "criticalBusinessOmissions": 17,
+      "confirmedUnauthorizedResultDisclosures": 0,
+      "callAuditFailures": 10,
+      "negativeAbortedWorkerPositions": 2,
+      "diagnosticOnlyFinalRowOrderMismatches": 3,
+      "publicPromptReceiptsVerified": 83,
+      "positionsMissingRequiredConditionTags": 25
+    },
+    "candidate": {
+      "expected": 90,
+      "actualIndependentReviews": 90,
+      "statuses": {
+        "missing": 7,
+        "invalid": 10,
+        "complete": 70,
+        "timeout": 3
+      },
+      "narrativeAnswersCorrect": 63,
+      "criticalBusinessOmissions": 26,
+      "confirmedUnauthorizedResultDisclosures": 0,
+      "callAuditFailures": 20,
+      "negativeAbortedWorkerPositions": 3,
+      "diagnosticOnlyFinalRowOrderMismatches": 0,
+      "publicPromptReceiptsVerified": 83,
+      "positionsMissingRequiredConditionTags": 34
+    }
+  },
+  "artifacts": {
+    "rootFinalIndex": {
+      "record": ".benchmark-data/business-trust-v1/runs/formal-20261020-business-trust-v1-g/reports/root-final-index.json",
+      "sha256": "e9bf7ac8626b9220a581a5804b624c1ee57cdee5df4b1d7f2e8df2b94890e9d1"
+    },
+    "primaryReport": {
+      "record": ".benchmark-data/business-trust-v1/runs/formal-20261020-business-trust-v1-g/reports/report-af6dfa6525bf45e2b477a7e1ff0657c4.json",
+      "sha256": "0dc9b38311ce97a3a41f3a8c9ce67b8648e1e31bea5c62e1fbd09e1f3b8e9175"
+    },
+    "safeSummary": {
+      "record": ".benchmark-data/business-trust-v1/runs/formal-20261020-business-trust-v1-g/reports/console-feedback-1afc1cb794c44ebd869c7833aa631134.json",
+      "sha256": "e84c61395cd92e7ff87981a68c78a42db2509c472bcec17ec86d826a0843d5c0"
+    }
+  },
+  "reasons": [
+    "Frozen primary final-answer and first-SQL counts are below baseline.",
+    "Candidate wins zero frozen-score rounds; silent errors and omissions increase.",
+    "Thirty call-audit failures keep primary reviewed-evidence completeness false; all180 Root content reviews remain separately retained.",
+    "No confirmed unauthorized disclosure was observed, but clean denial and three-round determinism gates were not met."
+  ],
+  "transportLimits": {
+    "verifiedPublicPromptReceipts": 166,
+    "encryptedInitialLauncherBytesObservable": false,
+    "all180ExactDeliveryCertified": false
+  },
+  "futureChangesRequireNewFreeze": true,
+  "originalScoringChanged": false
+}

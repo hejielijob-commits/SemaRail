@@ -77,6 +77,51 @@ describe("RuleWorkbench", () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ confirmationRule: expect.objectContaining({ models: ["orders", "customers"], allowedValues: ["day", "month"], prompt: "Choose day or month", requireConfirmation: true }) }), "draft"));
   });
 
+  it("edits versioned execution checks in the existing rule editor and publishes them with the rule", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<RuleWorkbench rules={[rule({ executionChecks: { schemaVersion: 1, checks: [{ id: "orders-total", kind: "reference", model: "orders", column: "net_amount", mandatory: true }] } })]} onSave={onSave} />);
+
+    fireEvent.change(await screen.findByRole("combobox", { name: "Check type 1" }), { target: { value: "metric" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Aggregation 1" }), { target: { value: "avg" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Unit 1" }), { target: { value: "USD" } });
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ executionChecks: {
+      schemaVersion: 1,
+      checks: [{ id: "orders-total", kind: "metric", model: "orders", column: "net_amount", mandatory: true, aggregation: "avg", distinct: false, unit: "USD" }],
+    } }), "publish"));
+  });
+
+  it("edits the conditional original-time grouping check in the versioned editor", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<RuleWorkbench rules={[rule({ executionChecks: { schemaVersion: 1, checks: [{ id: "sales-trend", kind: "reference", model: "orders", column: "order_date", mandatory: true }] } })]} onSave={onSave} />);
+
+    fireEvent.change(await screen.findByRole("combobox", { name: "Check type 1" }), { target: { value: "timeGrouping" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Require original grouping when trend is requested 1" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Condition key 1" }), { target: { value: "trend" } });
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ executionChecks: {
+      schemaVersion: 1,
+      checks: [{ id: "sales-trend", kind: "timeGrouping", model: "orders", column: "order_date", mandatory: true, mode: "original", whenGrouped: true, conditionKey: "trend" }],
+    } }), "publish"));
+  });
+
+  it("edits the conditional original-time grouping check in the versioned editor", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<RuleWorkbench rules={[rule({ executionChecks: { schemaVersion: 1, checks: [{ id: "sales-trend", kind: "reference", model: "orders", column: "order_date", mandatory: true }] } })]} onSave={onSave} />);
+
+    fireEvent.change(await screen.findByRole("combobox", { name: "Check type 1" }), { target: { value: "timeGrouping" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Require original grouping when trend is requested 1" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Condition key 1" }), { target: { value: "trend" } });
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ executionChecks: {
+      schemaVersion: 1,
+      checks: [{ id: "sales-trend", kind: "timeGrouping", model: "orders", column: "order_date", mandatory: true, mode: "original", whenGrouped: true, conditionKey: "trend" }],
+    } }), "publish"));
+  });
+
   it("discards local edits back to the committed rule", async () => {
     const onDiscard = vi.fn();
     render(<RuleWorkbench rules={[rule()]} onDiscard={onDiscard} />);

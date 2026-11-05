@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "purpose": "External app prompt delivery and transport acceptance only; no HR Agent quality conclusion",
+  "mode": "public-file-one-read-v1",
+  "checkedAt": "2026-10-17T16:47:28.568920+00:00",
+  "sourceHashes": {
+    "benchmarks/business-trust-v1/app_dispatch.py": "b48b9a4f85e2a3d3fb4a7133de267b42947b5fc7c5a057613147b386e0e0add8",
+    "benchmarks/business-trust-v1/review.py": "3b35989b4565511e4382e5776bb59166b5d50dbc2ca19bd275f4f2ba123a7a0e",
+    "benchmarks/business-trust-v1/transport_smoke.py": "dcba1fa99ca39058bcfc88a99bd07d53003b3ae31c1b5704cf28822902442031",
+    "benchmarks/business-trust-v1/tests/test_app_bootstrap.py": "88374ca2a968f9c02496176b47b26181b9bd7b1e8221b477024cec8bdc2cf250",
+    "benchmarks/business-trust-v1/README.md": "2a72d3b3b3dac6f809a404b54ef37510df9f1404db3ec01df31016e2cbe66995"
+  },
+  "focusedTests": {
+    "executed": 17,
+    "skipped": 1,
+    "record": ".benchmark-data/business-trust-v1/bootstrap-focused-r2.log",
+    "sha256": "2c9d59baa8a9bfd633bba7573066eca47724d172756150b16026ebdbd92100cc"
+  },
+  "harnessTests": {
+    "executed": 63,
+    "skipped": 1,
+    "record": ".benchmark-data/business-trust-v1/harness-after-bootstrap-r2.log",
+    "sha256": "df993703c8f33d058d7be08e90e1254e1c799bbc1ce458c34983ab1ca1ebfc11"
+  },
+  "actualWindowsJunction": {
+    "status": "passed",
+    "record": ".benchmark-data/business-trust-v1/bootstrap-junction-20261018-r3.json",
+    "sha256": "f520f81d30071d3c67b93add897a6639cf640a77bebb65755bdae3faa446cd91"
+  },
+  "realSmoke": {
+    "schemaVersion": 1,
+    "smokeId": "btv-bootstrap-20261018-b",
+    "status": "passed",
+    "excludedFromCampaign": true,
+    "threadId": "01a14abe-cbec-70c3-a431-55a59a1ce73c",
+    "traceSha256": "4de391b3adc2e1fac26ac6d683dc46bdeea42213596f0a807cfebc914298f557",
+    "observedModels": [
+      "gpt-6-luna"
+    ],
+    "observedReasoning": [
+      "max"
+    ],
+    "operations": [
+      "begin",
+      "tool",
+      "final"
+    ],
+    "toolNames": [
+      "semarail_get_context"
+    ],
+    "provenanceBoundEmptyPolls": 1,
+    "auditedAt": "2026-10-17T16:46:03.244372+00:00",
+    "bootstrapMode": "public-file-one-read-v1",
+    "publicPromptReceiptVerified": true,
+    "sentInputIndependentlyByteVerified": false,
+    "publicPromptSha256": "aeb63eb87d49d8185fd389aa3dafe1326d5d2002828e89c5b0e2c450e47da0b9",
+    "publicPromptReceiptSha256": "aeb63eb87d49d8185fd389aa3dafe1326d5d2002828e89c5b0e2c450e47da0b9",
+    "launcherSha256": "2160ac397bb3980376a048a00145c4d31c9e3e12efc061d5dfcbf86496309d6e",
+    "verificationRecordSha256": "ec15e983cf3b92e12fdc6b511861e834583eb7036c4ce206948e51cb12fdd5dc",
+    "ownedHostIdentityVerifiedAndStopped": true,
+    "listenerClosed": true
+  },
+  "coveredBehaviors": [
+    "Public prompt independently rendered from frozen template, nonce and fixed transport",
+    "Actual real export of 180 empty worker directories and selected prompts accepted by review",
+    "Coordinated file plus recorded-hash changes rejected",
+    "Exact schema types, duplicate and missing reads, private reads, wrong client paths, failed or truncated outputs rejected",
+    "Only outer JS whitespace tolerated around exact read call; extra source rejected",
+    "Legacy app dispatch preserved"
+  ],
+  "limitations": [
+    "The encrypted initial launcher message bytes are not independently exposed; receipt verification does not claim otherwise",
+    "One symlink-creation unit case skipped due Windows privilege; real directory-junction rejection separately observed on current code",
+    "No official180 position is represented by this disposable fake-broker smoke"
+  ],
+  "supersededNonFrozenLogRetention": {
+    "earlier61TestLogOverwritten": true,
+    "earlierLogSha256": "09c57d3e27f193cf67867b87e55b8d449c935618188dcb78467e8cfc55697130",
+    "usedForFinalAcceptance": false,
+    "authoritativeLog": ".benchmark-data/business-trust-v1/harness-after-bootstrap-r2.log"
+  },
+  "formalRunStarted": false,
+  "goalComplete": false
+}

@@ -1,0 +1,4024 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-25T11:22:14.484532+00:00",
+  "runId": "formal-20261020-business-trust-v1-g",
+  "manifestSha256": "3494d53422feb6748bf65799a0072812ec2f95ee46fff62503b7bbc9da535b68",
+  "status": "closed_complete_not_promoted",
+  "denominator": 180,
+  "counts": {
+    "expectedPositions": 180,
+    "genuineSpawnReturns": 180,
+    "notSpawned": 0,
+    "spawnedWithoutIndependentReview": 0,
+    "statuses": {
+      "complete": 150,
+      "missing": 15,
+      "invalid": 11,
+      "timeout": 4
+    },
+    "tracesImported": 165,
+    "detachedPrebeginFailuresRetained": 15,
+    "actualTraceEvidenceRetained": 180,
+    "independentReviews": 180,
+    "auditPassed": 150,
+    "auditFailed": 30,
+    "publicReceiptsVerified": 166,
+    "contentSupplements": 180
+  },
+  "positions": [
+    {
+      "jobId": "job-001",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "c0ef4b73badb5076980350497a83f3a07e9bc7754f8677edcfcd50076eedd434",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-002",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "6b592b7f70cabefb40dc8619257243132c1a2725a2175e9d6c9f5462b377c6c0",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": false,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 3
+    },
+    {
+      "jobId": "job-003",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "0208877ff5d5e323a730a49d6be92be9f92d1a0e40241d5493cb6b2bb061f765",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-004",
+      "status": "invalid",
+      "spawnReturned": true,
+      "latestRecordSha256": "dc480cb8ec502909df45e5ae515507fcbc4f6dd4e457bcfc0788af5892ed462f",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 4
+    },
+    {
+      "jobId": "job-005",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "ac3fb26a3ea54eef5dafdf228bf837c3e714febeeea1dba9a7d3cb9d0b596bbd",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-006",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "abc1f6c156b540f2ff7d01ff8761aa251c014096d1dbee31ff40b08619930780",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-007",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "367246790102aec0ef2498e10490c21d0f7f55d7c4d48cd5c267fce206223ac8",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": false,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 5
+    },
+    {
+      "jobId": "job-008",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "bde7ed1240ef0aade870fca5be2cd409d3c7e56de95dc632ed159bab202f2393",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-009",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "9d8def6dea671a921ca3426969aa7a236702d8ad534e7abbab9a134e274209ca",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-010",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "3710921e676df997941a2bd5054fb206bdd63f93557c4964cc20a5d68e24efff",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-011",
+      "status": "invalid",
+      "spawnReturned": true,
+      "latestRecordSha256": "1db8afaf1559ce432ba310a417b8b96bc22dde5de8832d391af42ada5b64b504",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 4
+    },
+    {
+      "jobId": "job-012",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "6230987c5f177f11b985519d57471aec72c44ed4c8faf0409e472a4e7a3c0d8f",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-013",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "cb8f590a1a5deba89e85ee96edf13052e8fbdae561eb77a725754783dc2d084f",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-014",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "b6a4c46b8f49a1218a60e02c9a8e31298b9af4e3802f475db9e9cec93b10921c",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-015",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "270ba96fdb3f088eebc1d34765a9b147715186623f54995c5b630b2ec6ce65ac",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-016",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "dec55bce2c7a456c656670f5d1c72d2a35d757333a6678b045436b35b8f003ba",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-017",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "3e0bb51da3692176a8571857716416ed0cc11ab82ec4d432df7b869793efcf20",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-018",
+      "status": "invalid",
+      "spawnReturned": true,
+      "latestRecordSha256": "8731fa55fd8a6702024f953c4c8b8f5d89ed0374c4cf47600c31a1cdf081090f",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 3
+    },
+    {
+      "jobId": "job-019",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "6d6bbacd38dce3319f027c9ab2035a576c3bc665c877af9ef76f988ee32fb265",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-020",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "61657356130ef593af8c21910371b94f8b92050bdd11ebcea7c1d8ed5c21e8be",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-021",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "605558eb8ff1d7eb842f033e0c1451fa7c70d4984e8a8ea6b860ff7eea478434",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-022",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "4a4452a3bc9c776081d70269cb60b2d2b00cc5d836e5aa9f58115675b0179fcd",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-023",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "7d5b334faa3e7f09227216e1cdf1f6055bb8cf2ee2f06c1c84f4713470cdb7a1",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-024",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "db13a1e16bbecdef036b4069681b9285ef6ca082cb1adb49b437a3aa148d8fd0",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-025",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "a263c64319d742ead85acbedb6bdfd7ebb768209788c5a68ae3385d9e0733ddf",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": false,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 4
+    },
+    {
+      "jobId": "job-026",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "852a4a99b1080205ef4a4bc49d447a3a52564153f15906b34cfd27975e1d8e7c",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": false,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 4
+    },
+    {
+      "jobId": "job-027",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "9213ac5a7bdae5b9dd56f57c19fbbac7d60ee65be522117cda594f43acbea408",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-028",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "655c66de644ced7907513ae10b656af8e97eb1c6a80dd6252d5fa0c9ea5b4d36",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-029",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "1258139b61ea6adeef578858326e10d384231c1be8dd87403f36283f2d697241",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-030",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "6cba8a5f12c26b44ae1d4e8e81a0f57aedb807b85346846c0f4b5e30282cb6cc",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-031",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "2444d8cc0bf60c6243c91bd410cc2dfb69099e7b360051d63ce83c88a7079c36",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-032",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "f40ddd129a850fd976564cd86458a674667cf9ee9e212e5a092b339d2d004441",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-033",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "b761e129ab3257923db05c33aa554e19e7cf19ce89d22bc7f5e053c6a1abe8fa",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-034",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "a35cfa8497bac988bc1d5224f36f9b0832e9250f66a5bcfe093ec6267a31a0cf",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-035",
+      "status": "invalid",
+      "spawnReturned": true,
+      "latestRecordSha256": "89dba9596b163ecfdc334dcada4bd3efcfbbecd48f25b2ff8ea5ae620061d564",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 3
+    },
+    {
+      "jobId": "job-036",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "54f2a72137be4fffcfc85b3c49af11f34df976cc294fcd4a3e6c8c3eaa02360f",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-037",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "bf7986cb559dff643537528955497ef0fe9237eaacba88f5dd3df297edeede18",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-038",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "d4264c1d705be69999bfc045477ec1b778021f3d47e477cff2daf74150c6fab6",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-039",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "4629e292bf6844f9b27d68143a6f64f28b792f3cd9a4cd34d8bc53f662eac52d",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-040",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "d08557bb3712e8e12cf5be7c05080d95ec4dbf496d25c5b12f9babcb3178e78b",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": false,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 3
+    },
+    {
+      "jobId": "job-041",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "a616a0cb46c3a2480afc14a18b3c706176253c6c8afed4dda07abd44dc02cbea",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-042",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "b7878b13822d5277a9a2b1cde0046bdae429b86360b71f1486d30ab6590fde7d",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-043",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "667914dfd4e8148f6e8c73247e75a7cd252e8240bdbd0bcce7cbc495a9a04651",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": false,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 3
+    },
+    {
+      "jobId": "job-044",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "0592fcdc191573b8a845fce56df09472c6a7e3d264aa6421cc54a4a4a19c2eff",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-045",
+      "status": "invalid",
+      "spawnReturned": true,
+      "latestRecordSha256": "8bc9210830c8dff6c74cc7dcd1b14b73a7c45f3586ddf9e4a928c1c69f3be3b5",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 4
+    },
+    {
+      "jobId": "job-046",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "786c4926f6e30854ea5c379b9181fbf9c19e2c8b068571ad85b0c5e323446d42",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-047",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "8c24ab65a0d3d3e75df2ac8ee341b1a235dfe3736ce804e148c52ccd7f736641",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-048",
+      "status": "invalid",
+      "spawnReturned": true,
+      "latestRecordSha256": "9a4357d24dbe63968232663474466dc701b6f513659d3d423dc69cb446c8aad3",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 5
+    },
+    {
+      "jobId": "job-049",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "8a4a89f8c2aed4873cabd70fd66e06cb895159a3065a8f8c71f9daf776e2f2af",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-050",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "7044844717387be22bbdde6fa0da21ddf5369dde59e3396b5e69fbc51ca6738b",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-051",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "c1a82658a2affa17835c8bfb468bde62fdd45111d0f45664d99af7c6d98585ab",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-052",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "b9488c78ae1b335d775caa47f4df43030e8c43470f993f3101f9979e7e131782",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-053",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "1abaed9757a202793523b1af90934a2bd479fee513540023094ac6328754f57b",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-054",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "845998b97e708de0d2befb588350dfa5a9e0bc3b49a354260d7588a227151218",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-055",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "51df68d1e550d4035a815340fc6fdd0ab42b29621099e034d6d74d0826a13566",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-056",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "76945713e56ff8adf1c92b2bb79124578005408e9dbbde26c5682f778f15accf",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-057",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "d124763e4a9ea78fd230429c95548c306b574ca219dde0b3cbe61a3b39cef004",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-058",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "f726b8cf2b383d65eede7507cc8b66e89f2eb351bcba4b7c7dc78ab6be99c9fd",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-059",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "a924e1092adf7c005eda3426e5b16ee596c465062192ca40086aad53e5af23b3",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-060",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "074d19b217d20acbfc74d7b5de665252347ef463bff16fcae875f6b5361c321d",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-061",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "0a1302d9e14a9ae64fb035ad3b2e483666642a7df2e0e0e922ca744ff9d40c55",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-062",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "84d3712936e61a89f11e3950b203a035af7cdd27e6a5d80bd8064d5f6e273bc7",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-063",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "cbd41f68b9574d774f7384adaa67fd85cd92f09571d4965b3a821bc05b8ed5de",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-064",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "5a5f3555d6c3aa87fcfbf2d48a9b3b261473dc7edf5bf1c3bdf35da5691d36b0",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-065",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "68de8cbfbc3e3a9d1c9d55f8c7fdce8c4f4ebd02e0c51913d97e39b56eac63c3",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-066",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "e3390ed1a0766c4b1ca5fe687550a29ef3796a4842f1b5abf24641ec36eb2564",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-067",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "6b0a459dec8387b5be232d91c55ff8250711e7982e0ff9adce4c00d61b715adf",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-068",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "908772d30335f5a71ef66674477ce5da1bba201dc78f3afc3f804b5f6a4d1a1b",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": false,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-069",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "2aff0f5fab9011a476d8d60cecbd4a3fda059f8e284da8e98a3c648b761f964f",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-070",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "fbbdb0aa57ca97f7d011598aa5cf74c5595918fc66bf9c5b7946a65ad0c931c1",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-071",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "4086932963a868496fd0ee8c7f9e8b82d7379f7fc82b9fb45e6114166fa0dbde",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": false,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 3
+    },
+    {
+      "jobId": "job-072",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "7e2380052763e3646e2da5fb6310a48adf9bca107b1f1d790305ec4e97847f90",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-073",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "1e87c358ced0c5a81a067a0da3c7264136c41bf24bfbfba3d8b6bfd56e7cfa60",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-074",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "ba46b6a9d7aacb6d06d7b4d4b525c044527b9de4d6be65ae066bf3e3c1880393",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-075",
+      "status": "invalid",
+      "spawnReturned": true,
+      "latestRecordSha256": "67bc2517f1f4985afe25f9ca4fafc846128cc65501fd53e73c8d07e620ee75da",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 5
+    },
+    {
+      "jobId": "job-076",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "2d14cf58226564d1f0e8dafcf58a2b0042cf7bd5a14d1e7f01c16cc4a656b9c4",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-077",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "6bbee6e254a1000fc8e36688e218fe052092fb1b0c93da3e1b379d85e69ee72e",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-078",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "5210f8422c3782e910a8b7baf2dd5353b50c418861121127cc22f2ebec986637",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-079",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "c07de00b4b5655562cc92bbbead73285befa3a8045aa36f0988e10fd4172b770",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-080",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "f5819bae7c9da90fc4ecbeb5315e4c8a008e92a660bc6fee094749b3af5ebd7e",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 3,
+      "independentReviewReasonErrata": [
+        {
+          "record": ".benchmark-data/business-trust-v1/runs/formal-20261020-business-trust-v1-g/review-errata/job-080-reason-v1.json",
+          "sha256": "9b6350c7f78e1055821965308aa5aa46577b7f43a87033c42b3f387ca9754d05"
+        }
+      ]
+    },
+    {
+      "jobId": "job-081",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "b98187e552f0a881cc62ee7706bbc837dd72144844be4ff164a40c0dc5616c68",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-082",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "816b00252b893191869763244b86833189da5e5302ae8787bc4812e1cdba1753",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-083",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "055ff81ecd3e3587199aab410b37125d5a192a71df4da995d28d9136654661a2",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-084",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "c66d3495b7449ff1bbae9086ba6423a3f9ff78b558ded08bf58faa6587563fb3",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": false,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 3
+    },
+    {
+      "jobId": "job-085",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "16d7a2c5f666c16c926b2c7e71c8ff90b76da009707ab4b8467e34e04b4343fb",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-086",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "e6fc3fe76bdc2c1d21644fc626fd165a5a82d82e67040f9d8de48e1b19e1f85d",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-087",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "5cc67deb34908bbad694312436c2ea49aed89b07ac0103bbdd46915255ac3024",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-088",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "c30bdf8956070a6b480f35d2f24905113c23ae89a482b14b30dc70980c1cc62e",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-089",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "777e18ec841b59cc61ac70517cce2c6d28063962fc4050b5e9c0c6a46c2ec27c",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-090",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "5c6d903b71607b3963e306ebee26eb3a66bca995958c3411f42b200cf6785047",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-091",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "8ead7ba51497d1ce25269a5c5c9eee2fb082a4c8f6fc192276df98a46ff514e4",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-092",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "817687bff9868d70ad9ee8aa030c9dd16fe6d7d82521e8b9aa3f843a93883654",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-093",
+      "status": "invalid",
+      "spawnReturned": true,
+      "latestRecordSha256": "b24eace8b41d0273d0c1f4875030e93cd2533a4b4a9bb1ff4b75a863917cefc5",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 3
+    },
+    {
+      "jobId": "job-094",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "2af81b282d352b67ef3f66162eefe57d331f4896cd9223c2990d8e4ee0136d8a",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-095",
+      "status": "invalid",
+      "spawnReturned": true,
+      "latestRecordSha256": "d806deeb0e79643d834c9425feb83a49549e956f0e8b1fb52dd8e7a9241427fb",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 4
+    },
+    {
+      "jobId": "job-096",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "83850b05df8be83d100c37b15a5eb9d5e3a2c6491b77d6d66b04b3de1b442023",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-097",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "0914da55df664a9223ceba885a803cd32d3f3b89664b8f26beaa6efea73d86e2",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-098",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "e2e9b4a69116748042137bbf184a7e7f454055248f7649c219239a424beeebdc",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-099",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "3f18964c67c799d467b769d84e37f5918189dda3f60276edbbd9590f72898a0a",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-100",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "e949858293f2e0b8f59da775b8cd7db4c42b2faa7d794aa80a55d13e01a6c3c2",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-101",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "fed3f41a1863e04811f089eb1d52d2c9c3e1621b966438231bc86317a87cd56a",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-102",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "822a6e7d876e18e6b698b16432889be602ae1771cdb770a3dc9d0c3ff4fb5b9b",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-103",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "edcc43e59e7a305c877d5f2522c2508d0d093ee3bc8f9c1e652fb3ad7195921e",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 4
+    },
+    {
+      "jobId": "job-104",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "dc5c3224fc054a637f6282326cd231b99528ea9d17695d24357477a272544c41",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": false,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 4
+    },
+    {
+      "jobId": "job-105",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "36ca261ecf75c0cbbe30f395f30c15f3ae7bf0a3cd64e1ba506eb7f65f2d63e1",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-106",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "48df9303e53e8ba7f2c4d78133a2b43a5cf8bfa00b54b9e7ba89667f63aa8401",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-107",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "1c141b7fc1e8a23f8c9badea4e5974a915d4cab76cd1686c57fb843b91d0b217",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-108",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "cfd6543d4aebea31d854642fe413a81003757c3b16c7e6c9455c083a2da6a836",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-109",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "6b634b8237a360ac39839ab48b508fdaa1ae39b6873f457633721717b6d0841d",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-110",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "da212aca1db6205478b2a842b7078009d5c4a221c36418218c40050a30beda88",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-111",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "0253d3d3fb7d0f111f394997436ce5b60102ec67189ad1b3302c699a5cef1328",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": false,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 3
+    },
+    {
+      "jobId": "job-112",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "7ab721b65d9f32e18d25d3c453df3b59f7f4a8d6291e27d597f34c6926d0a4c4",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-113",
+      "status": "invalid",
+      "spawnReturned": true,
+      "latestRecordSha256": "3450e7927d02088768ff6accf3c7acbfa766e089bf2a3f2d04e0ef43a87b4959",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 4
+    },
+    {
+      "jobId": "job-114",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "4c0a4f316774ff328c08897a987a3952a85672e28b45071954c1df8f855887b3",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-115",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "bbba8f8332d2352bfec23d0cf1db2eb0e6e9d794ee6019d72280a3de26558858",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-116",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "f31ad67f4dcc5b80e58379e495ad1dd12e43c0fc330fe648d1c7632e24b9fe45",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-117",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "bbc9cd5f2f1cb5f48ed8a0e3d0ad9a14da2538999a2c062a9c063588aefe14ff",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-118",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "842dfc745137a23dcdf28205038223478dfb441e22b51ce1e9828e54235c538d",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-119",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "8c665ac27f30ac81360f32821bf18a65a252516823aecf83d7975ad2292880b2",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-120",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "04faef23940b50a98e63ef720d5a3cadfda25ca48587b72b817ba2d7d182469d",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-121",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "1b7205e5422e89fff4effe42885e0f151f74b549dfae0334481a372b757461fe",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-122",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "1ec699a11ed93a7978a7509e54082e40b62284c79029c27b4612398628d9399c",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-123",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "04adaa0c74903eec7e3194544fd82f9cdfbc67e1af5fe9547490aceb956ca08f",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-124",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "f17fb9b1d49308c0d1e35aea1ce1d44adf01a96016b4a4cf245f80a73e2eae12",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-125",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "1964ee3bd0c00b867ca796b95232d2fa0c52c6da5e70abf728c1cc43b473ad1a",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-126",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "64e1448eff5172df27959600c7d7c835dbe814bf8862c89f35a4d3d90c1d66f8",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-127",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "352858199acd99023d3d0b911662897ef85e5a18dc8e942931c007a2b38fd3ff",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-128",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "eee7f331d1dfadce1902472a59f839583ffc435b960db1f654dab7d0d244ff9b",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-129",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "03684a4095527a49d17eb17c282dd11631d534415692e128527cb3b9d4086f5b",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-130",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "05918de6646eb8727b964a0a6dde1b4417927342de2064180568bf8a60413692",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-131",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "6504e8f9029d9c4d5e3232918491bcae9c27c48de72d933f640c96d5e13da2d3",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-132",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "3817a86e26cb240958bba218f90c66f6f07b6b46d2a71278381eeaf8f1811eae",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-133",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "1a5304b60bb63c18933fdfa2f3ca4cd0d5ff697e72606a84478af128806e2bae",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-134",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "945a0d4174ca7556507b055e237698f9dd2932b7a6ba887d7b24ad8207c59890",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-135",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "17d576219ef57af099a8c2c59806d45286fc91c67e41f5a1f9d0ff10d613a45c",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-136",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "babb6f255ccec485c33497794cd046fb32124873054c8294434ec9c0cc54b720",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-137",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "e11a0b9c07b3ec0da983e3f923ff86cfa5428fdfd45a64b928eafbe1aa473d85",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-138",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "0f83b96660070b13b470f2df9641ba3ceaf9c747c31a3d3cebcf831bf39eadba",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-139",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "559dc8003c1e97e9f939b4d406dec5e128a2965acc1a5833c240aa14581826dd",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-140",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "848860e5220a640c9c4a4fdb877735777583c4f700f373b62996d6a0d384007f",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-141",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "34339fd6fcc60d3a4b3673342b9dd3d1904064912667cc8e8a0e39719fdc2ea9",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": false,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 3
+    },
+    {
+      "jobId": "job-142",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "8127f90b97952ed56221311328843001a73ab76f8c976b092796cf2a3fe3f14c",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-143",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "1c46cfae17346bdc434a8ee4f97919c7ebfbf30394e1a7696d320cf1db817ebf",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-144",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "15ebe6bccf19e0ebbdd85d543c65bd4e4abeb969b6cd5f545a5a739f09e8fe69",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-145",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "a25359d956df835e3dc1de36978dd7e803aa5cce8ea9e6fda3b81f149781d676",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-146",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "fab829619f8d077c8ea5db783b7c1ef52f0a6107cf27e9c9adb4e6e347b1010c",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-147",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "7739f843e236b8cf81028f1a9cb18da52f565e9be9ee27d59979513d7674348a",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-148",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "c04cc1b71f37b3019a5a6f6c6233ac40e53712f083700692e0c3e1d01063cda8",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-149",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "a034fe1c9f58dc1eb7888c0733fd20c944454f46c445b7d4273dd664f76ba387",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-150",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "49d28bf82c0c8edb7bc74889ab5df66f8326180b1b4bd68ee517c8e9d5792149",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-151",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "1413fc4df6c98d01d99465a4ec7fd287e837b51afe50e3abe317609a9bc26dcf",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-152",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "ec0e04f863fd6baa9a979479c68735d6ceb542cda68677eea9cf8e1adaae1dfe",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 4
+    },
+    {
+      "jobId": "job-153",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "60d8fa980a3ea547a221920d0eb1007b2e6706477f53d459009189680a77cb2f",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": false,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 4
+    },
+    {
+      "jobId": "job-154",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "25fc933f9c4bf0292fb71dfb0f90328db8e3c7ebed17cb23c426e9e1a6c8d0cd",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-155",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "21225aa797f5cfddcc92831a3d6b0f76700441bbed97bbcf1e3eb20c84012cbd",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-156",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "a323b55c3445745a9e4eac985d1e94cea90ed071f4b024330714fade476eadfc",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-157",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "a3727bd6291b4f4620f0281d27840ceaca99ab5b485e5bac84a330525c75549c",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-158",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "f1dcc37d54ed15b0d052aa2021f0a9cd2d815d4e561b9265cee8dbea9f53a282",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-159",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "c1d76247dad4424ae0ab545513d19aa7edeb16b14b56330d2f95b993abf8a19f",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-160",
+      "status": "invalid",
+      "spawnReturned": true,
+      "latestRecordSha256": "79d3ca62214805ba262b16a86a36ed67a88f09e1ea0f7c1bd3e91cdcf621a9d3",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 4
+    },
+    {
+      "jobId": "job-161",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "03bbf13acb2d2078c78536dc186c0f8c63ccfdca14e2de800532b86001aa133e",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-162",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "65c2e6887e8da37441d9a4da5aa0f778b8d7e53ab127d68de6f5365ca0abf2a8",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-163",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "51ceb86737c838aa0460acb3d9142ef4979f24b1b574c8767c33ef73aa07485c",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-164",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "4fb18754283247377e5d261ba16bb3d341ff359c59185260ce05f12597a08a08",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-165",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "3582a75dd66e3ea5a7c6cf7dbdf1c78254a485b61d55fe1ff668a65bd4e4ff48",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-166",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "8d2be77429b88fcd75e790dd695ec0ad282b464b534c23ade2a136c0e86862a5",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-167",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "4c83910601bf1a51ea444674b5580fa642f94908c0c036035e2467cc0dd09b5e",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-168",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "5605db82c04845aab53c562dc0436872402dbe9ae24419637cd04895e5730e61",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-169",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "fa894e2f8879dc894d1d7162fbd3bc7ce7718d71b02421622df38517c40c85e8",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 1
+    },
+    {
+      "jobId": "job-170",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "de9b88156ca00f638a860af379163c18bf5e4b7771335e6d0aae517cd427e4c9",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 2
+    },
+    {
+      "jobId": "job-171",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "125ee18fe3f1b99400683705511047c0514473b5037a06087d78eb1826a3a4ad",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-172",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "a844e8131ce15bf38eb1b5e8e1237a6046762624607b3fca6bcf17caafdda551",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-173",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "85588099eb5598fc9e66ae6feb7243bc070faefb73d7117293cb1f7011fade9b",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-174",
+      "status": "timeout",
+      "spawnReturned": true,
+      "latestRecordSha256": "280227859d0aebfe35dd44d4fd60e36188bdbd1f4c3ae01d10937c8fe04ffd9e",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 4
+    },
+    {
+      "jobId": "job-175",
+      "status": "missing",
+      "spawnReturned": true,
+      "latestRecordSha256": "f63a987a6452cb9b019f76c3dfae21c5995b704a0ecc47e5fa816ef8016bdaf5",
+      "traceImported": false,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": true,
+      "auditStatus": "failed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": false,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": false,
+      "criticalBusinessOmission": true,
+      "missingRequiredConditionTagCount": 3
+    },
+    {
+      "jobId": "job-176",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "1bc05fc03f229307824ebe7185aa508f72e85865255c957c312b906b78025ecc",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-177",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "386ae1a6c4bd2f0704dc1e18e5e0ac36576f8e3bc0fa796fab05fe2b4fdf7d66",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-178",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "29f8ce99e2dd913ddc605e36c0cb4ddd41c0fddf5276550ec0df185c7c006296",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-179",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "3f8920be3d18b1786d4ff3f174176ab744213d1c790cd1e4c01c6e9bf7b20de2",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    },
+    {
+      "jobId": "job-180",
+      "status": "complete",
+      "spawnReturned": true,
+      "latestRecordSha256": "e5179841c6a715ae1a44af2006be4e62d4f8339c31184771746896a233c0919f",
+      "traceImported": true,
+      "independentlyReviewed": true,
+      "contentSupplementRecorded": true,
+      "detachedPrebeginFailureRetained": false,
+      "auditStatus": "passed",
+      "observedModels": [
+        "gpt-6-luna"
+      ],
+      "observedReasoning": [
+        "max"
+      ],
+      "publicPromptReceiptVerified": true,
+      "sentInputIndependentlyByteVerified": false,
+      "narrativeAnswerCorrect": true,
+      "criticalBusinessOmission": false,
+      "missingRequiredConditionTagCount": 0
+    }
+  ],
+  "promotionEstablished": false,
+  "goalComplete": true,
+  "ledgerSha256AtCapture": "c00938555b84ab1301e1dd58b6ccdaf86f6b7277ddae9a8ebf23272cf5a9d3a0",
+  "limitations": [
+    "All frozen positions remain in the denominator.",
+    "Actual public-file read receipts do not prove encrypted initial-message bytes.",
+    "Supplementary content omissions are distinguished from the unchanged frozen evaluator omission metric.",
+    "Ended pre-begin failures retain detached actual traces and failed external reviews; absent broker identities are never invented or officially imported.",
+    "Historical E and F records and their separate progress documents remain unchanged."
+  ],
+  "finalComparisonComplete": true,
+  "allPositionsAccounted": true,
+  "promotionDecision": "not_promoted",
+  "finalReports": {
+    "report": "D:\\xiaohe\\wrenAI\\semarail-trace-v2\\.benchmark-data\\business-trust-v1\\runs\\formal-20261020-business-trust-v1-g\\reports\\report-af6dfa6525bf45e2b477a7e1ff0657c4.json",
+    "safeSummary": "D:\\xiaohe\\wrenAI\\semarail-trace-v2\\.benchmark-data\\business-trust-v1\\runs\\formal-20261020-business-trust-v1-g\\reports\\console-feedback-1afc1cb794c44ebd869c7833aa631134.json",
+    "reportSha256": "0dc9b38311ce97a3a41f3a8c9ce67b8648e1e31bea5c62e1fbd09e1f3b8e9175",
+    "safeSummarySha256": "e84c61395cd92e7ff87981a68c78a42db2509c472bcec17ec86d826a0843d5c0",
+    "expected": 180,
+    "recommendation": {
+      "promote": false,
+      "reason": "incomplete evidence or one or more predeclared gates failed"
+    }
+  },
+  "finalRequirementAudit": {
+    "record": "docs/business-trust-v1-final-requirement-audit.json",
+    "sha256": "def6e7d9a9ec9b9820226ae6128509fdc1634a46d7b8a25d86b12a9d0b7be8e5"
+  }
+}

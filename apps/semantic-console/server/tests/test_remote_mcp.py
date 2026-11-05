@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from typing import Any
@@ -209,6 +210,8 @@ class RemoteMcpTests(unittest.TestCase):
                                     "semarail_plan_query",
                                     "semarail_prepare_query",
                                     "semarail_governed_query",
+                                    "semarail_cancel_query",
+                                    "semarail_get_query_evidence",
                                     "semarail_submit_feedback",
                                 ],
                             )
@@ -305,6 +308,63 @@ class RemoteMcpTests(unittest.TestCase):
             "previewRows",
         ):
             self.assertNotIn(sensitive, serialized_audit)
+
+    def test_stateless_cancellation_targets_active_runtime_and_original_subject(self) -> None:
+        entered, stopped = threading.Event(), threading.Event()
+        dispatcher = self.dispatcher
+        original = dispatcher.dispatch
+        def blocking(request):
+            if request["method"] == "query.run":
+                entered.set()
+                if not stopped.wait(5):
+                    raise AssertionError("active query was not cancelled")
+            elif request["method"] == "query.cancel":
+                dispatcher.requests.append(request)
+                stopped.set()
+                return {"protocolVersion": "1", "id": request["id"], "ok": True, "result": {"queryId": request["params"]["queryId"], "cancelled": True}}
+            return original(request)
+        dispatcher.dispatch = blocking
+        other = self.gateway.access_control.create_service_account("Other cancellation identity")
+        self.gateway.access_control.bind_policy(other.id, self.policy["id"])
+        other_key = self.gateway.access_control.issue_api_key(other.id, label="cancel-test")["apiKey"]
+
+        async def exercise():
+            from contextlib import asynccontextmanager
+            server = create_remote_mcp_server(project=self.gateway.project.project_dir, gateway=self.gateway, allowed_hosts=["testserver"])
+            app = server.streamable_http_app()
+            @asynccontextmanager
+            async def connection(key):
+                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver", headers={"Authorization": "Bearer " + key}) as client:
+                    async with streamable_http_client("http://testserver/mcp", http_client=client, terminate_on_close=False) as (read, write, _):
+                        async with ClientSession(read, write) as session:
+                            await session.initialize()
+                            yield session
+            async with app.router.lifespan_context(app):
+                async with connection(self.api_key) as query_session, connection(self.api_key) as cancel_session, connection(other_key) as other_session:
+                    task = asyncio.create_task(query_session.call_tool("semarail_governed_query", {"question": "Revenue?", "semantic_sql": "SELECT amount FROM sales", "query_id": "eval-query-test"}))
+                    self.assertTrue(await asyncio.to_thread(entered.wait, 3))
+                    try:
+                        denied = await other_session.call_tool("semarail_cancel_query", {"query_id": "eval-query-test"})
+                        self.assertTrue(denied.isError)
+                        self.assertFalse(stopped.is_set())
+                        duplicate = await cancel_session.call_tool("semarail_governed_query", {"question": "Revenue?", "semantic_sql": "SELECT amount FROM sales", "query_id": "eval-query-test"})
+                        self.assertTrue(duplicate.isError)
+                        cancelled = await cancel_session.call_tool("semarail_cancel_query", {"query_id": "eval-query-test"})
+                        self.assertFalse(cancelled.isError)
+                        self.assertTrue(cancelled.structuredContent["cancelled"])
+                        self.assertFalse((await asyncio.wait_for(task, 3)).isError)
+                        stale = await cancel_session.call_tool("semarail_cancel_query", {"query_id": "eval-query-test"})
+                        self.assertTrue(stale.isError)
+                        invalid = await cancel_session.call_tool("semarail_governed_query", {"question": "Revenue?", "semantic_sql": "SELECT amount FROM sales", "query_id": "bad id"})
+                        self.assertTrue(invalid.isError)
+                    finally:
+                        stopped.set()
+                        if not task.done():
+                            await task
+        asyncio.run(exercise())
+        cancel_calls = [r for r in dispatcher.requests if r["method"] == "query.cancel"]
+        self.assertEqual(len(cancel_calls), 1)
+        self.assertEqual(cancel_calls[0]["params"]["queryId"], "eval-query-test")
 
 
 if __name__ == "__main__":

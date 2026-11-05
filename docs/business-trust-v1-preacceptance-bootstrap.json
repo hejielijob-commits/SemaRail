@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "runId": "preaccept-20261018-bootstrap-v2",
+  "recordedAt": "2026-10-17T16:55:44.324594+00:00",
+  "status": "passed",
+  "executionMode": "preacceptance_only",
+  "workerDispatchAllowed": false,
+  "manifestSha256": "f7f31115492663f5718c44dafc8ac7fdcbc5fbaa56b1c50bfd9389fe177a4bb6",
+  "candidateSourceManifestSha256": "86496f8580d7fe4fa69cfc8b11b7b8aeaaee9db75db7e39a478310de30271ff4",
+  "candidateDistribution": {
+    "name": "@hejielijob/semarail-core",
+    "version": "0.1.0-alpha.7",
+    "artifact": {
+      "path": "dist/hejielijob-semarail-core-0.1.0-alpha.7.tgz",
+      "sha256": "dddc5048cb6cb63f5f15cbe602f6cd8ab0af828611597f5c771cf93d908bfc48"
+    }
+  },
+  "corpusSha256": "89b1b8c97d326e914db21ab259558907731c927a2df7be3574b0537b030b4f9d",
+  "gates": {
+    "historicalExecutions": {
+      "passed": 120,
+      "total": 120
+    },
+    "contextDelivery": {
+      "passed": true,
+      "questions": 60
+    },
+    "executionChecks": {
+      "passed": true,
+      "totalChecks": 17
+    },
+    "canonicalOracle": {
+      "passed": true,
+      "total": 30,
+      "physicalPostgresChecked": 20,
+      "permissionBoundaryExecutions": 18,
+      "permissionPlanExecutions": 18,
+      "failures": []
+    }
+  },
+  "reportHashes": {
+    "regression.json": "beef36a6930e835c3fbc33ae336a3735a5acf4a1200701c733e052122ebbf243",
+    "context-delivery-validation.json": "2f44d46892ea85324abe78db93a14c896c6424a230351aea7453db4e5123bbf2",
+    "execution-check-validation.json": "e26ec1e230867bbd3b47937b86a79175bc54aa29f7b7077e776f38da45c5307d",
+    "oracle-validation.json": "70db8106524752a37494c301ec626472ca1a944c0244abb77597e06802ebd9bf"
+  },
+  "ownedHostIdentityVerifiedAndStopped": true,
+  "benchmarkPortsClosed": true,
+  "limitations": [
+    "Preacceptance only; no Agent quality comparison",
+    "All180 genuine scheduled positions and independent reviews remain required",
+    "Earlier interrupted bootstrap-v1 preacceptance preserved without edits"
+  ]
+}

@@ -12,6 +12,10 @@ SemaRail turns database schemas, business definitions, relationships, rules, and
 For the optional Codex desktop integration, metadata policy, Trace API, and
 replay verification, see [Codex desktop Trace v1](docs/trace-v1.md).
 
+For test-project Agent suites, deterministic scores, manual review and historical
+baselines, see [Evaluation center v1](docs/evaluation-center.md), including its
+current acceptance ledger and independent Codex runner setup.
+
 SemaRail is agent-neutral. Any MCP-capable client can use its semantic tools through the authenticated HTTP endpoint or stdio bridge.
 
 > **Status:** Alpha. APIs, configuration, and storage formats may change before the first stable release. The Core tarball can be built from source; npm and PyPI packages are not published yet.
@@ -32,6 +36,7 @@ SemaRail is agent-neutral. Any MCP-capable client can use its semantic tools thr
 - **Full execution Traces** — replay an opted-in Codex desktop turn as Session → turn → Agent/subagent → tool → Core, with parallel activity, observed durations, errors, and direct issue navigation. Trace events retain only safe metadata for 30 days.
 - **Explicit feedback and regression review** — submit caller-owned feedback from MCP or a Console link, classify it in the Console, and export only reviewed reproducible regression cases.
 - **Business-condition clarification** — publish structured metric, time-range, grain, and business-definition confirmation rules; required conditions block execution until `semarail_prepare_query` returns ready.
+- **Business query evidence (opt-in)** — validate declared published business constraints, read independent Core-owned evidence through MCP, and associate feedback with published repairs, SQL regression and reviewed external Agent evidence. See [business trust v1](docs/business-trust-v1.md) for its finite proof scope and promotion gates.
 
 ### Datasource management
 
@@ -178,12 +183,15 @@ Until the package is published, build the local Core tarball from the repository
 ```powershell
 pnpm install
 pnpm package:core
-npm install --global .\dist\hejielijob-semarail-core-0.1.0-alpha.4.tgz
+npm install --global .\dist\hejielijob-semarail-core-0.1.0-alpha.9.tgz
 $env:SEMARAIL_API_TOKEN = semarail token create
 semarail start --project C:\path\to\semantic-project
 ```
 
 The Core process owns the semantic project, database credentials, execution limits, Semantic Console, and MCP servers. Open [http://127.0.0.1:48763](http://127.0.0.1:48763) after it starts. Keep `SEMARAIL_API_TOKEN` private: it is the local bootstrap-administrator credential used to create narrower, revocable service-account keys.
+
+For the accepted alpha.9 artifact, its checksum, upgrade precautions and current
+validation limits, see [business trust alpha.9 candidate](docs/business-trust-v1-alpha9-candidate.md).
 
 ### Run from source
 

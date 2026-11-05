@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "runId": "preaccept-20261016-alpha7-v1",
+  "recordedAt": "2026-10-15T16:18:40.799486+00:00",
+  "status": "passed",
+  "executionMode": "preacceptance_only",
+  "workerDispatchAllowed": false,
+  "manifestSha256": "f23e24070c973922dcd0db79f98c57c0a3d299b1f54041f044f4ca421f9fd4b9",
+  "candidateSourceManifestSha256": "2b14a2f867ffebd659be28fa45d4c7f4c9545c269ff6a46d175ce8ed21dcd8e5",
+  "candidateDistribution": {
+    "name": "@hejielijob/semarail-core",
+    "version": "0.1.0-alpha.7",
+    "artifact": {
+      "path": "dist/hejielijob-semarail-core-0.1.0-alpha.7.tgz",
+      "sha256": "dddc5048cb6cb63f5f15cbe602f6cd8ab0af828611597f5c771cf93d908bfc48"
+    }
+  },
+  "corpusSha256": "89b1b8c97d326e914db21ab259558907731c927a2df7be3574b0537b030b4f9d",
+  "gates": {
+    "historicalExecutions": {
+      "passed": 120,
+      "total": 120
+    },
+    "contextDelivery": {
+      "passed": true,
+      "questions": 60
+    },
+    "executionChecks": {
+      "passed": true,
+      "totalChecks": 17
+    },
+    "canonicalOracle": {
+      "passed": true,
+      "total": 30,
+      "physicalPostgresChecked": 20,
+      "permissionBoundaryExecutions": 18,
+      "permissionPlanExecutions": 18,
+      "failures": []
+    }
+  },
+  "reportHashes": {
+    "regression.json": "2d5685331c2c56885c7fb2c80860220d1fe6a81f1cac3c0e811ab5851363d8c6",
+    "context-delivery-validation.json": "315ca17614190821ae5129bd20520eacdb78609855f87a49c557f58e703b0819",
+    "execution-check-validation.json": "e26ec1e230867bbd3b47937b86a79175bc54aa29f7b7077e776f38da45c5307d",
+    "oracle-validation.json": "70db8106524752a37494c301ec626472ca1a944c0244abb77597e06802ebd9bf"
+  },
+  "limitations": [
+    "Preacceptance only; no genuine Agent outcome or comparative quality claim",
+    "Formal 180-position campaign and independent reviews remain required",
+    "Historical C report and all180 placeholders preserved unchanged"
+  ]
+}

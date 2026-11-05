@@ -100,7 +100,7 @@ class RuntimeRpcTests(unittest.TestCase):
         runtime_account = self.gateway.access_control.create_service_account(
             "Runtime test Agent", attributes={"regionCodes": ["CN-JIA"]}
         )
-        runtime_policy = self.gateway.access_control.create_policy(
+        self.runtime_policy = self.gateway.access_control.create_policy(
             "Runtime test access",
             {
                 "schemaVersion": 1,
@@ -116,9 +116,41 @@ class RuntimeRpcTests(unittest.TestCase):
                 },
             },
         )
-        self.gateway.access_control.bind_policy(runtime_account.id, runtime_policy["id"])
+        self.gateway.access_control.bind_policy(runtime_account.id, self.runtime_policy["id"])
         runtime_key = self.gateway.access_control.issue_api_key(runtime_account.id)
         self.authorization = f"Bearer {runtime_key['apiKey']}"
+
+    def _prepare_business_orders_query(self) -> tuple[str, str]:
+        project = self.project.project_dir
+        model_dir = project / "models" / "orders"
+        model_dir.mkdir(parents=True)
+        (model_dir / "metadata.yml").write_text(
+            "name: orders\ntable_reference:\n  schema: public\n  table: orders\ncolumns:\n"
+            "  - {name: order_id, type: VARCHAR}\n",
+            encoding="utf-8",
+        )
+        service = SemanticConsoleService(self.project)
+        service.create_rule({
+            "title": "Distinct order count",
+            "content": "Count distinct orders.",
+            "executionChecks": {"schemaVersion": 1, "checks": [
+                {"id": "orders-count", "kind": "metric", "model": "orders", "column": "order_id", "aggregation": "count", "distinct": True},
+            ]},
+        })
+        self.project.publish()
+        semantic_sql = "SELECT COUNT(DISTINCT order_id) AS order_count FROM orders"
+        status, prepared = self.gateway.dispatch(
+            {
+                "protocolVersion": "2",
+                "id": "prepare-business-orders",
+                "method": "query.prepare",
+                "params": {"question": "How many orders?", "semanticSql": semantic_sql},
+            },
+            authorization=self.authorization,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(prepared["result"]["status"], "ready")
+        return semantic_sql, prepared["result"]["preparationId"]
 
     def test_health_exposes_stable_core_handshake(self) -> None:
         status, response = self.gateway.dispatch(
@@ -546,6 +578,111 @@ class RuntimeRpcTests(unittest.TestCase):
         self.assertEqual(run_status, 200)
         self.assertTrue(run["ok"])
         self.assertNotIn("preparationId", self.dispatcher.requests[-1]["params"])
+
+    def test_final_execution_fence_rejects_same_id_profile_change_after_prepare(self) -> None:
+        semantic_sql, preparation_id = self._prepare_business_orders_query()
+        before = len(self.dispatcher.requests)
+        service = SemanticConsoleService(self.project)
+        original_require_ready = self.gateway.preparations.require_ready
+
+        def prepare_then_change_profile(**kwargs):
+            template = original_require_ready(**kwargs)
+            service.update_datasource(
+                self.datasource_id,
+                {"connection": {"password": "rotated-secret"}},
+            )
+            return template
+
+        with patch.object(self.gateway.preparations, "require_ready", side_effect=prepare_then_change_profile):
+            status, response = self.gateway.dispatch(
+                {
+                    "protocolVersion": "2",
+                    "id": "run-after-profile-change",
+                    "method": "query.run",
+                    "params": {
+                        "question": "How many orders?",
+                        "semanticSql": semantic_sql,
+                        "queryId": "q-profile-binding",
+                        "preparationId": preparation_id,
+                    },
+                },
+                authorization=self.authorization,
+            )
+
+        self.assertEqual(status, 409)
+        self.assertEqual(response["error"]["code"], "BUSINESS_EVIDENCE_STALE")
+        self.assertEqual(self.project.active_datasource_identifier(), self.datasource_id)
+        self.assertEqual(len(self.dispatcher.requests), before)
+
+    def test_final_execution_fence_rejects_updated_row_policy_snapshot(self) -> None:
+        semantic_sql, preparation_id = self._prepare_business_orders_query()
+        before = len(self.dispatcher.requests)
+        original_require_ready = self.gateway.preparations.require_ready
+
+        def prepare_then_restrict_rows(**kwargs):
+            template = original_require_ready(**kwargs)
+            updated_document = json.loads(json.dumps(self.runtime_policy["document"]))
+            updated_document["tables"]["public.orders"]["rows"] = [{
+                "field": "region_code",
+                "operator": "in",
+                "valueFrom": "subject.attributes.regionCodes",
+            }]
+            self.gateway.access_control.update_policy(self.runtime_policy["id"], updated_document)
+            return template
+
+        with patch.object(self.gateway.preparations, "require_ready", side_effect=prepare_then_restrict_rows):
+            status, response = self.gateway.dispatch(
+                {
+                    "protocolVersion": "2",
+                    "id": "run-after-row-policy-change",
+                    "method": "query.run",
+                    "params": {
+                        "question": "How many orders?",
+                        "semanticSql": semantic_sql,
+                        "queryId": "q-row-policy-binding",
+                        "preparationId": preparation_id,
+                    },
+                },
+                authorization=self.authorization,
+            )
+
+        self.assertEqual(status, 409)
+        self.assertEqual(response["error"]["code"], "BUSINESS_EVIDENCE_STALE")
+        # Current table/column permission still allows the evidence reference;
+        # the changed row policy itself is what blocks dispatch.
+        self.assertEqual(len(self.dispatcher.requests), before)
+
+    def test_final_execution_fence_rechecks_current_method_grant(self) -> None:
+        semantic_sql, preparation_id = self._prepare_business_orders_query()
+        before = len(self.dispatcher.requests)
+        original_require_ready = self.gateway.preparations.require_ready
+
+        def prepare_then_revoke_query_scope(**kwargs):
+            template = original_require_ready(**kwargs)
+            updated_document = json.loads(json.dumps(self.runtime_policy["document"]))
+            updated_document["tools"].remove("query:execute")
+            self.gateway.access_control.update_policy(self.runtime_policy["id"], updated_document)
+            return template
+
+        with patch.object(self.gateway.preparations, "require_ready", side_effect=prepare_then_revoke_query_scope):
+            status, response = self.gateway.dispatch(
+                {
+                    "protocolVersion": "2",
+                    "id": "run-after-method-policy-change",
+                    "method": "query.run",
+                    "params": {
+                        "question": "How many orders?",
+                        "semanticSql": semantic_sql,
+                        "queryId": "q-method-policy-binding",
+                        "preparationId": preparation_id,
+                    },
+                },
+                authorization=self.authorization,
+            )
+
+        self.assertEqual(status, 403)
+        self.assertEqual(response["error"]["code"], "POLICY_DENIED")
+        self.assertEqual(len(self.dispatcher.requests), before)
 
     def test_diagnostic_write_failure_never_replaces_query_result(self) -> None:
         class UnavailableDiagnostics:

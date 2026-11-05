@@ -21,7 +21,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { Button, Field, InlineNotice, Modal, Pagination, TextArea, TextInput, usePagination } from "./ui";
-import type { QueryConfirmationRule } from "../types";
+import type { ExecutionCheckV1, ExecutionChecksV1, QueryConfirmationRule } from "../types";
 import "./knowledge-workbench.css";
 
 /** The two locales supported by the semantic-console workbenches. */
@@ -37,6 +37,7 @@ export interface KnowledgeRule {
   scope?: string[];
   tags?: string[];
   confirmationRule?: QueryConfirmationRule;
+  executionChecks?: ExecutionChecksV1;
   updatedAt?: string;
   draft?: boolean;
   sourceContent?: string;
@@ -141,6 +142,8 @@ const ruleCopy = {
     delete: "Delete", deleteTitle: "Delete this rule?", deleteDescription: "The rule file will be removed from the project draft. Publish the project to make the deletion effective downstream.",
     deleteAction: "Delete rule", deleting: "Deleting", deleteConfirm: "This removes {{name}} and its source file from the current draft.",
     removeToken: "Remove", operationFailed: "The operation could not be completed.",
+    executionTitle: "Execution checks", executionBody: "Declare checks that Core verifies against the actual query before it runs. Saved checks are versioned with this semantic rule.",
+    executionAdd: "Add execution check", executionRemove: "Remove check", executionKeepOne: "Keep at least one check, or leave execution checks unset.", executionLimit: "A rule can have at most 128 checks.", executionKind: "Check type", executionId: "Check ID", executionModel: "Model", executionColumn: "Column", executionMandatory: "Required check", executionAggregation: "Aggregation", executionCount: "Count", executionAverage: "Average", executionDistinct: "Count distinct values", executionUnit: "Unit", executionGrain: "Grain", executionConditionKey: "Condition key", executionValueType: "Date value type", executionDate: "Date", executionDateRange: "Date range", executionConfirmation: "Confirmation source", executionConfirmed: "Confirmed by user", executionConfirmedOrDefault: "Confirmed or published default", executionDefault: "Default date (YYYY-MM-DD)", executionRangeDefault: "Default date range (start,end)", executionPredicate: "Expected value (JSON scalar)", executionGrouping: "Groups by the original time field", executionInvalid: "Complete each check with valid model and column names and values before saving.",
   },
   "zh-CN": {
     eyebrow: "语义层",
@@ -207,6 +210,8 @@ const ruleCopy = {
     delete: "删除", deleteTitle: "删除这条规则？", deleteDescription: "规则文件将从项目草稿中移除；发布项目后，删除才会影响下游查询。",
     deleteAction: "删除规则", deleting: "删除中", deleteConfirm: "这会从当前草稿中移除 {{name}} 及其源文件。",
     removeToken: "移除", operationFailed: "操作未能完成。",
+    executionTitle: "执行校验", executionBody: "声明由 Core 在查询执行前根据实际查询进行校验的条件。保存后会与此语义规则一同版本化。",
+    executionAdd: "添加执行校验", executionRemove: "移除校验", executionKeepOne: "至少保留一条校验，也可以保持未设置。", executionLimit: "每条规则最多设置 128 条校验。", executionKind: "校验类型", executionId: "校验 ID", executionModel: "模型", executionColumn: "字段", executionMandatory: "必需校验", executionAggregation: "聚合方式", executionCount: "计数", executionAverage: "平均值", executionDistinct: "统计不同值", executionUnit: "单位", executionGrain: "粒度", executionConditionKey: "条件键", executionValueType: "日期值类型", executionDate: "日期", executionDateRange: "日期范围", executionConfirmation: "确认来源", executionConfirmed: "用户已确认", executionConfirmedOrDefault: "用户已确认或采用已发布默认值", executionDefault: "默认日期（YYYY-MM-DD）", executionRangeDefault: "默认日期范围（开始日期,结束日期）", executionPredicate: "预期值（JSON 标量）", executionGrouping: "按原始时间字段分组", executionInvalid: "保存前请填写有效的模型、字段和值。",
   },
 } as const;
 
@@ -223,12 +228,56 @@ function copyRule(rule: KnowledgeRule): KnowledgeRule {
     scope: rule.scope ? [...rule.scope] : [],
     tags: rule.tags ? [...rule.tags] : [],
     confirmationRule: rule.confirmationRule ? { ...rule.confirmationRule, models: [...rule.confirmationRule.models], allowedValues: rule.confirmationRule.allowedValues ? [...rule.confirmationRule.allowedValues] : undefined } : undefined,
+    executionChecks: rule.executionChecks ? { schemaVersion: 1, checks: rule.executionChecks.checks.map((check) => ({ ...check, ...("defaultValue" in check && typeof check.defaultValue === "object" && check.defaultValue !== null ? { defaultValue: { ...check.defaultValue } } : {}) })) as ExecutionCheckV1[] } : undefined,
   };
 }
 
 function sameRule(a: KnowledgeRule | undefined, b: KnowledgeRule | undefined) {
   if (!a || !b) return false;
-  return a.name === b.name && a.content === b.content && a.enabled === b.enabled && JSON.stringify(a.scope ?? []) === JSON.stringify(b.scope ?? []) && JSON.stringify(a.tags ?? []) === JSON.stringify(b.tags ?? []) && JSON.stringify(a.confirmationRule) === JSON.stringify(b.confirmationRule);
+  return a.name === b.name && a.content === b.content && a.enabled === b.enabled && JSON.stringify(a.scope ?? []) === JSON.stringify(b.scope ?? []) && JSON.stringify(a.tags ?? []) === JSON.stringify(b.tags ?? []) && JSON.stringify(a.confirmationRule) === JSON.stringify(b.confirmationRule) && JSON.stringify(a.executionChecks) === JSON.stringify(b.executionChecks);
+}
+
+const CHECK_ID = /^[A-Za-z_][A-Za-z0-9_.-]{0,159}$/;
+const CONDITION_KEY = /^[A-Za-z][A-Za-z0-9_.-]{0,127}$/;
+
+function validIsoDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
+}
+
+function executionChecksAreValid(value: ExecutionChecksV1 | undefined) {
+  if (!value) return true;
+  if (value.schemaVersion !== 1 || value.checks.length < 1 || value.checks.length > 128) return false;
+  const ids = new Set<string>();
+  return value.checks.every((check) => {
+    if ((check.id !== undefined && (!CHECK_ID.test(check.id) || ids.has(check.id))) || !CHECK_ID.test(check.model) || !CHECK_ID.test(check.column)) return false;
+    if (check.id) ids.add(check.id);
+    if (check.mandatory !== undefined && typeof check.mandatory !== "boolean") return false;
+    if (check.kind === "metric") return (check.aggregation === "count" || check.aggregation === "avg") && (check.distinct === undefined || typeof check.distinct === "boolean") && [check.unit, check.grain].every((item) => item === undefined || (typeof item === "string" && item.length >= 1 && item.length <= 128));
+    if (check.kind === "predicate") return check.operator === "=" && (typeof check.value === "string" || typeof check.value === "boolean" || (typeof check.value === "number" && Number.isFinite(check.value)));
+    if (check.kind === "timeFilter") {
+      if (!CONDITION_KEY.test(check.conditionKey) || !["date", "dateRange"].includes(check.valueType) || !["confirmed", "confirmedOrDefault"].includes(check.confirmation)) return false;
+      if (check.defaultValue === undefined) return true;
+      if (check.confirmation !== "confirmedOrDefault") return false;
+      return check.valueType === "date"
+        ? typeof check.defaultValue === "string" && validIsoDate(check.defaultValue)
+        : typeof check.defaultValue === "object" && validIsoDate(check.defaultValue.start) && validIsoDate(check.defaultValue.end) && check.defaultValue.start <= check.defaultValue.end;
+    }
+    if (check.kind === "timeGrouping") return check.mode === "original"
+      && (check.whenGrouped === undefined || typeof check.whenGrouped === "boolean")
+      && (check.conditionKey === undefined || (check.whenGrouped === true && typeof check.conditionKey === "string" && CONDITION_KEY.test(check.conditionKey)));
+    return check.kind === "reference";
+  });
+}
+
+function newExecutionCheck(kind: ExecutionCheckV1["kind"], id: string): ExecutionCheckV1 {
+  const base = { id, model: "", column: "", mandatory: true };
+  if (kind === "metric") return { ...base, kind, aggregation: "count", distinct: false };
+  if (kind === "predicate") return { ...base, kind, operator: "=", value: "" };
+  if (kind === "timeFilter") return { ...base, kind, conditionKey: "", valueType: "date", confirmation: "confirmed" };
+  if (kind === "timeGrouping") return { ...base, kind, mode: "original" };
+  return { ...base, kind };
 }
 
 function StatusBadge({ rule, text }: { rule: KnowledgeRule; text: string }) {
@@ -347,6 +396,10 @@ export function RuleWorkbench({
 
   async function save(action: RuleSaveAction) {
     if (!selected || !onSave || readOnly || busyAction) return;
+    if (!executionChecksAreValid(selected.executionChecks)) {
+      setOperationError(c.executionInvalid);
+      return;
+    }
     setBusyAction(action);
     try {
       await onSave(selected, action);
@@ -484,6 +537,7 @@ export function RuleWorkbench({
           <div className="kw-tab-panel" id="kw-rule-tabpanel" role="tabpanel" aria-labelledby={`kw-rule-tab-${tab}`}>
             {tab === "content" ? <div className="kw-rule-content"><div className="kw-content-heading"><div><h3>{c.contentTitle}</h3><p>{c.contentHint}</p></div><StatusBadge rule={selected} text={selected.enabled ? c.enabled : c.disabled} /></div><div className="kw-form-grid"><label className="kw-field kw-field-wide"><span>{c.nameLabel}</span><input className="input" value={selected.name} onChange={(event) => updateSelected({ name: event.target.value })} disabled={readOnly} /></label><label className="kw-field kw-field-wide"><span>{c.contentLabel}</span><textarea className="input kw-rule-textarea" value={selected.content} onChange={(event) => updateSelected({ content: event.target.value })} disabled={readOnly} /></label><CreatableTagSelect label={c.tagsLabel} values={selected.tags ?? []} options={reusableTags} copy={tagSelectCopy} disabled={readOnly} onChange={(tags) => updateSelected({ tags })} /></div><div className="kw-rule-toggle-row"><div><strong>{selected.enabled ? c.ruleEnabled : c.ruleDisabled}</strong><small>{selected.enabled ? c.enabled : c.disabled}</small></div><button type="button" role="switch" aria-checked={selected.enabled} aria-label={selected.enabled ? `${c.onLabel}: ${selected.name}` : `${c.offLabel}: ${selected.name}`} className={`kw-large-toggle ${selected.enabled ? "kw-large-toggle-on" : ""}`} onClick={(event) => void toggleRule(selected, event)} disabled={readOnly || busyAction === "toggle"}><span aria-hidden="true" /></button></div></div> : null}
             {tab === "content" ? <ConfirmationRuleEditor locale={locale} value={selected.confirmationRule} disabled={readOnly} onChange={(confirmationRule) => updateSelected({ confirmationRule })} /> : null}
+            {tab === "content" ? <ExecutionChecksEditor locale={locale} value={selected.executionChecks} disabled={readOnly} onChange={(executionChecks) => updateSelected({ executionChecks })} /> : null}
             {tab === "source" ? <div className="kw-source-view"><div className="kw-source-heading"><div><h3>{c.sourceTab}</h3><p>{c.sourceHint}</p></div><code title={selected.sourcePath}>{selected.sourcePath}</code></div>{sourceContent ? <pre className="kw-code"><code>{sourceContent}</code></pre> : <RuleEmptyState title={c.sourceUnavailable} body={c.sourceLabel} icon={<Code size={22} weight="duotone" />} />}</div> : null}
             {tab === "diff" ? <div className="kw-source-view"><div className="kw-source-heading"><div><h3>{c.diffTab}</h3><p>{c.diffHint}</p></div><code title={selected.sourcePath}>{selected.sourcePath}</code></div>{diffContent ? <pre className="kw-code kw-diff-code"><code>{diffContent}</code></pre> : <RuleEmptyState title={c.noDiff} body={c.noDiffBody} icon={<Check size={22} weight="bold" />} />}</div> : null}
           </div>
@@ -526,6 +580,80 @@ function ConfirmationRuleEditor({ locale, value, disabled, onChange }: { locale:
     <Field label={c.defaultValue}><TextInput aria-label={c.defaultValue} disabled={disabled} value={confirmationDefaultText(value.defaultValue)} onChange={(event) => patch({ defaultValue: confirmationDefaultValue(event.target.value, value.valueType) })} /></Field>
     <Field label={c.prompt}><TextArea aria-label={c.prompt} disabled={disabled} value={value.prompt} onChange={(event) => patch({ prompt: event.target.value })} /></Field>
   </div><div className="kw-confirmation-checks"><label><input type="checkbox" disabled={disabled} checked={value.required} onChange={(event) => patch({ required: event.target.checked })} />{c.required}</label><label><input type="checkbox" disabled={disabled} checked={value.requireConfirmation} onChange={(event) => patch({ requireConfirmation: event.target.checked })} />{c.confirm}</label></div></section>;
+}
+
+function ExecutionChecksEditor({ locale, value, disabled, onChange }: { locale: KnowledgeWorkbenchLocale; value?: ExecutionChecksV1; disabled: boolean; onChange: (value: ExecutionChecksV1 | undefined) => void }) {
+  const c = locale === "zh-CN" ? {
+    title: "执行校验", body: "声明由 Core 在查询执行前根据实际查询进行校验的条件。保存后会与此语义规则一同版本化。", add: "添加执行校验", remove: "移除校验", keepOne: "至少保留一条校验，也可以保持未设置。", limit: "每条规则最多设置 128 条校验。", kind: "校验类型", id: "校验 ID", model: "模型", column: "字段", mandatory: "必需校验", aggregation: "聚合方式", count: "计数", average: "平均值", distinct: "统计不同值", unit: "单位", grain: "粒度", conditionKey: "条件键", requireOriginalWhenGrouped: "趋势场景要求按原始时间字段分组", valueType: "日期值类型", date: "日期", dateRange: "日期范围", confirmation: "确认来源", confirmed: "用户已确认", confirmedOrDefault: "用户已确认或采用已发布默认值", defaultDate: "默认日期（YYYY-MM-DD）", rangeStart: "开始日期", rangeEnd: "结束日期", predicate: "预期值（JSON 标量）", grouping: "按原始时间字段分组", invalid: "保存前请填写有效的模型、字段和值。", unset: "未设置执行校验。",
+  } : {
+    title: "Execution checks", body: "Declare checks that Core verifies against the actual query before it runs. Saved checks are versioned with this semantic rule.", add: "Add execution check", remove: "Remove check", keepOne: "Keep at least one check, or leave execution checks unset.", limit: "A rule can have at most 128 checks.", kind: "Check type", id: "Check ID", model: "Model", column: "Column", mandatory: "Required check", aggregation: "Aggregation", count: "Count", average: "Average", distinct: "Count distinct values", unit: "Unit", grain: "Grain", conditionKey: "Condition key", requireOriginalWhenGrouped: "Require original grouping when trend is requested", valueType: "Date value type", date: "Date", dateRange: "Date range", confirmation: "Confirmation source", confirmed: "Confirmed by user", confirmedOrDefault: "Confirmed or published default", defaultDate: "Default date (YYYY-MM-DD)", rangeStart: "Start date", rangeEnd: "End date", predicate: "Expected value (JSON scalar)", grouping: "Groups by the original time field", invalid: "Complete each check with valid model and column names and values before saving.", unset: "No execution checks are set.",
+  };
+  const checks = value?.checks ?? [];
+
+  function replace(index: number, patch: Record<string, unknown>) {
+    const next = checks.map((check, offset) => offset === index ? { ...check, ...patch } as ExecutionCheckV1 : check);
+    onChange({ schemaVersion: 1, checks: next });
+  }
+
+  function addCheck() {
+    let suffix = checks.length + 1;
+    let id = `check-${suffix}`;
+    while (checks.some((check) => check.id === id)) id = `check-${++suffix}`;
+    onChange({ schemaVersion: 1, checks: [...checks, newExecutionCheck("reference", id)] });
+  }
+
+  function changeKind(index: number, kind: ExecutionCheckV1["kind"]) {
+    const previous = checks[index];
+    if (!previous) return;
+    const next = newExecutionCheck(kind, previous.id ?? `check-${index + 1}`);
+    replace(index, { ...next, model: previous.model, column: previous.column, mandatory: previous.mandatory ?? true });
+  }
+
+  function parsePredicate(valueText: string): string | number | boolean {
+    try {
+      const parsed: unknown = JSON.parse(valueText);
+      if (typeof parsed === "string" || typeof parsed === "boolean" || (typeof parsed === "number" && Number.isFinite(parsed))) return parsed;
+    } catch { /* Plain text remains a string value. */ }
+    return valueText;
+  }
+
+  function rangePart(check: Extract<ExecutionCheckV1, { kind: "timeFilter" }>, side: "start" | "end", text: string) {
+    const current = typeof check.defaultValue === "object" && check.defaultValue !== null ? check.defaultValue : { start: "", end: "" };
+    replace(checks.indexOf(check), { defaultValue: { ...current, [side]: text } });
+  }
+
+  return <section className="kw-execution-checks">
+    <header><div><h3>{c.title}</h3><p>{c.body}</p></div><Button size="sm" icon={Plus} disabled={disabled || checks.length >= 128} onClick={addCheck}>{c.add}</Button></header>
+    {!value ? <p className="kw-execution-empty">{c.unset}</p> : null}
+    {checks.map((check, index) => <article className="kw-execution-check" key={check.id ?? `${check.kind}-${index}`}>
+      <div className="kw-execution-grid">
+        <Field label={`${c.id} ${index + 1}`}><TextInput aria-label={`${c.id} ${index + 1}`} disabled={disabled} value={check.id ?? ""} onChange={(event) => replace(index, { id: event.target.value || undefined })} /></Field>
+        <Field label={`${c.kind} ${index + 1}`}><select className="input select" aria-label={`${c.kind} ${index + 1}`} disabled={disabled} value={check.kind} onChange={(event) => changeKind(index, event.target.value as ExecutionCheckV1["kind"])}><option value="reference">reference</option><option value="metric">metric</option><option value="predicate">predicate</option><option value="timeFilter">timeFilter</option><option value="timeGrouping">timeGrouping</option></select></Field>
+        <Field label={`${c.model} ${index + 1}`}><TextInput aria-label={`${c.model} ${index + 1}`} disabled={disabled} value={check.model} onChange={(event) => replace(index, { model: event.target.value })} /></Field>
+        <Field label={`${c.column} ${index + 1}`}><TextInput aria-label={`${c.column} ${index + 1}`} disabled={disabled} value={check.column} onChange={(event) => replace(index, { column: event.target.value })} /></Field>
+        {check.kind === "metric" ? <>
+          <Field label={`${c.aggregation} ${index + 1}`}><select className="input select" aria-label={`${c.aggregation} ${index + 1}`} disabled={disabled} value={check.aggregation} onChange={(event) => replace(index, { aggregation: event.target.value })}><option value="count">{c.count}</option><option value="avg">{c.average}</option></select></Field>
+          <Field label={`${c.unit} ${index + 1}`}><TextInput aria-label={`${c.unit} ${index + 1}`} disabled={disabled} value={check.unit ?? ""} onChange={(event) => replace(index, { unit: event.target.value || undefined })} /></Field>
+          <Field label={`${c.grain} ${index + 1}`}><TextInput aria-label={`${c.grain} ${index + 1}`} disabled={disabled} value={check.grain ?? ""} onChange={(event) => replace(index, { grain: event.target.value || undefined })} /></Field>
+          <label className="kw-execution-choice"><input type="checkbox" aria-label={`${c.distinct} ${index + 1}`} disabled={disabled} checked={check.distinct === true} onChange={(event) => replace(index, { distinct: event.target.checked })} />{c.distinct}</label>
+        </> : null}
+        {check.kind === "predicate" ? <Field label={`${c.predicate} ${index + 1}`}><TextInput aria-label={`${c.predicate} ${index + 1}`} disabled={disabled} value={String(check.value)} onChange={(event) => replace(index, { operator: "=", value: parsePredicate(event.target.value) })} /></Field> : null}
+        {check.kind === "timeFilter" ? <>
+          <Field label={`${c.conditionKey} ${index + 1}`}><TextInput aria-label={`${c.conditionKey} ${index + 1}`} disabled={disabled} value={check.conditionKey} onChange={(event) => replace(index, { conditionKey: event.target.value })} /></Field>
+          <Field label={`${c.valueType} ${index + 1}`}><select className="input select" aria-label={`${c.valueType} ${index + 1}`} disabled={disabled} value={check.valueType} onChange={(event) => replace(index, { valueType: event.target.value, defaultValue: undefined })}><option value="date">{c.date}</option><option value="dateRange">{c.dateRange}</option></select></Field>
+          <Field label={`${c.confirmation} ${index + 1}`}><select className="input select" aria-label={`${c.confirmation} ${index + 1}`} disabled={disabled} value={check.confirmation} onChange={(event) => replace(index, { confirmation: event.target.value, defaultValue: undefined })}><option value="confirmed">{c.confirmed}</option><option value="confirmedOrDefault">{c.confirmedOrDefault}</option></select></Field>
+          {check.confirmation === "confirmedOrDefault" ? check.valueType === "date" ? <Field label={`${c.defaultDate} ${index + 1}`}><TextInput aria-label={`${c.defaultDate} ${index + 1}`} disabled={disabled} value={typeof check.defaultValue === "string" ? check.defaultValue : ""} onChange={(event) => replace(index, { defaultValue: event.target.value || undefined })} /></Field> : <div className="kw-execution-range"><Field label={`${c.rangeStart} ${index + 1}`}><TextInput aria-label={`${c.rangeStart} ${index + 1}`} disabled={disabled} value={typeof check.defaultValue === "object" && check.defaultValue !== null ? check.defaultValue.start : ""} onChange={(event) => rangePart(check, "start", event.target.value)} /></Field><Field label={`${c.rangeEnd} ${index + 1}`}><TextInput aria-label={`${c.rangeEnd} ${index + 1}`} disabled={disabled} value={typeof check.defaultValue === "object" && check.defaultValue !== null ? check.defaultValue.end : ""} onChange={(event) => rangePart(check, "end", event.target.value)} /></Field></div> : null}
+        </> : null}
+        {check.kind === "timeGrouping" ? <>
+          <p className="kw-execution-grouping">{c.grouping}</p>
+          <label className="kw-execution-choice"><input type="checkbox" aria-label={`${c.requireOriginalWhenGrouped} ${index + 1}`} disabled={disabled} checked={check.whenGrouped === true} onChange={(event) => replace(index, { whenGrouped: event.target.checked, ...(event.target.checked ? {} : { conditionKey: undefined }) })} />{c.requireOriginalWhenGrouped}</label>
+          {check.whenGrouped === true ? <Field label={`${c.conditionKey} ${index + 1}`}><TextInput aria-label={`${c.conditionKey} ${index + 1}`} disabled={disabled} value={check.conditionKey ?? ""} onChange={(event) => replace(index, { conditionKey: event.target.value || undefined })} /></Field> : null}
+        </> : null}
+      </div>
+      <div className="kw-execution-footer"><label><input type="checkbox" disabled={disabled} checked={check.mandatory !== false} onChange={(event) => replace(index, { mandatory: event.target.checked })} />{c.mandatory}</label><Button size="sm" variant="ghost" disabled={disabled || checks.length <= 1} onClick={() => onChange({ schemaVersion: 1, checks: checks.filter((_, offset) => offset !== index) })}>{c.remove}</Button></div>
+    </article>)}
+    {checks.length === 1 ? <p className="kw-execution-hint">{c.keepOne}</p> : checks.length >= 128 ? <p className="kw-execution-hint">{c.limit}</p> : null}
+  </section>;
 }
 
 interface TagSelectCopy {

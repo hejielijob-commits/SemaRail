@@ -27,9 +27,11 @@ try:  # Package import when started with ``python -m server``.
     from .identity_api import IdentityApi
     from .diagnostics_api import DiagnosticsApi
     from .regression_api import RegressionApi
+    from .evaluation_api import EvaluationApi
     from .service import SemanticConsoleService
     from .project import ProjectStore
     from .runtime_rpc import RuntimeRpcGateway
+    from .business_trust_api import BusinessTrustApi
 except ImportError:  # Direct ``python app.py`` / test loading by file path.
     from access_control import AccessControlError, AuthContext, BOOTSTRAP_SUBJECT_ID  # type: ignore[no-redef]
     from access_api import AccessControlAdminApi  # type: ignore[no-redef]
@@ -38,9 +40,11 @@ except ImportError:  # Direct ``python app.py`` / test loading by file path.
     from identity_api import IdentityApi  # type: ignore[no-redef]
     from diagnostics_api import DiagnosticsApi  # type: ignore[no-redef]
     from regression_api import RegressionApi  # type: ignore[no-redef]
+    from evaluation_api import EvaluationApi
     from service import SemanticConsoleService  # type: ignore[no-redef]
     from project import ProjectStore  # type: ignore[no-redef]
     from runtime_rpc import RuntimeRpcGateway  # type: ignore[no-redef]
+    from business_trust_api import BusinessTrustApi
 
 
 MAX_REQUEST_BYTES = 4 * 1024 * 1024
@@ -111,6 +115,9 @@ class SemanticConsoleApplication:
             project_id=project_id,
         )
         self.regression_api = RegressionApi(self.runtime_rpc)
+        self.evaluation_api = EvaluationApi(self.runtime_rpc, self.regression_api)
+        self.regression_api.evaluation_guard = self.evaluation_api.ensure_idle
+        self.business_trust_api = BusinessTrustApi(self.runtime_rpc, self.regression_api.store)
 
     def request(
         self,
@@ -163,9 +170,15 @@ class SemanticConsoleApplication:
         access_response = self.access_api.dispatch(method.upper(), parsed.path, body, authorization, query)
         if access_response is not None:
             return access_response
+        evaluation_response = self.evaluation_api.dispatch(method.upper(), parsed.path, query, body, authorization)
+        if evaluation_response is not None:
+            return evaluation_response
         regression_response = self.regression_api.dispatch(method.upper(), parsed.path, query, body, authorization)
         if regression_response is not None:
             return regression_response
+        business_response = self.business_trust_api.dispatch(method.upper(), parsed.path, body, authorization)
+        if business_response is not None:
+            return business_response
         diagnostics_response = self.diagnostics_api.dispatch(
             method.upper(), parsed.path, query, body, authorization
         )
@@ -195,6 +208,7 @@ class SemanticConsoleApplication:
         configuration_guard = None
         if auth is not None and normalized_method in {"POST", "PUT", "PATCH", "DELETE"}:
             try:
+                self.evaluation_api.ensure_idle(auth, project_id)
                 configuration_guard = self.regression_api.acquire_configuration_guard(auth, project_id)
             except (AccessControlError, DiagnosticError) as exc:
                 return exc.status, {"code": exc.code, "message": exc.safe_message}
@@ -344,6 +358,9 @@ class _Handler(BaseHTTPRequestHandler):
         encoded = json.dumps(response, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         self.send_response(status)
         self._headers()
+        if self.path.startswith("/api/v1/diagnostics/queries/") or "/resolution" in self.path or "/agent-evaluations" in self.path:
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Pragma", "no-cache")
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         try:
@@ -502,6 +519,18 @@ class SemanticConsoleHTTPServer(ThreadingHTTPServer):
         if now < self._next_diagnostic_cleanup_at:
             return
         self._next_diagnostic_cleanup_at = now + _DIAGNOSTIC_CLEANUP_INTERVAL_SECONDS
+        evaluations = getattr(getattr(self.application, "evaluation_api", None), "store", None)
+        if evaluations is not None:
+            try:
+                evaluations.cleanup_expired()
+            except Exception:
+                _LOGGER.error("evaluation evidence retention cleanup failed")
+        evidence = getattr(self.application.runtime_rpc, "business_evidence", None)
+        if evidence is not None:
+            try:
+                evidence.cleanup_expired()
+            except Exception:
+                _LOGGER.error("business evidence retention cleanup failed")
         diagnostics_api = getattr(self.application, "diagnostics_api", None)
         diagnostics = getattr(diagnostics_api, "store", None)
         if diagnostics is None:

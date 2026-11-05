@@ -346,7 +346,7 @@ def main() -> int:
                     "UNION ALL SELECT 'preparation',max(version) FROM query_preparation_schema_migrations"
                 ).fetchall()
             }
-        if ledgers != {"access": 2, "diagnostics": 4, "preparation": 1}:
+        if ledgers != {"access": 2, "diagnostics": 12, "preparation": 5}:
             raise AssertionError("PostgreSQL migration ledgers are incomplete")
 
         print("CONTROL_POSTGRES_E2E_PASS")

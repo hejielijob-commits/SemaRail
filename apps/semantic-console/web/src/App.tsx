@@ -55,6 +55,7 @@ import AccessControl from "./components/AccessControl";
 import DiagnosticsWorkbench from "./components/DiagnosticsWorkbench";
 import TraceWorkbench from "./components/TraceWorkbench";
 import TraceComparisonWorkbench from "./components/TraceComparisonWorkbench";
+import EvaluationWorkbench from "./components/EvaluationWorkbench";
 
 const ViewWorkbench = lazy(() => import("./components/ViewWorkbench"));
 
@@ -62,7 +63,7 @@ type Notice = { tone: "info" | "success" | "warning" | "error"; title: string; b
 
 const navGroups: { labelKey: string; items: { id: ConsoleSection; labelKey: string; icon: typeof House; count?: string }[] }[] = [
   { labelKey: "nav.workspace", items: [{ id: "overview", labelKey: "nav.overview", icon: House }, { id: "datasources", labelKey: "nav.datasources", icon: Database }, { id: "schema", labelKey: "nav.schema", icon: Table }, { id: "mcp", labelKey: "nav.mcp", icon: Plug }, { id: "access", labelKey: "nav.access", icon: ShieldCheck }] },
-  { labelKey: "nav.quality", items: [{ id: "diagnostics", labelKey: "nav.diagnostics", icon: WarningCircle }, { id: "traces", labelKey: "nav.traces", icon: GitBranch }, { id: "traceComparison", labelKey: "nav.traceComparison", icon: GitBranch }, { id: "regressionCases", labelKey: "nav.regressionCases", icon: CheckCircle }] },
+  { labelKey: "nav.quality", items: [{ id: "diagnostics", labelKey: "nav.diagnostics", icon: WarningCircle }, { id: "traces", labelKey: "nav.traces", icon: GitBranch }, { id: "traceComparison", labelKey: "nav.traceComparison", icon: GitBranch }, { id: "evaluations", labelKey: "nav.evaluations", icon: Play }, { id: "regressionCases", labelKey: "nav.regressionCases", icon: CheckCircle }] },
   { labelKey: "nav.semanticLayer", items: [{ id: "models", labelKey: "nav.models", icon: Cube }, { id: "relationships", labelKey: "nav.relationships", icon: ShareNetwork }, { id: "views", labelKey: "nav.views", icon: Eye }, { id: "cubes", labelKey: "nav.cubes", icon: Stack }, { id: "rules", labelKey: "nav.rules", icon: BookOpenText }, { id: "sqlKnowledge", labelKey: "nav.sqlKnowledge", icon: Code }, { id: "mdl", labelKey: "nav.mdl", icon: BracketsCurly }] },
 ];
 
@@ -116,7 +117,7 @@ function semanticRelationships(value: RelationshipGraphRelationship[]): Semantic
 function knowledgeRules(snapshot: KnowledgeRulesResponse | null): KnowledgeRule[] {
   return (snapshot?.rules ?? []).map((rule) => ({
     id: rule.id, name: rule.title, content: rule.content, enabled: rule.enabled,
-    sourcePath: rule.sourcePath, scope: rule.scope, tags: rule.tags, confirmationRule: rule.confirmationRule,
+    sourcePath: rule.sourcePath, scope: rule.scope, tags: rule.tags, confirmationRule: rule.confirmationRule, executionChecks: rule.executionChecks,
     updatedAt: rule.updatedAt, draft: rule.draft, sourceContent: rule.sourceContent, diff: rule.diff,
   }));
 }
@@ -461,7 +462,7 @@ function App() {
   async function saveRule(rule: KnowledgeRule, action: RuleSaveAction) {
     const result = await api.updateRule(rule.id, {
       title: rule.name, content: rule.content, enabled: rule.enabled,
-      scope: rule.scope, tags: rule.tags, confirmationRule: rule.confirmationRule, expectedRevision: rulesSnapshot?.revision,
+      scope: rule.scope, tags: rule.tags, confirmationRule: rule.confirmationRule, executionChecks: rule.executionChecks, expectedRevision: rulesSnapshot?.revision,
     });
     setRulesSnapshot((current) => current ? { ...current, revision: result.revision, rules: result.rules } : current);
     markSaved();
@@ -783,8 +784,9 @@ function App() {
           {section === "sqlKnowledge" ? <SqlKnowledgeWorkbench candidates={knowledgeCandidates(sqlCandidates)} loading={sqlLoading} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onRetry={() => void loadSqlCandidates()} onValidate={validateCandidate} onApprove={approveCandidate} onReject={rejectCandidate} onResubmit={resubmitCandidate} onSaveSql={saveSqlCandidate} /> : null}
           {section === "mcp" ? <McpIntegration integration={mcpIntegration} loading={mcpLoading} error={mcpError} locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} onRetry={() => void loadMcpIntegration()} /> : null}
           {section === "access" ? <AccessControl locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} adminToken={consoleSession?.accessAdmin ? consoleSession.token : ""} activeDatasourceId={project.activeDatasource?.id ?? ""} /> : null}
-          {section === "diagnostics" ? <DiagnosticsWorkbench locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} mode="diagnostics" authToken={consoleSession?.token ?? ""} adminToken={consoleSession?.consoleAdmin ? consoleSession.token : ""} feedbackReference={feedbackReference} initialFeedbackId={issueJumpId} onCreateRegressionCase={(item) => void createRegressionFromIssue(item.id, item.traceId)} onOpenTrace={openTrace} /> : null}
+          {section === "diagnostics" ? <DiagnosticsWorkbench locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} mode="diagnostics" authToken={consoleSession?.token ?? ""} adminToken={consoleSession?.consoleAdmin ? consoleSession.token : ""} feedbackReference={feedbackReference} initialFeedbackId={issueJumpId} onCreateRegressionCase={(item) => void createRegressionFromIssue(item.id, item.traceId)} onOpenTrace={openTrace} onOpenAsset={openProjectFile} onOpenVersions={() => setShowHistory(true)} onOpenRegressions={() => navigate("regressionCases")} /> : null}
           {section === "traces" ? <TraceWorkbench locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} adminToken={consoleSession?.consoleAdmin ? consoleSession.token : ""} focusCoreTraceId={traceJumpId} focusTraceId={traceAgentJumpId} onOpenIssue={openIssue} /> : null}
+          {section === "evaluations" ? <EvaluationWorkbench locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} adminToken={consoleSession?.consoleAdmin ? consoleSession.token : ""} onOpenTrace={openAgentTrace} /> : null}
           {section === "traceComparison" ? <TraceComparisonWorkbench locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} adminToken={consoleSession?.consoleAdmin ? consoleSession.token : ""} projectName={String(project.name ?? project.projectName ?? "")} /> : null}
           {section === "regressionCases" ? <DiagnosticsWorkbench locale={activeI18n.language === "zh-CN" ? "zh-CN" : "en-US"} mode="regressionCases" authToken={consoleSession?.token ?? ""} adminToken={consoleSession?.consoleAdmin ? consoleSession.token : ""} activeDatasourceId={project.activeDatasource?.id ?? ""} initialRegressionSeed={regressionSeed} onRegressionSeedConsumed={clearRegressionSeed} onOpenIssue={openIssue} onOpenTrace={openAgentTrace} /> : null}
           {section === "instructions" ? <InstructionsPage value={instructions} onChange={setInstructions} onSave={() => { const path = files.find((file) => isInstructionFile(file.path))?.path; if (path) void handleSaveFile(path, instructions); else setNotice({ tone: "error", title: "Draft save failed", body: "The project API did not return an instructions file." }); }} savedAt={draftSavedAt} loading={fileLoading} /> : null}
@@ -800,7 +802,7 @@ function App() {
   </div>;
 }
 
-function pageTitle(section: ConsoleSection, t: (key: string) => string) { return t(({ overview: "page.overview", datasources: "page.datasources", schema: "page.schema", models: "page.models", relationships: "page.relationships", views: "page.views", cubes: "page.cubes", rules: "page.rules", sqlKnowledge: "page.sqlKnowledge", mcp: "page.mcp", access: "page.access", diagnostics: "page.diagnostics", traces: "page.traces", traceComparison: "page.traceComparison", regressionCases: "page.regressionCases", instructions: "page.instructions", mdl: "page.mdl" })[section]); }
+function pageTitle(section: ConsoleSection, t: (key: string) => string) { return t(({ overview: "page.overview", datasources: "page.datasources", schema: "page.schema", models: "page.models", relationships: "page.relationships", views: "page.views", cubes: "page.cubes", rules: "page.rules", sqlKnowledge: "page.sqlKnowledge", mcp: "page.mcp", access: "page.access", diagnostics: "page.diagnostics", traces: "page.traces", traceComparison: "page.traceComparison", evaluations: "page.evaluations", regressionCases: "page.regressionCases", instructions: "page.instructions", mdl: "page.mdl" })[section]); }
 
 function Sidebar({ projectName, section, onNavigate, open, onClose }: { projectName: string; section: ConsoleSection; onNavigate: (section: ConsoleSection) => void; open: boolean; onClose: () => void }) {
   const { t } = useTranslation();

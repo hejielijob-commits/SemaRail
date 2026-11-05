@@ -3,11 +3,17 @@
 Standalone SemaRail Core distribution. It contains the local Semantic Console,
 semantic runtime, MCP servers, and governed-query policy boundary.
 
+The Console includes **Quality → Evaluation center** for isolated test projects.
+It manages versioned suites and Agent profiles, deterministic scoring, independent
+answer review, evidence retention and historical baseline comparisons. Running
+an Agent requires the separate `semarail-eval-runner` project; Core never starts
+Codex. See the repository's `docs/evaluation-center.md` for setup and acceptance.
+
 This alpha package is currently built from the SemaRail repository:
 
 ```powershell
 pnpm package:core
-npm install --global .\dist\hejielijob-semarail-core-0.1.0-alpha.4.tgz
+npm install --global .\dist\hejielijob-semarail-core-0.1.0-alpha.7.tgz
 $env:SEMARAIL_API_TOKEN = semarail token create
 $env:SEMARAIL_DATABASE_URL = "postgresql://readonly_user:password@localhost:5432/database"
 semarail start --project C:\path\to\semantic-project

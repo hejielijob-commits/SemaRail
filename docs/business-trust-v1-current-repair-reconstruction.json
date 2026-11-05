@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "checkedAt": "2026-10-15T17:04:33.690394+00:00",
+  "sourceAcceptanceRecordSha256": "50967c15e98afb5b4def6909b173cec2036c9b1078cd138fd44f2ae3a196fe42",
+  "sourceFilesByteUnchanged": true,
+  "sourceFilesChecked": 57,
+  "codeSha256": {
+    "feedback_resolution.py": "29418d3f0109bf18e86cedbe4ac31bfa82234ca211f48ca945f2efa979dcd4f8",
+    "project.py": "bb3c5e8f07c589d523e914b0230438800bfcf4d419e76fdf42aaaa02ed797a65",
+    "regression.py": "a653dab70f2506cd77a7a1af8c0dbad30121cdabe9acbb0162ab4dbeeb2fc90e"
+  },
+  "scenarios": {
+    "performanceSnapshot": {
+      "status": "verified",
+      "checks": [
+        {
+          "key": "semanticAsset",
+          "status": "passed",
+          "reasonCode": "PUBLISHED_ASSET_CHANGED"
+        },
+        {
+          "key": "feedbackEvidence",
+          "status": "passed",
+          "reasonCode": "SOURCE_FEEDBACK_MATCHES_BASE_VERSION"
+        },
+        {
+          "key": "regressionCase",
+          "status": "passed",
+          "reasonCode": "CASE_REVISION_LINKED"
+        },
+        {
+          "key": "sqlRun",
+          "status": "passed",
+          "reasonCode": "SQL_RUN_PASSED_SAME_VERSION"
+        },
+        {
+          "key": "agentEvaluation",
+          "status": "passed",
+          "reasonCode": "REVIEWED_AGENT_EVALUATION_SAME_VERSION"
+        }
+      ]
+    },
+    "salarySnapshot": {
+      "status": "verified",
+      "checks": [
+        {
+          "key": "semanticAsset",
+          "status": "passed",
+          "reasonCode": "PUBLISHED_ASSET_CHANGED"
+        },
+        {
+          "key": "feedbackEvidence",
+          "status": "passed",
+          "reasonCode": "SOURCE_FEEDBACK_MATCHES_BASE_VERSION"
+        },
+        {
+          "key": "regressionCase",
+          "status": "passed",
+          "reasonCode": "CASE_REVISION_LINKED"
+        },
+        {
+          "key": "sqlRun",
+          "status": "passed",
+          "reasonCode": "SQL_RUN_PASSED_SAME_VERSION"
+        },
+        {
+          "key": "agentEvaluation",
+          "status": "passed",
+          "reasonCode": "REVIEWED_AGENT_EVALUATION_SAME_VERSION"
+        }
+      ]
+    }
+  },
+  "scope": "Current-code storage reconstruction of copies of the genuine retained repair records, including the new current-case revision guard.",
+  "limitations": [
+    "Trusted existing subject context is used for store reads; this is not a new authentication, SQL run, Agent evaluation or formal comparison.",
+    "Historical source files remain byte-identical. Private credential files are excluded from the copied project/state inputs; no credentials are issued or exported."
+  ]
+}

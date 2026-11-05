@@ -1,0 +1,1138 @@
+{
+  "baselineSourceManifestSha256": "6e88b5cd93bd15d2e4329cccd458cd4f0c694096d5685d2c7bed8424ba4cce43",
+  "candidateSourceManifestSha256": "d052eccf465c095ab5445f44119ea860ae74760cd91a5f14caa67112acfe97be",
+  "canonicalOracle": {
+    "failures": [],
+    "passed": true,
+    "permissionBoundaryExecutions": 18,
+    "permissionBoundaryResults": [
+      {
+        "groups": {
+          "baseline": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": true,
+            "method": "prepared_governed_query",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": false,
+            "preparationReady": true,
+            "prepare": {
+              "errorCode": null,
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": null,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": false,
+              "status": "ready",
+              "tool": "semarail_prepare_query"
+            }
+          },
+          "candidate": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "CLARIFICATION_REQUIRED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": false,
+            "method": "plan_denial_and_unprepared_query_block",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": true,
+            "preparationReady": false,
+            "prepare": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_prepare_query"
+            }
+          }
+        },
+        "questionId": "BTV-02"
+      },
+      {
+        "groups": {
+          "baseline": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": true,
+            "method": "prepared_governed_query",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": false,
+            "preparationReady": true,
+            "prepare": {
+              "errorCode": null,
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": null,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": false,
+              "status": "ready",
+              "tool": "semarail_prepare_query"
+            }
+          },
+          "candidate": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "CLARIFICATION_REQUIRED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": false,
+            "method": "plan_denial_and_unprepared_query_block",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": true,
+            "preparationReady": false,
+            "prepare": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_prepare_query"
+            }
+          }
+        },
+        "questionId": "BTV-13"
+      },
+      {
+        "groups": {
+          "baseline": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": true,
+            "method": "prepared_governed_query",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": false,
+            "preparationReady": true,
+            "prepare": {
+              "errorCode": null,
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": null,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": false,
+              "status": "ready",
+              "tool": "semarail_prepare_query"
+            }
+          },
+          "candidate": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "CLARIFICATION_REQUIRED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": false,
+            "method": "plan_denial_and_unprepared_query_block",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": true,
+            "preparationReady": false,
+            "prepare": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_prepare_query"
+            }
+          }
+        },
+        "questionId": "BTV-14"
+      },
+      {
+        "groups": {
+          "baseline": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": true,
+            "method": "prepared_governed_query",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": false,
+            "preparationReady": true,
+            "prepare": {
+              "errorCode": null,
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": null,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": false,
+              "status": "ready",
+              "tool": "semarail_prepare_query"
+            }
+          },
+          "candidate": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "CLARIFICATION_REQUIRED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": false,
+            "method": "plan_denial_and_unprepared_query_block",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": true,
+            "preparationReady": false,
+            "prepare": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_prepare_query"
+            }
+          }
+        },
+        "questionId": "BTV-15"
+      },
+      {
+        "groups": {
+          "baseline": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": true,
+            "method": "prepared_governed_query",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": false,
+            "preparationReady": true,
+            "prepare": {
+              "errorCode": null,
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": null,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": false,
+              "status": "ready",
+              "tool": "semarail_prepare_query"
+            }
+          },
+          "candidate": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "CLARIFICATION_REQUIRED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": false,
+            "method": "plan_denial_and_unprepared_query_block",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": true,
+            "preparationReady": false,
+            "prepare": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_prepare_query"
+            }
+          }
+        },
+        "questionId": "BTV-16"
+      },
+      {
+        "groups": {
+          "baseline": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": true,
+            "method": "prepared_governed_query",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": false,
+            "preparationReady": true,
+            "prepare": {
+              "errorCode": null,
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": null,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": false,
+              "status": "ready",
+              "tool": "semarail_prepare_query"
+            }
+          },
+          "candidate": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "CLARIFICATION_REQUIRED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": false,
+            "method": "plan_denial_and_unprepared_query_block",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": true,
+            "preparationReady": false,
+            "prepare": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_prepare_query"
+            }
+          }
+        },
+        "questionId": "BTV-21"
+      },
+      {
+        "groups": {
+          "baseline": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": true,
+            "method": "prepared_governed_query",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": false,
+            "preparationReady": true,
+            "prepare": {
+              "errorCode": null,
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": null,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": false,
+              "status": "ready",
+              "tool": "semarail_prepare_query"
+            }
+          },
+          "candidate": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "CLARIFICATION_REQUIRED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": false,
+            "method": "plan_denial_and_unprepared_query_block",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": true,
+            "preparationReady": false,
+            "prepare": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_prepare_query"
+            }
+          }
+        },
+        "questionId": "BTV-22"
+      },
+      {
+        "groups": {
+          "baseline": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": true,
+            "method": "prepared_governed_query",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": false,
+            "preparationReady": true,
+            "prepare": {
+              "errorCode": null,
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": null,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": false,
+              "status": "ready",
+              "tool": "semarail_prepare_query"
+            }
+          },
+          "candidate": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "CLARIFICATION_REQUIRED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": false,
+            "method": "plan_denial_and_unprepared_query_block",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": true,
+            "preparationReady": false,
+            "prepare": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_prepare_query"
+            }
+          }
+        },
+        "questionId": "BTV-27"
+      },
+      {
+        "groups": {
+          "baseline": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": true,
+            "method": "prepared_governed_query",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": false,
+            "preparationReady": true,
+            "prepare": {
+              "errorCode": null,
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": null,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": false,
+              "status": "ready",
+              "tool": "semarail_prepare_query"
+            }
+          },
+          "candidate": {
+            "governedBoundaryPassed": true,
+            "governedQuery": {
+              "errorCode": "CLARIFICATION_REQUIRED",
+              "noResultRows": true,
+              "notARowReturningTool": false,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_governed_query"
+            },
+            "governedQueryPreparationIdProvided": false,
+            "method": "plan_denial_and_unprepared_query_block",
+            "passed": true,
+            "plan": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_plan_query"
+            },
+            "policyDenialProven": true,
+            "preparationNonReady": true,
+            "preparationReady": false,
+            "prepare": {
+              "errorCode": "POLICY_DENIED",
+              "noResultRows": true,
+              "notARowReturningTool": true,
+              "previewRowsEmpty": false,
+              "previewRowsPresent": false,
+              "returnedRows": 0,
+              "rowsEmpty": false,
+              "rowsPresent": false,
+              "statsReturnedRowsPresent": true,
+              "status": "error",
+              "tool": "semarail_prepare_query"
+            }
+          }
+        },
+        "questionId": "BTV-28"
+      }
+    ],
+    "permissionPlanExecutions": 18,
+    "physicalPostgresChecked": 20,
+    "schemaVersion": 1,
+    "total": 30
+  },
+  "contextDelivery": {
+    "failureCount": 0,
+    "passed": true,
+    "questions": 60
+  },
+  "dataManifestSha256": "43cc11018e9d2e46b8e1a9e9c1a99562fda44e36d06af1ca27de7ce633f32c77",
+  "distribution": {
+    "name": "@hejielijob/semarail-core",
+    "sha256": "f1221955454a9165d35d0140868d28d961a5bcee275df0ceb96300d4a6899739",
+    "version": "0.1.0-alpha.5"
+  },
+  "executionChecks": {
+    "candidateGroup": "candidate",
+    "checks": [
+      {
+        "passed": true,
+        "probeId": "headcount-current-ready",
+        "reasonCodes": [],
+        "status": "ready"
+      },
+      {
+        "passed": true,
+        "probeId": "salary-snapshot-scalar-ready",
+        "reasonCodes": [],
+        "status": "ready"
+      },
+      {
+        "passed": true,
+        "probeId": "salary-original-date-trend-ready",
+        "reasonCodes": [],
+        "status": "ready"
+      },
+      {
+        "passed": true,
+        "probeId": "performance-quarter-scalar-ready",
+        "reasonCodes": [],
+        "status": "ready"
+      },
+      {
+        "passed": true,
+        "probeId": "performance-original-date-trend-ready",
+        "reasonCodes": [],
+        "status": "ready"
+      },
+      {
+        "passed": true,
+        "probeId": "headcount-nondistinct-count-blocked",
+        "reasonCodes": [
+          "metric_conflicts"
+        ],
+        "status": "blocked"
+      },
+      {
+        "passed": true,
+        "probeId": "headcount-missing-active-predicate-blocked",
+        "reasonCodes": [
+          "predicate_missing"
+        ],
+        "status": "blocked"
+      },
+      {
+        "passed": true,
+        "probeId": "headcount-conflicting-active-predicate-blocked",
+        "reasonCodes": [
+          "predicate_conflicts"
+        ],
+        "status": "blocked"
+      },
+      {
+        "passed": true,
+        "probeId": "salary-wrong-snapshot-blocked",
+        "reasonCodes": [
+          "time_filter_conflicts"
+        ],
+        "status": "blocked"
+      },
+      {
+        "passed": true,
+        "probeId": "salary-unconfirmed-snapshot-blocked",
+        "reasonCodes": [
+          "time_confirmation_missing"
+        ],
+        "status": "needs_clarification"
+      },
+      {
+        "passed": true,
+        "probeId": "salary-snapshot-condition-missing-blocked",
+        "reasonCodes": [
+          "time_confirmation_missing"
+        ],
+        "status": "needs_clarification"
+      },
+      {
+        "passed": true,
+        "probeId": "salary-transformed-date-trend-blocked",
+        "reasonCodes": [
+          "time_grouping_transformed"
+        ],
+        "status": "blocked"
+      },
+      {
+        "passed": true,
+        "probeId": "performance-wrong-quarter-blocked",
+        "reasonCodes": [
+          "time_filter_conflicts"
+        ],
+        "status": "blocked"
+      },
+      {
+        "passed": true,
+        "probeId": "performance-transformed-date-trend-blocked",
+        "reasonCodes": [
+          "time_filter_conflicts",
+          "time_grouping_transformed"
+        ],
+        "status": "blocked"
+      },
+      {
+        "executionBoundary": {
+          "blockedPreparationId": {
+            "errorCode": "CLARIFICATION_REQUIRED",
+            "passed": true,
+            "returnedRows": 0,
+            "status": "error"
+          },
+          "legacyWithoutPreparationId": {
+            "errorCode": "CLARIFICATION_REQUIRED",
+            "passed": true,
+            "returnedRows": 0,
+            "status": "error"
+          }
+        },
+        "passed": true,
+        "probeId": "headcount-or-shape-blocked",
+        "reasonCodes": [
+          "unsupported_sql_shape"
+        ],
+        "status": "blocked"
+      },
+      {
+        "executionBoundary": {
+          "blockedPreparationId": {
+            "errorCode": "CLARIFICATION_REQUIRED",
+            "passed": true,
+            "returnedRows": 0,
+            "status": "error"
+          },
+          "legacyWithoutPreparationId": {
+            "errorCode": "CLARIFICATION_REQUIRED",
+            "passed": true,
+            "returnedRows": 0,
+            "status": "error"
+          }
+        },
+        "passed": true,
+        "probeId": "salary-subquery-shape-blocked",
+        "reasonCodes": [
+          "unsupported_sql_shape"
+        ],
+        "status": "blocked"
+      },
+      {
+        "executionBoundary": {
+          "blockedPreparationId": {
+            "errorCode": "CLARIFICATION_REQUIRED",
+            "passed": true,
+            "returnedRows": 0,
+            "status": "error"
+          },
+          "legacyWithoutPreparationId": {
+            "errorCode": "CLARIFICATION_REQUIRED",
+            "passed": true,
+            "returnedRows": 0,
+            "status": "error"
+          }
+        },
+        "passed": true,
+        "probeId": "performance-subquery-shape-blocked",
+        "reasonCodes": [
+          "unsupported_sql_shape"
+        ],
+        "status": "blocked"
+      }
+    ],
+    "conflictCounterexamples": 9,
+    "executionBoundaryCases": 3,
+    "failures": [],
+    "limitation": "authenticated MCP prepare checks; three unsupported shapes also exercise governed execution with and without preparation IDs; no raw SQL, conditions, or result rows persisted",
+    "mandatoryCounterexamples": 12,
+    "passed": true,
+    "positiveAcceptanceCases": 5,
+    "schemaVersion": 1,
+    "totalChecks": 17,
+    "unsupportedShapeCounterexamples": 3
+  },
+  "executionMode": "preacceptance_only",
+  "historicalRegression": {
+    "passed": 120,
+    "total": 120
+  },
+  "limitations": [
+    "Preacceptance only. No Agent outcome or answer-quality improvement is established.",
+    "Earlier interrupted and failed preacceptance records are preserved."
+  ],
+  "manifestSha256": "7043744b364daa25abb46718273659c3c24b7cbc114a00ada59326f24e7a9d4b",
+  "reportHashes": {
+    "context-delivery-validation.json": "93d049323d1ced368531c24089c31c0a17651b6a4205d64cca240a78cc0ecd24",
+    "execution-check-validation.json": "e26ec1e230867bbd3b47937b86a79175bc54aa29f7b7077e776f38da45c5307d",
+    "oracle-validation.json": "70db8106524752a37494c301ec626472ca1a944c0244abb77597e06802ebd9bf",
+    "regression.json": "28eec3e8d6fe2542c56fbab2de3b0e1ddcbaf1d02324baf95a1a0fd9c518cbd6"
+  },
+  "runId": "preaccept-20261014-owned-wmi-final-v1",
+  "schemaVersion": 1,
+  "workerDispatchAllowed": false
+}

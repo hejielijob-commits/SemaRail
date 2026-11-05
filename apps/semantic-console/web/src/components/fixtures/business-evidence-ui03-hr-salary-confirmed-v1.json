@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "rulesVersion": "business-trust-v1",
+  "projectRevision": "sha256:e7c2f28643844cba092916e67f790f20c26b927b3730dd411fd526f759b38412",
+  "references": [
+    {
+      "ruleId": "business-trust-v1",
+      "model": "compensation_history",
+      "column": "effective_date"
+    },
+    {
+      "ruleId": "rule_88046b3c7b34612576d9e0e0",
+      "model": "compensation_history",
+      "column": "effective_date"
+    },
+    {
+      "ruleId": "business-trust-v1",
+      "model": "compensation_history",
+      "column": "monthly_salary"
+    },
+    {
+      "ruleId": "rule_88046b3c7b34612576d9e0e0",
+      "model": "compensation_history",
+      "column": "monthly_salary"
+    }
+  ],
+  "models": [
+    "compensation_history"
+  ],
+  "columns": [
+    {
+      "model": "compensation_history",
+      "column": "effective_date"
+    },
+    {
+      "model": "compensation_history",
+      "column": "effective_date"
+    },
+    {
+      "model": "compensation_history",
+      "column": "monthly_salary"
+    },
+    {
+      "model": "compensation_history",
+      "column": "monthly_salary"
+    }
+  ],
+  "metrics": [
+    {
+      "ruleId": "rule_88046b3c7b34612576d9e0e0",
+      "checkId": "average-salary",
+      "model": "compensation_history",
+      "column": "monthly_salary",
+      "aggregation": "avg",
+      "distinct": false,
+      "status": "passed",
+      "grain": "employee"
+    }
+  ],
+  "unit": {
+    "status": "unverified",
+    "value": null
+  },
+  "grain": [
+    {
+      "model": "compensation_history",
+      "column": "monthly_salary",
+      "value": "employee",
+      "status": "verified"
+    },
+    {
+      "model": "compensation_history",
+      "column": "effective_date",
+      "value": "original",
+      "status": "not_applicable"
+    }
+  ],
+  "time": {
+    "field": "effective_date",
+    "value": "2024-09-01",
+    "source": "confirmed",
+    "groupedByOriginal": false
+  },
+  "defaultsApplied": {},
+  "conditions": {
+    "effectiveDate": "2024-09-01",
+    "trend": false
+  },
+  "confirmations": {
+    "effectiveDate": "confirmed",
+    "trend": "confirmed"
+  },
+  "checks": [
+    {
+      "id": "rule_88046b3c7b34612576d9e0e0:average-salary",
+      "ruleId": "rule_88046b3c7b34612576d9e0e0",
+      "mandatory": true,
+      "status": "passed",
+      "reasonCode": "metric_matches"
+    },
+    {
+      "id": "rule_88046b3c7b34612576d9e0e0:effective-date",
+      "ruleId": "rule_88046b3c7b34612576d9e0e0",
+      "mandatory": true,
+      "status": "passed",
+      "reasonCode": "time_filter_matches"
+    },
+    {
+      "id": "rule_88046b3c7b34612576d9e0e0:salary-trend",
+      "ruleId": "rule_88046b3c7b34612576d9e0e0",
+      "mandatory": true,
+      "status": "passed",
+      "reasonCode": "time_grouping_not_applicable"
+    }
+  ],
+  "queryId": "query-business-trust-1",
+  "datasourceId": "synthetic-hr-fixture",
+  "outcome": "success",
+  "createdAt": "2026-10-12T02:00:00Z",
+  "expiresAt": "2026-11-11T02:00:00Z"
+}

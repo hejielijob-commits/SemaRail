@@ -25,7 +25,7 @@ import {
 import { _schema, type ContractSchema } from './schema.js'
 
 /** Supported sidecar RPC methods. */
-export const RPC_METHODS = ['health', 'project.validate', 'project.describe', 'context.ask', 'query.prepare', 'query.dryPlan', 'query.run', 'query.cancel'] as const
+export const RPC_METHODS = ['health', 'project.validate', 'project.describe', 'context.ask', 'query.prepare', 'query.dryPlan', 'query.run', 'query.cancel', 'query.evidence'] as const
 
 /** Supported sidecar RPC method. */
 export type RpcMethod = typeof RPC_METHODS[number]

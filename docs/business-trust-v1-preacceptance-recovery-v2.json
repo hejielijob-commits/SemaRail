@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "status": "passed_worker_ready_recovery",
+  "checkedAt": "2026-10-18T16:11:05.649265+00:00",
+  "runId": "preaccept-20261018-recovery-v2",
+  "manifestSha256": "11c3354becc25d14d886032dc43721880e322141295b1a3fb0d445740dad35d9",
+  "workerDispatchAllowed": false,
+  "officialWorkersDispatched": 0,
+  "candidateSourceFiles": 281,
+  "candidateSourcesMatchPassingTests": true,
+  "acceptedCandidateSourceArchiveSha256": "486cc7628edcfeccd9b4c2aa25a5fae24cd64ec6d62453079a2f1899ef77cda0",
+  "tests": {
+    "count": 107,
+    "skipped": 1,
+    "logSha256": "5f2e485424235bdd43bfb2fdb723c3579b970b7de061ac5d7f82dd78118403f5"
+  },
+  "gates": {
+    "regression.json": {
+      "sha256": "fce7c4557bcc9e25bad660050ef63496e24b5f00575849a0dd2d0d2cb736a6f2",
+      "passed": true
+    },
+    "context-delivery-validation.json": {
+      "sha256": "60115aae681e39314446f397265b99ddd57870a951741eb6f2672be0db8503fe",
+      "passed": true
+    },
+    "execution-check-validation.json": {
+      "sha256": "e26ec1e230867bbd3b47937b86a79175bc54aa29f7b7077e776f38da45c5307d",
+      "passed": true
+    },
+    "oracle-validation.json": {
+      "sha256": "70db8106524752a37494c301ec626472ca1a944c0244abb77597e06802ebd9bf",
+      "passed": true
+    },
+    "tool-capabilities.json": {
+      "sha256": "778f5996fa06045cc54227c8bdcfbb814fefda26ecd8fd9d20cf4759188630ac",
+      "passed": true
+    }
+  },
+  "counts": {
+    "historicalExecutions": 120,
+    "contextQuestions": 60,
+    "catalogFallbacks": 6,
+    "executionChecks": 17,
+    "oracleQuestions": 30,
+    "physicalPostgresChecked": 20,
+    "permissionPlanExecutions": 18,
+    "permissionBoundaryExecutions": 18
+  },
+  "recovery": {
+    "originalOwnedProcessConfirmedStopped": true,
+    "attemptSha256": "bc508924e790c2589d91352bc36a1eca040a47c214f18773ee7da1e59dd3830f",
+    "attemptId": "0db100463593421ca773e6570d5b3d90",
+    "sameOriginalRolesAuthenticated": 10,
+    "contextQuestionsRechecked": 60,
+    "allOriginalRecordsAndGatesUnchanged": true,
+    "samePrivateCiphertextAndBindings": true,
+    "positions": 180,
+    "consumedPositionsBeforeAndAfter": 0,
+    "beforeSha256": "4ff566ebae499f83ab2dfabab9e3158f376a787d25d06e86aaee2a2776548cbf",
+    "stopSha256": "63603dcef05848af045bae0f9f7c38e3b4b705aff98633ec6f407d95a4126d29",
+    "afterSha256": "9c3f0754e63fb218cdf5e665bc2aed5e6acdcdd0d13d877429aac0b6f2882e8a",
+    "cleanupSha256": "7a1d62ebb43315634bd17391e8f906eaa67ea4bbd8291d73d1c19dd8ca6cf759",
+    "cachedCoreStatesBefore": [
+      "missing",
+      "missing"
+    ],
+    "authenticatedMcpStatesBefore": [
+      "ready",
+      "ready"
+    ],
+    "ownedHostsStoppedAndPortsClosed": true,
+    "separatePostgresRemainsLive": true
+  },
+  "limitations": [
+    "No Agent worker was active during this rehearsal; active-worker deadline and capture-prefix cases have deterministic test evidence only.",
+    "This preacceptance and recovery prove technical startup and recovery behavior, not Agent answer-quality improvement.",
+    "Failed v1 remains preserved; no original credential was reconstructed and its state was not restarted."
+  ],
+  "promotionEstablished": false
+}

@@ -278,8 +278,61 @@ describe("ApiClient", () => {
     expect(fetchMock.mock.calls[5]?.[1]).toMatchObject({ method: "POST", body: JSON.stringify({ caseIds: ["case/a"] }) });
     expect(fetchMock.mock.calls[6]?.[1]).toMatchObject({ method: "POST", body: "{}" });
   });
+
+  it("uses scoped feedback-resolution and query-evidence routes", async () => {
+    const evidence = businessEvidencePayload("query-a");
+    const fetchMock = vi.fn((input: RequestInfo | URL, _init?: RequestInit) => Promise.resolve(jsonResponse(String(input).endsWith("/queries/query-a/evidence") ? evidence : {})));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient();
+    client.setBearerToken("console-admin-token");
+
+    await client.getFeedbackResolution("feedback/a");
+    await client.saveFeedbackResolution("feedback/a", {
+      expectedRevision: 2, assetPath: "knowledge/rules/revenue.md", baseVersionId: "version-1",
+      publishedVersionId: "version-2", caseId: "case-1", caseRevision: 3, runId: "run-1",
+    });
+    await client.verifyFeedbackResolution("feedback/a");
+    await client.importAgentEvaluation("feedback/a", {
+      schemaVersion: 1, campaignId: "campaign-1", reportSha256: "a".repeat(64), source: "evaluator",
+      model: "agent-v2", reasoning: "high", datasetVersion: "dataset-1", semanticVersion: "sha256:project-v2",
+      verdictAggregates: { passed: 3, failed: 0, inconclusive: 0, total: 3 },
+    });
+    await client.reviewAgentEvaluation("feedback/a", "evaluation/1", { expectedRevision: 1, decision: "approved" });
+    await expect(client.getQueryEvidence("query-a")).resolves.toMatchObject({ unit: { value: null }, time: { field: null } });
+
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      "/api/v1/diagnostics/feedback/feedback%2Fa/resolution",
+      "/api/v1/diagnostics/feedback/feedback%2Fa/resolution",
+      "/api/v1/diagnostics/feedback/feedback%2Fa/resolution/verify",
+      "/api/v1/diagnostics/feedback/feedback%2Fa/agent-evaluations",
+      "/api/v1/diagnostics/feedback/feedback%2Fa/agent-evaluations/evaluation%2F1/review",
+      "/api/v1/diagnostics/queries/query-a/evidence",
+    ]);
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "PUT", body: expect.stringContaining('"expectedRevision":2') });
+    expect(fetchMock.mock.calls[4]?.[1]).toMatchObject({ method: "POST", body: JSON.stringify({ expectedRevision: 1, decision: "approved" }) });
+    expect(fetchMock.mock.calls[5]?.[1]).toMatchObject({ headers: expect.objectContaining({ Authorization: "Bearer console-admin-token" }) });
+  });
+
+  it("fails closed on unknown or extra query-evidence schema fields", async () => {
+    const unsupported = new ApiClient();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ ...businessEvidencePayload("query-1"), schemaVersion: 2 })));
+    await expect(unsupported.getQueryEvidence("query-1")).rejects.toMatchObject({ status: 502, code: "UNSUPPORTED_BUSINESS_EVIDENCE_VERSION" });
+
+    const withUnknownField = new ApiClient();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ ...businessEvidencePayload("query-1"), rawSql: "SELECT private_value" })));
+    await expect(withUnknownField.getQueryEvidence("query-1")).rejects.toMatchObject({ status: 502, code: "INVALID_BUSINESS_EVIDENCE" });
+  });
 });
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+function businessEvidencePayload(queryId: string) {
+  return {
+    schemaVersion: 1, rulesVersion: "rules-v1", projectRevision: "sha256:project-v1", queryId,
+    datasourceId: "warehouse", outcome: "success", createdAt: "2026-10-12T02:00:00Z", expiresAt: "2026-11-11T02:00:00Z",
+    references: [], models: [], columns: [], metrics: [], grain: [], unit: { status: "unverified", value: null },
+    time: { source: "unknown", field: null, groupedByOriginal: null }, defaultsApplied: {}, conditions: {}, confirmations: {}, checks: [],
+  };
 }

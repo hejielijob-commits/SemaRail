@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "acceptedAt": "2026-10-25T10:40:32.875921+00:00",
+  "runId": "formal-20261020-business-trust-v1-g",
+  "manifestSha256": "3494d53422feb6748bf65799a0072812ec2f95ee46fff62503b7bbc9da535b68",
+  "status": "runtime_recovered_after_observed_worker_abort",
+  "sourceFilesUnchanged": 291,
+  "retainedFileCount": 1991,
+  "retainedFilesUnchanged": true,
+  "originalFrozenInputsAndGatesUnchanged": true,
+  "originalDispatchLedgerUnchanged": true,
+  "privateCheckpointCiphertextUnchanged": true,
+  "samePostgresClusterAndLoadReport": true,
+  "all180PublicPromptsAndLaunchersUnchanged": true,
+  "recoveryAttempt": {
+    "record": ".benchmark-data/business-trust-v1/runs/formal-20261020-business-trust-v1-g/recovery-attempts/attempt-c9eab760ee6d4ca0866e30d91c738055.json",
+    "sha256": "36bc09bfeff7f510b8da36a20e76bf18a60c69360a5c37a233f115b7a620a83f",
+    "authenticatedContextChecks": 60,
+    "authenticatedRoleCatalogChecks": 10,
+    "brokerConsumedPositions": 160,
+    "recoveredRunningPositions": 1,
+    "runningPositions": 0,
+    "passed": true
+  },
+  "expiredAtOriginalDeadline": [
+    "job-174"
+  ],
+  "ownedHostPid": 42084,
+  "actualCimIdentityVerified": true,
+  "childKillOnWorkerExit": true,
+  "brokerHealthReady": true,
+  "spawnReturns": 175,
+  "independentReviews": 173,
+  "nextUnspawnedPosition": "job-176",
+  "newAgentAttemptsDuringRecovery": 0,
+  "newAgentCreditAvailabilityVerified": false,
+  "creditFailureObservedDuringThisInterruption": false,
+  "frozenScoringChanged": false,
+  "promotionEstablished": false,
+  "goalComplete": false,
+  "limitation": "Runtime recovery expires the original due attempt; it does not rerun the task or establish external model availability."
+}

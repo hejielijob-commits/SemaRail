@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-22T14:43:27.113031+00:00",
+  "runId": "formal-20261020-business-trust-v1-g",
+  "manifestSha256": "3494d53422feb6748bf65799a0072812ec2f95ee46fff62503b7bbc9da535b68",
+  "sourceFilesUnchanged": 291,
+  "runtimeObservation": {
+    "at": "2026-10-22T14:43:20.2344205Z",
+    "boot": "2026-10-22T14:35:54.5000000Z",
+    "oldWorkers": [],
+    "listeners": []
+  },
+  "spawnReturns": 68,
+  "independentReviews": 66,
+  "interruptedJobs": [
+    "job-067",
+    "job-068"
+  ],
+  "nextUnspawnedPosition": "job-069",
+  "status": "external_interruption_runtime_absent",
+  "denominator": 180,
+  "attemptsWillNotBeRetried": [
+    "job-067",
+    "job-068"
+  ],
+  "frozenScoringChanged": false,
+  "goalComplete": false,
+  "promotionEstablished": false,
+  "privateSnapshotSha256": "59e6d36da9e2ee63097519cef21872e827f2c5865037d4e2f9e9670964daa845"
+}

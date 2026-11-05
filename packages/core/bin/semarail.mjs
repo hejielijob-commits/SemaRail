@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_ENDPOINT = 'http://127.0.0.1:48763'
-const VERSION = '0.1.0-alpha.4'
+const VERSION = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8')).version
 
 function usage() {
   return [

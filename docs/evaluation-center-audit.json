@@ -1,0 +1,2026 @@
+{
+  "schemaVersion": 1,
+  "auditId": "evaluation-center-v1-requirement-audit",
+  "auditedAt": "2026-11-05T16:39:51.743305+00:00",
+  "goalComplete": true,
+  "overallStatus": "verified",
+  "scope": "Final acceptance of full original five-section objective including dataset-registered read-only scorer. Unit, controlled integration, real inference, rendered UI and installed-package evidence remain distinguished.",
+  "statusDefinitions": {
+    "verified": "Specified capability supported at the explicitly recorded proof scope; not automatically end-to-end accepted.",
+    "partial": "Some implementation or evidence exists but part of this clause is absent or insufficiently proven.",
+    "missing": "Required outcome/evidence not observed.",
+    "incomplete": "Current authoritative evidence contradicts successful acceptance or a required gate failed."
+  },
+  "pathsAreRelativeTo": "D:/xiaohe/wrenAI/semarail-trace-v2",
+  "requirements": [
+    {
+      "id": "G01",
+      "objectiveClause": "1/5",
+      "requirement": "One-click complete real Agent workflow in Console",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.tsx",
+          "symbol": "Run evaluation"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/live_acceptance.py",
+          "symbol": "assert_run"
+        },
+        {
+          "path": ".benchmark-data/evaluation-oneclick/20261105-162628/oneclick-report.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Actual page Run click -> installed daemon auto-claim -> real Codex/MCP -> dataset-registered independent reference scorer -> passed1/1 -> evidence/Core diagnostic. No retry or follow-up required.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "G02",
+      "objectiveClause": "1",
+      "requirement": "Codex CLI with authenticated MCP",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/src/semarail_eval_runner/main.py",
+          "symbol": "run_job"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_real_stdio_protocol_roundtrip_and_nonce"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_cli_isolation.py",
+          "symbol": "test_actual_provider_request_exposes_no_host_access_tools"
+        },
+        {
+          "path": ".benchmark-data/evaluation-center/20261105-152709/acceptance-summary.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Eight genuine gpt-6-luna low executions called authenticated MCP. Local-provider CLI catalog/private-input tests separately verify isolation.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "G03",
+      "objectiveClause": "1",
+      "requirement": "Deterministic grading separated from human review",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/evaluation_scoring.py",
+          "symbol": "def score"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_strict_auto_comparison_does_not_follow_manual_review"
+        }
+      ],
+      "proofScope": "Pure grading/API behavior only.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "G04",
+      "objectiveClause": "1",
+      "requirement": "Historical baseline without automatic dual deployment",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/evaluation_api.py",
+          "symbol": "baseline"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.tsx",
+          "symbol": "Historical baseline comparison"
+        }
+      ],
+      "proofScope": "Current implementation uses stored runs; no double-deployment orchestrator.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "G05",
+      "objectiveClause": "1",
+      "requirement": "Only explicitly enabled isolated test project published version",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/evaluation_api.py",
+          "symbol": "testDataOnly"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "does not dispatch when server preflight detects environment drift"
+        },
+        {
+          "path": ".benchmark-data/evaluation-browser/final-backend-verification.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Explicit enabled/testDataOnly and published revision required. Actual page starts only under isolated registered synthetic HR project. Desktop browser permission is independent.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "G06",
+      "objectiveClause": "1",
+      "requirement": "Initial real PostgreSQL HR role acceptance",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/tests/live_acceptance.py",
+          "symbol": "cases ="
+        },
+        {
+          "path": ".benchmark-data/evaluation-center/20261104-163336/acceptance-summary.json",
+          "symbol": "\"status\": \"failed\""
+        },
+        {
+          "path": ".benchmark-data/evaluation-center/20261105-152709/acceptance-summary.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Real PostgreSQL synthetic HR roles; query, clarification, denial and intentional wrong result executed in both rounds,8positions without execution errors.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "S01",
+      "objectiveClause": "2 suites",
+      "requirement": "Suite create/edit/labels/case IDs/roles/behaviors",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/evaluations.py",
+          "symbol": "def validate"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "creates a suite draft using editable case fields"
+        }
+      ],
+      "proofScope": "Form and server validation tests.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "S02",
+      "objectiveClause": "2 suites",
+      "requirement": "Suite publication immutable and revisions retained",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_published_versions_are_immutable_and_export_reimports_draft"
+        },
+        {
+          "path": "apps/semantic-console/server/evaluations.py",
+          "symbol": "suites"
+        }
+      ],
+      "proofScope": "Persisted old revision tested, not merely disabled UI controls.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "S03",
+      "objectiveClause": "2 suites",
+      "requirement": "Suite copy",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.tsx",
+          "symbol": "Copy suite"
+        },
+        {
+          "path": "apps/semantic-console/server/evaluation_api.py",
+          "symbol": "\"copy\""
+        },
+        {
+          "path": ".benchmark-data/evaluation-browser/scorer-proof/report.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Actual browser imported, published, copied and edited a suite through durable API; original published revision retained.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "S04",
+      "objectiveClause": "2 suites",
+      "requirement": "Versioned suite import/export to validated draft",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_published_versions_are_immutable_and_export_reimports_draft"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "imports versioned suites as drafts and exports the saved server version"
+        }
+      ],
+      "proofScope": "API and mocked frontend roundtrip tests.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "S05",
+      "objectiveClause": "2 suites",
+      "requirement": "Reference SQL/expected result/assertions never sent to Agent",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_oracle_never_dispatched"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_model_claim_without_observed_query_cannot_create_result"
+        }
+      ],
+      "proofScope": "Actual CLI request to local provider includes no reference SQL, expected-row, assertion or host credential canaries. test_cli_isolation actual request catalog and content exclusion test passed; paid HR grading remains a separate gate.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "S06",
+      "objectiveClause": "2 suites",
+      "requirement": "Clarification replies mapped to Core condition IDs",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_clarification_only_after_core_requested_it"
+        },
+        {
+          "path": "../semarail-eval-runner/src/semarail_eval_runner/main.py",
+          "symbol": "semarail_eval_answer_clarification"
+        }
+      ],
+      "proofScope": "Synthetic Core requests only; real clarification acceptance remains G06.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "S07",
+      "objectiveClause": "2 suites",
+      "requirement": "Review guidance and known business conditions retained",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_prompt_shares_only_known_business_conditions"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "retains scores and review guidance when detailed evidence has expired"
+        }
+      ],
+      "proofScope": "Known conditions allowed, hidden answers withheld; historical sanitized cases rendered.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "P01",
+      "objectiveClause": "2 profiles",
+      "requirement": "Versioned Agent profile create/edit/publish and explicit model",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/evaluations.py",
+          "symbol": "model"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_profile_export_import_is_versioned_and_starts_as_draft"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.tsx",
+          "symbol": "Model (explicit selection)"
+        }
+      ],
+      "proofScope": "API profile versions and explicit model validation; UI profile basics implemented.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "P02",
+      "objectiveClause": "3 public API",
+      "requirement": "Profile versioned import/export accessible through Console",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_profile_export_import_is_versioned_and_starts_as_draft"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.tsx",
+          "symbol": "Agent profiles"
+        }
+      ],
+      "proofScope": "Profile import/export controls implemented; actual frontend suite187 passed including profile roundtrip tests.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "P03",
+      "objectiveClause": "2 profiles",
+      "requirement": "Defaults timeout300 concurrency2 rounds1; bounds rounds1..3 concurrency1..4",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_rounds_and_concurrency_bounds"
+        },
+        {
+          "path": "apps/semantic-console/server/evaluations.py",
+          "symbol": "timeoutSeconds"
+        }
+      ],
+      "proofScope": "Boundary validation tests and defaults source.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "P04",
+      "objectiveClause": "2 profiles",
+      "requirement": "Multi-round concurrent durable schedule without duplicate attempts",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_parallel_claims_across_independent_stores_obey_concurrency_for_all_rounds"
+        }
+      ],
+      "proofScope": "Two independent stores claim six attempts across three rounds; fake query results, not concurrent real models.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "R01",
+      "objectiveClause": "2 runs",
+      "requirement": "Preflight shows count/model/environment before starting",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "previews exact attempt count before starting a real run"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "does not dispatch when server preflight detects environment drift"
+        }
+      ],
+      "proofScope": "Mocked UI plus API preflight; actual browser run blocked under G01.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "R02",
+      "objectiveClause": "2 runs",
+      "requirement": "Progress/status/history reconstruction after refresh",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "reconstructs persisted scores after remount and saves manual review separately"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "ignores an older in-flight poll after a different run is selected"
+        }
+      ],
+      "proofScope": "Serialized fixture reconstruction and stale request race verified; CUA reconstruction not independently passed.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "R03",
+      "objectiveClause": "2 runs",
+      "requirement": "Failed rerun creates new task with frozen original versions",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_rerun_uses_frozen_suite_and_profile_even_after_head_deletion"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "reruns failed cases in a new task bound to the historical snapshots"
+        }
+      ],
+      "proofScope": "API tested after deleting current asset heads; original record kept.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "Q01",
+      "objectiveClause": "2 scoring",
+      "requirement": "Full actual row multiset/tolerance/null/empty/duplicates",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_duplicate_multiplicity_and_tolerance_matching"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_data_fingerprint.py",
+          "symbol": "test_raw_values_schema_duplicates_empty_and_semantic_independence"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_ordering.py",
+          "symbol": "test_empty_result_with_observed_order_is_vacuously_unique"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_empty_result_comparisons"
+        }
+      ],
+      "proofScope": "Pure scoring and raw database checksum are separate checks, not proof of model answer accuracy.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "Q02",
+      "objectiveClause": "2 scoring",
+      "requirement": "Ordered result/cell assertions require observable unique top-level order",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/tests/test_ordering.py",
+          "symbol": "test_ties_nulls_and_numeric_representation_are_ambiguous"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_ordering.py",
+          "symbol": "test_sql_limits_at_any_depth_invalidate_window_proof"
+        },
+        {
+          "path": "apps/semantic-console/server/evaluation_scoring.py",
+          "symbol": "evaluate"
+        }
+      ],
+      "proofScope": "Ordering helper covers aliases/ordinals/ties/limits; end-to-end real ordered query absent.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "Q03",
+      "objectiveClause": "2 scoring",
+      "requirement": "Truncated/incomplete/unproven results cannot pass",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_incomplete_order_and_malformed_rows_are_not_passed"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_reference_preview_cannot_establish_oracle"
+        }
+      ],
+      "proofScope": "Deterministic failure/inconclusive semantics tested.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "Q04",
+      "objectiveClause": "2 scoring",
+      "requirement": "First SQL preserved across repair; actual first error failed",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_first_result_does_not_get_replaced_by_repair"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_business_conflict_and_observed_first_error_remain_failures"
+        }
+      ],
+      "proofScope": "Trusted observation scoring tested; real two-query repair not established.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "Q05",
+      "objectiveClause": "2 scoring",
+      "requirement": "Role denial includes prior disclosure check",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_later_denial_cannot_hide_prior_disclosure"
+        },
+        {
+          "path": "apps/semantic-console/server/evaluation_scoring.py",
+          "symbol": "permission"
+        }
+      ],
+      "proofScope": "Synthetic observed result/error evidence only; no real model denial pass.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "Q06",
+      "objectiveClause": "2 scoring",
+      "requirement": "Clarification and business conditions independent; missing evidence inconclusive",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_clarification_also_requires_correct_result"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_business_conflict_and_observed_first_error_remain_failures"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_unsupported_requires_observed_core_error_not_boolean_flag"
+        }
+      ],
+      "proofScope": "Pure grader enforces typed observed evidence.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "Q07",
+      "objectiveClause": "2 scoring",
+      "requirement": "Natural-language manual review retains reason/actor/time/history",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_restart_retains_scores_evidence_review_history_and_idempotent_completion"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "keeps review history and clears a different case's Core diagnostic"
+        }
+      ],
+      "proofScope": "Persisted history through recreated app plus UI reconstruction.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "Q08",
+      "objectiveClause": "2 efficiency",
+      "requirement": "Observed duration, tool count and token usage or unavailable",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/src/semarail_eval_runner/main.py",
+          "symbol": "observedTokens"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.tsx",
+          "symbol": "Observed token usage"
+        }
+      ],
+      "proofScope": "Explicit observed call count, duration and token metrics; unobserved/expired evidence distinct from observed zero; frontend suite187 passed.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "Q09",
+      "objectiveClause": "2 reporting",
+      "requirement": "Whole frozen schedule denominator includes cancelled/unstarted/errors",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_cancelled_unstarted_records_remain_in_denominator"
+        },
+        {
+          "path": "apps/semantic-console/server/evaluations.py",
+          "symbol": "passRate"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.tsx",
+          "symbol": "Not started"
+        }
+      ],
+      "proofScope": "Full denominator plus separate states verified, not completion-only normalization.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A01",
+      "objectiveClause": "3 architecture",
+      "requirement": "Generic Core outside independent Codex runner repository",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/evaluation_api.py",
+          "symbol": "EvaluationApi"
+        },
+        {
+          "path": "../semarail-eval-runner/src/semarail_eval_runner/main.py",
+          "symbol": "def work"
+        },
+        {
+          "path": "packages/contract/src/evaluation.ts",
+          "symbol": "EvaluationRun"
+        }
+      ],
+      "proofScope": "Separate code ownership boundaries inspected; Core never launches Codex.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A02",
+      "objectiveClause": "3 architecture",
+      "requirement": "Reuse regression dataset registry, locks and diagnostics; preserve legacy",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/evaluation_api.py",
+          "symbol": "regression_test_datasets"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_run_completion_idempotency_review_and_config_lock"
+        }
+      ],
+      "proofScope": "Generic integration source and tests; parent full server378 passed is compatibility evidence, not live acceptance.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A03",
+      "objectiveClause": "3 CLI",
+      "requirement": "Ephemeral isolated directory, JSONL, no global config mutation",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/src/semarail_eval_runner/main.py",
+          "symbol": "TemporaryDirectory"
+        },
+        {
+          "path": "../semarail-eval-runner/src/semarail_eval_runner/main.py",
+          "symbol": "--ephemeral"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_cli_isolation.py",
+          "symbol": "test_actual_provider_request_exposes_no_host_access_tools"
+        },
+        {
+          "path": ".benchmark-data/evaluation-oneclick/20261105-162628/oneclick-report.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Fresh temporary directory and task-local MCP capability, ephemeral noninteractive JSONL, no user/global config mutation. Actual CLI provider catalog and private-input canary tests passed.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A04",
+      "objectiveClause": "3 interfaces",
+      "requirement": "Named versioned types Suite/Case/Profile/Run/Attempt/Review/Comparison",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "packages/contract/src/evaluation.ts",
+          "symbol": "EvaluationComparison"
+        },
+        {
+          "path": "apps/semantic-console/web/src/api/evaluations.test.ts",
+          "symbol": "rejects unknown response schema versions"
+        }
+      ],
+      "proofScope": "Compile-time contract types and REST client version checks; contract20 existing tests do not cover new types behavior.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A05",
+      "objectiveClause": "3 API",
+      "requirement": "All management/worker/evidence routes documented and versioned",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/evaluation_api.py",
+          "symbol": "def _dispatch"
+        },
+        {
+          "path": "docs/evaluation-center.md",
+          "symbol": "API notes"
+        },
+        {
+          "path": ".benchmark-data/evaluation-browser/final-backend-verification.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "All32 evaluation paths documented with versioned API envelopes, worker/admin boundaries and explicit dataset-scorer subject-only schemas. API usage documented.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A06",
+      "objectiveClause": "3 auth",
+      "requirement": "Management project console:admin; worker project eval:worker and assigned leases only",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_other_project_cannot_read_assets_runs_or_evidence_by_known_id"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_worker_cannot_use_other_lease_and_role_policy_revocation_is_immediate"
+        }
+      ],
+      "proofScope": "Authenticated fake-Core API tests, not identity proof through real model.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A07",
+      "objectiveClause": "3 auth",
+      "requirement": "Host config owns commands/roles; no browser arbitrary commands or secrets",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/evaluations.py",
+          "symbol": "unsupported fields"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_child_environment_removes_all_custom_secrets"
+        },
+        {
+          "path": "apps/semantic-console/web/src/api/evaluations.test.ts",
+          "symbol": "keeps the credential in a header and preserves versioned JSON"
+        }
+      ],
+      "proofScope": "Allowlisted data shapes and child environment tests.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A08",
+      "objectiveClause": "3 flow1",
+      "requirement": "Preflight online runner, data binding and published semantic revision",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "keeps run disabled when no runner is registered"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "does not count stale runners as available"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_preflight_and_exploratory_compare_after_data_version_change"
+        }
+      ],
+      "proofScope": "Server/API and mocked UI preflight checks.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A09",
+      "objectiveClause": "3 flow2",
+      "requirement": "Freeze suite/profile/scorer/data/semantic/permission/runtime/code identities",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/evaluation_api.py",
+          "symbol": "promptSha256"
+        },
+        {
+          "path": "apps/semantic-console/server/evaluation_api.py",
+          "symbol": "policyVersions"
+        },
+        {
+          "path": "apps/semantic-console/server/evaluation_api.py",
+          "symbol": "coreVersion"
+        },
+        {
+          "path": ".benchmark-data/evaluation-oneclick/20261105-162628/oneclick-report.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Frozen suite/profile revisions, dataset/scorer registration, raw fingerprint, semantic/scoring versions, Core version/source hash, roles/scorer policy+context hashes, runner/CLI versions, explicit model/config and prompt digest; live HR manifests inspected.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A10",
+      "objectiveClause": "3 flow3",
+      "requirement": "Fresh process and MCP capability per attempt",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/src/semarail_eval_runner/main.py",
+          "symbol": "serve_broker"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_cancel_terminates_job_without_retry"
+        },
+        {
+          "path": ".benchmark-data/evaluation-center/20261105-152709/acceptance-summary.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Each of8 attempts starts a fresh Codex process and MCP capability; installed daemon actual page run independently confirms that path. Nonce/process tests reject reuse.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A11",
+      "objectiveClause": "3 flow4",
+      "requirement": "Distinct role/scorer/worker identities; raw DB secret excluded",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_preflight_rejects_reused_credentials_before_external_calls"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_preflight_rejects_same_subject_with_different_keys"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_reference_sql_requires_independent_managed_scorer"
+        }
+      ],
+      "proofScope": "Distinct worker, Agent and per-dataset registered scorer identities. Scorer grants limited to read/query capabilities for dataset; privileged/wildcard identities rejected. Raw DB credential absent from Agent environment.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A12",
+      "objectiveClause": "3 flow5",
+      "requirement": "Unknown clarification is unsupported interaction",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_clarification_only_after_core_requested_it"
+        },
+        {
+          "path": "../semarail-eval-runner/src/semarail_eval_runner/main.py",
+          "symbol": "unsupported_interaction"
+        }
+      ],
+      "proofScope": "Mock broker returns no invented user response; real clarification acceptance absent.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A13",
+      "objectiveClause": "3 flow6",
+      "requirement": "Trusted independent reference SQL and observed query capture",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_reference_outage_preserves_actual_agent_answer"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_model_claim_without_observed_query_cannot_create_result"
+        },
+        {
+          "path": ".benchmark-data/evaluation-oneclick/20261105-162628/oneclick-report.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Dataset registration binds independent read-only scorer to dataset version+datasource. Worker must match. Actual reference SQL used registered subject; trusted proxy captured Agent results. Missing/mismatched/stale/privileged binding and drift tested.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A14",
+      "objectiveClause": "3 flow7",
+      "requirement": "Open Core diagnostics and collected Agent Trace; absence explicit",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "keeps review history and clears a different case's Core diagnostic"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_trace_ownership_and_events_persistence"
+        },
+        {
+          "path": ".benchmark-data/evaluation-browser/live-proof/live-browser-report.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Actual query evidence opens caller-owned Core diagnostic in authenticated rendered page. Full Agent Trace absence explicitly shown; existing associated Trace callback supported.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A15",
+      "objectiveClause": "3 freeze",
+      "requirement": "Execution lock blocks publish/rollback/datasource changes",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_run_completion_idempotency_review_and_config_lock"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_configuration_guard_recovers_stale_evaluation_without_report_poll"
+        }
+      ],
+      "proofScope": "Reused project guard/API checks; no simultaneous external source edits are claimed prevented.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "A16",
+      "objectiveClause": "3 freeze",
+      "requirement": "Raw physical content fingerprint independent semantics; drift stops jobs",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/tests/test_data_fingerprint.py",
+          "symbol": "test_raw_values_schema_duplicates_empty_and_semantic_independence"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_fingerprint_drift_stops_queued_dispatch"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_data_drift_blocks_model_launch"
+        }
+      ],
+      "proofScope": "Real PG scratch mutation validates content hash; launch gating mocked; full1.9m performance not separately benchmarked.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "B01",
+      "objectiveClause": "3 baseline",
+      "requirement": "Only fully executed run can become baseline",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/evaluation_api.py",
+          "symbol": "baseline must be fully executed"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_run_completion_idempotency_review_and_config_lock"
+        }
+      ],
+      "proofScope": "Baseline guard source inspected; full model baseline not achieved.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "B02",
+      "objectiveClause": "3 compare",
+      "requirement": "Strict matching suite/data/scorer and case-round keys; exploratory otherwise",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_different_case_selection_is_exploratory"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_strict_auto_comparison_does_not_follow_manual_review"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "labels differing environments as exploratory"
+        }
+      ],
+      "proofScope": "API compare fixtures only; actual published semantic regression remains acceptance gap.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "B03",
+      "objectiveClause": "3 compare",
+      "requirement": "Fixed/regression/persistent failure/stable pass and environment factors",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/evaluation_api.py",
+          "symbol": "persistent_failure"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.tsx",
+          "symbol": "Candidate score"
+        }
+      ],
+      "proofScope": "Classification source and strict comparison tests. No real improvement claim supported.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "D01",
+      "objectiveClause": "4 storage",
+      "requirement": "Independent schema migrations with SQLite and PostgreSQL compatibility",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/evaluations.py",
+          "symbol": "evaluation_schema_migrations"
+        },
+        {
+          "path": "scripts/acceptance-evaluations-postgres.py",
+          "symbol": "reopened = EvaluationStore"
+        }
+      ],
+      "proofScope": "SQLite tests and real PG scratch acceptance reported; not production migrations or upgrade/downgrade proof.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "D02",
+      "objectiveClause": "4 evidence",
+      "requirement": "Detailed evidence isolated, no hidden reasoning or credentials",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/evaluations.py",
+          "symbol": "scrub_evidence"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_evidence_redacts_credentials_and_artifact_urls"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_trace_ownership_and_events_persistence"
+        }
+      ],
+      "proofScope": "Recursive redaction and omission tests; does not imply arbitrary sensitive-text semantic detection.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "D03",
+      "objectiveClause": "4 evidence",
+      "requirement": "30day expiry/early delete with permanent summaries and explicit unavailable",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_expired_evidence_is_deleted_while_long_term_scores_remain"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_idle_server_maintenance_deletes_expired_evidence_without_api_access"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "retains scores and review guidance when detailed evidence has expired"
+        }
+      ],
+      "proofScope": "Clock-driven expiry and app idle cleanup tested, not actual30day wait.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "D04",
+      "objectiveClause": "4 lease",
+      "requirement": "Claim lease heartbeat and terminal idempotency",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_run_completion_idempotency_review_and_config_lock"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_heartbeats_cannot_extend_hard_deadline"
+        }
+      ],
+      "proofScope": "API real DB transaction behavior; runner heartbeat model/reference test mocked.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "D05",
+      "objectiveClause": "4 cancellation",
+      "requirement": "Timeout/cancel terminates process tree and best-effort Core cancellation",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_cancel_sends_protocol_notification_for_inflight_request"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_cancellation_targets_inflight_remote_executor_for_role_and_scorer"
+        },
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_cancel_terminates_job_without_retry"
+        },
+        {
+          "path": ".benchmark-data/evaluation-browser/final-frontend-bootstrap-verification.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Actual same-runtime MCP cancellation returned CANCELLED in3.61s (proof/actual-cancellation.json). Runner46 gate includes actual Windows tree kill and single-invocation timeout. Bootstrap7 gate includes actual runtime lifetime/exit propagation.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "D06",
+      "objectiveClause": "4 restart",
+      "requirement": "Queued resume; started orphan interrupted and never automatically replayed",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_restart_preserves_queue_and_fences_abandoned_started_attempt"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_lease_expiry_never_reissues_started_attempt"
+        }
+      ],
+      "proofScope": "Entire app/gateway/store recreated against same DB; OS crash not separately induced.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "D07",
+      "objectiveClause": "4 retries",
+      "requirement": "Communication completion retries do not reinvoke model",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/tests/test_runner.py",
+          "symbol": "test_cancel_terminates_job_without_retry"
+        },
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_parallel_claims_across_independent_stores_obey_concurrency_for_all_rounds"
+        },
+        {
+          "path": "../semarail-eval-runner/src/semarail_eval_runner/main.py",
+          "symbol": "for retry in range(3)"
+        }
+      ],
+      "proofScope": "Retry payload source plus idempotency tests; transient real network faults not injected.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "D08",
+      "objectiveClause": "4 compatibility",
+      "requirement": "Legacy scripts/frozen campaigns preserved",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "docs/evaluation-center.md",
+          "symbol": "Existing golden-question scripts and frozen benchmark campaigns are retained."
+        },
+        {
+          "path": "dist/evaluation-center-v1-candidate-4/source-verification.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Frozen alpha9 archive SHA256 unchanged; new independent tables preserve regression semantics.19 existing regression tests and prior full378 server suite passed. Existing benchmark scripts/reports retained.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "D09",
+      "objectiveClause": "4 optin",
+      "requirement": "No runner allows management but prevents run with reason",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "keeps run disabled when no runner is registered"
+        },
+        {
+          "path": "apps/semantic-console/server/evaluation_api.py",
+          "symbol": "Online workers must provide every test role"
+        }
+      ],
+      "proofScope": "UI/API no-runner tests; separate actual toggle disagreement G05 unresolved.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "T01",
+      "objectiveClause": "5 test gates",
+      "requirement": "Current focused suites prove intended unit/API behavior",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/server/tests/test_evaluations.py",
+          "symbol": "test_parallel_claims_across_independent_stores_obey_concurrency_for_all_rounds"
+        },
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+          "symbol": "ignores an older in-flight poll after a different run is selected"
+        }
+      ],
+      "proofScope": "Final58 evaluation+legacyregression, full190Console, final typecheck, contract20compatibility, CLI6/build/79filecheck, bootstrap7actualWindowslifecycle, runner46with no skips and opt-in CLI+PG; actual PG19checks separately passed.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "T02",
+      "objectiveClause": "5 real acceptance",
+      "requirement": "Real PostgreSQL + real Codex query/clarify/deny/failure",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": ".benchmark-data/evaluation-center/20261104-163336/acceptance-summary.json",
+          "symbol": "\"status\": \"failed\""
+        },
+        {
+          "path": "../semarail-eval-runner/tests/live_acceptance.py",
+          "symbol": "assert_run"
+        },
+        {
+          "path": ".benchmark-data/evaluation-center/20261105-152709/acceptance-summary.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Real PostgreSQL and Codex completed query/clarify/deny/intentionalnegative on both published revisions. Expected failed scoring is distinct from process failure.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "T03",
+      "objectiveClause": "5 regression acceptance",
+      "requirement": "Real baseline then published semantic change detects intended regression",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "../semarail-eval-runner/tests/live_acceptance.py",
+          "symbol": "controlled evaluation-only semantic regression"
+        },
+        {
+          "path": ".benchmark-data/evaluation-browser/live-proof/live-browser-report.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Baseline3/4 -> candidate2/4 with only semantic revision changed. Query regression detected, clarification/denial stable_pass, intentionalnegative persistent_failure. Rendered strict comparison and Core evidence inspected.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "T04",
+      "objectiveClause": "5 Console acceptance",
+      "requirement": "Actual rendered page refresh/edit/enable/run/inspect/review/compare",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.tsx",
+          "symbol": "Enable evaluations for this test project"
+        },
+        {
+          "path": ".benchmark-data/evaluation-browser/scorer-proof/report.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Temporary independent Edge/Playwright checks scorer setup, suite/profile import/export, immutable copy, preview/start, review persistence, reload/re-auth, comparison and desktop/mobile. Separate actual model page start and live regression rendering passed.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "T05",
+      "objectiveClause": "5 delivery",
+      "requirement": "Build packed Core and runner and install fresh environment",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "scripts/acceptance-evaluation-distribution.py",
+          "symbol": "installed_core_evaluation_api"
+        },
+        {
+          "path": ".benchmark-data/evaluation-distribution/20261104-162022/report.json",
+          "symbol": "installed_core_start_timeout"
+        },
+        {
+          "path": ".benchmark-data/evaluation-distribution/20261105-163354/report.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Candidate4 archive+wheel installed in fresh prefix/venv. Runtime/API/assets passed; launcher supervised and process tree stopped.79 Core files+5 runner modules exact;55 source Python files/OpenAPI/web assets match packaged source.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "T06",
+      "objectiveClause": "5 docs/artifacts",
+      "requirement": "Installation/config/run commands and HR suite example",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "docs/evaluation-center.md",
+          "symbol": "Installation and host configuration"
+        },
+        {
+          "path": "examples/evaluation/hr-smoke-suite.json",
+          "symbol": null
+        },
+        {
+          "path": "dist/evaluation-center-v1-candidate-4/source-verification.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Exact archive/wheel commands, Core+MCP launch, host aliases, per-dataset scorer registration, check/run and editable versioned HR example documented. Artifacts unpublished.",
+      "remainingEvidence": null
+    },
+    {
+      "id": "T07",
+      "objectiveClause": "5 final gate",
+      "requirement": "Complete goal one-click/review/compare/locate",
+      "status": "verified",
+      "evidence": [
+        {
+          "path": "docs/evaluation-center.md",
+          "symbol": "Acceptance ledger"
+        },
+        {
+          "path": ".benchmark-data/evaluation-oneclick/20261105-162628/oneclick-report.json",
+          "symbol": "Final accepted verification"
+        }
+      ],
+      "proofScope": "Full original scope accepted: one-click real run, independent manual review controls/history, historical strict comparison and diagnosis, plus final installed-runtime lifecycle gate. Actual human answer review remains pending by design.",
+      "remainingEvidence": null
+    }
+  ],
+  "runtimeEvidence": {
+    "live": ".benchmark-data/evaluation-center/20261105-152709/acceptance-summary.json",
+    "one": ".benchmark-data/evaluation-oneclick/20261105-162628/oneclick-report.json",
+    "ui": ".benchmark-data/evaluation-browser/scorer-proof/report.json",
+    "render": ".benchmark-data/evaluation-browser/live-proof/live-browser-report.json",
+    "install": ".benchmark-data/evaluation-distribution/20261105-163354/report.json",
+    "backend": ".benchmark-data/evaluation-browser/final-backend-verification.json",
+    "frontend": ".benchmark-data/evaluation-browser/final-frontend-bootstrap-verification.json",
+    "artifacts": "dist/evaluation-center-v1-candidate-4/source-verification.json",
+    "model": "gpt-6-luna",
+    "reasoningEffort": "low",
+    "plannedLivePositions": 8,
+    "baselineRunId": "21ba7d5f073744f88ca8540969693886",
+    "candidateRunId": "3ec1af52bdce46afac6d53ea855de61b",
+    "strictComparisonOnlyChangedFactor": "semanticVersion",
+    "newRegressions": [
+      "query"
+    ],
+    "oneClickRunId": "90e1b957540c41c3abd01cb77a415650",
+    "oneClickScorerMatchesDatasetRegistration": true,
+    "browserMethod": "User explicitly approved independent temporary Playwright/Edge browser; localhost only; no global setting change",
+    "manualAnswerReview": "pending by design, separately editable with history; no model judge",
+    "earlierFailuresPreserved": true
+  },
+  "executionLedger": [
+    {
+      "command": "node scripts/test-semantic-console.mjs",
+      "result": "378passed before final focused additions",
+      "scope": "full server compatibility; final58 checks cover changed evaluation+legacyregression behavior"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m unittest server.tests.test_evaluations server.tests.test_regression -q",
+      "result": "58passed,39evaluation+19regression",
+      "evidence": ".benchmark-data/evaluation-browser/final-backend-verification.json"
+    },
+    {
+      "command": "pnpm --filter @hejielijob/semantic-console-web test",
+      "result": "190passed,20files",
+      "evidence": ".benchmark-data/evaluation-browser/final-frontend-bootstrap-verification.json"
+    },
+    {
+      "command": "workspace typecheck; contract tests; CoreCLI/build/verify-pack",
+      "result": "passed; contract20,CLI6,pack79",
+      "scope": "Final frontend typecheck after scorer addition; generated source exactness separately verified"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m unittest discover -s packages/core/runtime -p test_bootstrap.py -v",
+      "result": "7passed, actual Windows early-exit reproduced before fix",
+      "evidence": ".benchmark-data/evaluation-browser/final-frontend-bootstrap-verification.json"
+    },
+    {
+      "command": "PYTHONPATH=src;tests SEMARAIL_TEST_CLI_ISOLATION=1 SEMARAIL_FINGERPRINT_NATIVE_HELPER=<owned helper> python -m unittest discover -s tests -v",
+      "result": "46passed,no skips,32.448s",
+      "source": "root terminal20007",
+      "scope": "Runner modules unchanged since gate; README and live acceptance harness subsequently updated only"
+    },
+    {
+      "command": ".venv/Scripts/python.exe scripts/acceptance-evaluations-postgres.py",
+      "result": "passed19checks",
+      "evidence": ".benchmark-data/evaluation-browser/final-backend-verification.json"
+    },
+    {
+      "command": "real Codex HR baseline+semantic change campaign",
+      "result": "passed8positions; intended regression detected",
+      "evidence": ".benchmark-data/evaluation-center/20261105-152709/acceptance-summary.json"
+    },
+    {
+      "command": "independent controlled and live rendered Playwright scripts",
+      "result": "passed; actual-source backend and Console; separate controlled vs paid model evidence",
+      "evidence": [
+        ".benchmark-data/evaluation-browser/scorer-proof/report.json",
+        ".benchmark-data/evaluation-browser/live-proof/live-browser-report.json"
+      ]
+    },
+    {
+      "command": "scripts/acceptance-evaluation-oneclick.py --model gpt-6-luna --worker <installed executable>",
+      "result": "passed real page->installed daemon->Codex->registered reference scorer1/1",
+      "evidence": ".benchmark-data/evaluation-oneclick/20261105-162628/oneclick-report.json"
+    },
+    {
+      "command": "scripts/acceptance-evaluation-distribution.py --archive <candidate4> --runner-wheel <wheel>",
+      "result": "passed6checks including supervision and cleanup",
+      "evidence": ".benchmark-data/evaluation-distribution/20261105-163354/report.json"
+    }
+  ],
+  "unverifiedCommands": [],
+  "sourceInventory": [
+    {
+      "path": "../semarail-eval-runner/src/semarail_eval_runner/data_fingerprint.py",
+      "sha256": "85fcdf10eec3d7e44d7e8a82251a011f3dda9c3c91934e4cb754baa373274583"
+    },
+    {
+      "path": "../semarail-eval-runner/src/semarail_eval_runner/main.py",
+      "sha256": "bc0e6cd56bf26114f0398b6a74eb1ebae321ac76a12b562ba011bfcbfbe6bfc1"
+    },
+    {
+      "path": "../semarail-eval-runner/tests/live_acceptance.py",
+      "sha256": "fce040fc331bad1adeb17bcaa7a548eee6813b1e78e7e7733d6e30f486cf791d"
+    },
+    {
+      "path": "../semarail-eval-runner/tests/test_cli_isolation.py",
+      "sha256": "ff76fba85d0aa379158292aae767f24b8e9669090298da18241ac7b767b039a2"
+    },
+    {
+      "path": "../semarail-eval-runner/tests/test_data_fingerprint.py",
+      "sha256": "d8751d64fecb4e72dd25271b6578ec101bf565cb929a9e5380b6e1d14692c519"
+    },
+    {
+      "path": "../semarail-eval-runner/tests/test_ordering.py",
+      "sha256": "5f2f40e3b25ef81782ed208beacd0ff087d4797339e7d90ec95d151a44a4b9be"
+    },
+    {
+      "path": "../semarail-eval-runner/tests/test_runner.py",
+      "sha256": "03ef8c45e707ee7a0032c907190b1eb6d397ebfd2a849dadf7ddab515615edd9"
+    },
+    {
+      "path": "apps/semantic-console/server/evaluation_api.py",
+      "sha256": "2f30acc0dcaadfac57c874f2f00fad377b93d5bd299200a4c6b3dc5dad9e8649"
+    },
+    {
+      "path": "apps/semantic-console/server/evaluation_scoring.py",
+      "sha256": "7ce2b09c12d63ba3c0f4bc99b50d38d25641f15ab68ebec5fee91592cbd39b2f"
+    },
+    {
+      "path": "apps/semantic-console/server/evaluations.py",
+      "sha256": "9d84221298e6eec986c003e1bab064f409b34601a7388da1c6987eb993230824"
+    },
+    {
+      "path": "apps/semantic-console/server/openapi.json",
+      "sha256": "eae64889ed7c12c7b8c33fdb16f6a5facb659cb2aee87b9cef452571bfa132ec"
+    },
+    {
+      "path": "apps/semantic-console/server/tests/test_evaluations.py",
+      "sha256": "27b26f16e074c366a838e1b4677db9d6f09f2c878994546830fde88a28055b3f"
+    },
+    {
+      "path": "apps/semantic-console/web/src/api/evaluations.test.ts",
+      "sha256": "5b22123b20d53b8b1dbc6ef5d7ece4f3f601b06b04b440b8105fca485b387035"
+    },
+    {
+      "path": "apps/semantic-console/web/src/api/evaluations.ts",
+      "sha256": "d5bc2225e44a8da391c541ea7ca42a6986bc7a97075a39b3835eb0da8ce26efd"
+    },
+    {
+      "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+      "sha256": "4c6961f503b6891093eb2416322472e9dfcd90e66e86b8136c22fa88acdbf808"
+    },
+    {
+      "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.tsx",
+      "sha256": "b47732664b4512b133f7d0776928f395c433ce38c9a05577240b5a45f7924785"
+    },
+    {
+      "path": "docs/evaluation-center.md",
+      "sha256": "4361af1ad74c8bd8ebd958e47d90191ff67af31b3dee46572b7e6ec939e11463"
+    },
+    {
+      "path": "packages/contract/src/evaluation.ts",
+      "sha256": "76a1597a1a19544e90c6df19bf3b938dd30b05dc5c2bb210a05d84c792fc1d3e"
+    },
+    {
+      "path": "packages/core/runtime/bootstrap.py",
+      "sha256": "5c26b635237f854cb16163cd2e40ffcaed4d80cfae3bb83782310d8250444655"
+    },
+    {
+      "path": "packages/core/runtime/test_bootstrap.py",
+      "sha256": "38f92ec3208da770173ac236d2349cc34b67c0b072c4afdb5ae269b6bbf3293b"
+    },
+    {
+      "path": "scripts/acceptance-evaluation-browser.cjs",
+      "sha256": "76f7fb1d017de24d6fbeb266ddfddedf458717d1e04ddf2f06b494a3a647db04"
+    },
+    {
+      "path": "scripts/acceptance-evaluation-distribution.py",
+      "sha256": "6f63c397b5363ead5e796eed8ce50568dd9606690481d37758c4b10d7513aded"
+    },
+    {
+      "path": "scripts/acceptance-evaluation-live-browser.cjs",
+      "sha256": "17d25378e197fe86020de35dd39a3a2d981dd4b882417dd57a2f2154628da9db"
+    },
+    {
+      "path": "scripts/acceptance-evaluation-oneclick.cjs",
+      "sha256": "0355817f9652578e8c3f560be0f8fe6623c73fd68e668fe78368831b802e6a46"
+    },
+    {
+      "path": "scripts/acceptance-evaluation-oneclick.py",
+      "sha256": "6d0d1bdbea3c84839584c6b10529ed0582b69278ba062bbe5567d72bdf4d16a2"
+    },
+    {
+      "path": "scripts/acceptance-evaluations-postgres.py",
+      "sha256": "d999525ede3b7034e8459e175a9c4363219b4b6408e988d294578f5a7bd5847e"
+    }
+  ],
+  "counts": {
+    "verified": 64
+  },
+  "notes": [
+    "Accepted2026-11-06 Asia/Shanghai; auditedAt is UTC.",
+    "Earlier failed model/browser/install reports retained unchanged at original paths; prior audit snapshot preserved in historicalAudit.",
+    "Real HR cases use explicit SQL to establish integration behavior, not natural-language accuracy.",
+    "No model judge, automatic draft deployment, schedules, CI release gate or alternate runner.",
+    "Final unpublished artifacts candidate4 retain development version; frozen root alpha9 archive unchanged.",
+    "Pending human review is a product state; deterministic pass does not imply human answer passed.",
+    "Windows execv orphan/early-exit reproduced in real process regression test and corrected in bootstrap4; final fresh install verifies supervision and cleanup."
+  ],
+  "historicalAudit": {
+    "auditedAt": "2026-11-04T17:00:32.744983+00:00",
+    "overallStatus": "incomplete",
+    "runtimeEvidence": {
+      "latestLiveReport": ".benchmark-data/evaluation-center/20261104-163336/acceptance-summary.json",
+      "liveStateDatabase": ".benchmark-data/evaluation-center/20261104-163336/state/access-control.sqlite3",
+      "readOnlyQuery": "SELECT attempt_id,body_json FROM evaluation_evidence; only toolCalls length/cliFailure were projected; no secrets/results copied",
+      "observedLiveAttemptEvidence": [
+        {
+          "toolCalls": 0,
+          "cliFailure": "timeout"
+        },
+        {
+          "toolCalls": 0,
+          "cliFailure": "timeout"
+        },
+        {
+          "toolCalls": 0,
+          "cliFailure": "timeout"
+        },
+        {
+          "toolCalls": 0,
+          "cliFailure": "timeout"
+        }
+      ],
+      "interpretation": "Report attempt status completed is not proof of model success. Report is failed and every recorded tool-call list is empty.",
+      "distributionReport": ".benchmark-data/evaluation-distribution/20261104-162022/report.json",
+      "distributionStatus": "failed: installed_core_start_timeout; npm archive and wheel installation only passed",
+      "browserIssue": {
+        "provenance": "Parent direct browser observations, not independently reproduced by this audit agent",
+        "state": "Unresolved disagreement: user enabled switch but CUA still observed disabled control/state"
+      }
+    },
+    "executionLedger": [
+      {
+        "command": "node scripts/test-semantic-console.mjs",
+        "source": "parent terminal report",
+        "result": "378 tests passed before two later parallel-round focused tests passed",
+        "scope": "compatibility plus then-current server tests; audit focused rerun still in progress"
+      },
+      {
+        "command": "pnpm --filter @hejielijob/semantic-console-web test",
+        "source": "parent terminal report",
+        "result": "185 tests passed",
+        "scope": "mock/component tests, not browser acceptance"
+      },
+      {
+        "command": "pnpm --filter @hejielijob/semarail-contract test",
+        "source": "parent terminal report",
+        "result": "20 tests passed",
+        "scope": "existing compatibility suite; no claim new TS interfaces validated by all20"
+      },
+      {
+        "command": "PYTHONPATH=../semarail-eval-runner/src SEMARAIL_FINGERPRINT_NATIVE_HELPER=benchmarks/business-trust-v1/native_postgres.py python -m unittest discover -s ../semarail-eval-runner/tests -v",
+        "source": "this audit command tool terminal",
+        "result": "42 tests, 41 passed,1 opt-in CLI isolation skipped",
+        "scope": "mock runner, ordering, rawPGscratch. No paid model; skipped actual local CLI catalog capture."
+      },
+      {
+        "command": "PYTHONPATH=apps/semantic-console python -m unittest server.tests.test_evaluations -v",
+        "source": "this audit terminal8760",
+        "result": "35 tests passed in52.790s",
+        "scope": "current focused generic API/scoring/lifecycle tests, fake Core query dispatcher"
+      },
+      {
+        "command": "pnpm --filter @hejielijob/semantic-console-web exec vitest run --config vitest.config.ts src/components/EvaluationWorkbench.test.tsx src/api/evaluations.test.ts",
+        "source": "this audit terminal89590",
+        "result": "17 tests passed in72.46s",
+        "scope": "13 component tests+4 client tests, mocked backend, no CUA"
+      }
+    ],
+    "unverifiedCommands": [
+      {
+        "command": "python ../semarail-eval-runner/tests/live_acceptance.py --model <explicit-model> --reasoning low",
+        "reason": "latest actual execution failed and zero MCP tools"
+      },
+      {
+        "command": "python scripts/acceptance-evaluation-distribution.py --archive <current-core.tgz> --runner-wheel <current-runner.whl>",
+        "reason": "first installed startup timeout; retry ongoing, not accepted yet"
+      },
+      {
+        "command": "semarail-eval-runner check --config eval-runner.toml",
+        "reason": "preflight source/tests inspected; final installed-artifact check not independently observed"
+      },
+      {
+        "command": "semarail-eval-runner run --config eval-runner.toml",
+        "reason": "successful live full model flow unproven"
+      }
+    ],
+    "counts": {
+      "incomplete": 5,
+      "partial": 13,
+      "verified": 45,
+      "missing": 1
+    },
+    "notes": [
+      "Snapshot is not a completion claim. Source hashes bind inspected state; later code/test changes require revalidation.",
+      "Only this new audit JSON is written by this audit task. Main documentation intentionally not edited.",
+      "Do not delete or alter failed live evidence to obtain a green ledger."
+    ],
+    "unverifiedRequirements": [
+      {
+        "id": "G01",
+        "objectiveClause": "1/5",
+        "requirement": "One-click complete real Agent workflow in Console",
+        "status": "incomplete",
+        "evidence": [
+          {
+            "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.tsx",
+            "symbol": "Run evaluation"
+          },
+          {
+            "path": "../semarail-eval-runner/tests/live_acceptance.py",
+            "symbol": "assert_run"
+          },
+          {
+            "path": ".benchmark-data/evaluation-oneclick/20261105-162628/oneclick-report.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "UI/API implementation and mocked tests exist; latest real run failed with zero tools.",
+        "remainingEvidence": "Successful authenticated browser start through real CLI/MCP query, report and diagnosis."
+      },
+      {
+        "id": "G02",
+        "objectiveClause": "1",
+        "requirement": "Codex CLI with authenticated MCP",
+        "status": "partial",
+        "evidence": [
+          {
+            "path": "../semarail-eval-runner/src/semarail_eval_runner/main.py",
+            "symbol": "run_job"
+          },
+          {
+            "path": "../semarail-eval-runner/tests/test_runner.py",
+            "symbol": "test_real_stdio_protocol_roundtrip_and_nonce"
+          },
+          {
+            "path": "../semarail-eval-runner/tests/test_cli_isolation.py",
+            "symbol": "test_actual_provider_request_exposes_no_host_access_tools"
+          },
+          {
+            "path": ".benchmark-data/evaluation-center/20261105-152709/acceptance-summary.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Mocked MCP roundtrip and real CLI catalog capture are distinct from model inference.",
+        "remainingEvidence": "Actual configured model must issue tool calls and answer."
+      },
+      {
+        "id": "G05",
+        "objectiveClause": "1",
+        "requirement": "Only explicitly enabled isolated test project published version",
+        "status": "partial",
+        "evidence": [
+          {
+            "path": "apps/semantic-console/server/evaluation_api.py",
+            "symbol": "testDataOnly"
+          },
+          {
+            "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+            "symbol": "does not dispatch when server preflight detects environment drift"
+          },
+          {
+            "path": ".benchmark-data/evaluation-browser/final-backend-verification.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Evaluation enablement is separate from desktop Browser permission. Server and API checks exist; rendered start proof remains pending.",
+        "remainingEvidence": "Rendered UI verification pending."
+      },
+      {
+        "id": "G06",
+        "objectiveClause": "1",
+        "requirement": "Initial real PostgreSQL HR role acceptance",
+        "status": "incomplete",
+        "evidence": [
+          {
+            "path": "../semarail-eval-runner/tests/live_acceptance.py",
+            "symbol": "cases ="
+          },
+          {
+            "path": ".benchmark-data/evaluation-center/20261104-163336/acceptance-summary.json",
+            "symbol": "\"status\": \"failed\""
+          },
+          {
+            "path": ".benchmark-data/evaluation-center/20261105-152709/acceptance-summary.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Real HR database/control setup exists; model emitted no observed tools.",
+        "remainingEvidence": "Query, clarification, denial and deliberately wrong result must all be demonstrated through real model calls."
+      },
+      {
+        "id": "S03",
+        "objectiveClause": "2 suites",
+        "requirement": "Suite copy",
+        "status": "partial",
+        "evidence": [
+          {
+            "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.tsx",
+            "symbol": "Copy suite"
+          },
+          {
+            "path": "apps/semantic-console/server/evaluation_api.py",
+            "symbol": "\"copy\""
+          },
+          {
+            "path": ".benchmark-data/evaluation-browser/scorer-proof/report.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Copy route and UI source inspected.",
+        "remainingEvidence": "Dedicated copy test and rendered copy/save proof absent."
+      },
+      {
+        "id": "A03",
+        "objectiveClause": "3 CLI",
+        "requirement": "Ephemeral isolated directory, JSONL, no global config mutation",
+        "status": "partial",
+        "evidence": [
+          {
+            "path": "../semarail-eval-runner/src/semarail_eval_runner/main.py",
+            "symbol": "TemporaryDirectory"
+          },
+          {
+            "path": "../semarail-eval-runner/src/semarail_eval_runner/main.py",
+            "symbol": "--ephemeral"
+          },
+          {
+            "path": "../semarail-eval-runner/tests/test_cli_isolation.py",
+            "symbol": "test_actual_provider_request_exposes_no_host_access_tools"
+          },
+          {
+            "path": ".benchmark-data/evaluation-oneclick/20261105-162628/oneclick-report.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Subprocess config source/mock tests and opt-in actual CLI local capture; no successful inference.",
+        "remainingEvidence": "Need genuine model+MCP run with same launch overrides."
+      },
+      {
+        "id": "A05",
+        "objectiveClause": "3 API",
+        "requirement": "All management/worker/evidence routes documented and versioned",
+        "status": "partial",
+        "evidence": [
+          {
+            "path": "apps/semantic-console/server/evaluation_api.py",
+            "symbol": "def _dispatch"
+          },
+          {
+            "path": "docs/evaluation-center.md",
+            "symbol": "API notes"
+          },
+          {
+            "path": ".benchmark-data/evaluation-browser/final-backend-verification.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Source routes exist; OpenAPI currently being refreshed by parent.",
+        "remainingEvidence": "Verify generated/current OpenAPI enumerates every implemented route and request schema."
+      },
+      {
+        "id": "A09",
+        "objectiveClause": "3 flow2",
+        "requirement": "Freeze suite/profile/scorer/data/semantic/permission/runtime/code identities",
+        "status": "partial",
+        "evidence": [
+          {
+            "path": "apps/semantic-console/server/evaluation_api.py",
+            "symbol": "promptSha256"
+          },
+          {
+            "path": "apps/semantic-console/server/evaluation_api.py",
+            "symbol": "policyVersions"
+          },
+          {
+            "path": "apps/semantic-console/server/evaluation_api.py",
+            "symbol": "coreVersion"
+          },
+          {
+            "path": ".benchmark-data/evaluation-oneclick/20261105-162628/oneclick-report.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Run captures source/profile metadata in implementation; no proof all requested identities actually observed in successful model run.",
+        "remainingEvidence": "Complete live run and inspect frozen manifest including actual CLI/core/runner/source and role versions."
+      },
+      {
+        "id": "A10",
+        "objectiveClause": "3 flow3",
+        "requirement": "Fresh process and MCP capability per attempt",
+        "status": "partial",
+        "evidence": [
+          {
+            "path": "../semarail-eval-runner/src/semarail_eval_runner/main.py",
+            "symbol": "serve_broker"
+          },
+          {
+            "path": "../semarail-eval-runner/tests/test_runner.py",
+            "symbol": "test_cancel_terminates_job_without_retry"
+          },
+          {
+            "path": ".benchmark-data/evaluation-center/20261105-152709/acceptance-summary.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Subprocess invocation test; actual CLI launch occurred but zero observed business tools.",
+        "remainingEvidence": "Successful fresh sessions through real MCP."
+      },
+      {
+        "id": "A13",
+        "objectiveClause": "3 flow6",
+        "requirement": "Trusted independent reference SQL and observed query capture",
+        "status": "partial",
+        "evidence": [
+          {
+            "path": "../semarail-eval-runner/tests/test_runner.py",
+            "symbol": "test_reference_outage_preserves_actual_agent_answer"
+          },
+          {
+            "path": "../semarail-eval-runner/tests/test_runner.py",
+            "symbol": "test_model_claim_without_observed_query_cannot_create_result"
+          },
+          {
+            "path": ".benchmark-data/evaluation-oneclick/20261105-162628/oneclick-report.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Model cannot fabricate observed result in mocks; oracle errors preserve evidence.",
+        "remainingEvidence": "Real grader role query plus actual Agent final query evidence."
+      },
+      {
+        "id": "A14",
+        "objectiveClause": "3 flow7",
+        "requirement": "Open Core diagnostics and collected Agent Trace; absence explicit",
+        "status": "partial",
+        "evidence": [
+          {
+            "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.test.tsx",
+            "symbol": "keeps review history and clears a different case's Core diagnostic"
+          },
+          {
+            "path": "apps/semantic-console/server/tests/test_evaluations.py",
+            "symbol": "test_trace_ownership_and_events_persistence"
+          },
+          {
+            "path": ".benchmark-data/evaluation-browser/live-proof/live-browser-report.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Core ownership/UI details tested; full Agent Trace only when existing association observed.",
+        "remainingEvidence": "Rendered successful run-to-Core and collected Agent Trace navigation proof."
+      },
+      {
+        "id": "D05",
+        "objectiveClause": "4 cancellation",
+        "requirement": "Timeout/cancel terminates process tree and best-effort Core cancellation",
+        "status": "partial",
+        "evidence": [
+          {
+            "path": "../semarail-eval-runner/tests/test_runner.py",
+            "symbol": "test_cancel_sends_protocol_notification_for_inflight_request"
+          },
+          {
+            "path": "../semarail-eval-runner/tests/test_runner.py",
+            "symbol": "test_cancellation_targets_inflight_remote_executor_for_role_and_scorer"
+          },
+          {
+            "path": "../semarail-eval-runner/tests/test_runner.py",
+            "symbol": "test_cancel_terminates_job_without_retry"
+          },
+          {
+            "path": ".benchmark-data/evaluation-browser/final-frontend-bootstrap-verification.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Actual Windows parent+child process termination verified by native process handles in test_process_tree.py; same-runtime stateless MCP cancellation separately covered in test_remote_mcp.py. Real PostgreSQL query interruption remains pending.",
+        "remainingEvidence": "Real running query cancel observation and actual Windows child-tree disappearance."
+      },
+      {
+        "id": "D08",
+        "objectiveClause": "4 compatibility",
+        "requirement": "Legacy scripts/frozen campaigns preserved",
+        "status": "partial",
+        "evidence": [
+          {
+            "path": "docs/evaluation-center.md",
+            "symbol": "Existing golden-question scripts and frozen benchmark campaigns are retained."
+          },
+          {
+            "path": "dist/evaluation-center-v1-candidate-4/source-verification.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Existing files retained and parent full suites reported green; no pre-change source hash inventory available.",
+        "remainingEvidence": "Final diff review ensure no existing frozen archive/campaign overwritten."
+      },
+      {
+        "id": "T02",
+        "objectiveClause": "5 real acceptance",
+        "requirement": "Real PostgreSQL + real Codex query/clarify/deny/failure",
+        "status": "incomplete",
+        "evidence": [
+          {
+            "path": ".benchmark-data/evaluation-center/20261104-163336/acceptance-summary.json",
+            "symbol": "\"status\": \"failed\""
+          },
+          {
+            "path": "../semarail-eval-runner/tests/live_acceptance.py",
+            "symbol": "assert_run"
+          },
+          {
+            "path": ".benchmark-data/evaluation-center/20261105-152709/acceptance-summary.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Inspected SQLite evidence four attempts zero toolCalls, cliFailure timeout; failed baseline0/4.",
+        "remainingEvidence": "Run genuinely successful actual model/MCP protocol and retain evidence for all four scenarios."
+      },
+      {
+        "id": "T03",
+        "objectiveClause": "5 regression acceptance",
+        "requirement": "Real baseline then published semantic change detects intended regression",
+        "status": "missing",
+        "evidence": [
+          {
+            "path": "../semarail-eval-runner/tests/live_acceptance.py",
+            "symbol": "controlled evaluation-only semantic regression"
+          },
+          {
+            "path": ".benchmark-data/evaluation-browser/live-proof/live-browser-report.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Acceptance script implements scenario but latest run never reached candidate phase.",
+        "remainingEvidence": "Two actual completed runs, same physical fingerprint and strict regression category linked to Core evidence."
+      },
+      {
+        "id": "T04",
+        "objectiveClause": "5 Console acceptance",
+        "requirement": "Actual rendered page refresh/edit/enable/run/inspect/review/compare",
+        "status": "partial",
+        "evidence": [
+          {
+            "path": "apps/semantic-console/web/src/components/EvaluationWorkbench.tsx",
+            "symbol": "Enable evaluations for this test project"
+          },
+          {
+            "path": ".benchmark-data/evaluation-browser/scorer-proof/report.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Actual independent Playwright browser against real local Console/backend passed historical report inspection, pending review save, reload/reauth/review reconstruction, profile import/export; desktop/mobile screenshots inspected.",
+        "remainingEvidence": "Rendered suite edit/publish, one-click live start and strict semantic comparison with evidence navigation."
+      },
+      {
+        "id": "T05",
+        "objectiveClause": "5 delivery",
+        "requirement": "Build packed Core and runner and install fresh environment",
+        "status": "incomplete",
+        "evidence": [
+          {
+            "path": "scripts/acceptance-evaluation-distribution.py",
+            "symbol": "installed_core_evaluation_api"
+          },
+          {
+            "path": ".benchmark-data/evaluation-distribution/20261104-162022/report.json",
+            "symbol": "installed_core_start_timeout"
+          },
+          {
+            "path": ".benchmark-data/evaluation-distribution/20261105-163354/report.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Packed Core installed in a fresh npm prefix; fresh private Python runtime initialization, evaluation API CRUD/publish and Console assets passed. Runner wheel installed with dependencies. Report20261105-150933. Current runner host-enable fix requires refreshed wheel and final install check.",
+        "remainingEvidence": "Final current-source package checksums, fresh installed Core started and evaluation APIs/assets served."
+      },
+      {
+        "id": "T06",
+        "objectiveClause": "5 docs/artifacts",
+        "requirement": "Installation/config/run commands and HR suite example",
+        "status": "partial",
+        "evidence": [
+          {
+            "path": "docs/evaluation-center.md",
+            "symbol": "Installation and host configuration"
+          },
+          {
+            "path": "examples/evaluation/hr-smoke-suite.json",
+            "symbol": null
+          },
+          {
+            "path": "dist/evaluation-center-v1-candidate-4/source-verification.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "Docs/example exist; packaged-install commands not all passed.",
+        "remainingEvidence": "Verify install, configure, check, run commands from delivered artifacts, plus all role aliases and dataset bindings."
+      },
+      {
+        "id": "T07",
+        "objectiveClause": "5 final gate",
+        "requirement": "Complete goal one-click/review/compare/locate",
+        "status": "incomplete",
+        "evidence": [
+          {
+            "path": "docs/evaluation-center.md",
+            "symbol": "Acceptance ledger"
+          },
+          {
+            "path": ".benchmark-data/evaluation-oneclick/20261105-162628/oneclick-report.json",
+            "symbol": "Final accepted verification"
+          }
+        ],
+        "proofScope": "End-to-end acceptance unresolved; implementation gates alone cannot complete goal.",
+        "remainingEvidence": "Close G01/G05/G06/P02/Q08/A03/A09/A10/A13/A14/D05/T02/T03/T04/T05/T06 with scope-appropriate proof."
+      }
+    ]
+  }
+}

@@ -867,7 +867,9 @@ class RegressionRunner:
             state_file = Path(project.datasource_state_file)
             private_state = state_file.read_bytes() if state_file.exists() else b""
             digest = hashlib.sha256(json.dumps(material, sort_keys=True, default=str).encode() + private_state).hexdigest()
-            return {"datasourceId": project.active_datasource_identifier(), "semanticVersion": overview.get("revision")}, digest
+            # SQL runs execute the published tree. A draft digest is not evidence
+            # that the run used an actual published revision.
+            return {"datasourceId": project.active_datasource_identifier(), "semanticVersion": project.published_revision}, digest
 
     def _execute(self, scope: tuple[str, str], run: dict[str, Any], cases: list[dict[str, Any]], authorization: str | None, state: dict[str, Any]) -> None:
         stop_heartbeat = threading.Event()

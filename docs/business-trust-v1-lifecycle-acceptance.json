@@ -1,0 +1,166 @@
+{
+  "agentEvaluation": {
+    "campaignId": "lifecycle-business-trust-v1-20261013-b",
+    "coveredScenarios": [
+      "salarySnapshot",
+      "performanceSnapshot"
+    ],
+    "datasetVersion": "hr-enterprise-43cc11018e9d2e46b8e1a9e9",
+    "model": "gpt-6-luna",
+    "reasoning": "max",
+    "reportSha256": "3d7d846c35cf0bf3bb6ee96839703201d19c39ac56da2fa6d70ab90d29c4828f",
+    "semanticVersion": "sha256:b319625441b8743618a52ddde743389fa35b9a3a89ca28ae1413ce81dd97ce6d",
+    "source": "external_agent_session_oracle_root_review",
+    "verdictAggregates": {
+      "failed": 0,
+      "inconclusive": 0,
+      "passed": 2,
+      "total": 2
+    }
+  },
+  "basePublishedVersionId": "20261012T171400232345Z-8e830e45",
+  "baseSemanticVersion": "sha256:6d06c3af7cbe0984ff90664eb4eb8e99e198cfe2c00626d292fdbfb928be90e4",
+  "datasetVersion": "hr-enterprise-43cc11018e9d2e46b8e1a9e9",
+  "datasourceId": "hr_actual_snapshot",
+  "externalAgentEvaluationImported": true,
+  "fixPublishedVersionId": "20261012T171409778037Z-03279199",
+  "fixSemanticVersion": "sha256:b319625441b8743618a52ddde743389fa35b9a3a89ca28ae1413ce81dd97ce6d",
+  "formalCampaignProjectModified": false,
+  "independentOracleReports": [
+    {
+      "governedQueryRecord": 27,
+      "reportSha256": "0aea1bd75b5c09cb5de53a5e2b84f4a449c981146626a3beeb4fc936ab5a5482",
+      "scenario": "salarySnapshot",
+      "status": "matched",
+      "transcriptSha256": "be524a62902cde84a9324ac28c2708c42c705a0b87e455c12c0712b593598b3d",
+      "workerThreadId": "01a135e8-6325-7883-a795-532a34aa8653"
+    },
+    {
+      "governedQueryRecord": 30,
+      "reportSha256": "8c879a86e17be43bd20f1c2979f86d9e30cd39ab25e8dbeed70d541d081b8bf4",
+      "scenario": "performanceSnapshot",
+      "status": "matched",
+      "transcriptSha256": "be524a62902cde84a9324ac28c2708c42c705a0b87e455c12c0712b593598b3d",
+      "workerThreadId": "01a135e8-c8e0-76d3-997f-65ca0a5ecf2e"
+    }
+  ],
+  "limitations": [
+    "Two real repair acceptance scenarios, separate from the official 180-position comparison.",
+    "Earlier failed attempts remain in private acceptance history. No comparative answer-quality improvement is claimed.",
+    "Export excludes credentials, connection details, private file paths, raw answers, SQL and result rows."
+  ],
+  "projectId": "semarail_hr_lifecycle_2f8a1dee71e5",
+  "publishedVersionIsCurrent": true,
+  "queryValuesIncluded": false,
+  "readerPasswordPersisted": false,
+  "retainedReportSha256": "b292fe951da26141b3831133cebe3ca5a8230d11d08245387dc139314acb34bd",
+  "scenarios": {
+    "performanceSnapshot": {
+      "agentEvaluationCoverageStatus": "evaluated",
+      "agentEvaluationId": "aeval_385ba595a62541f1a77fbdadeb197b3a",
+      "agentEvaluationRevision": 2,
+      "agentReview": {
+        "decision": "approved",
+        "reviewedAt": "2026-10-13T16:00:42.152687Z",
+        "reviewerSubjectId": "svc_e3d3f8b12cd04670a5f9b0509bc31927"
+      },
+      "caseId": "case_73348ef07f3e4c4d8c53501526b816a1",
+      "caseRevision": 1,
+      "datasetVersion": "hr-enterprise-43cc11018e9d2e46b8e1a9e9",
+      "feedbackId": "fb_ace14096a2a9423d8920946ddebae996",
+      "fixSemanticVersion": "sha256:b319625441b8743618a52ddde743389fa35b9a3a89ca28ae1413ce81dd97ce6d",
+      "independentOracleReview": {
+        "governedQueryRecord": 30,
+        "reportSha256": "8c879a86e17be43bd20f1c2979f86d9e30cd39ab25e8dbeed70d541d081b8bf4",
+        "scenario": "performanceSnapshot",
+        "status": "matched",
+        "transcriptSha256": "be524a62902cde84a9324ac28c2708c42c705a0b87e455c12c0712b593598b3d",
+        "workerThreadId": "01a135e8-c8e0-76d3-997f-65ca0a5ecf2e"
+      },
+      "resolutionStatus": "verified",
+      "runId": "rr_998b3899aaea4e7380e5d59247d9b9aa",
+      "runStatus": "completed",
+      "sourceQueryId": "hr-lifecycle-source-performancesnapshot-6223c2c3a9",
+      "sourceSemanticVersion": "sha256:6d06c3af7cbe0984ff90664eb4eb8e99e198cfe2c00626d292fdbfb928be90e4",
+      "sourceTraceId": "trace-448b80d63c734c30942929e4893cb8d9",
+      "sqlStatus": "passed",
+      "verificationChecks": {
+        "agentEvaluation": {
+          "reasonCode": "REVIEWED_AGENT_EVALUATION_SAME_VERSION",
+          "status": "passed"
+        },
+        "feedbackEvidence": {
+          "reasonCode": "SOURCE_FEEDBACK_MATCHES_BASE_VERSION",
+          "status": "passed"
+        },
+        "regressionCase": {
+          "reasonCode": "CASE_REVISION_LINKED",
+          "status": "passed"
+        },
+        "semanticAsset": {
+          "reasonCode": "PUBLISHED_ASSET_CHANGED",
+          "status": "passed"
+        },
+        "sqlRun": {
+          "reasonCode": "SQL_RUN_PASSED_SAME_VERSION",
+          "status": "passed"
+        }
+      }
+    },
+    "salarySnapshot": {
+      "agentEvaluationCoverageStatus": "evaluated",
+      "agentEvaluationId": "aeval_d15dbe1e11aa4f34beb75b1464c65963",
+      "agentEvaluationRevision": 2,
+      "agentReview": {
+        "decision": "approved",
+        "reviewedAt": "2026-10-13T16:00:42.221681Z",
+        "reviewerSubjectId": "svc_e3d3f8b12cd04670a5f9b0509bc31927"
+      },
+      "caseId": "case_af4b29a95bea46599a4ebaaef0a435d6",
+      "caseRevision": 1,
+      "datasetVersion": "hr-enterprise-43cc11018e9d2e46b8e1a9e9",
+      "feedbackId": "fb_db13a6de08dc4c96aba0d9ec62dedd54",
+      "fixSemanticVersion": "sha256:b319625441b8743618a52ddde743389fa35b9a3a89ca28ae1413ce81dd97ce6d",
+      "independentOracleReview": {
+        "governedQueryRecord": 27,
+        "reportSha256": "0aea1bd75b5c09cb5de53a5e2b84f4a449c981146626a3beeb4fc936ab5a5482",
+        "scenario": "salarySnapshot",
+        "status": "matched",
+        "transcriptSha256": "be524a62902cde84a9324ac28c2708c42c705a0b87e455c12c0712b593598b3d",
+        "workerThreadId": "01a135e8-6325-7883-a795-532a34aa8653"
+      },
+      "resolutionStatus": "verified",
+      "runId": "rr_998b3899aaea4e7380e5d59247d9b9aa",
+      "runStatus": "completed",
+      "sourceQueryId": "hr-lifecycle-source-salarysnapshot-236c15ea55",
+      "sourceSemanticVersion": "sha256:6d06c3af7cbe0984ff90664eb4eb8e99e198cfe2c00626d292fdbfb928be90e4",
+      "sourceTraceId": "trace-86d2b06b417b46348c8154f56faa5d38",
+      "sqlStatus": "passed",
+      "verificationChecks": {
+        "agentEvaluation": {
+          "reasonCode": "REVIEWED_AGENT_EVALUATION_SAME_VERSION",
+          "status": "passed"
+        },
+        "feedbackEvidence": {
+          "reasonCode": "SOURCE_FEEDBACK_MATCHES_BASE_VERSION",
+          "status": "passed"
+        },
+        "regressionCase": {
+          "reasonCode": "CASE_REVISION_LINKED",
+          "status": "passed"
+        },
+        "semanticAsset": {
+          "reasonCode": "PUBLISHED_ASSET_CHANGED",
+          "status": "passed"
+        },
+        "sqlRun": {
+          "reasonCode": "SQL_RUN_PASSED_SAME_VERSION",
+          "status": "passed"
+        }
+      }
+    }
+  },
+  "schemaVersion": 1,
+  "sourceFeedbackAndRegressionRecordsAreActual": true,
+  "status": "fully_verified"
+}

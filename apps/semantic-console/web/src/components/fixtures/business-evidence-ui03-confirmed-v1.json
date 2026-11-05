@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "rulesVersion": "business-trust-v1",
+  "projectRevision": "published-v4",
+  "references": [
+    { "ruleId": "rule-revenue", "model": "orders", "column": "net_amount" }
+  ],
+  "models": [{ "name": "orders" }],
+  "columns": [{ "model": "orders", "column": "net_amount" }],
+  "metrics": [
+    {
+      "ruleId": "rule-revenue",
+      "checkId": "metric-average",
+      "model": "orders",
+      "column": "net_amount",
+      "aggregation": "avg",
+      "distinct": false,
+      "unit": "USD",
+      "sql": "SELECT secret_column FROM orders"
+    }
+  ],
+  "unit": { "status": "verified", "value": "USD" },
+  "grain": [
+    { "model": "orders", "column": "created_at", "value": "day", "status": "verified" }
+  ],
+  "time": { "field": "created_at", "value": "2026-10-12", "source": "confirmed", "groupedByOriginal": false },
+  "defaultsApplied": {
+    "reporting_period": { "start": "2026-10-01", "end": "2026-10-31" },
+    "unknown_payload": { "answer": "sensitive prompt answer", "statement": "SELECT secret_column FROM orders" }
+  },
+  "conditions": {
+    "snapshot_date": "2026-10-12",
+    "reporting_period": { "start": "2026-10-01", "end": "2026-10-31" },
+    "include_trend": true,
+    "unknown_payload": { "nested": ["sensitive prompt answer", { "sql": "SELECT secret_column FROM orders" }] }
+  },
+  "confirmations": {
+    "snapshot_date": "confirmed",
+    "reporting_period": "defaulted",
+    "include_trend": "missing",
+    "unknown_payload": "missing"
+  },
+  "checks": [
+    { "id": "check-passed", "ruleId": "rule-revenue", "mandatory": true, "status": "passed", "reasonCode": "METRIC_MATCHED" },
+    { "id": "check-conflict", "ruleId": "rule-revenue", "mandatory": false, "status": "conflict", "reasonCode": "FILTER_CONFLICT" },
+    { "id": "check-unverified", "ruleId": "rule-revenue", "mandatory": true, "status": "unverified", "reasonCode": "CONFIRMATION_MISSING" },
+    { "id": "check-stale", "ruleId": "rule-revenue", "mandatory": false, "status": "stale", "reasonCode": "PUBLISHED_REVISION_CHANGED" }
+  ],
+  "queryId": "query-business-trust-1",
+  "datasourceId": "warehouse-trusted",
+  "outcome": "success",
+  "createdAt": "2026-10-12T02:00:00Z",
+  "expiresAt": "2026-11-11T02:00:00Z"
+}

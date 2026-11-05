@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-25T10:41:56.291971+00:00",
+  "runId": "formal-20261020-business-trust-v1-g",
+  "manifestSha256": "3494d53422feb6748bf65799a0072812ec2f95ee46fff62503b7bbc9da535b68",
+  "sourceFilesUnchanged": 291,
+  "runtimeObservation": {
+    "observedAt": "2026-10-25T10:36:17.8473055Z",
+    "lastBootUpTime": "2026-10-25T04:03:58.5000000Z",
+    "previousOwnedProcesses": [],
+    "listeners": [],
+    "ownedWorkerCandidates": []
+  },
+  "spawnReturns": 175,
+  "independentReviews": 175,
+  "interruptedJobs": [
+    "job-174",
+    "job-175"
+  ],
+  "nextUnspawnedPosition": "job-176",
+  "status": "observed_worker_abort_and_runtime_exit_recovered",
+  "denominator": 180,
+  "attemptsWillNotBeRetried": [
+    "job-174",
+    "job-175"
+  ],
+  "creditFailureObserved": false,
+  "platformFailures": [],
+  "rootCause": "Not established; actual worker abort events and absent owned service processes were observed. No system reboot occurred since prior recovery.",
+  "negativeAbortProofs": [
+    {
+      "jobId": "job-174",
+      "record": ".benchmark-data/business-trust-v1/runs/formal-20261020-business-trust-v1-g/interrupted-attempts/job-174.json",
+      "sha256": "8d27764af386d6a27b9c7351f91d98983e3a4c536ee349e898acbac12252cde3"
+    },
+    {
+      "jobId": "job-175",
+      "record": ".benchmark-data/business-trust-v1/runs/formal-20261020-business-trust-v1-g/interrupted-attempts/job-175.json",
+      "sha256": "b4250cf38edc7662697c14cb2c07e3b76570c01ab5c08dfc57b24a60c9f75cc1"
+    }
+  ],
+  "beforeSnapshot": {
+    "record": ".benchmark-data/business-trust-v1/g-runtime-recovery-before-20261025-v2.json",
+    "sha256": "4d214bfd738b706f0c938ada1a2f4a41602199ebd84dfb290e3d74301a083702"
+  },
+  "afterSnapshot": {
+    "record": ".benchmark-data/business-trust-v1/g-runtime-recovery-after-20261025-v2.json",
+    "sha256": "981c94a252e3d3b3d8773ae26889bf6246e14963a56b7371540246c723b2441a"
+  },
+  "recovery": {
+    "record": "docs/business-trust-v1-g-runtime-recovery-20261025-v2.json",
+    "sha256": "2e83f4b18d7dfec869f0cb27fb881c03af0399da8a2e5042ea619f485664cce5"
+  },
+  "frozenScoringChanged": false,
+  "goalComplete": false,
+  "promotionEstablished": false
+}

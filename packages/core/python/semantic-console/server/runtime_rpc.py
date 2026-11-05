@@ -31,6 +31,7 @@ try:
         ArtifactStore,
     )
     from .diagnostics import DiagnosticError, DiagnosticStore
+    from .business_evidence import BusinessEvidenceStore
     from .project import ProjectStore
     from .query_preparation import PreparationError, QueryPreparationStore
 except ImportError:  # pragma: no cover - direct module loading
@@ -48,6 +49,7 @@ except ImportError:  # pragma: no cover - direct module loading
         ArtifactStore,
     )
     from diagnostics import DiagnosticError, DiagnosticStore  # type: ignore[no-redef]
+    from business_evidence import BusinessEvidenceStore
     from project import ProjectStore  # type: ignore[no-redef]
     from query_preparation import PreparationError, QueryPreparationStore  # type: ignore[no-redef]
 
@@ -62,10 +64,10 @@ MAX_PREVIEW_ROWS = 200
 MAX_PREVIEW_BYTES = 1_048_576
 MAX_TIMEOUT_MS = 30_000
 _PUBLIC_METHODS = frozenset(
-    {"health", "project.validate", "project.describe", "context.ask", "query.prepare", "query.dryPlan", "query.run", "query.cancel"}
+    {"health", "project.validate", "project.describe", "context.ask", "query.prepare", "query.dryPlan", "query.run", "query.cancel", "query.evidence"}
 )
-_DATA_POLICY_METHODS = frozenset({"project.describe", "context.ask", "query.prepare", "query.dryPlan", "query.run"})
-_DIAGNOSTIC_METHODS = _PUBLIC_METHODS
+_DATA_POLICY_METHODS = frozenset({"project.describe", "context.ask", "query.prepare", "query.dryPlan", "query.run", "query.evidence"})
+_DIAGNOSTIC_METHODS = _PUBLIC_METHODS - {"query.evidence"}
 _REQUEST_FIELDS = frozenset({"protocolVersion", "id", "method", "params", "deadlineMs"})
 _LOGGER = logging.getLogger("semarail-core.runtime")
 DEFAULT_ARTIFACT_BASE_URL = "http://127.0.0.1:48763"
@@ -357,6 +359,11 @@ class RuntimeRpcGateway:
         )
         self.policy_engine = policy_engine or PolicyEngine()
         self.preparations = preparation_store or QueryPreparationStore(self.access_control, self.project)
+        try:
+            self.business_evidence: BusinessEvidenceStore | None = BusinessEvidenceStore(self.access_control, self.project, self.policy_engine)
+        except Exception:
+            _LOGGER.error("business evidence storage initialization failed")
+            self.business_evidence = None
         if diagnostic_store is not None:
             self.diagnostics: DiagnosticStore | None = diagnostic_store
         else:
@@ -797,18 +804,35 @@ class RuntimeRpcGateway:
                 )
             else:
                 policy_duration_ms += max(0.0, (time.monotonic() - compile_started_at) * 1000.0)
+        if method == "query.evidence":
+            try:
+                evidence = self.read_query_evidence(auth, project_id, str(normalized["queryId"]))
+            except DiagnosticError as exc:
+                return exc.status, fail(exc.code, exc.safe_message, phase="diagnostics")
+            self._audit(auth, str(method), "allowed", request_id, decision, transport=transport, datasource_id=datasource_id)
+            return 200, _public_response({"id": request_id, "ok": True, "result": evidence}, protocol_version, trace_id)
         if method == "query.prepare":
             try:
                 runtime_started_at = time.monotonic()
-                prepared = self.preparations.prepare(
-                    auth=auth,
-                    project_id=project_id,
-                    question=str(normalized["question"]),
-                    semantic_sql=str(normalized["semanticSql"]),
-                    conditions=normalized["conditions"],
-                    confirmed_conditions=normalized["confirmedConditions"],
-                )
+                with self.project.bound_execution():
+                    if datasource_id != self.project.active_datasource_identifier():
+                        raise DiagnosticError("BUSINESS_EVIDENCE_STALE", "active datasource changed; prepare again", status=409)
+                    prepared = self.preparations.prepare(
+                        auth=auth,
+                        project_id=project_id,
+                        question=str(normalized["question"]),
+                        semantic_sql=str(normalized["semanticSql"]),
+                        conditions=normalized["conditions"],
+                        confirmed_conditions=normalized["confirmedConditions"],
+                    )
+                    evidence_template = prepared.get("businessEvidence")
+                    if isinstance(evidence_template, Mapping):
+                        if self.business_evidence is None:
+                            raise DiagnosticError("BUSINESS_EVIDENCE_UNAVAILABLE", "business evidence storage is unavailable", status=503)
+                        self.business_evidence.validate_template_permission(auth=auth, project_id=project_id, template=evidence_template, datasource_id=str(datasource_id))
             except PreparationError as exc:
+                return exc.status, fail(exc.code, exc.safe_message, phase="preparation")
+            except DiagnosticError as exc:
                 return exc.status, fail(exc.code, exc.safe_message, phase="preparation")
             self._audit(
                 auth, str(method), "allowed", request_id, decision,
@@ -823,16 +847,39 @@ class RuntimeRpcGateway:
             capture(public_response, "success")
             return 200, public_response
         artifact_reservation: ArtifactReservation | None = None
+        business_template: Mapping[str, Any] | None = None
+        business_bindings: list[dict[str, str]] | None = None
+        business_publication: str | None = None
+        business_datasource_profile_binding: str | None = None
         if method == "query.run":
             normalized.pop("retryOfQueryId", None)
             try:
-                self.preparations.require_ready(
+                business_template = self.preparations.require_ready(
                     auth=auth,
                     project_id=project_id,
                     semantic_sql=str(normalized["semanticSql"]),
                     preparation_id=(str(normalized["preparationId"]) if "preparationId" in normalized else None),
                 )
+                business_publication = getattr(business_template, "published_version_id", None)
+                business_datasource_profile_binding = getattr(
+                    business_template, "datasource_profile_binding_id", None
+                )
             except PreparationError as exc:
+                blocked_template = getattr(exc, "business_evidence", None)
+                if isinstance(blocked_template, Mapping) and self.business_evidence is not None:
+                    try:
+                        self.business_evidence.validate_template_permission(auth=auth, project_id=project_id, template=blocked_template, datasource_id=str(datasource_id))
+                        self.business_evidence.record(
+                            auth=auth,
+                            project_id=project_id,
+                            query_id=str(normalized["queryId"]),
+                            datasource_id=str(datasource_id),
+                            template=blocked_template,
+                            outcome="blocked",
+                            datasource_profile_binding_id=self.project.datasource_profile_binding_id(datasource_id),
+                        )
+                    except DiagnosticError:
+                        _LOGGER.error("blocked business evidence write rejected for trace %s", trace_id)
                 self._audit(
                     auth, str(method), "denied", request_id, decision,
                     transport=transport, datasource_id=datasource_id,
@@ -848,6 +895,14 @@ class RuntimeRpcGateway:
                     phase="preparation",
                 )
             normalized.pop("preparationId", None)
+            # An opted-in query must not execute if its independent evidence ledger is unavailable.
+            if business_template is not None and self.business_evidence is None:
+                return 503, fail("BUSINESS_EVIDENCE_UNAVAILABLE", "business evidence storage is unavailable", phase="diagnostics", retryable=True)
+            if business_template is not None and self.business_evidence is not None:
+                try:
+                    business_bindings = self.business_evidence.validate_template_permission(auth=auth, project_id=project_id, template=business_template, datasource_id=str(datasource_id), publication_binding=business_publication)
+                except DiagnosticError as exc:
+                    return exc.status, fail(exc.code, exc.safe_message, phase="preparation")
             # Core owns the artifact identity, expiry, filename, and token.
             # The request field below is trusted in-process metadata; it is
             # injected after public params have been normalized, so a caller
@@ -938,7 +993,99 @@ class RuntimeRpcGateway:
         }
         try:
             runtime_started_at = time.monotonic()
-            response = self.dispatcher.dispatch(internal)
+            if method == "query.run":
+                # Recheck the execution bindings at the last boundary. The
+                # binding fence serializes dispatch against publish/rollback
+                # and datasource profile changes without holding ProjectStore's
+                # general lock while waiting on Core (so query.cancel remains
+                # able to reach the dispatcher).
+                with self.project.bound_execution():
+                    if business_template is not None and self.business_evidence is not None:
+                        current_profile_binding = self.project.datasource_profile_binding_id(datasource_id)
+                        if (
+                            not isinstance(business_datasource_profile_binding, str)
+                            or not business_datasource_profile_binding
+                            or current_profile_binding != business_datasource_profile_binding
+                        ):
+                            raise DiagnosticError(
+                                "BUSINESS_EVIDENCE_STALE",
+                                "datasource profile changed; prepare again",
+                                status=409,
+                            )
+                        business_bindings = self.business_evidence.validate_template_permission(
+                            auth=auth,
+                            project_id=project_id,
+                            template=business_template,
+                            datasource_id=str(datasource_id),
+                            publication_binding=business_publication,
+                        )
+
+                    # `authorizationPolicy` is compiled before artifact
+                    # reservation. Re-read both method grants and row/column
+                    # controls here: a column-only evidence check would miss
+                    # a row-filter or method-policy update and could dispatch
+                    # the earlier, broader snapshot.
+                    current_policies = (
+                        [] if auth.subject.id == BOOTSTRAP_SUBJECT_ID
+                        else self.access_control.policies_for_subject(auth.subject.id)
+                    )
+                    current_decision = self.policy_engine.authorize_method(
+                        auth.subject,
+                        str(method),
+                        current_policies,
+                        project_id=project_id,
+                        datasource_id=datasource_id,
+                    )
+                    if not current_decision.allowed:
+                        raise DiagnosticError(
+                            "POLICY_DENIED",
+                            "current data permission is required",
+                            status=403,
+                        )
+                    try:
+                        current_compiled_policy = self.policy_engine.compile_data_policy(
+                            auth.subject,
+                            current_policies,
+                            project_id=project_id,
+                            datasource_id=datasource_id,
+                        )
+                    except Exception as exc:
+                        raise DiagnosticError(
+                            "POLICY_DENIED",
+                            "the current data access policy is invalid",
+                            status=403,
+                        ) from exc
+                    initial_method_versions = tuple(sorted(decision.policy_versions))
+                    current_method_versions = tuple(sorted(current_decision.policy_versions))
+                    if (
+                        initial_method_versions != current_method_versions
+                        or current_decision.limits != decision.limits
+                        or current_compiled_policy != compiled_policy
+                    ):
+                        raise DiagnosticError(
+                            "BUSINESS_EVIDENCE_STALE" if business_template is not None else "POLICY_CHANGED",
+                            "authorization policy changed; prepare the query again" if business_template is not None
+                            else "authorization policy changed; retry the query",
+                            status=409,
+                        )
+                    response = self.dispatcher.dispatch(internal)
+            else:
+                response = self.dispatcher.dispatch(internal)
+        except DiagnosticError as exc:
+            if artifact_reservation is not None:
+                self.artifacts.fail(artifact_reservation)
+            self._audit(
+                auth,
+                str(method),
+                "denied",
+                request_id,
+                decision,
+                transport=transport,
+                datasource_id=datasource_id,
+                query_id=normalized.get("queryId") if method in {"query.run", "query.cancel"} else None,
+                compiled_policy=compiled_policy,
+            )
+            return exc.status, fail(exc.code, exc.safe_message, phase="preparation")
         except Exception:
             if artifact_reservation is not None:
                 self.artifacts.fail(artifact_reservation)
@@ -1008,8 +1155,37 @@ class RuntimeRpcGateway:
         public_response = _public_response(response, protocol_version, trace_id)
         public_result = public_response.get("result")
         result_failed = isinstance(public_result, Mapping) and public_result.get("status") == "error"
+        if business_template is not None and self.business_evidence is not None:
+            try:
+                binding_changed = (
+                    business_template["projectRevision"] != self.project.published_revision
+                    or datasource_id != self.project.active_datasource_identifier()
+                    or (business_publication is not None and business_publication != self.project.published_version_id)
+                    or business_datasource_profile_binding != self.project.datasource_profile_binding_id(datasource_id)
+                )
+                if binding_changed:
+                    business_template = {**business_template, "checks": [{**check, "status": "stale", "reasonCode": "EXECUTION_BINDING_CHANGED"} for check in business_template["checks"]]}
+                self.business_evidence.record(
+                    auth=auth, project_id=project_id, query_id=str(normalized["queryId"]),
+                    datasource_id=str(datasource_id), template=business_template,
+                    outcome="success" if public_response.get("ok") is True and not result_failed and not binding_changed else "failure",
+                    permission_bindings=business_bindings,
+                    publication_binding=business_publication,
+                    datasource_profile_binding_id=business_datasource_profile_binding,
+                )
+                if binding_changed:
+                    return 409, fail("CLARIFICATION_REQUIRED", "query execution bindings changed; prepare again before using the result", phase="preparation", reason_code="CLARIFICATION_REQUIRED")
+            except Exception:
+                _LOGGER.error("business evidence write failed for trace %s", trace_id)
+                return 503, fail("BUSINESS_EVIDENCE_UNAVAILABLE", "query completed but its business evidence could not be persisted; do not infer verification", phase="diagnostics")
         capture(public_response, "success" if public_response.get("ok") is True and not result_failed else "failure")
         return 200, public_response
+
+    def read_query_evidence(self, auth: AuthContext, project_id: str, query_id: str, *, administrator: bool = False) -> dict[str, Any]:
+        """Read caller-owned evidence or a currently authorized administrator projection."""
+        if self.business_evidence is None:
+            raise DiagnosticError("BUSINESS_EVIDENCE_UNAVAILABLE", "business evidence storage is unavailable", status=503)
+        return self.business_evidence.get(auth=auth, project_id=project_id, query_id=query_id, administrator=administrator)
 
     def _integrate_artifact_response(
         self,
@@ -1248,6 +1424,10 @@ class RuntimeRpcGateway:
                 "contextVersion": 2,
                 **({"budgets": budgets} if "budgets" in params else {}),
             }
+        if method == "query.evidence":
+            if set(params) != {"queryId"} or not isinstance(params.get("queryId"), str) or not 1 <= len(params["queryId"]) <= 128:
+                return "query.evidence requires only a bounded queryId"
+            return {"queryId": params["queryId"]}
         if method == "query.cancel":
             if set(params) != {"queryId"} or not isinstance(params.get("queryId"), str):
                 return "query.cancel requires only queryId"

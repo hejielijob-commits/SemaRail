@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "status": "fix_verified_authenticated_worker_ready_recovery",
+  "checkedAt": "2026-10-18T16:11:44.631706+00:00",
+  "failedRunId": "preaccept-20261018-recovery-v1",
+  "failedRunManifestSha256": "d6c0ebe1313df8ac4c05d1b652632105d54dfa7cba787e38559f51288274d163",
+  "rootCause": "Core and remote MCP own separate cached index lifecycle objects. Core starts before the independent MCP retrieval path builds the persistent index; the old Core object can still report missing while authenticated MCP retrieval is ready.",
+  "initialProbeArtifact": "A probe without frozen embedding settings reported embedding_config_mismatch; that probe configuration error was excluded from the root cause.",
+  "isolatedReproducer": {
+    "groups": [
+      "baseline",
+      "candidate"
+    ],
+    "usesActualConsoleApi": true,
+    "coreConstructedBeforePersistedIndexDelivery": true,
+    "coreReportedState": "missing",
+    "coreReportedReason": "revision_not_built",
+    "bindingRejected": true,
+    "originalRunStateModified": false,
+    "logSha256": "c28d6820158fca922a4bae73cc3c0f0cb5b9ddf1e76139fffe81cbe193ccf442",
+    "recordSha256": "8558e1d3b8771bc9c35bf9df14b517cf147cb6935681e3722a0e74ffc4d540be",
+    "frozenReproducerSourcesSha256": "8ef980ac3858709359a66aa970c8fb2f3c3fcffce31f7636c33091dfeb6be40d",
+    "experimentSourceSha256": "1b75f5b63ea9be84c003a56007fc38e7445ca9c2c698b58deead6b76847c64f5"
+  },
+  "fixScope": "Benchmark binding observes live authenticated MCP Context v2 at the matching published revision, with ready hybrid status. Resume must preserve pinned persistent index files.",
+  "freshRuntimeAcceptanceProven": true,
+  "recoveryProven": true,
+  "formalCampaignStarted": false,
+  "promotionEstablished": false,
+  "limitations": [
+    "The original coordinator sanitized its exception text; this independent reproducer establishes the startup ordering failure without claiming the original exception message was retained.",
+    "The failed run is preserved and cannot be resumed before a worker-ready checkpoint.",
+    "The successful rehearsal had no active Agent workers; it does not establish answer-quality improvement."
+  ],
+  "fixedSourceTestEvidence": {
+    "testLog": ".benchmark-data/business-trust-v1/harness-live-mcp-recovery-r3.log",
+    "testLogSha256": "5f2e485424235bdd43bfb2fdb723c3579b970b7de061ac5d7f82dd78118403f5",
+    "metadataSha256": "f888ee4f6c8a240a14390de772995a6a2878c9197b5f77a450df7c0274947a33",
+    "tests": 107,
+    "skipped": 1,
+    "sourceFiles": 281,
+    "sourceUnchangedDuringTests": true,
+    "sourceHashes": {
+      "benchmarks/business-trust-v1/experiment.py": "4907160b7ce6421502bb6f9076accd54afe8569678ae9e5f5d0b87c8c26a89ed",
+      "benchmarks/business-trust-v1/tests/test_benchmark_harness.py": "5fbc86dca07ebc19a376346e754e12c66aeae3fa5547be21f6895fa158e2e6c4",
+      "benchmarks/business-trust-v1/tests/test_checkpoint.py": "00c3399447d68ce65524d840667b4fb0f72a1a79919176f0685e98f30c8c053d"
+    }
+  },
+  "freshPreacceptance": {
+    "runId": "preaccept-20261018-recovery-v2",
+    "manifestSha256": "11c3354becc25d14d886032dc43721880e322141295b1a3fb0d445740dad35d9",
+    "workerDispatchAllowed": false,
+    "sourceMatchesPassingTestSet": true,
+    "status": "passed_worker_ready_recovery",
+    "safeRecord": "docs/business-trust-v1-preacceptance-recovery-v2.json",
+    "safeRecordSha256": "65ef271da227646aac57d742ec51649d6ae5a75e5cc0e909d94d614d04d5adc3"
+  },
+  "actualWindowsIndexJunctionRejection": {
+    "record": ".benchmark-data/business-trust-v1/semantic-index-actual-junction-v1.json",
+    "sha256": "53d2b15e7fa69f29445ced20f543c7fc8733254221b6fb29886425fbd95933dd",
+    "passed": true,
+    "realRunStateModified": false
+  }
+}

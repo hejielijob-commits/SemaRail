@@ -12,20 +12,50 @@ from typing import Any, Callable
 
 try:
     from .access_control import AccessControlStore, AuthContext, _timestamp, _utc_now
+    from .business_evidence import validate_evidence
+    from .business_verification import VerificationError, evaluate_query
+    from .diagnostics import DiagnosticError
     from .knowledge import RuleStore
-    from .project import ProjectStore
+    from .project import ProjectError, ProjectStore
 except ImportError:  # pragma: no cover
     from access_control import AccessControlStore, AuthContext, _timestamp, _utc_now  # type: ignore[no-redef]
+    from business_evidence import validate_evidence  # type: ignore[no-redef]
+    from business_verification import VerificationError, evaluate_query  # type: ignore[no-redef]
+    from diagnostics import DiagnosticError  # type: ignore[no-redef]
     from knowledge import RuleStore  # type: ignore[no-redef]
-    from project import ProjectStore  # type: ignore[no-redef]
+    from project import ProjectError, ProjectStore  # type: ignore[no-redef]
 
 
 class PreparationError(RuntimeError):
-    def __init__(self, code: str, safe_message: str, *, status: int = 400) -> None:
+    def __init__(
+        self,
+        code: str,
+        safe_message: str,
+        *,
+        status: int = 400,
+        business_evidence: Mapping[str, Any] | None = None,
+    ) -> None:
         super().__init__(safe_message)
         self.code = code
         self.safe_message = safe_message
         self.status = status
+        self.business_evidence = dict(business_evidence) if business_evidence is not None else None
+
+
+class PreparedBusinessEvidence(dict[str, Any]):
+    """Validated template with Python-only bindings for the governed run."""
+
+    __slots__ = ("published_version_id", "datasource_profile_binding_id")
+
+    def __init__(
+        self,
+        evidence: Mapping[str, Any],
+        published_version_id: str,
+        datasource_profile_binding_id: str,
+    ) -> None:
+        super().__init__(evidence)
+        self.published_version_id = published_version_id
+        self.datasource_profile_binding_id = datasource_profile_binding_id
 
 
 class QueryPreparationStore:
@@ -55,6 +85,8 @@ class QueryPreparationStore:
             with lock, connect() as connection:
                 if getattr(self.access_control, "path", None) is None:
                     connection.execute("SELECT pg_advisory_xact_lock(?)", (self._MIGRATION_LOCK_ID,))
+                else:
+                    connection.execute("BEGIN IMMEDIATE")
                 connection.execute(
                     "CREATE TABLE IF NOT EXISTS query_preparation_schema_migrations (version INTEGER PRIMARY KEY,applied_at TEXT NOT NULL)"
                 )
@@ -62,7 +94,7 @@ class QueryPreparationStore:
                     "SELECT version FROM query_preparation_schema_migrations ORDER BY version"
                 ).fetchall()
                 applied = [int(row["version"]) for row in rows]
-                if applied not in ([], [1]):
+                if applied not in ([], [1], [1, 2], [1, 2, 3], [1, 2, 3, 4], [1, 2, 3, 4, 5]):
                     raise PreparationError(
                         "PREPARATION_SCHEMA_INCOMPATIBLE", "query preparation storage is incompatible", status=503
                     )
@@ -77,6 +109,45 @@ class QueryPreparationStore:
                         "INSERT INTO query_preparation_schema_migrations(version,applied_at) VALUES(?,?)",
                         (1, _timestamp(self.clock())),
                     )
+                    applied = [1]
+                if applied == [1]:
+                    connection.execute(
+                        "ALTER TABLE query_preparations ADD COLUMN confirmed_json TEXT NOT NULL DEFAULT '[]'"
+                    )
+                    connection.execute(
+                        "ALTER TABLE query_preparations ADD COLUMN business_evidence_json TEXT"
+                    )
+                    connection.execute(
+                        "INSERT INTO query_preparation_schema_migrations(version,applied_at) VALUES(?,?)",
+                        (2, _timestamp(self.clock())),
+                    )
+                    applied = [1, 2]
+                if applied == [1, 2]:
+                    connection.execute(
+                        "ALTER TABLE query_preparations ADD COLUMN datasource_id TEXT NOT NULL DEFAULT ''"
+                    )
+                    connection.execute(
+                        "INSERT INTO query_preparation_schema_migrations(version,applied_at) VALUES(?,?)",
+                        (3, _timestamp(self.clock())),
+                    )
+                    applied = [1, 2, 3]
+                if applied == [1, 2, 3]:
+                    connection.execute(
+                        "ALTER TABLE query_preparations ADD COLUMN published_version_id TEXT NOT NULL DEFAULT ''"
+                    )
+                    connection.execute(
+                        "INSERT INTO query_preparation_schema_migrations(version,applied_at) VALUES(?,?)",
+                        (4, _timestamp(self.clock())),
+                    )
+                    applied = [1, 2, 3, 4]
+                if applied == [1, 2, 3, 4]:
+                    connection.execute(
+                        "ALTER TABLE query_preparations ADD COLUMN datasource_profile_binding_id TEXT NOT NULL DEFAULT ''"
+                    )
+                    connection.execute(
+                        "INSERT INTO query_preparation_schema_migrations(version,applied_at) VALUES(?,?)",
+                        (5, _timestamp(self.clock())),
+                    )
         except PreparationError:
             raise
         except Exception as exc:
@@ -88,12 +159,25 @@ class QueryPreparationStore:
     def _hash_sql(semantic_sql: str) -> str:
         return hashlib.sha256(semantic_sql.encode("utf-8")).hexdigest()
 
+    @staticmethod
+    def _business_ready(evidence: Mapping[str, Any]) -> bool:
+        checks = evidence.get("checks")
+        if not isinstance(checks, list) or any(not isinstance(item, Mapping) for item in checks):
+            return False
+        return all(
+            item.get("status") == "passed"
+            or (not item.get("mandatory") and item.get("status") == "unverified")
+            for item in checks
+        )
+
     def _applicable(self, semantic_sql: str) -> tuple[str, list[dict[str, Any]]]:
         snapshot = self.rules.list()
         revision = str(snapshot.get("revision") or "")
         configured: list[dict[str, Any]] = []
         for record in snapshot.get("rules", []):
             if not isinstance(record, Mapping) or not record.get("enabled"):
+                continue
+            if record.get("executionChecks") is not None:
                 continue
             rule = record.get("confirmationRule")
             if not isinstance(rule, Mapping):
@@ -186,6 +270,8 @@ class QueryPreparationStore:
         ):
             raise PreparationError("INVALID_PARAMS", "confirmedConditions are invalid")
         revision, rules = self._applicable(semantic_sql)
+        datasource_id = self.project.active_datasource_identifier() or ""
+        datasource_profile_binding_id = self.project.datasource_profile_binding_id(datasource_id) or ""
         resolved = dict(conditions)
         defaults: dict[str, Any] = {}
         clarification: list[dict[str, Any]] = []
@@ -213,22 +299,136 @@ class QueryPreparationStore:
                         "missingReason": "required" if missing else "confirmation_required",
                     }
                 )
+
+        business_evidence: dict[str, Any] | None = None
+        business_rules: list[dict[str, Any]] = []
+        try:
+            published = self.rules.list_published()
+            business_rules = [
+                dict(record)
+                for record in published.get("rules", [])
+                if isinstance(record, Mapping)
+                and record.get("enabled")
+                and not record.get("missing")
+                and isinstance(record.get("executionChecks"), Mapping)
+            ]
+            if business_rules:
+                business_evidence = evaluate_query(
+                    self.project,
+                    semantic_sql,
+                    resolved,
+                    confirmed_conditions,
+                )
+        except VerificationError as exc:
+            raise PreparationError(exc.code, exc.safe_message, status=409) from exc
+        except ProjectError as exc:
+            raise PreparationError("PUBLISHED_RULES_UNAVAILABLE", "published business rules are unavailable", status=503) from exc
+
+        if business_evidence is not None:
+            try:
+                # Keep prepare responses and stored templates within the same
+                # bounded, secret-screened contract as persisted query evidence.
+                business_evidence = validate_evidence(business_evidence, executed=False)
+            except DiagnosticError as exc:
+                raise PreparationError(
+                    "BUSINESS_EVIDENCE_INVALID",
+                    "business verification evidence is unavailable",
+                    status=409,
+                ) from exc
+
+        if business_evidence is not None:
+            for key, value in business_evidence.get("defaultsApplied", {}).items():
+                if isinstance(key, str):
+                    resolved[key] = value
+                    defaults[key] = value
+            for item in business_evidence.get("checks", []):
+                if not isinstance(item, Mapping):
+                    continue
+                if item.get("status") == "passed" or (
+                    not item.get("mandatory") and item.get("status") == "unverified"
+                ):
+                    continue
+                reason = item.get("reasonCode")
+                if item.get("status") == "unverified" and reason in {"time_condition_missing", "time_confirmation_missing"}:
+                    matched_spec = next(
+                        (
+                            spec for rule in business_rules
+                            if rule.get("id") == item.get("ruleId")
+                            for spec in rule.get("executionChecks", {}).get("checks", [])
+                            if isinstance(spec, Mapping)
+                            and spec.get("kind") == "timeFilter"
+                            and f"{rule.get('id')}:{spec.get('id')}" == item.get("id")
+                        ),
+                        None,
+                    )
+                    if isinstance(matched_spec, Mapping) and isinstance(matched_spec.get("conditionKey"), str):
+                        key = matched_spec["conditionKey"]
+                        if not any(entry.get("conditionKey") == key for entry in clarification):
+                            clarification.append({
+                                "conditionKey": key,
+                                "kind": "timeRange",
+                                "question": f"Please confirm the reporting period for {matched_spec.get('column')}.",
+                                "options": [],
+                                "missingReason": "required" if reason == "time_condition_missing" else "confirmation_required",
+                            })
+                    else:
+                        blocked.append({"conditionKey": "businessVerification", "reason": str(reason or "unverified")})
+                else:
+                    blocked.append({"conditionKey": "businessVerification", "reason": str(reason or "unverified")})
         status = "blocked" if blocked else "needs_clarification" if clarification else "ready"
+        if business_evidence is not None and not self._business_ready(business_evidence) and not blocked and not clarification:
+            blocked.append({"conditionKey": "businessVerification", "reason": "mandatory_check_unverified"})
+            status = "blocked"
+        if business_evidence is not None and business_evidence.get("projectRevision"):
+            if not rules:
+                revision = str(business_evidence["projectRevision"])
+        published_version_id = ""
+        if business_evidence is not None:
+            published_version_id = self.project.published_version_id or ""
+            if not published_version_id:
+                raise PreparationError(
+                    "PUBLISHED_VERSION_UNAVAILABLE",
+                    "published project version is unavailable",
+                    status=503,
+                )
         preparation_id = f"prep_{uuid.uuid4().hex}"
         now = self.clock().astimezone(UTC)
+        # RuntimeRPC holds the ProjectStore execution fence around this call.
+        # Keep the store safe for direct callers too: do not persist a ready
+        # template if its datasource profile changed during evaluation.
+        if (
+            datasource_id != (self.project.active_datasource_identifier() or "")
+            or datasource_profile_binding_id
+            != (self.project.datasource_profile_binding_id(datasource_id) or "")
+        ):
+            raise PreparationError(
+                "BUSINESS_EVIDENCE_STALE",
+                "datasource profile changed; prepare again",
+                status=409,
+            )
         connect = getattr(self.access_control, "_connect")
         with connect() as connection:
             connection.execute(
-                "INSERT INTO query_preparations(id,organization_id,project_id,subject_id,credential_id,semantic_sql_hash,rule_revision,status,conditions_json,defaults_json,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO query_preparations(id,organization_id,project_id,subject_id,credential_id,semantic_sql_hash,rule_revision,status,conditions_json,defaults_json,created_at,expires_at,confirmed_json,business_evidence_json,datasource_id,published_version_id,datasource_profile_binding_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     preparation_id, auth.subject.organization_id, project_id, auth.subject.id,
                     auth.credential_id, self._hash_sql(semantic_sql), revision, status,
-                    json.dumps(resolved, ensure_ascii=False, separators=(",", ":")),
+                    # Persist only caller-supplied conditions. Published defaults
+                    # are returned to the caller, but must be re-derived from
+                    # the current published rule during execution revalidation;
+                    # persisting them here would make them look like unconfirmed
+                    # caller input on the second verification pass.
+                    json.dumps(dict(conditions), ensure_ascii=False, separators=(",", ":")),
                     json.dumps(defaults, ensure_ascii=False, separators=(",", ":")),
                     _timestamp(now), _timestamp(now + timedelta(minutes=self.ttl_minutes)),
+                    json.dumps(sorted(set(confirmed_conditions)), ensure_ascii=False, separators=(",", ":")),
+                    json.dumps(business_evidence, ensure_ascii=False, separators=(",", ":")) if business_evidence is not None else None,
+                    datasource_id,
+                    published_version_id,
+                    datasource_profile_binding_id if business_evidence is not None else "",
                 ),
             )
-        return {
+        result = {
             "schemaVersion": 1,
             "status": status,
             "preparationId": preparation_id,
@@ -239,12 +439,26 @@ class QueryPreparationStore:
             "ruleRevision": revision,
             "expiresAt": _timestamp(now + timedelta(minutes=self.ttl_minutes)),
         }
+        if business_evidence is not None:
+            result["businessEvidence"] = business_evidence
+        return result
 
     def require_ready(
         self, *, auth: AuthContext, project_id: str, semantic_sql: str, preparation_id: str | None
-    ) -> None:
-        revision, rules = self._applicable(semantic_sql)
-        if not rules:
+    ) -> dict[str, Any] | None:
+        revision, legacy_rules = self._applicable(semantic_sql)
+        try:
+            published = self.rules.list_published()
+            has_business_rules = any(
+                isinstance(record, Mapping)
+                and record.get("enabled")
+                and not record.get("missing")
+                and isinstance(record.get("executionChecks"), Mapping)
+                for record in published.get("rules", [])
+            )
+        except ProjectError as exc:
+            raise PreparationError("PUBLISHED_RULES_UNAVAILABLE", "published business rules are unavailable", status=503) from exc
+        if not legacy_rules and not has_business_rules:
             return
         if not isinstance(preparation_id, str):
             raise PreparationError("CLARIFICATION_REQUIRED", "query confirmation is required before execution", status=409)
@@ -260,10 +474,85 @@ class QueryPreparationStore:
         except ValueError:
             expiry = now
         if (
-            row is None or row["status"] != "ready" or row["semantic_sql_hash"] != self._hash_sql(semantic_sql)
-            or row["rule_revision"] != revision or expiry <= now
+            row is None or row["semantic_sql_hash"] != self._hash_sql(semantic_sql)
+            or row["credential_id"] != auth.credential_id
+            or row["datasource_id"] != (self.project.active_datasource_identifier() or "")
+            or (legacy_rules and row["rule_revision"] != revision) or expiry <= now
         ):
             raise PreparationError("CLARIFICATION_REQUIRED", "query preparation is missing, stale, or not ready", status=409)
 
+        business_evidence: dict[str, Any] | None = None
+        if has_business_rules:
+            current_datasource_profile_binding_id = self.project.datasource_profile_binding_id(
+                self.project.active_datasource_identifier()
+            ) or ""
+            if row["datasource_profile_binding_id"] != current_datasource_profile_binding_id:
+                raise PreparationError(
+                    "CLARIFICATION_REQUIRED",
+                    "query preparation is missing, stale, or not ready",
+                    status=409,
+                )
+            try:
+                stored_conditions = json.loads(str(row["conditions_json"]))
+                stored_confirmed = json.loads(str(row["confirmed_json"] or "[]"))
+                stored_template = json.loads(str(row["business_evidence_json"])) if row["business_evidence_json"] else None
+            except (TypeError, ValueError) as exc:
+                raise PreparationError("CLARIFICATION_REQUIRED", "query preparation is missing, stale, or not ready", status=409) from exc
+            if not isinstance(stored_conditions, Mapping) or not isinstance(stored_confirmed, list) or not isinstance(stored_template, Mapping):
+                raise PreparationError("CLARIFICATION_REQUIRED", "query preparation is missing, stale, or not ready", status=409)
+            try:
+                business_evidence = evaluate_query(self.project, semantic_sql, stored_conditions, stored_confirmed)
+            except VerificationError as exc:
+                raise PreparationError(exc.code, exc.safe_message, status=409) from exc
+            try:
+                business_evidence = validate_evidence(business_evidence, executed=False)
+            except DiagnosticError as exc:
+                raise PreparationError(
+                    "BUSINESS_EVIDENCE_INVALID",
+                    "business verification evidence is unavailable",
+                    status=409,
+                ) from exc
+            if not self._business_ready(business_evidence):
+                raise PreparationError(
+                    "CLARIFICATION_REQUIRED",
+                    "published business checks are not satisfied",
+                    status=409,
+                    business_evidence=business_evidence,
+                )
+            if row["status"] != "ready":
+                raise PreparationError(
+                    "CLARIFICATION_REQUIRED",
+                    "query preparation is missing, stale, or not ready",
+                    status=409,
+                    business_evidence=business_evidence,
+                )
+            if (
+                stored_template.get("schemaVersion") != 1
+                or stored_template.get("rulesVersion") != business_evidence.get("rulesVersion")
+                or stored_template.get("projectRevision") != business_evidence.get("projectRevision")
+            ):
+                raise PreparationError(
+                    "CLARIFICATION_REQUIRED",
+                    "query preparation is missing, stale, or not ready",
+                    status=409,
+                    business_evidence=business_evidence,
+                )
+            current_version_id = self.project.published_version_id or ""
+            if row["published_version_id"] != current_version_id:
+                raise PreparationError(
+                    "CLARIFICATION_REQUIRED",
+                    "query preparation is missing, stale, or not ready",
+                    status=409,
+                    business_evidence=business_evidence,
+                )
+            business_evidence = PreparedBusinessEvidence(
+                business_evidence,
+                str(row["published_version_id"]),
+                str(row["datasource_profile_binding_id"]),
+            )
+        elif row["status"] != "ready":
+            raise PreparationError("CLARIFICATION_REQUIRED", "query preparation is missing, stale, or not ready", status=409)
+        return business_evidence
 
-__all__ = ["PreparationError", "QueryPreparationStore"]
+
+__all__ = ["PreparationError", "PreparedBusinessEvidence", "QueryPreparationStore"]

@@ -24,6 +24,9 @@ const required = [
   'python/semantic-console/server/access_control.py', 'python/semantic-console/server/authorization.py',
   'python/semantic-console/server/identity.py', 'python/semantic-console/server/identity_api.py',
   'python/semantic-console/server/remote_mcp.py', 'python/semantic-console/server/stdio_mcp.py',
+  'python/semantic-console/server/evaluation_api.py',
+  'python/semantic-console/server/evaluations.py',
+  'python/semantic-console/server/evaluation_scoring.py',
   'python/semantic-console/server/README.md', 'python/semantic-console/server/openapi.json',
   'semantic-console-web/index.html', 'semantic-console-web/licenses/react/LICENSE',
   'README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md',
@@ -34,6 +37,7 @@ if (forbidden.length) throw new Error(`Core package included adapter/test files:
 for (const [file, marker] of [
   ['python/semantic-console/server/access_api.py', 'unbind_policy'],
   ['python/semantic-console/server/app.py', '/api/v1/auth/capabilities'],
+  ['python/semantic-console/server/app.py', 'EvaluationApi'],
   ['python/semantic-console/server/runtime_rpc.py', 'project_id=project_id'],
   ['python/semantic-console/server/authorization.py', 'datasource binding is required'],
   ['python/semantic-console/server/access_control.py', 'confirmation_hash'],

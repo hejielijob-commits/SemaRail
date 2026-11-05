@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "acceptedAt": "2026-10-24T10:04:55.257919+00:00",
+  "runId": "formal-20261020-business-trust-v1-g",
+  "denominator": 180,
+  "spawnReturns": 104,
+  "independentReviews": 104,
+  "nextUnspawnedPosition": "job-105",
+  "freshSmoke": {
+    "record": ".benchmark-data/business-trust-v1/transport-smokes/transport-alpha9-credit-20261024-b/verification.json",
+    "sha256": "2de11ffa883792f44bfca2a801ef57168aa4f3da6c2d1bdcb390e92dca074cde",
+    "actualSessionId": "01a16d5a-c409-73d1-b07e-c65b14295913",
+    "traceSha256": "f82fa6fc4bd6758919d7cac272fbeb81f0112f1d257d0690652a45f61f733798",
+    "observedModels": [
+      "gpt-6-luna"
+    ],
+    "observedReasoning": [
+      "max"
+    ],
+    "publicPromptReceiptVerified": true
+  },
+  "latestInterruption": {
+    "record": "docs/business-trust-v1-g-external-interruption-20261023-v1.json",
+    "sha256": "e9de0a8f7f57b35066138642c4c5e68c08ec0f528e764a51e79256d707a178d0"
+  },
+  "currentRuntimeRecovery": {
+    "record": "docs/business-trust-v1-g-runtime-recovery-20261024-v1.json",
+    "sha256": "8c3d8366e2096a5a7263a3e33384b5a450f960423251d63980683603b25d6fbb"
+  },
+  "publicPromptRestoration": {
+    "record": ".benchmark-data/business-trust-v1/g-public-prompt-restoration-20261024-v1.json",
+    "sha256": "9886dc5895e5b7d93d93581089c480e5a9ee2f61cd365238c40b5d5f8f6305b1"
+  },
+  "checkOnlyAccepted": {
+    "jobId": "job-105",
+    "ready": true,
+    "reservedPositions": [],
+    "metadataAppended": false,
+    "reservationRule": "spawned missing positions reserve a slot before begin"
+  },
+  "dispatchLedgerUnchanged": "bd2daeaf4ae338e89de9701e515cea95c7a5d0103f16f9b83ab6a7dc55a46b0b",
+  "failedPositionsNotRetried": [
+    "job-103",
+    "job-104"
+  ],
+  "frozenScoringChanged": false,
+  "goalComplete": false,
+  "promotionEstablished": false
+}

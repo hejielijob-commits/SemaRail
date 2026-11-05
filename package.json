@@ -18,12 +18,15 @@
     "acceptance:core": "pnpm --filter @hejielijob/semarail-core test",
     "acceptance:postgres": "pwsh -NoLogo -NoProfile -File scripts/acceptance-postgres.ps1",
     "acceptance:control-postgres": "pwsh -NoLogo -NoProfile -File scripts/acceptance-control-postgres.ps1",
+    "acceptance:business-trust-postgres": "pwsh -NoLogo -NoProfile -File scripts/acceptance-business-trust-postgres.ps1",
     "evaluate:golden": "pwsh -NoLogo -NoProfile -File scripts/evaluate-golden.ps1",
     "benchmark:hr:prepare": "pwsh -NoLogo -NoProfile -File scripts/hr-benchmark.ps1 prepare",
     "benchmark:hr": "pwsh -NoLogo -NoProfile -File scripts/hr-benchmark.ps1 run",
     "benchmark:hr:evaluate": "pwsh -NoLogo -NoProfile -File scripts/hr-benchmark.ps1 evaluate",
     "benchmark:hr:clean": "pwsh -NoLogo -NoProfile -File scripts/hr-benchmark.ps1 clean",
     "test:hr-benchmark": "pwsh -NoLogo -NoProfile -File scripts/hr-benchmark.ps1 test",
+    "benchmark:business-trust": "node scripts/business-trust-v1.mjs",
+    "test:business-trust": "node scripts/business-trust-v1.mjs test",
     "probe:sidecar": "node scripts/probe-sidecar.mjs",
     "package:core": "node scripts/package-distribution.mjs"
   }

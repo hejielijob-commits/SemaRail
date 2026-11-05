@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { test } from 'node:test'
 import { resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
 
 const cli = resolve(import.meta.dirname, '..', 'bin', 'semarail.mjs')
 
@@ -14,7 +15,8 @@ test('CLI exposes branded help and version', () => {
   assert.match(help.stdout, /semarail mcp bridge/)
   assert.match(help.stdout, /semarail auth login --provider/)
   const version = spawnSync(process.execPath, [cli, '--version'], { encoding: 'utf8' })
-  assert.equal(version.stdout.trim(), '0.1.0-alpha.4')
+  const manifest = JSON.parse(readFileSync(resolve(import.meta.dirname, '..', 'package.json'), 'utf8'))
+  assert.equal(version.stdout.trim(), manifest.version)
 })
 
 test('employee auth commands fail closed without configuration or session data', () => {

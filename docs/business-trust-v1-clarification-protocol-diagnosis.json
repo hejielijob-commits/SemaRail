@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-20T15:16:52.502575+00:00",
+  "status": "shared_protocol_corrected_offline_verified_real_mcp_preacceptance_pending",
+  "finding": "The old shared prompt requested a published condition key for coordinator clarification, while the coordinator matched only private corpus conversation topics. These identifiers were conflated.",
+  "frozenCorpusSha256": "89b1b8c97d326e914db21ab259558907731c927a2df7be3574b0537b030b4f9d",
+  "corpusAndScoringUnchanged": true,
+  "historicalObservations": [
+    {
+      "jobId": "job-047",
+      "questionId": "BTV-18",
+      "recordSha256": "c2b1b81acaafbd773a4bb6c6f896735aa52c14c1f7a6be6f300e1d007fc933d1",
+      "publicPromptSha256": "da1d99252539f4cbae183403b45acff459fa5e6a529b7b9f4b53e42266dbe588",
+      "configuredConversationKeys": [
+        "timeRange"
+      ],
+      "publishedCanonicalConditionKeys": [
+        "effectiveDateRange"
+      ],
+      "requestedKeys": [
+        "snapshot_basis"
+      ],
+      "matched": [
+        false
+      ],
+      "contextToolCalled": true
+    },
+    {
+      "jobId": "job-048",
+      "questionId": "BTV-18",
+      "recordSha256": "a4358b7ebca7f9b33eebaee573ad0eb511208920f8187bbbe152921b98f2c40d",
+      "publicPromptSha256": "af9e87f1190ea49812ad378d748ffe278e13a23236d0815e919236acf7dd41ba",
+      "configuredConversationKeys": [
+        "timeRange"
+      ],
+      "publishedCanonicalConditionKeys": [
+        "effectiveDateRange"
+      ],
+      "requestedKeys": [
+        "snapshot_basis"
+      ],
+      "matched": [
+        false
+      ],
+      "contextToolCalled": false
+    },
+    {
+      "jobId": "job-051",
+      "questionId": "BTV-29",
+      "recordSha256": "ff6fdf3996320d2e6e8c7d13c2d0b1992d065de5231b020ca2877feace1bc049",
+      "publicPromptSha256": "0fe2fe433ebabc7f222a19799cc8f8dedbb5e8fd6daabaa51b86d4def891545b",
+      "configuredConversationKeys": [
+        "timeRange"
+      ],
+      "publishedCanonicalConditionKeys": [
+        "reviewPeriod"
+      ],
+      "requestedKeys": [
+        "review_period"
+      ],
+      "matched": [
+        false
+      ],
+      "contextToolCalled": false
+    },
+    {
+      "jobId": "job-052",
+      "questionId": "BTV-29",
+      "recordSha256": "7c6b7f1b7d4888c6f5e00f643936fd6a6f4ca99f0f198729c6af40dff13cc728",
+      "publicPromptSha256": "e5694a0eda512d1366b3d64cf542084d34293559333df4ea03d85d000476099a",
+      "configuredConversationKeys": [
+        "timeRange"
+      ],
+      "publishedCanonicalConditionKeys": [
+        "reviewPeriod"
+      ],
+      "requestedKeys": [
+        "review_period"
+      ],
+      "matched": [
+        false
+      ],
+      "contextToolCalled": false
+    }
+  ],
+  "correction": {
+    "publicVersionedContract": "clarificationProtocol schemaVersion 1",
+    "sameForAllGroupsAndQuestions": true,
+    "conversationTopics": [
+      "timeRange",
+      "granularity"
+    ],
+    "corePreparationKeys": "Published rule text or query.prepare clarifications[].conditionKey",
+    "unadvertisedCorpusTopicsRejectedBeforeFreeze": true,
+    "arbitraryClarificationKeysStillUnmatched": true,
+    "coreContextSchemaChanged": false,
+    "privateAnswersOrCanonicalValuesAddedToPublicContract": false
+  },
+  "validation": {
+    "focusedProtocolTests": 4,
+    "allPublicBeginCombinationsChecked": 60,
+    "harnessTestsRun": 111,
+    "skipped": 1,
+    "targetedGroupedConfirmationMcpProbesAdded": 4,
+    "executionBoundaryMcpProbes": 7,
+    "newPreacceptanceChecks": 21
+  },
+  "currentSourceHashes": {
+    "benchmarks/business-trust-v1/experiment.py": "7b636e4c5f7711c4dcb1abcc5543f65a24be87ec93b3f3ffd2ec1c9d1b8dff2f",
+    "benchmarks/business-trust-v1/worker-prompt.md": "c3445585a8de21c1870330f77343abc379a97af29f6991b6cea5a48fb9c31b72",
+    "benchmarks/business-trust-v1/tests/test_clarification_protocol.py": "4e324be1fc11f83b7f008208e505af09f656d93ea116238a308a8c4679689ba9",
+    "benchmarks/business-trust-v1/tests/test_benchmark_harness.py": "7e62244cdca35d336041358987cd04b1287fe0a887ef4112449b7aca4588c24a"
+  },
+  "logs": {
+    "clarification-protocol-red-v1.log": "a6941016ef74a261fbcd9d1baf2f5b343c97d5ab65cafbafee74ad626608d512",
+    "clarification-protocol-green-v1.log": "2e912a48ec25f4bf4ca78d136a7dea0f27599de3d7f014fe758ed0fa5a776500",
+    "clarification-protocol-green-v2.log": "6348d8f6ef2ec1d1f6540fc6d550f670cec0b68ef742ca5d128b387ba7f63628",
+    "harness-period-gate-v1.log": "6b53f96eae027d31ddeb91294b2145e38a4048b67fef1fe830cef625f1b2e8a3",
+    "harness-after-period-gate-v2.log": "8b956439291f9b8309a741485660842e94075c4edcb917958d22ba55a9ea1bd6"
+  },
+  "priorFailedTestAttempt": "green-v1 used the wrong test fixture method name; fixed test invokes the real Host.command and green-v2 passed.",
+  "historicalScoresChanged": false,
+  "newFrozenComparisonRequired": true,
+  "agentQualityImprovementClaimed": false,
+  "limitations": [
+    "This protocol defect does not prove the workers would otherwise have answered correctly. Original outcomes and content judgments remain retained.",
+    "Real authenticated MCP preacceptance is running separately; this record proves offline protocol routing and gate wiring only."
+  ]
+}
