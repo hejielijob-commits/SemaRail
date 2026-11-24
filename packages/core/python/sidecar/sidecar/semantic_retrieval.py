@@ -498,6 +498,7 @@ class HybridSearchResponse(Sequence[HybridSearchHit], Mapping[str, Any]):
     candidate_count: int = 0
     filtered_count: int = 0
     selected_count: int = 0
+    join_path_relationships: tuple[str, ...] = ()
 
     @property
     def results(self) -> tuple[HybridSearchHit, ...]:
@@ -1332,21 +1333,53 @@ class HybridSemanticRetriever:
             ),
         )
         max_score = ranking_scores[ordered[0].document.id] if ordered else 1.0
+        join_path: tuple[str, ...] = ()
+        seed_fields: tuple[str, ...] = ()
+        relationship_limit = min(limit, quota_map.get("relationship", limit))
+        schema_limit = quota_map.get("model", limit)
+        field_limit = min(limit, quota_map.get("column", limit))
+        if "graph" in enabled_channels and depth_limit > 0 and relationship_limit and min(schema_limit, field_limit) >= 2:
+            rule_fields = {
+                item_id for item_id, _ in _rank_scores(bound_columns, field_limit) if item_id in fused
+            }
+            seed_fields = self._join_seed_fields(fused.values(), rule_fields, field_limit)
+            anchors = tuple(dict.fromkeys(
+                _normalise(by_id[item_id].model or "") for item_id in seed_fields
+            ))
+            # Keep room for the fields already chosen before adding a path.
+            relationship_limit = min(relationship_limit, limit - len(rule_fields.union(seed_fields)))
+            join_path = self._join_path_relationships(
+                visible, anchors, depth_limit, relationship_limit, schema_limit,
+                ranking_scores, bound_relationships,
+            )
+        path_ids = set(join_path)
+        seed_field_ids = set(seed_fields) if join_path else set()
+        if join_path:
+            for item_id in join_path:
+                fused.setdefault(item_id, _Candidate(document=by_id[item_id], fused_score=0.0))
+            ordered = [fused[item_id] for item_id in join_path] + [
+                item for item in ordered if item.document.id not in path_ids
+            ]
         counts: Counter[str] = Counter()
         hits: list[HybridSearchHit] = []
         traces: list[RetrievalTrace] = []
-        # Reservation must never exceed either a kind quota or the total
-        # response limit.  Otherwise a small custom budget can reserve more
-        # records than it is able to emit and leave the response under-filled.
+        # Fit rule-bound records in the space left by the selected fields and joins.
+        reserved_by_kind = {"relationship": path_ids.copy(), "column": seed_field_ids.copy()}
         reservation_candidates: list[tuple[float, int, str, str]] = []
         for kind, scores in (
             ("relationship", bound_relationships),
             ("column", bound_columns),
         ):
+            reserved = reserved_by_kind[kind]
             kind_quota = quota_map.get(kind)
+            if kind_quota is not None:
+                kind_quota -= len(reserved)
             if kind_quota is not None and kind_quota <= 0:
                 continue
-            ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
+            ranked = sorted(
+                ((item_id, score) for item_id, score in scores.items() if item_id not in reserved),
+                key=lambda item: (-item[1], item[0]),
+            )
             if kind_quota is not None:
                 ranked = ranked[:kind_quota]
             reservation_candidates.extend(
@@ -1355,11 +1388,7 @@ class HybridSemanticRetriever:
                 if item_id in fused
             )
         reservation_candidates.sort(key=lambda item: (-item[0], item[1], item[3]))
-        reserved_by_kind: dict[str, set[str]] = {
-            "relationship": set(),
-            "column": set(),
-        }
-        for _, _, kind, item_id in reservation_candidates[:limit]:
+        for _, _, kind, item_id in reservation_candidates[:limit - len(path_ids) - len(seed_field_ids)]:
             reserved_by_kind[kind].add(item_id)
         for candidate in ordered:
             kind = candidate.document.kind
@@ -1379,10 +1408,16 @@ class HybridSemanticRetriever:
                 continue
             counts[kind] += 1
             reserved.discard(candidate.document.id)
-            relevance = ranking_scores[candidate.document.id] / max_score if max_score > 0 else 0.0
-            match_type = candidate.primary_type
+            relevance = ranking_scores.get(candidate.document.id, 0.0) / max_score if max_score > 0 else 0.0
+            on_join_path = candidate.document.id in path_ids
+            match_type = "graph" if on_join_path else candidate.primary_type
             reason = _candidate_reason(candidate, vector_reason)
-            if rerank:
+            retrieval_types = candidate.retrieval_types
+            if on_join_path:
+                reason = "joins models of selected fields through a declared relationship path"
+                if "graph" not in retrieval_types:
+                    retrieval_types += ("graph",)
+            elif rerank:
                 reason += " after deterministic lightweight reranking"
             hit = HybridSearchHit(
                 document=candidate.document,
@@ -1390,7 +1425,7 @@ class HybridSemanticRetriever:
                 rank=len(hits) + 1,
                 match_type=match_type,
                 reason=reason,
-                retrieval_types=candidate.retrieval_types,
+                retrieval_types=retrieval_types,
             )
             hits.append(hit)
             if trace:
@@ -1424,6 +1459,7 @@ class HybridSemanticRetriever:
             len(fused),
             filtered_count,
             len(hits),
+            join_path_relationships=join_path,
         )
 
     # Friendly aliases for callers that use retrieval terminology.
@@ -1738,6 +1774,98 @@ class HybridSemanticRetriever:
                 scores[neighbor] = max(scores.get(neighbor, 0.0), 1.0 / next_depth)
                 depths[neighbor] = min(depths.get(neighbor, next_depth), next_depth)
         return scores, depths
+
+    def _join_seed_fields(
+        self,
+        candidates: Iterable[_Candidate],
+        rule_fields: set[str],
+        limit: int,
+    ) -> tuple[str, ...]:
+        """Select direct field hits by RRF before resolving their models."""
+
+        scores: dict[str, float] = {}
+        for candidate in candidates:
+            document = candidate.document
+            if document.kind != "column" or not document.model:
+                continue
+            scores[document.id] = sum(
+                1.0 / (self.rrf_k + rank)
+                for rank in (candidate.exact_rank, candidate.lexical_rank, candidate.vector_rank)
+                if rank is not None
+            )
+        ranked = [item_id for item_id, _ in _rank_scores(scores, len(scores))]
+        available = limit - len(rule_fields)
+        unbound = [item_id for item_id in ranked if item_id not in rule_fields]
+        chosen = rule_fields.union(unbound[:available])
+        return tuple(item_id for item_id in ranked if item_id in chosen)
+
+    def _join_path_relationships(
+        self,
+        documents: Sequence[SemanticDocument],
+        anchors: Sequence[str],
+        depth_limit: int,
+        relationship_limit: int,
+        schema_limit: int,
+        ranking_scores: Mapping[str, float],
+        bound_relationships: Mapping[str, float],
+    ) -> tuple[str, ...]:
+        """Reserve complete, shortest declared paths between matched models."""
+
+        if len(anchors) < 2 or relationship_limit <= 0:
+            return ()
+        neighbors: dict[str, list[tuple[str, str]]] = {
+            _normalise(document.model or document.id.partition(":")[2]): []
+            for document in documents
+            if document.kind == "model"
+        }
+        for document in documents:
+            if document.kind != "relationship" or len(document.referencedModels) != 2:
+                continue
+            left, right = (_normalise(model) for model in document.referencedModels)
+            if left != right and left in neighbors and right in neighbors:
+                neighbors[left].append((right, document.id))
+                neighbors[right].append((left, document.id))
+        for edges in neighbors.values():
+            edges.sort(key=lambda edge: (
+                -bound_relationships.get(edge[1], 0.0), -ranking_scores.get(edge[1], 0.0), edge[1],
+            ))
+
+        selected: dict[str, None] = {}
+        components: dict[str, set[str]] = {}
+        for index, source in enumerate(anchors[:-1]):
+            if source not in neighbors:
+                continue
+            targets = anchors[index + 1:]
+            remaining = set(targets) - components.get(source, set())
+            paths: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {source: ((source,), ())}
+            queue = deque([source])
+            while queue and remaining:
+                current = queue.popleft()
+                models, edges = paths[current]
+                if len(edges) >= depth_limit:
+                    continue
+                for neighbor, edge in neighbors[current]:
+                    if neighbor not in paths:
+                        paths[neighbor] = ((*models, neighbor), (*edges, edge))
+                        queue.append(neighbor)
+                        remaining.discard(neighbor)
+            for target in targets:
+                if target not in paths or target in components.get(source, ()):
+                    continue
+                models, edges = paths[target]
+                if len(selected.keys() | set(edges)) > relationship_limit:
+                    continue
+                if len(components.keys() | set(models)) > schema_limit:
+                    continue
+                selected.update(dict.fromkeys(edges))
+                component = set(models)
+                for model in models:
+                    component.update(components.get(model, ()))
+                for model in component:
+                    components[model] = component
+                if len(selected) == relationship_limit:
+                    return tuple(selected)
+        return tuple(selected)
 
     def _partition_filename(self, revision: str) -> str:
         return f"partition-{_revision_key(revision)}.json"

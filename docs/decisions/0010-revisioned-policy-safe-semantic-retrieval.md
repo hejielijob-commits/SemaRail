@@ -41,11 +41,15 @@ Retrieval is hybrid and deterministic at its boundaries:
 2. exact technical and business-name matches;
 3. Unicode-aware lexical retrieval;
 4. optional multilingual vector retrieval;
-5. reciprocal-rank fusion and explicit rule binding;
-6. bounded relationship-graph expansion over the already-visible graph when
-   the query is classified as cross-model;
-7. repeat structural authorization filtering at the response boundary;
-8. per-kind quotas and a deterministic context budget.
+5. explicit rule binding and, for cross-model questions, bounded expansion over
+   the visible relationship graph;
+6. use reciprocal-rank fusion to rank direct field hits and apply the field
+   quota before deriving their owning models. Only direct hits seed the paths;
+7. reserve complete shortest JOIN paths between those models within the schema,
+   relationship, and total quotas. Path depth is measured in declared
+   relationships;
+8. fill the remaining slots by fused rank and apply structural authorization
+   filtering and deterministic Context budgets at the response boundary.
 
 The public result exposes the retrieval methods and bounded scores used to
 select a record, but never exposes raw embedding vectors, vector distances,

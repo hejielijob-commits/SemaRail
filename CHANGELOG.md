@@ -56,6 +56,9 @@ All notable user-visible changes to this project are documented here. The format
 
 ### Changed
 
+- Context v2 reserves complete authorized JOIN paths between models of the
+  selected fields ahead of ordinary fused relationship candidates.
+
 - Removed the deferred agent-specific adapter packages and their installation,
   replay, and packaging gates. Agent integrations now use the stable MCP
   boundary; future UI plugins belong in separate repositories.

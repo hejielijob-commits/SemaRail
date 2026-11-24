@@ -95,6 +95,59 @@ class WrenAdapterTests(unittest.TestCase):
         columns = {column["name"] for column in result["schema"]["models"][0]["columns"]}
         self.assertEqual(columns, {"employee_id", "review_date", "performance_score"})
 
+    def test_context_v2_keeps_bridge_models_and_join_columns_within_schema_budget(self) -> None:
+        manifest = {
+            "models": [
+                {"name": name, "columns": [{"name": column, "type": "BIGINT"} for column in columns]}
+                for name, columns in (
+                    ("archive", ("archive_key",)),
+                    ("staff", ("workforce", "staff_key")),
+                    ("bridge", ("staff_key", "org_key")),
+                    ("org", ("division", "org_key")),
+                )
+            ],
+            "relationships": [
+                {"name": "archive_staff", "models": ["archive", "staff"], "joinType": "MANY_TO_ONE",
+                 "condition": "archive.archive_key = staff.staff_key",
+                 "description": "Compare workforce and division"},
+                {"name": "staff_bridge", "models": ["staff", "bridge"], "joinType": "MANY_TO_ONE",
+                 "condition": "staff.staff_key = bridge.staff_key"},
+                {"name": "bridge_org", "models": ["bridge", "org"], "joinType": "MANY_TO_ONE",
+                 "condition": "bridge.org_key = org.org_key"},
+            ],
+        }
+        context = SimpleNamespace(build_json=lambda _: manifest)
+        with tempfile.TemporaryDirectory() as temp:
+            project = Path(temp)
+            (project / "wren_project.yml").write_text("name: demo\n", encoding="utf-8")
+            adapter = LazyWrenAdapter(
+                module_loader=lambda _: context,
+                version_provider=lambda: "0.13.2",
+                semantic_retriever=HybridSemanticRetriever(embedder=None),
+            )
+            response = Dispatcher(context_provider=adapter).dispatch({
+                "protocolVersion": "2", "id": "bridge", "method": "context.ask",
+                "params": {
+                    "projectDir": str(project), "question": "compare workforce and division",
+                    "contextVersion": 2, "budgets": {"topK": {"schema": 3, "relationships": 3}},
+                },
+                "traceId": "bridge",
+            })
+
+        self.assertTrue(response["ok"], response)
+        result = response["result"]
+        self.assertEqual({item["name"] for item in result["relationships"][:2]}, {
+            "staff_bridge", "bridge_org",
+        })
+        models = {
+            model["name"]: {column["name"] for column in model["columns"]}
+            for model in result["schema"]["models"]
+        }
+        self.assertEqual(set(models), {"staff", "bridge", "org"})
+        self.assertEqual(models["staff"], {"workforce", "staff_key"})
+        self.assertEqual(models["bridge"], {"staff_key", "org_key"})
+        self.assertEqual(models["org"], {"division", "org_key"})
+
     def test_v1_v2_shadow_logs_text_free_size_and_retrieval_comparison(self) -> None:
         manifest = {
             "models": [{"name": "employees", "columns": [{"name": "employee_id", "type": "BIGINT"}]}],

@@ -272,6 +272,115 @@ class HybridRetrievalTests(unittest.TestCase):
         self.assertIn("model:b", ids)
         self.assertNotEqual(ids[0], "column:b.id")
 
+    def test_declared_join_path_wins_over_multichannel_relationship(self) -> None:
+        documents = [
+            SemanticDocument("model:staff", "model", "r1", model="staff"),
+            SemanticDocument("model:org", "model", "r1", model="org"),
+            SemanticDocument("model:archive", "model", "r1", model="archive", text="historical data"),
+            SemanticDocument("column:staff.worker", "column", "r1", model="staff", field="worker", text="employee"),
+            SemanticDocument("column:org.unit", "column", "r1", model="org", field="unit", text="department"),
+            SemanticDocument(
+                "relationship:approved", "relationship", "r1",
+                text="approved key", referencedModels=("staff", "org"),
+            ),
+            SemanticDocument(
+                "relationship:archive", "relationship", "r1",
+                text="compare employee department", referencedModels=("staff", "archive"),
+            ),
+        ]
+        index = HybridSemanticRetriever(embedder=DeterministicEmbedder(), vector_top_k=2)
+        index.build(documents, revision="r1")
+        index.activate("r1")
+        query = "compare employee department"
+        quotas = {"model": 2, "column": 2, "relationship": 1}
+        base_channels = ("exact", "lexical", "vector")
+
+        direct = index.search(query, limit=5, quotas=quotas, channels=base_channels)
+        related = index.search(query, limit=5, quotas=quotas, channels=(*base_channels, "graph"))
+
+        distractor = next(hit for hit in direct if hit.document.kind == "relationship")
+        self.assertEqual(distractor.document.id, "relationship:archive")
+        self.assertEqual(distractor.retrieval_types, ("lexical", "vector"))
+        self.assertEqual(related.join_path_relationships, ("relationship:approved",))
+        self.assertEqual(related[0].document.id, "relationship:approved")
+        self.assertEqual(related[0].retrieval_types, ("graph",))
+        self.assertEqual(related.trace[0].reason_code, "graphExpansion")
+        self.assertEqual(len(related), 5)
+        self.assertEqual({hit.document.id for hit in related if hit.document.kind == "column"}, {
+            "column:staff.worker", "column:org.unit",
+        })
+
+    def test_bridge_path_requires_visible_edges_and_room_for_every_join_and_model(self) -> None:
+        documents = [
+            SemanticDocument("model:staff", "model", "r1", model="staff"),
+            SemanticDocument("model:org", "model", "r1", model="org"),
+            SemanticDocument("model:bridge", "model", "r1", model="bridge", text="mapping"),
+            SemanticDocument("column:staff.staff_key", "column", "r1", model="staff", text="workforce"),
+            SemanticDocument("column:org.org_key", "column", "r1", model="org", text="division"),
+            SemanticDocument("column:bridge.mapping", "column", "r1", model="bridge", text="mapping key"),
+            SemanticDocument(
+                "relationship:staff_bridge", "relationship", "r1", referencedModels=("staff", "bridge"),
+                referencedColumns=("staff.staff_key", "bridge.mapping"),
+            ),
+            SemanticDocument(
+                "relationship:bridge_org", "relationship", "r1", referencedModels=("bridge", "org"),
+                referencedColumns=("bridge.mapping", "org.org_key"),
+            ),
+        ]
+        index = HybridSemanticRetriever()
+        index.build(documents, revision="r1")
+        index.activate("r1")
+        query = "compare workforce with division"
+        channels = ("lexical", "graph")
+        quotas = {"model": 3, "column": 3, "relationship": 2}
+        result = index.search(query, limit=8, channels=channels, relationship_depth=2, quotas=quotas)
+
+        self.assertEqual(set(result.join_path_relationships), {
+            "relationship:staff_bridge", "relationship:bridge_org",
+        })
+        self.assertEqual(tuple(hit.document.id for hit in result[:2]), result.join_path_relationships)
+        for options in (
+            {"relationship_depth": 1},
+            {"quotas": {**quotas, "relationship": 1}},
+            {"quotas": {**quotas, "model": 2}},
+            {"limit": 1},
+            {"visibility_filter": lambda doc: doc.id != "relationship:bridge_org"},
+            {"visibility_filter": lambda doc: doc.id != "model:bridge"},
+        ):
+            with self.subTest(options=options):
+                search_options = {"limit": 8, "relationship_depth": 2, "quotas": quotas, **options}
+                limited = index.search(query, channels=channels, **search_options)
+                self.assertEqual(limited.join_path_relationships, ())
+
+    def test_field_quota_applies_before_deduplicating_join_models(self) -> None:
+        question = "compare workforce with division"
+        documents = [
+            SemanticDocument("model:staff", "model", "r1", model="staff"),
+            SemanticDocument("model:org", "model", "r1", model="org", text="division"),
+            SemanticDocument(
+                "column:staff.staff_key", "column", "r1", model="staff", text=question,
+            ),
+            SemanticDocument(
+                "column:staff.staff_grade", "column", "r1", model="staff", text=question,
+            ),
+            SemanticDocument("column:org.org_key", "column", "r1", model="org", text="division"),
+            SemanticDocument(
+                "relationship:staff_org", "relationship", "r1", referencedModels=("staff", "org"),
+            ),
+        ]
+        index = HybridSemanticRetriever()
+        index.build(documents, revision="r1")
+        index.activate("r1")
+        search_options = {"limit": 6, "channels": ("lexical", "graph")}
+        quotas = {"model": 2, "relationship": 1}
+
+        narrow = index.search(question, quotas={**quotas, "column": 2}, **search_options)
+        wide = index.search(question, quotas={**quotas, "column": 3}, **search_options)
+
+        self.assertEqual(narrow.join_path_relationships, ())
+        self.assertEqual(wide.join_path_relationships, ("relationship:staff_org",))
+        self.assertIn("column:org.org_key", {hit.document.id for hit in wide})
+
     def test_persistent_revision_pointer_and_mismatch_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             index = HybridSemanticRetriever(
