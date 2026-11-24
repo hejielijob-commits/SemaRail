@@ -14,17 +14,18 @@ replay verification, see [Codex desktop Trace v1](docs/trace-v1.md).
 
 SemaRail is agent-neutral. Any MCP-capable client can use its semantic tools through the authenticated HTTP endpoint or stdio bridge.
 
-> **Status:** Alpha. APIs, configuration, and storage formats may change before the first stable release. The Core tarball can be built from source; npm and PyPI packages are not published yet.
+> **Status:** Alpha. APIs, configuration, and storage formats may change before the first stable release. The current Core tarball is built from the checkout you intend to run.
 
 ![SemaRail Semantic Console overview](docs/images/semantic-console-overview.png)
 
 ## Features
 
 - **Visual semantic modeling** — import database schemas and manage models, fields, relationships, views, cubes, business rules, and reviewed SQL knowledge.
+- **Bounded semantic retrieval** — opt into Context v2 for hybrid search over the published project and prioritized JOIN paths for cross-model questions.
 - **Agent-neutral MCP tools** — expose semantic context and governed queries through authenticated Streamable HTTP, with an authenticated stdio bridge for clients that require it.
 - **Governed data access** — resolve every request to a current Subject and policy, parse generated PostgreSQL with `sqlglot`, enforce table/column/row rules and physical-object allowlists, and apply read-only, timeout, row, byte, and concurrency limits.
 - **Bounded Agent results** — return small query results inline, but turn larger results into a short-lived CSV download with only a 20-row preview in the Agent context.
-- **Enterprise identity and policy** — use revocable service-account keys or DingTalk/OIDC employee sessions, change permissions without reinstalling Agents, and audit decisions without storing SQL, result rows, or secrets.
+- **Enterprise identity and policy** — use revocable service-account keys or DingTalk/OIDC employee sessions, change permissions without reinstalling Agents, and record authorization decisions as metadata.
 - **Common database metadata** — test connections, browse schemas, and import models from PostgreSQL, MySQL, SQLite, ClickHouse, and DuckDB.
 - **Versioned semantic projects** — validate drafts, inspect generated source and diffs, publish revisions, and roll back changes.
 - **Bilingual metadata** — maintain English and Simplified Chinese display names without changing stable technical identifiers.
@@ -170,17 +171,24 @@ see [CHANGELOG.md](CHANGELOG.md).
 
 Requirements:
 
+- Git and a SemaRail checkout
 - Node.js `^22.19.0 || >=24`
+- pnpm `11.x`
 - Python `>=3.11`
 
-Until the package is published, build the local Core tarball from the repository:
+Run the following commands from the repository root to build and install the
+tarball for the checked-out Core version.
 
 ```powershell
-pnpm install
+pnpm install --frozen-lockfile
 pnpm package:core
-npm install --global .\dist\hejielijob-semarail-core-0.1.0-alpha.4.tgz
+$core = Get-Content .\packages\core\package.json -Raw | ConvertFrom-Json
+$tarball = Join-Path .\dist ("{0}-{1}.tgz" -f $core.name.TrimStart('@').Replace('/', '-'), $core.version)
+npm install --global $tarball
 $env:SEMARAIL_API_TOKEN = semarail token create
-semarail start --project C:\path\to\semantic-project
+$projectDir = (Resolve-Path .\examples\wren-postgres).Path
+$stateDir = Join-Path $env:LOCALAPPDATA "semarail\semantic-console\sales-demo"
+semarail start --project $projectDir --state-dir $stateDir
 ```
 
 The Core process owns the semantic project, database credentials, execution limits, Semantic Console, and MCP servers. Open [http://127.0.0.1:48763](http://127.0.0.1:48763) after it starts. Keep `SEMARAIL_API_TOKEN` private: it is the local bootstrap-administrator credential used to create narrower, revocable service-account keys.
@@ -198,38 +206,14 @@ Requirements:
 ```powershell
 git clone https://github.com/hejielijob-commits/SemaRail.git
 cd SemaRail
-pnpm install
+pnpm install --frozen-lockfile
 pnpm build
 ```
-
-For a larger, reproducible local validation against 100,000 synthetic employees and five authorization roles, see the [HR enterprise benchmark](benchmarks/hr-enterprise/README.md). It runs separately from CI and requires Docker.
-
-### HR enterprise benchmark: overview and results
-
-The benchmark contains 60 fixed questions drawn from enterprise HR scenarios,
-built on a reproducible dataset of 100,000 employees and 1.9 million PostgreSQL
-rows. It includes 30 basic reporting questions, 15 cross-model analytical
-questions, and 15 authorization-boundary questions in Chinese and English across
-five enterprise roles. Together, they validate the MDL models, relationships,
-metric rules, SQL knowledge, semantic planning, governed execution, and access
-control. **All 60 questions passed.**
-
-The checked-in semantic layer and evaluation evidence include:
-
-- [Wren MDL project](benchmarks/hr-enterprise/project/wren_project.yml)
-- [six semantic model definitions](benchmarks/hr-enterprise/project/models/)
-- [model relationships](benchmarks/hr-enterprise/project/relationships.yml)
-- [HR metric and authorization rules](benchmarks/hr-enterprise/project/knowledge/rules/hr-metrics.md)
-- [SQL knowledge examples](benchmarks/hr-enterprise/project/knowledge/sql/)
-- [PostgreSQL schema](benchmarks/hr-enterprise/sql/001_schema.sql)
-- [60 evaluation cases](benchmarks/hr-enterprise/golden-questions.json)
-- [evaluation process and results](benchmarks/hr-enterprise/EVALUATION_REPORT.md)
-- [machine-readable result summary](benchmarks/hr-enterprise/results/evaluation-summary.json)
 
 Create the Python environment and install the semantic runtime, MCP servers, Console, governed PostgreSQL query driver, and Console metadata drivers:
 
 ```powershell
-py -3.11 -m venv .venv
+python -m venv .venv
 & .\.venv\Scripts\python.exe -m pip install `
   -e ".\python\sidecar[wren,mcp]" `
   -e ".\apps\semantic-console[wren]"
@@ -249,6 +233,27 @@ $stateDir = Join-Path $env:LOCALAPPDATA "semarail\semantic-console\sales-demo"
 
 Open [http://127.0.0.1:48763](http://127.0.0.1:48763). The server binds to loopback by default.
 
+### HR enterprise benchmark
+
+The optional Docker benchmark uses 100,000 synthetic employees, 1.9 million
+PostgreSQL rows, and 60 fixed Chinese and English questions across five roles.
+The recorded deterministic SQL regression passed 60/60. The historical blind
+model run scored 51/60 on its optimized first pass and 60/60 after corrections to
+the evaluation of those same answers. Context v2 retrieval has a separate
+benchmark. See the [benchmark setup](benchmarks/hr-enterprise/README.md),
+[evaluation report](benchmarks/hr-enterprise/EVALUATION_REPORT.md), and
+[versioned result summary](benchmarks/hr-enterprise/results/evaluation-summary.json).
+
+The benchmark's inputs are checked in alongside the report.
+
+- [Wren MDL project](benchmarks/hr-enterprise/project/wren_project.yml)
+- [Six semantic model definitions](benchmarks/hr-enterprise/project/models/)
+- [Model relationships](benchmarks/hr-enterprise/project/relationships.yml)
+- [HR metric and authorization rules](benchmarks/hr-enterprise/project/knowledge/rules/hr-metrics.md)
+- [SQL knowledge examples](benchmarks/hr-enterprise/project/knowledge/sql/)
+- [PostgreSQL schema](benchmarks/hr-enterprise/sql/001_schema.sql)
+- [60 evaluation cases](benchmarks/hr-enterprise/golden-questions.json)
+
 ## Use SemaRail with MCP agents
 
 The default multi-user integration is SemaRail's authenticated Streamable HTTP
@@ -264,22 +269,51 @@ MCP endpoint. It exposes the same seven stable tools to any MCP-capable Agent:
 
 ![SemaRail MCP integration](docs/images/mcp-integration.png)
 
+### Retrieve semantic context
+
+Call `semarail_get_context` with `context_version: 2` for budgeted context from
+the authorized, published project. Omitting the version uses Context v1.
+Context v2 combines exact matching, BM25, optional multilingual embeddings,
+and structured rule binding. For questions classified as cross-model, it
+prioritizes complete JOIN paths between directly matched models, within the
+relationship depth and schema budgets. Matching model or column text can
+establish a path endpoint. Ordinary relationship candidates still compete
+for remaining slots by their fused rank.
+
+Use these tool arguments to request Context v2 with a retrieval trace.
+
+```json
+{
+  "question": "Compare employees across departments",
+  "context_version": 2,
+  "budgets": { "topK": { "relationships": 4 }, "maxRelationshipDepth": 2 },
+  "include_retrieval_trace": true
+}
+```
+
+The Console relationship graph is where you maintain the JOIN definitions that
+this lookup uses. See the [Context v2 retrieval design](docs/decisions/0010-revisioned-policy-safe-semantic-retrieval.md).
+
 ### Start authenticated MCP
 
 Start the MCP endpoint against the same project and state directory as Core:
 
 ```powershell
 $env:SEMARAIL_API_TOKEN = "<local bootstrap token>"
+$projectDir = (Resolve-Path .\examples\wren-postgres).Path
+$stateDir = Join-Path $env:LOCALAPPDATA "semarail\semantic-console\sales-demo"
 semarail mcp serve `
-  --project C:\path\to\semantic-project `
-  --state-dir C:\path\to\semarail-state
+  --project $projectDir `
+  --state-dir $stateDir
 ```
 
 The endpoint is `http://127.0.0.1:48764/mcp`. The bootstrap token initializes
 the shared control-plane store but is rejected by remote MCP. In **Access
 control**, create a service account, assign trusted attributes, bind a
-project/datasource/table/column/row policy, and issue a one-time key. Configure
-that managed key in the Agent's private environment or secret manager:
+project/datasource/table/column/row policy, and issue a one-time key. Store
+that managed key as `SEMARAIL_TOKEN` in the Agent's private environment or
+secret manager. This example assumes your MCP client supports
+environment-variable interpolation in HTTP headers.
 
 ```json
 {
@@ -408,7 +442,11 @@ All model-generated SQL is treated as untrusted input.
 
 ## Development
 
+Install the workspace and Python test extras using the
+[contributor setup](CONTRIBUTING.md#development-setup) before running the checks.
+
 ```powershell
+pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build

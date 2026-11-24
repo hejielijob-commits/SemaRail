@@ -3,11 +3,15 @@
 Standalone SemaRail Core distribution. It contains the local Semantic Console,
 semantic runtime, MCP servers, and governed-query policy boundary.
 
-This alpha package is currently built from the SemaRail repository:
+Build this alpha package from the root of the SemaRail checkout. The package
+manifest supplies the tarball version.
 
 ```powershell
+pnpm install --frozen-lockfile
 pnpm package:core
-npm install --global .\dist\hejielijob-semarail-core-0.1.0-alpha.4.tgz
+$core = Get-Content .\packages\core\package.json -Raw | ConvertFrom-Json
+$tarball = Join-Path .\dist ("{0}-{1}.tgz" -f $core.name.TrimStart('@').Replace('/', '-'), $core.version)
+npm install --global $tarball
 $env:SEMARAIL_API_TOKEN = semarail token create
 $env:SEMARAIL_DATABASE_URL = "postgresql://readonly_user:password@localhost:5432/database"
 semarail start --project C:\path\to\semantic-project
