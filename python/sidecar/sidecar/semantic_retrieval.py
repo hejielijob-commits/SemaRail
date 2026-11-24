@@ -1334,15 +1334,26 @@ class HybridSemanticRetriever:
         )
         max_score = ranking_scores[ordered[0].document.id] if ordered else 1.0
         join_path: tuple[str, ...] = ()
+        seed_fields: tuple[str, ...] = ()
         relationship_limit = min(limit, quota_map.get("relationship", limit))
         schema_limit = quota_map.get("model", limit)
-        if "graph" in enabled_channels and depth_limit > 0 and relationship_limit and schema_limit >= 2:
-            anchors = self._join_model_anchors(fused.values(), quota_map, min(seed_limit, schema_limit))
+        field_limit = min(limit, quota_map.get("column", limit))
+        if "graph" in enabled_channels and depth_limit > 0 and relationship_limit and min(schema_limit, field_limit) >= 2:
+            rule_fields = {
+                item_id for item_id, _ in _rank_scores(bound_columns, field_limit) if item_id in fused
+            }
+            seed_fields = self._join_seed_fields(fused.values(), rule_fields, field_limit)
+            anchors = tuple(dict.fromkeys(
+                _normalise(by_id[item_id].model or "") for item_id in seed_fields
+            ))
+            # Keep room for the fields already chosen before adding a path.
+            relationship_limit = min(relationship_limit, limit - len(rule_fields.union(seed_fields)))
             join_path = self._join_path_relationships(
                 visible, anchors, depth_limit, relationship_limit, schema_limit,
                 ranking_scores, bound_relationships,
             )
         path_ids = set(join_path)
+        seed_field_ids = set(seed_fields) if join_path else set()
         if join_path:
             for item_id in join_path:
                 fused.setdefault(item_id, _Candidate(document=by_id[item_id], fused_score=0.0))
@@ -1352,21 +1363,21 @@ class HybridSemanticRetriever:
         counts: Counter[str] = Counter()
         hits: list[HybridSearchHit] = []
         traces: list[RetrievalTrace] = []
-        # Reservation must never exceed either a kind quota or the total
-        # response limit.  Otherwise a small custom budget can reserve more
-        # records than it is able to emit and leave the response under-filled.
+        # Fit rule-bound records in the space left by the selected fields and joins.
+        reserved_by_kind = {"relationship": path_ids.copy(), "column": seed_field_ids.copy()}
         reservation_candidates: list[tuple[float, int, str, str]] = []
         for kind, scores in (
             ("relationship", bound_relationships),
             ("column", bound_columns),
         ):
+            reserved = reserved_by_kind[kind]
             kind_quota = quota_map.get(kind)
-            if kind == "relationship" and kind_quota is not None:
-                kind_quota -= len(join_path)
+            if kind_quota is not None:
+                kind_quota -= len(reserved)
             if kind_quota is not None and kind_quota <= 0:
                 continue
             ranked = sorted(
-                ((item_id, score) for item_id, score in scores.items() if item_id not in path_ids),
+                ((item_id, score) for item_id, score in scores.items() if item_id not in reserved),
                 key=lambda item: (-item[1], item[0]),
             )
             if kind_quota is not None:
@@ -1377,11 +1388,7 @@ class HybridSemanticRetriever:
                 if item_id in fused
             )
         reservation_candidates.sort(key=lambda item: (-item[0], item[1], item[3]))
-        reserved_by_kind: dict[str, set[str]] = {
-            "relationship": set(path_ids),
-            "column": set(),
-        }
-        for _, _, kind, item_id in reservation_candidates[:limit - len(join_path)]:
+        for _, _, kind, item_id in reservation_candidates[:limit - len(path_ids) - len(seed_field_ids)]:
             reserved_by_kind[kind].add(item_id)
         for candidate in ordered:
             kind = candidate.document.kind
@@ -1407,7 +1414,7 @@ class HybridSemanticRetriever:
             reason = _candidate_reason(candidate, vector_reason)
             retrieval_types = candidate.retrieval_types
             if on_join_path:
-                reason = "joins independently matched models through a declared relationship path"
+                reason = "joins models of selected fields through a declared relationship path"
                 if "graph" not in retrieval_types:
                     retrieval_types += ("graph",)
             elif rerank:
@@ -1768,32 +1775,29 @@ class HybridSemanticRetriever:
                 depths[neighbor] = min(depths.get(neighbor, next_depth), next_depth)
         return scores, depths
 
-    def _join_model_anchors(
+    def _join_seed_fields(
         self,
         candidates: Iterable[_Candidate],
-        quotas: Mapping[str, int],
+        rule_fields: set[str],
         limit: int,
     ) -> tuple[str, ...]:
-        """Rank directly matched schema without votes from graph neighbors."""
+        """Select direct field hits by RRF before resolving their models."""
 
         scores: dict[str, float] = {}
         for candidate in candidates:
             document = candidate.document
-            if document.kind not in {"model", "column"} or quotas.get(document.kind, 1) == 0:
+            if document.kind != "column" or not document.model:
                 continue
-            # Vector retrieval can rank every schema item with positive similarity.
-            # Require a text match before a model can trigger a reserved join.
-            if candidate.exact_rank is None and candidate.lexical_rank is None:
-                continue
-            model = _normalise(document.model or document.id.partition(":")[2].split(".", 1)[0])
-            if model:
-                score = sum(
-                    1.0 / (self.rrf_k + rank)
-                    for rank in (candidate.exact_rank, candidate.lexical_rank, candidate.vector_rank)
-                    if rank is not None
-                )
-                scores[model] = max(scores.get(model, 0.0), score)
-        return tuple(model for model, _ in _rank_scores(scores, limit))
+            scores[document.id] = sum(
+                1.0 / (self.rrf_k + rank)
+                for rank in (candidate.exact_rank, candidate.lexical_rank, candidate.vector_rank)
+                if rank is not None
+            )
+        ranked = [item_id for item_id, _ in _rank_scores(scores, len(scores))]
+        available = limit - len(rule_fields)
+        unbound = [item_id for item_id in ranked if item_id not in rule_fields]
+        chosen = rule_fields.union(unbound[:available])
+        return tuple(item_id for item_id in ranked if item_id in chosen)
 
     def _join_path_relationships(
         self,
@@ -1807,7 +1811,7 @@ class HybridSemanticRetriever:
     ) -> tuple[str, ...]:
         """Reserve complete, shortest declared paths between matched models."""
 
-        if len(anchors) < 2:
+        if len(anchors) < 2 or relationship_limit <= 0:
             return ()
         neighbors: dict[str, list[tuple[str, str]]] = {
             _normalise(document.model or document.id.partition(":")[2]): []

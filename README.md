@@ -274,11 +274,12 @@ MCP endpoint. It exposes the same seven stable tools to any MCP-capable Agent:
 Call `semarail_get_context` with `context_version: 2` for budgeted context from
 the authorized, published project. Omitting the version uses Context v1.
 Context v2 combines exact matching, BM25, optional multilingual embeddings,
-and structured rule binding. For questions classified as cross-model, it
-prioritizes complete JOIN paths between directly matched models, within the
-relationship depth and schema budgets. Matching model or column text can
-establish a path endpoint. Ordinary relationship candidates still compete
-for remaining slots by their fused rank.
+and structured rule binding. For questions classified as cross-model, it first
+ranks independently retrieved fields with reciprocal rank fusion and applies the
+field quota. It then finds complete JOIN paths between the models of those
+selected fields, within the depth and context budgets. Columns added by the
+graph cannot create new path endpoints. Ordinary relationships compete for
+remaining slots by their fused rank.
 
 Use these tool arguments to request Context v2 with a retrieval trace.
 

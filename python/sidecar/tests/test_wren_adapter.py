@@ -144,9 +144,9 @@ class WrenAdapterTests(unittest.TestCase):
             for model in result["schema"]["models"]
         }
         self.assertEqual(set(models), {"staff", "bridge", "org"})
-        self.assertIn("staff_key", models["staff"])
+        self.assertEqual(models["staff"], {"workforce", "staff_key"})
         self.assertEqual(models["bridge"], {"staff_key", "org_key"})
-        self.assertIn("org_key", models["org"])
+        self.assertEqual(models["org"], {"division", "org_key"})
 
     def test_v1_v2_shadow_logs_text_free_size_and_retrieval_comparison(self) -> None:
         manifest = {
