@@ -598,6 +598,20 @@ class LazyWrenAdapter:
             relationship for relationship in _semantic_relationships(manifest, project_path)
             if f"relationship:{relationship.get('name')}" in selected_ids
         ]
+        join_path = getattr(result, "join_path_relationships", ())
+        if join_path:
+            paths = set(join_path)
+            hit_order = {document.id: index for index, document in enumerate(selected)}
+            relationships.sort(key=lambda item: hit_order[f"relationship:{item['name']}"])
+            path_models = {
+                model
+                for relationship in relationships
+                if f"relationship:{relationship['name']}" in paths
+                for model in relationship["models"]
+            }
+            # The final Context budget trims the tail of the schema and
+            # relationship sections. Keep the models needed by reserved joins first.
+            models.sort(key=lambda item: item["name"] not in path_models)
         views_by_name = {item.get("name"): item for item in _semantic_views(manifest, project_path)}
         metrics: list[dict[str, Any]] = []
         rules: list[dict[str, Any]] = []
